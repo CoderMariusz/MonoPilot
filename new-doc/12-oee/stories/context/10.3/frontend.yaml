@@ -1,0 +1,71 @@
+# Story 10.3 - Frontend Specification
+# Downtime Event Tracking
+
+types:
+  - path: "apps/frontend/lib/types/downtime-event.ts"
+    exports: ["DowntimeEvent", "DowntimeSeverity", "CreateDowntimeEventInput", "UpdateDowntimeEventInput"]
+
+components:
+  - path: "apps/frontend/components/oee/downtime/DowntimeEventsDataTable.tsx"
+    description: "DataTable for downtime events with active events highlighting"
+    columns: ["Machine", "Reason", "Start Time", "Duration", "Severity", "Type", "Status", "Actions"]
+
+  - path: "apps/frontend/components/oee/downtime/DowntimeFormModal.tsx"
+    description: "Modal to log new downtime event"
+    form_fields:
+      - { name: "machine_id", type: "select", required: true }
+      - { name: "reason_code_id", type: "select", required: true, grouped_by: "category" }
+      - { name: "start_time", type: "datetime", default: "now" }
+      - { name: "notes", type: "textarea", maxlength: 500 }
+
+  - path: "apps/frontend/components/oee/downtime/ActiveDowntimePanel.tsx"
+    description: "Real-time panel showing active downtime events"
+    features:
+      - "Auto-refresh every 30s"
+      - "Live duration counter"
+      - "Quick 'End Downtime' button"
+      - "Severity color coding"
+
+  - path: "apps/frontend/components/oee/downtime/SeverityBadge.tsx"
+    description: "Badge showing downtime severity"
+    variants:
+      - { severity: "minor", color: "yellow", label: "Minor (<5min)" }
+      - { severity: "moderate", color: "orange", label: "Moderate (5-15min)" }
+      - { severity: "major", color: "red", label: "Major (>15min)" }
+
+pages:
+  - path: "apps/frontend/app/(authenticated)/oee/downtime/page.tsx"
+    route: "/oee/downtime"
+    title: "Downtime Management"
+    layout: "Split view - Active Events (sidebar) + Events Log (main)"
+    components: ["ActiveDowntimePanel", "DowntimeEventsDataTable", "DowntimeFormModal"]
+    actions:
+      - { label: "+ Log Downtime", onClick: "openLogModal()", role: ["operator", "supervisor", "production_manager", "admin"] }
+
+hooks:
+  - name: "useDowntimeEvents"
+    type: "query"
+    queryKey: "['downtime-events', filters]"
+    refetchInterval: 30000
+  - name: "useActiveDowntimeEvents"
+    type: "query"
+    queryKey: "['downtime-events', 'active']"
+    refetchInterval: 10000
+  - name: "useCreateDowntimeEvent"
+    type: "mutation"
+  - name: "useEndDowntimeEvent"
+    type: "mutation"
+
+ux:
+  wireframes:
+    - id: "OEE-DOWNTIME-001"
+      title: "Downtime Management Page"
+      components: ["Active Events Sidebar", "Events Log Table"]
+  patterns:
+    table: "ShadCN DataTable with real-time duration update"
+    panel: "Sidebar with live updates (WebSocket or polling)"
+    modal: "ShadCN Dialog for event logging"
+  states:
+    - active_events_empty: "No active downtime - all machines running"
+    - active_events_display: "Show machine, reason, live duration counter"
+    - log_empty: "No downtime events logged yet"

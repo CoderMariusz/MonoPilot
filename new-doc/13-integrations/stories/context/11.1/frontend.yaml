@@ -1,0 +1,234 @@
+# Story 11.1 - Frontend Context
+# Pages, components, hooks, state management for integrations dashboard
+
+pages:
+  - path: "/integrations/dashboard"
+    file: "apps/frontend/app/(authenticated)/integrations/dashboard/page.tsx"
+    description: "Integrations dashboard main page"
+    layout: "IntegrationsLayout (with sidebar nav)"
+    access: "ADMIN, IT_MANAGER"
+    features:
+      - "Health status cards grid (4 cards)"
+      - "Recent activity feed"
+      - "Error summary panel"
+      - "Auto-refresh every 30s"
+    performance:
+      - "Initial render: < 2s"
+      - "Auto-refresh: < 500ms"
+
+  - path: "/integrations"
+    file: "apps/frontend/app/(authenticated)/integrations/layout.tsx"
+    description: "Integration module layout with navigation sidebar"
+    features:
+      - "Left sidebar navigation menu"
+      - "Breadcrumbs"
+      - "Module-level permission check"
+
+components:
+  - name: "IntegrationsDashboard"
+    file: "components/integrations/IntegrationsDashboard.tsx"
+    type: "container"
+    description: "Main dashboard container, orchestrates all child components"
+    props:
+      - none (fetches own data)
+    state:
+      - dashboardData: "DashboardResponse | null"
+      - loading: "boolean"
+      - error: "string | null"
+      - lastRefresh: "Date | null"
+    hooks:
+      - useIntegrationDashboard() (custom hook)
+      - useInterval() (for auto-refresh)
+    children:
+      - HealthStatusGrid
+      - ActivityFeed
+      - ErrorSummaryPanel
+
+  - name: "HealthStatusGrid"
+    file: "components/integrations/HealthStatusGrid.tsx"
+    type: "layout"
+    description: "2x2 grid of health status cards"
+    props:
+      - healthStatus: "DashboardResponse['health_status']"
+    children:
+      - HealthStatusCard (x4)
+
+  - name: "HealthStatusCard"
+    file: "components/integrations/HealthStatusCard.tsx"
+    type: "presentational"
+    description: "Single integration health status card"
+    props:
+      - integrationType: "string"
+      - health: "IntegrationHealth"
+      - onClick: "() => void (navigate to settings)"
+    features:
+      - Status badge (color-coded)
+      - Last sync/error timestamp
+      - Success rate bar
+      - Metadata display
+      - Click to navigate
+    variants:
+      - connected: "Green badge, checkmark icon"
+      - error: "Red badge, error icon"
+      - disconnected: "Yellow badge, warning icon"
+      - not_configured: "Gray badge, info icon"
+
+  - name: "ActivityFeed"
+    file: "components/integrations/ActivityFeed.tsx"
+    type: "list"
+    description: "Recent integration activity feed (last 20 events)"
+    props:
+      - events: "IntegrationEvent[]"
+      - loading: "boolean"
+    features:
+      - Virtualized list (react-window)
+      - Expandable event detail
+      - Status badges
+      - Relative timestamps
+      - Empty state
+    children:
+      - ActivityFeedItem (x20)
+
+  - name: "ActivityFeedItem"
+    file: "components/integrations/ActivityFeedItem.tsx"
+    type: "presentational"
+    description: "Single activity event item (expandable)"
+    props:
+      - event: "IntegrationEvent"
+      - expanded: "boolean"
+      - onToggle: "() => void"
+    features:
+      - Collapsible detail view
+      - Icon per integration type
+      - Status badge
+      - Relative time
+      - Error message (if status=error)
+      - Retry button (if failed)
+
+  - name: "ErrorSummaryPanel"
+    file: "components/integrations/ErrorSummaryPanel.tsx"
+    type: "presentational"
+    description: "Error summary metrics panel"
+    props:
+      - summary: "ErrorSummary"
+    features:
+      - Failed count with link to logs
+      - Pending retries with link
+      - Dead letter queue with link
+      - Green checkmark if no errors
+
+  - name: "IntegrationsNav"
+    file: "components/integrations/IntegrationsNav.tsx"
+    type: "navigation"
+    description: "Left sidebar navigation for integrations module"
+    features:
+      - Dashboard link (current)
+      - Connections section (Comarch, EDI, API Keys, Webhooks)
+      - Portals section (Supplier, Customer)
+      - Data Operations section (Export, Import)
+      - Logs & Monitoring section
+      - Active link highlighting
+      - Collapsible sections
+
+  - name: "IntegrationIcon"
+    file: "components/integrations/IntegrationIcon.tsx"
+    type: "presentational"
+    description: "Integration type icon component"
+    props:
+      - type: "string (comarch, edi, api_keys, webhooks, export)"
+      - size: "number"
+    icons:
+      - comarch: "Building icon"
+      - edi: "Network icon"
+      - api_keys: "Key icon"
+      - webhooks: "Webhook icon"
+      - export: "Download icon"
+      - import: "Upload icon"
+
+  - name: "StatusBadge"
+    file: "components/integrations/StatusBadge.tsx"
+    type: "presentational"
+    description: "Status badge component (reusable)"
+    props:
+      - status: "string (connected, error, disconnected, not_configured)"
+      - size: "sm | md | lg"
+    variants:
+      - connected: "Green bg, 'Connected' text"
+      - error: "Red bg, 'Error' text"
+      - disconnected: "Yellow bg, 'Disconnected' text"
+      - not_configured: "Gray bg, 'Not Configured' text"
+
+hooks:
+  - name: "useIntegrationDashboard"
+    file: "lib/hooks/use-integration-dashboard.ts"
+    description: "Fetch and manage dashboard data with auto-refresh"
+    parameters:
+      - autoRefresh: "boolean (default: true)"
+      - interval: "number (default: 30000ms)"
+    returns:
+      - data: "DashboardResponse | null"
+      - loading: "boolean"
+      - error: "string | null"
+      - refresh: "() => Promise<void>"
+      - lastRefresh: "Date | null"
+    logic:
+      - Fetch /api/integrations/dashboard on mount
+      - Auto-refresh every 30s if autoRefresh=true
+      - Pause refresh when tab inactive (Page Visibility API)
+      - Resume refresh when tab active
+      - Handle errors gracefully
+
+  - name: "useHealthCheck"
+    file: "lib/hooks/use-health-check.ts"
+    description: "Fetch integration health status"
+    parameters: []
+    returns:
+      - health: "HealthCheckResponse | null"
+      - loading: "boolean"
+      - error: "string | null"
+      - check: "() => Promise<void>"
+
+services:
+  - name: "integrationDashboardService"
+    file: "lib/services/integration-dashboard-service.ts"
+    description: "Dashboard data fetching service"
+    methods:
+      - getDashboard(refresh?: boolean): Promise<DashboardResponse>
+      - getHealthCheck(): Promise<HealthCheckResponse>
+
+state_management:
+  approach: "React Query (TanStack Query)"
+  queries:
+    - key: "['integrations', 'dashboard']"
+      staleTime: "30s"
+      refetchInterval: "30s"
+      enabled: "tab is active"
+
+ui_patterns:
+  dashboard_layout:
+    desktop: "3-column grid: health cards (left), activity feed (center), error summary (right)"
+    tablet: "2-column: health cards full width top, activity+errors stacked below"
+    mobile: "1-column: all stacked vertically"
+
+  health_card:
+    pattern: "ShadCN Card component"
+    hover: "Subtle shadow elevation"
+    click: "Navigate to integration settings"
+
+  activity_feed:
+    pattern: "Virtualized list (react-window)"
+    expand: "Accordion pattern (one open at a time)"
+    empty: "Empty state illustration + CTA"
+
+accessibility:
+  - "ARIA labels on all interactive elements"
+  - "Keyboard navigation (Tab, Enter, Space)"
+  - "Focus indicators visible"
+  - "Status badges have aria-label"
+  - "Activity feed items announce status to screen readers"
+
+performance:
+  - "Virtualized list for activity feed (only render visible items)"
+  - "Debounce auto-refresh (prevent rapid requests)"
+  - "Optimize re-renders with React.memo"
+  - "Use SWR/React Query for caching"

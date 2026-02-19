@@ -1,0 +1,346 @@
+database_schema:
+  title: "Story 07.14 - Shipment Manifest & Ship - Database Changes"
+  last_updated: "2025-12-18"
+
+table_modifications:
+  shipments:
+    existing: true
+    description: "Extend existing shipments table with manifest and ship tracking"
+    columns_add:
+      - name: "manifested_at"
+        type: "timestamptz"
+        nullable: true
+        default: null
+        description: "When shipment was manifested (SSCC validated)"
+        indexed: false
+      - name: "shipped_at"
+        type: "timestamptz"
+        nullable: true
+        default: null
+        description: "When shipment was confirmed as shipped (inventory consumed)"
+        indexed: true
+      - name: "shipped_by"
+        type: "uuid"
+        nullable: true
+        default: null
+        references: "auth.users(id)"
+        description: "User who marked shipment as shipped"
+        indexed: false
+      - name: "delivered_at"
+        type: "timestamptz"
+        nullable: true
+        default: null
+        description: "When shipment was marked as delivered"
+        indexed: true
+      - name: "delivered_by"
+        type: "uuid"
+        nullable: true
+        default: null
+        references: "auth.users(id)"
+        description: "User who marked shipment as delivered"
+        indexed: false
+    existing_columns_updated:
+      status:
+        description: "Add 'manifested' to valid enum values"
+        valid_values: ["pending", "packing", "packed", "manifested", "shipped", "delivered", "exception"]
+    indexes:
+      - name: "idx_shipments_shipped_at"
+        columns: ["shipped_at"]
+        where: "shipped_at IS NOT NULL"
+        purpose: "Query shipped shipments for reporting"
+      - name: "idx_shipments_delivered_at"
+        columns: ["delivered_at"]
+        where: "delivered_at IS NOT NULL"
+        purpose: "Query delivered shipments for reporting"
+      - name: "idx_shipments_org_status"
+        columns: ["org_id", "status"]
+        purpose: "Query shipments by org and status for workflow filtering"
+    rls_policies:
+      - name: "SELECT: Users can view shipments in their org"
+        action: "SELECT"
+        condition: "auth.jwt() ->> 'org_id' = shipments.org_id"
+      - name: "UPDATE: Users with Warehouse+ can update shipment status"
+        action: "UPDATE"
+        condition: "auth.jwt() ->> 'org_id' = shipments.org_id AND auth.jwt() ->> 'role' IN ('Warehouse', 'Manager', 'Admin')"
+      - name: "UPDATE: Only Manager+ can mark delivered"
+        action: "UPDATE"
+        columns: ["delivered_at", "delivered_by", "status (when = 'delivered')"]
+        condition: "auth.jwt() ->> 'org_id' = shipments.org_id AND auth.jwt() ->> 'role' IN ('Manager', 'Admin')"
+
+  license_plates:
+    existing: true
+    description: "Status field already supports 'shipped' value"
+    columns_unchanged: true
+    status_enum_update:
+      note: "Verify 'shipped' is in valid enum: ['in_stock', 'reserved', 'shipped', 'returned', 'damaged', 'scrapped']"
+    impact: "Ship endpoint updates license_plates.status = 'shipped' for all LPs in shipment_box_contents"
+
+  sales_orders:
+    existing: true
+    description: "Extend with shipped_at and status='shipped' support"
+    existing_columns_updated:
+      status:
+        description: "Verify 'shipped' and 'delivered' in enum"
+        valid_values: ["draft", "confirmed", "allocated", "picking", "packing", "shipped", "delivered", "cancelled"]
+      shipped_at:
+        note: "Column likely already exists, ensure it's populated on ship"
+        type: "timestamptz"
+    rls_policies:
+      - name: "UPDATE: Shipped status can only be updated by Warehouse+"
+        action: "UPDATE"
+        columns: ["status (when = 'shipped')", "shipped_at"]
+        condition: "auth.jwt() ->> 'org_id' = sales_orders.org_id AND auth.jwt() ->> 'role' IN ('Warehouse', 'Manager', 'Admin')"
+
+  sales_order_lines:
+    existing: true
+    description: "Extend with quantity_shipped tracking"
+    existing_columns_updated:
+      quantity_shipped:
+        note: "Column likely already exists, ensure it's updated on ship"
+        type: "integer"
+        description: "Actual quantity shipped (may be < quantity_ordered for partial fulfillment)"
+        default: 0
+    impact: "Ship endpoint sets quantity_shipped = quantity_packed for all lines of related SO"
+
+rpc_functions:
+  ship_shipment:
+    name: "ship_shipment"
+    description: "Transaction: Update shipment status, consume LPs, update SO cascade"
+    parameters:
+      - name: "p_shipment_id"
+        type: "uuid"
+        description: "Shipment ID to ship"
+      - name: "p_shipped_at"
+        type: "timestamptz"
+        description: "Timestamp of ship action (usually NOW())"
+      - name: "p_shipped_by"
+        type: "uuid"
+        description: "User ID marking shipment as shipped"
+    returns:
+      type: "shipments"
+      description: "Updated shipment record"
+    logic: |
+      BEGIN
+        -- 1. Validate shipment exists and check status
+        SELECT * INTO v_shipment FROM shipments WHERE id = p_shipment_id FOR UPDATE;
+        IF NOT FOUND THEN
+          RAISE EXCEPTION 'Shipment not found';
+        END IF;
+
+        IF v_shipment.status NOT IN ('manifested', 'packed') THEN
+          RAISE EXCEPTION 'Shipment must be manifested or packed before shipping';
+        END IF;
+
+        v_sales_order_id := v_shipment.sales_order_id;
+
+        -- 2. Update shipment status
+        UPDATE shipments
+        SET status = 'shipped',
+            shipped_at = p_shipped_at,
+            shipped_by = p_shipped_by
+        WHERE id = p_shipment_id;
+
+        -- 3. Consume license plates (update status to 'shipped')
+        UPDATE license_plates
+        SET status = 'shipped'
+        WHERE id IN (
+          SELECT DISTINCT lp.id
+          FROM license_plates lp
+          INNER JOIN shipment_box_contents sbc ON lp.id = sbc.license_plate_id
+          INNER JOIN shipment_boxes sb ON sbc.shipment_box_id = sb.id
+          WHERE sb.shipment_id = p_shipment_id
+        );
+
+        -- 4. Update sales order
+        UPDATE sales_orders
+        SET status = 'shipped',
+            shipped_at = p_shipped_at
+        WHERE id = v_sales_order_id;
+
+        -- 5. Update sales order lines (quantity_shipped = quantity_packed)
+        UPDATE sales_order_lines
+        SET quantity_shipped = quantity_packed
+        WHERE sales_order_id = v_sales_order_id;
+
+        -- 6. Return updated shipment
+        SELECT * INTO v_shipment FROM shipments WHERE id = p_shipment_id;
+        RETURN v_shipment;
+      END;
+    security: "SECURITY DEFINER (runs as database owner)"
+    error_handling:
+      - "Shipment not found: RAISE EXCEPTION 'Shipment not found'"
+      - "Invalid status: RAISE EXCEPTION 'Shipment must be manifested or packed before shipping'"
+      - "LP update failure: Transaction rolls back automatically"
+      - "SO update failure: Transaction rolls back automatically"
+
+migrations:
+  migration_1_shipment_timestamps:
+    filename: "XXXXX_add_shipment_manifest_timestamps.sql"
+    description: "Add manifested_at, shipped_at, shipped_by, delivered_at, delivered_by to shipments"
+    sql: |
+      -- Add manifest/ship/deliver tracking columns
+      ALTER TABLE shipments
+        ADD COLUMN manifested_at timestamptz,
+        ADD COLUMN shipped_at timestamptz,
+        ADD COLUMN shipped_by uuid,
+        ADD COLUMN delivered_at timestamptz,
+        ADD COLUMN delivered_by uuid;
+
+      -- Add foreign keys
+      ALTER TABLE shipments
+        ADD CONSTRAINT fk_shipments_shipped_by_users
+          FOREIGN KEY (shipped_by) REFERENCES auth.users(id) ON DELETE SET NULL,
+        ADD CONSTRAINT fk_shipments_delivered_by_users
+          FOREIGN KEY (delivered_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+
+      -- Add status constraint
+      ALTER TABLE shipments
+        DROP CONSTRAINT IF EXISTS shipments_status_check,
+        ADD CONSTRAINT shipments_status_check
+          CHECK (status IN ('pending', 'packing', 'packed', 'manifested', 'shipped', 'delivered', 'exception'));
+
+  migration_2_shipment_indexes:
+    filename: "XXXXX_add_shipment_indexes.sql"
+    description: "Add performance indexes for shipped/delivered queries"
+    sql: |
+      -- Indexes for shipped/delivered reporting
+      CREATE INDEX idx_shipments_shipped_at ON shipments(shipped_at) WHERE shipped_at IS NOT NULL;
+      CREATE INDEX idx_shipments_delivered_at ON shipments(delivered_at) WHERE delivered_at IS NOT NULL;
+      CREATE INDEX idx_shipments_org_status ON shipments(org_id, status);
+
+  migration_3_ship_shipment_rpc:
+    filename: "XXXXX_create_ship_shipment_rpc.sql"
+    description: "Create ship_shipment RPC function for transaction"
+    sql: |
+      CREATE OR REPLACE FUNCTION ship_shipment(
+        p_shipment_id uuid,
+        p_shipped_at timestamptz,
+        p_shipped_by uuid
+      ) RETURNS shipments AS $$
+      DECLARE
+        v_shipment shipments;
+        v_sales_order_id uuid;
+      BEGIN
+        -- Validate shipment
+        SELECT * INTO v_shipment FROM shipments WHERE id = p_shipment_id FOR UPDATE;
+        IF NOT FOUND THEN
+          RAISE EXCEPTION 'Shipment not found';
+        END IF;
+
+        IF v_shipment.status NOT IN ('manifested', 'packed') THEN
+          RAISE EXCEPTION 'Shipment must be manifested or packed before shipping';
+        END IF;
+
+        v_sales_order_id := v_shipment.sales_order_id;
+
+        -- Update shipment
+        UPDATE shipments
+        SET status = 'shipped',
+            shipped_at = p_shipped_at,
+            shipped_by = p_shipped_by
+        WHERE id = p_shipment_id;
+
+        -- Update license plates
+        UPDATE license_plates
+        SET status = 'shipped'
+        WHERE id IN (
+          SELECT DISTINCT lp.id
+          FROM license_plates lp
+          INNER JOIN shipment_box_contents sbc ON lp.id = sbc.license_plate_id
+          INNER JOIN shipment_boxes sb ON sbc.shipment_box_id = sb.id
+          WHERE sb.shipment_id = p_shipment_id
+        );
+
+        -- Update sales order
+        UPDATE sales_orders
+        SET status = 'shipped',
+            shipped_at = p_shipped_at
+        WHERE id = v_sales_order_id;
+
+        -- Update sales order lines
+        UPDATE sales_order_lines
+        SET quantity_shipped = quantity_packed
+        WHERE sales_order_id = v_sales_order_id;
+
+        -- Return updated shipment
+        SELECT * INTO v_shipment FROM shipments WHERE id = p_shipment_id;
+        RETURN v_shipment;
+      END;
+      $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+data_queries:
+  query_shipped_shipments:
+    name: "Get shipped shipments for a date range"
+    sql: |
+      SELECT
+        s.id,
+        s.shipment_number,
+        s.order_number,
+        s.carrier_name,
+        s.shipped_at,
+        u.name as shipped_by_name,
+        COUNT(sb.id) as box_count,
+        SUM(sb.weight) as total_weight_kg
+      FROM shipments s
+      LEFT JOIN auth.users u ON s.shipped_by = u.id
+      LEFT JOIN shipment_boxes sb ON s.id = sb.shipment_id
+      WHERE s.org_id = $1
+        AND s.status = 'shipped'
+        AND s.shipped_at >= $2
+        AND s.shipped_at <= $3
+      GROUP BY s.id, u.id
+      ORDER BY s.shipped_at DESC;
+
+  query_lp_consumption_by_shipment:
+    name: "Get all LPs consumed by a shipment"
+    sql: |
+      SELECT DISTINCT
+        lp.id,
+        lp.lot_number,
+        lp.best_before_date,
+        p.product_code,
+        p.name as product_name,
+        sbc.quantity,
+        sb.sscc
+      FROM license_plates lp
+      INNER JOIN shipment_box_contents sbc ON lp.id = sbc.license_plate_id
+      INNER JOIN shipment_boxes sb ON sbc.shipment_box_id = sb.id
+      INNER JOIN products p ON lp.product_id = p.id
+      WHERE sb.shipment_id = $1
+      ORDER BY sb.box_number, p.product_code;
+
+  query_partial_fulfillment:
+    name: "Find SO lines with partial fulfillment (quantity_shipped < quantity_packed)"
+    sql: |
+      SELECT
+        so.id as sales_order_id,
+        so.order_number,
+        sol.id as line_id,
+        sol.quantity_ordered,
+        sol.quantity_packed,
+        sol.quantity_shipped,
+        p.name as product_name
+      FROM sales_orders so
+      INNER JOIN sales_order_lines sol ON so.id = sol.sales_order_id
+      INNER JOIN products p ON sol.product_id = p.id
+      WHERE so.org_id = $1
+        AND so.status = 'shipped'
+        AND sol.quantity_shipped < sol.quantity_ordered
+      ORDER BY so.order_number;
+
+rls_policies_summary:
+  shipments_select:
+    description: "All authenticated users can view shipments in their org"
+    policy: "auth.jwt() ->> 'org_id' = shipments.org_id"
+  shipments_update_ship:
+    description: "Warehouse+ can update shipment status to shipped"
+    policy: "auth.jwt() ->> 'org_id' = shipments.org_id AND auth.jwt() ->> 'role' IN ('Warehouse', 'Manager', 'Admin')"
+  shipments_update_delivered:
+    description: "Manager+ can update shipment status to delivered"
+    policy: "auth.jwt() ->> 'org_id' = shipments.org_id AND auth.jwt() ->> 'role' IN ('Manager', 'Admin')"
+  license_plates_update:
+    description: "Update LP status when shipment is shipped"
+    policy: "auth.jwt() ->> 'org_id' = license_plates.org_id"
+  sales_orders_update:
+    description: "Warehouse+ can update SO status to shipped"
+    policy: "auth.jwt() ->> 'org_id' = sales_orders.org_id AND auth.jwt() ->> 'role' IN ('Warehouse', 'Manager', 'Admin')"

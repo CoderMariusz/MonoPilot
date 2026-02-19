@@ -1,0 +1,7 @@
+# Story 06.34 - Frontend Schema
+
+components:
+  - SupplierScorecard.tsx
+  - SupplierRatingChart.tsx
+  - SupplierApprovalBadge.tsx
+  - UpdateApprovalStatusModal.tsx

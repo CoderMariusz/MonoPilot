@@ -1,0 +1,286 @@
+# Story 11.2 - API Context
+# Endpoints, request/response types, validation for API Keys
+
+endpoints:
+  - method: GET
+    path: "/api/integrations/api-keys"
+    description: "List all API keys (masked)"
+    auth: true
+    roles: ["ADMIN", "IT_MANAGER"]
+    query_params:
+      - name: "status"
+        type: "string"
+        required: false
+        enum: ["active", "suspended", "revoked"]
+        description: "Filter by status"
+
+    response_success:
+      status: 200
+      body:
+        api_keys:
+          type: "array<ApiKey>"
+          description: "List of API keys with masked values"
+        total:
+          type: "number"
+          description: "Total count"
+
+    response_error:
+      - status: 403
+        description: "User lacks admin/IT manager role"
+        body:
+          error: "Insufficient permissions"
+
+    performance:
+      target: "< 500ms"
+      database_queries: "≤ 2"
+
+  - method: POST
+    path: "/api/integrations/api-keys"
+    description: "Create new API key"
+    auth: true
+    roles: ["ADMIN"]
+
+    request_body:
+      name:
+        type: "string"
+        required: true
+        min: 3
+        max: 255
+        description: "Key name"
+      scopes:
+        type: "array<string>"
+        required: true
+        min_items: 1
+        description: "Permission scopes"
+      rate_limit_tier:
+        type: "string"
+        required: false
+        enum: ["basic", "standard", "premium"]
+        default: "basic"
+      expires_at:
+        type: "string"
+        required: false
+        format: "ISO 8601"
+        description: "Optional expiration date"
+
+    response_success:
+      status: 201
+      body:
+        id: "string (UUID)"
+        name: "string"
+        key_value: "string - PLAIN TEXT (shown once only)"
+        key_prefix: "string - for display"
+        scopes: "array<string>"
+        rate_limit_tier: "string"
+        expires_at: "string | null"
+        created_at: "string (ISO 8601)"
+      note: "key_value is ONLY returned on creation, never retrievable again"
+
+    response_error:
+      - status: 400
+        description: "Validation error"
+        body:
+          error: "Invalid request body"
+          details: "array<{field, message}>"
+      - status: 409
+        description: "Duplicate key name"
+        body:
+          error: "API key name already exists"
+
+  - method: PUT
+    path: "/api/integrations/api-keys/:id"
+    description: "Update API key metadata (not key value)"
+    auth: true
+    roles: ["ADMIN"]
+
+    request_body:
+      name:
+        type: "string"
+        required: false
+      scopes:
+        type: "array<string>"
+        required: false
+      rate_limit_tier:
+        type: "string"
+        required: false
+      expires_at:
+        type: "string | null"
+        required: false
+
+    response_success:
+      status: 200
+      body:
+        api_key:
+          type: "ApiKey"
+          description: "Updated key (masked)"
+
+  - method: DELETE
+    path: "/api/integrations/api-keys/:id"
+    description: "Revoke API key (soft delete)"
+    auth: true
+    roles: ["ADMIN"]
+
+    request_body:
+      reason:
+        type: "string"
+        required: false
+        max: 500
+        description: "Revocation reason"
+
+    response_success:
+      status: 200
+      body:
+        message: "API key revoked successfully"
+
+  - method: POST
+    path: "/api/integrations/api-keys/:id/regenerate"
+    description: "Regenerate key value (creates new secret)"
+    auth: true
+    roles: ["ADMIN"]
+
+    response_success:
+      status: 200
+      body:
+        key_value: "string - NEW PLAIN TEXT (shown once)"
+        key_prefix: "string"
+      note: "Old key immediately invalid, new key shown once only"
+
+  - method: POST
+    path: "/api/integrations/api-keys/:id/suspend"
+    description: "Suspend API key"
+    auth: true
+    roles: ["ADMIN"]
+
+    response_success:
+      status: 200
+      body:
+        message: "API key suspended"
+
+  - method: POST
+    path: "/api/integrations/api-keys/:id/activate"
+    description: "Reactivate suspended API key"
+    auth: true
+    roles: ["ADMIN"]
+
+    response_success:
+      status: 200
+      body:
+        message: "API key activated"
+
+    response_error:
+      - status: 400
+        description: "Cannot reactivate revoked key"
+        body:
+          error: "Revoked keys cannot be reactivated"
+
+types:
+  ApiKey:
+    properties:
+      id:
+        type: "string (UUID)"
+      name:
+        type: "string"
+      key_prefix:
+        type: "string"
+        description: "First 8 chars (e.g., 'mp_live_abc123...')"
+      scopes:
+        type: "array<string>"
+      rate_limit_tier:
+        type: "string"
+      status:
+        type: "string"
+        enum: ["active", "suspended", "revoked"]
+      expires_at:
+        type: "string | null"
+      last_used_at:
+        type: "string | null"
+      request_count:
+        type: "number"
+      created_at:
+        type: "string (ISO 8601)"
+      revoked_at:
+        type: "string | null"
+      revocation_reason:
+        type: "string | null"
+
+validation:
+  createApiKeySchema:
+    library: "zod"
+    schema: |
+      z.object({
+        name: z.string().min(3).max(255),
+        scopes: z.array(z.enum(apiKeyScopes)).min(1, 'At least one scope required'),
+        rate_limit_tier: z.enum(['basic', 'standard', 'premium']).default('basic'),
+        expires_at: z.string().datetime().optional(),
+      })
+
+  updateApiKeySchema:
+    library: "zod"
+    schema: "createApiKeySchema.partial()"
+
+  apiKeyScopes:
+    - "read:products"
+    - "write:products"
+    - "read:orders"
+    - "write:orders"
+    - "read:inventory"
+    - "write:inventory"
+    - "read:production"
+    - "write:production"
+    - "read:shipping"
+    - "webhook:manage"
+
+authentication_middleware:
+  flow: |
+    1. Extract Authorization header (Bearer <key>)
+    2. Hash incoming key with bcrypt.compare()
+    3. Lookup key_value_hash in integration_api_keys
+    4. Check status = 'active'
+    5. Check expires_at > now() OR IS NULL
+    6. Check rate limit (Redis)
+    7. Update last_used_at, increment request_count
+    8. Set org_id for RLS
+    9. Proceed to endpoint handler
+
+rate_limiting:
+  implementation: "Redis-based token bucket"
+  key_format: "ratelimit:apikey:{key_id}:{window}"
+  headers:
+    - "X-RateLimit-Limit: {limit}"
+    - "X-RateLimit-Remaining: {remaining}"
+    - "X-RateLimit-Reset: {reset_timestamp}"
+  exceeded_response:
+    status: 429
+    headers:
+      - "Retry-After: {seconds}"
+    body:
+      error: "Rate limit exceeded"
+
+security:
+  key_generation:
+    format: "mp_{env}_{random32}"
+    env: "live | test"
+    random32: "base62 encoded 32 bytes (crypto.randomBytes)"
+  hashing:
+    algorithm: "bcrypt"
+    cost_factor: 12
+  masking:
+    display: "First 8 chars + '••••••••'"
+    example: "mp_live_abc123••••••••"
+
+error_handling:
+  - scenario: "Invalid API key"
+    response: "401 Unauthorized"
+    message: "Invalid API key"
+  - scenario: "Expired key"
+    response: "401 Unauthorized"
+    message: "API key has expired"
+  - scenario: "Suspended key"
+    response: "401 Unauthorized"
+    message: "API key has been suspended"
+  - scenario: "Insufficient scope"
+    response: "403 Forbidden"
+    message: "Insufficient scope: {required_scope} required"
+  - scenario: "Rate limit exceeded"
+    response: "429 Too Many Requests"
+    message: "Rate limit exceeded"

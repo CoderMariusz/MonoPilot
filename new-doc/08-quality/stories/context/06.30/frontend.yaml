@@ -1,0 +1,157 @@
+# Story 06.30 - HACCP Verification Records Frontend
+
+pages:
+  - path: /quality/haccp-verifications
+    file: app/(authenticated)/quality/haccp-verifications/page.tsx
+    description: "Verifications list with filters"
+    components:
+      - HACCPVerificationDataTable
+      - VerificationFilters
+
+  - path: /quality/haccp-verifications/new
+    file: app/(authenticated)/quality/haccp-verifications/new/page.tsx
+    description: "Create verification record"
+    components:
+      - VerificationForm
+
+  - path: /quality/haccp-verifications/[id]
+    file: app/(authenticated)/quality/haccp-verifications/[id]/page.tsx
+    description: "Verification detail/edit"
+    components:
+      - VerificationDetail
+      - VerificationActions
+
+components:
+  HACCPVerificationDataTable:
+    file: components/quality/haccp/HACCPVerificationDataTable.tsx
+    description: "ShadCN DataTable with verifications"
+    columns:
+      - Verification #
+      - Type (badge with icon)
+      - Date
+      - Result (PASS/FAIL/PARTIAL badge)
+      - Verified By
+      - Status (badge)
+      - Next Due (with overdue warning)
+      - Actions
+
+  VerificationForm:
+    file: components/quality/haccp/VerificationForm.tsx
+    description: "Create/edit verification form"
+    fields:
+      - HACCP Plan (dropdown)
+      - Verification Type (dropdown with icons)
+      - Verification Date (date picker)
+      - Frequency (dropdown)
+      - Checklist Items (dynamic list)
+      - Result (radio: pass/fail/partial)
+      - Findings (textarea, required if fail/partial)
+      - Recommendations (textarea)
+      - Corrective Actions Required (checkbox)
+      - Corrective Action Notes (textarea, required if checked)
+
+  VerificationChecklistEditor:
+    file: components/quality/haccp/VerificationChecklistEditor.tsx
+    description: "Checklist items editor"
+    features:
+      - Load default checklist based on type
+      - Add custom items
+      - Check/uncheck items
+      - Add notes per item
+      - Reorder items (drag-and-drop)
+
+  ApproveQAModal:
+    file: components/quality/haccp/ApproveQAModal.tsx
+    description: "QA Manager approval modal"
+    fields:
+      - Username (read-only)
+      - Password (e-signature)
+    action: "Approve as QA Manager"
+    next_step: "Verification moves to pending_director_approval"
+
+  ApproveDirectorModal:
+    file: components/quality/haccp/ApproveDirectorModal.tsx
+    description: "Quality Director approval modal"
+    fields:
+      - Username (read-only)
+      - Password (e-signature)
+    action: "Approve as Quality Director"
+    result: "Verification approved, next_date calculated, locked"
+
+  VerificationDetail:
+    file: components/quality/haccp/VerificationDetail.tsx
+    description: "Verification detail view"
+    sections:
+      - Header (Verification #, Type, Status, Result)
+      - HACCP Plan Info (Plan name, version, product)
+      - Verification Info (Date, Frequency, Verified by)
+      - Checklist (table of items with checked status)
+      - Findings & Recommendations
+      - Corrective Actions (if required)
+      - Approval History (QA Manager → Director)
+      - Next Verification Date
+
+  OverdueVerificationAlert:
+    file: components/quality/haccp/OverdueVerificationAlert.tsx
+    description: "Alert banner for overdue verifications"
+    display: "Dashboard and verification list page"
+    content: "{count} verifications overdue. [View Overdue]"
+
+  VerificationDashboardWidget:
+    file: components/quality/haccp/VerificationDashboardWidget.tsx
+    description: "Dashboard widget for verification summary"
+    metrics:
+      - Overdue (count, red)
+      - Due This Week (count, yellow)
+      - Due This Month (count, blue)
+      - Last Verification (date, result badge)
+    click: "Navigate to verification list"
+
+  VerificationStatusBadge:
+    file: components/quality/haccp/VerificationStatusBadge.tsx
+    colors:
+      draft: yellow
+      pending_qa_approval: blue
+      pending_director_approval: purple
+      approved: green
+      rejected: red
+
+  VerificationResultBadge:
+    file: components/quality/haccp/VerificationResultBadge.tsx
+    colors:
+      pass: green
+      fail: red
+      partial: orange
+
+ux_patterns:
+  list:
+    - ShadCN DataTable with filters
+    - Overdue badge (red) if next_date < today
+    - Type icons (calibration=wrench, review=checklist, audit=clipboard)
+    - Quick actions in row
+
+  creation:
+    - Multi-step form or single scrollable page
+    - Default checklist based on type
+    - Save draft frequently
+    - Submit for approval when complete
+
+  approval:
+    - Two-step workflow: QA Manager → Director
+    - E-signature with password at each step
+    - Clear indication of approval stage
+    - Locked after final approval
+
+  dashboard:
+    - Widget showing overdue count
+    - Alert banner if overdue > 0
+    - Click to filter overdue list
+
+states:
+  - loading: "Shimmer skeleton"
+  - empty: "No verifications recorded. [+ New Verification] CTA"
+  - overdue: "Red badge with count in header"
+  - pending_qa: "Blue badge with clock icon"
+  - pending_director: "Purple badge with user icon"
+  - approved: "Green badge with checkmark, locked icon"
+  - locked: "All fields read-only, no edit button"

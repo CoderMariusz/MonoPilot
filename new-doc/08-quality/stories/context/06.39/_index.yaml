@@ -1,0 +1,71 @@
+# Story 06.39 - Quality Analytics Context (Entry Point)
+# Generated: 2025-01-15
+# Purpose: Advanced analytics with SPC charts, trends, CAPA effectiveness
+# Phase: 4 (Analytics & Reporting)
+
+story:
+  id: "06.39"
+  name: "Quality Analytics"
+  slug: "quality-analytics"
+  epic: "06-quality"
+  phase: "4"
+  complexity: "L"
+  estimate_days: 4-5
+  type: "fullstack"
+  state: "ready"
+  priority: "P1"
+
+context_files:
+  - _index.yaml
+  - database.yaml    # Materialized views for analytics
+  - api.yaml         # 9 analytics endpoints
+  - frontend.yaml    # 7 chart types, Excel export
+  - tests.yaml       # SPC calculation tests
+
+dependencies:
+  required:
+    - story: "06.5-06.11"
+      provides: ["Inspection data"]
+    - story: "06.6"
+      provides: ["Test results for trending, SPC"]
+    - story: "06.9, 06.13"
+      provides: ["NCR data, root causes"]
+    - story: "06.25"
+      provides: ["CCP deviation data"]
+    - story: "06.31-06.33"
+      provides: ["CAPA effectiveness data"]
+    - story: "06.34"
+      provides: ["Supplier trends"]
+
+deliverables:
+  - type: "database"
+    count: 2
+    description: "Materialized views (defect_pareto, root_cause_frequency)"
+  - type: "api"
+    count: 9
+    description: "7 analytics + export + schedule"
+  - type: "service"
+    count: 1
+    description: "QualityAnalyticsService with SPC calculations"
+  - type: "components"
+    count: 10
+    description: "7 chart types + filters + export"
+
+technical_notes:
+  - "SPC Charts: X-bar (mean of means), R-chart (range)"
+  - "Control Limits: A2, D3, D4 constants based on subgroup size"
+  - "Cpk Calculation: Min((USL-mean)/(3*sigma), (mean-LSL)/(3*sigma))"
+  - "Scheduled Reports: Daily/weekly/monthly email via SendGrid"
+  - "Excel Export: Multi-sheet workbook with all analytics"
+  - "Minimum Data Points: 30 for SPC (statistical validity)"
+
+business_rules:
+  - rule: "SPC Subgroup Size Default"
+    description: "Default 5 (configurable 3-7)"
+  - rule: "Cpk Target"
+    description: ">1.33 capable, >1.67 highly capable"
+  - rule: "Trend Direction"
+    description: ">5% change = up/down, <=5% = stable"
+
+summary: |
+  Story 06.39 implements advanced quality analytics: Defect Pareto, NCR/Test Result/CCP deviation trends, SPC charts (X-bar, R-chart), root cause frequency, supplier quality trends, CAPA effectiveness. Includes Excel export and scheduled email reports.

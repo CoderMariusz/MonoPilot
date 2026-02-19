@@ -1,0 +1,367 @@
+# Story 01.4 - Frontend Specification (PRIMARY)
+# Purpose: Wizard step 1 component, form, validation, UX
+# Agent: FRONTEND-DEV
+
+# Note: This is the PRIMARY specification for this story
+is_frontend_focused: true
+
+# Components
+components:
+  - path: "apps/frontend/components/settings/onboarding/OrganizationProfileStep.tsx"
+    description: "Main wizard step 1 component with form"
+    props:
+      - "initialData?: Partial<OrganizationProfileStepData>"
+      - "onComplete: (data: OrganizationProfileStepData) => void"
+      - "onBack?: () => void"
+    features:
+      - "Form with 4 fields: name, timezone, language, currency"
+      - "Auto-detect timezone and language from browser"
+      - "Pre-fill org name if already set"
+      - "Validation with Zod schema"
+      - "Error display inline under fields"
+    pattern: |
+      'use client';
+
+      import { useEffect } from 'react';
+      import { useForm } from 'react-hook-form';
+      import { zodResolver } from '@hookform/resolvers/zod';
+      import {
+        organizationProfileStepSchema,
+        OrganizationProfileStepData,
+      } from '@/lib/validation/organization-profile-step';
+      import { getBrowserTimezone, getBrowserLanguage } from '@/lib/utils/browser-detection';
+      import {
+        Form,
+        FormControl,
+        FormField,
+        FormItem,
+        FormLabel,
+        FormMessage,
+      } from '@/components/ui/form';
+      import { Input } from '@/components/ui/input';
+      import { TimezoneSelect } from './TimezoneSelect';
+      import {
+        Select,
+        SelectContent,
+        SelectItem,
+        SelectTrigger,
+        SelectValue,
+      } from '@/components/ui/select';
+
+      interface Props {
+        initialData?: Partial<OrganizationProfileStepData>;
+        onComplete: (data: OrganizationProfileStepData) => void;
+      }
+
+      export function OrganizationProfileStep({ initialData, onComplete }: Props) {
+        const form = useForm<OrganizationProfileStepData>({
+          resolver: zodResolver(organizationProfileStepSchema),
+          defaultValues: {
+            name: initialData?.name || '',
+            timezone: initialData?.timezone || getBrowserTimezone(),
+            language: initialData?.language || getBrowserLanguage(),
+            currency: initialData?.currency || 'EUR',
+          },
+        });
+
+        const onSubmit = (data: OrganizationProfileStepData) => {
+          onComplete(data);
+        };
+
+        return (
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Basic Information</h3>
+
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Organization Name *</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g., Bakery Fresh Ltd" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Regional Settings</h3>
+
+                <FormField
+                  control={form.control}
+                  name="timezone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Timezone *</FormLabel>
+                      <FormControl>
+                        <TimezoneSelect
+                          value={field.value}
+                          onValueChange={field.onChange}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="language"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Language *</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select language" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="pl">Polski</SelectItem>
+                            <SelectItem value="en">English</SelectItem>
+                            <SelectItem value="de">Deutsch</SelectItem>
+                            <SelectItem value="fr">Francais</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="currency"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Currency *</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select currency" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="PLN">PLN - Polish Zloty</SelectItem>
+                            <SelectItem value="EUR">EUR - Euro</SelectItem>
+                            <SelectItem value="USD">USD - US Dollar</SelectItem>
+                            <SelectItem value="GBP">GBP - British Pound</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+            </form>
+          </Form>
+        );
+      }
+
+  - path: "apps/frontend/components/settings/onboarding/TimezoneSelect.tsx"
+    description: "Searchable timezone dropdown (300+ IANA timezones)"
+    props:
+      - "value: string"
+      - "onValueChange: (value: string) => void"
+    features:
+      - "Searchable combobox with 300+ timezones"
+      - "Groups by region (Europe, America, Asia, etc.)"
+      - "Shows current time in selected timezone"
+    pattern: |
+      'use client';
+
+      import { useState, useMemo } from 'react';
+      import { Check, ChevronsUpDown } from 'lucide-react';
+      import { cn } from '@/lib/utils';
+      import { Button } from '@/components/ui/button';
+      import {
+        Command,
+        CommandEmpty,
+        CommandGroup,
+        CommandInput,
+        CommandItem,
+      } from '@/components/ui/command';
+      import {
+        Popover,
+        PopoverContent,
+        PopoverTrigger,
+      } from '@/components/ui/popover';
+
+      interface Props {
+        value: string;
+        onValueChange: (value: string) => void;
+      }
+
+      export function TimezoneSelect({ value, onValueChange }: Props) {
+        const [open, setOpen] = useState(false);
+
+        const timezones = useMemo(() => {
+          try {
+            return Intl.supportedValuesOf('timeZone');
+          } catch {
+            // Fallback for older browsers
+            return ['UTC', 'Europe/Warsaw', 'Europe/London', 'America/New_York'];
+          }
+        }, []);
+
+        const groupedTimezones = useMemo(() => {
+          const groups: Record<string, string[]> = {};
+          timezones.forEach((tz) => {
+            const region = tz.split('/')[0];
+            if (!groups[region]) groups[region] = [];
+            groups[region].push(tz);
+          });
+          return groups;
+        }, [timezones]);
+
+        return (
+          <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                role="combobox"
+                aria-expanded={open}
+                className="w-full justify-between"
+              >
+                {value || 'Select timezone...'}
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-full p-0" align="start">
+              <Command>
+                <CommandInput placeholder="Search timezone..." />
+                <CommandEmpty>No timezone found.</CommandEmpty>
+                {Object.entries(groupedTimezones).map(([region, tzList]) => (
+                  <CommandGroup key={region} heading={region}>
+                    {tzList.map((tz) => (
+                      <CommandItem
+                        key={tz}
+                        value={tz}
+                        onSelect={() => {
+                          onValueChange(tz);
+                          setOpen(false);
+                        }}
+                      >
+                        <Check
+                          className={cn(
+                            'mr-2 h-4 w-4',
+                            value === tz ? 'opacity-100' : 'opacity-0'
+                          )}
+                        />
+                        {tz}
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                ))}
+              </Command>
+            </PopoverContent>
+          </Popover>
+        );
+      }
+
+# UX Specification
+ux:
+  wireframes:
+    - id: "SET-002"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SET-002-onboarding-organization.md"
+      description: "Onboarding Wizard - Organization Profile Step"
+      components:
+        - "Progress tracker (1/6, 16%)"
+        - "Basic Information card (org name)"
+        - "Regional Settings card (timezone, language, currency)"
+        - "Skip Step button"
+        - "Next: Warehouse button"
+
+    - id: "SET-007"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SET-007-organization-profile.md"
+      description: "Full Organization Profile page (reference for field patterns)"
+
+  patterns:
+    form: "ShadCN Form with react-hook-form + Zod resolver"
+    dropdown: "ShadCN Select for simple dropdowns (language, currency)"
+    searchable_dropdown: "ShadCN Combobox for timezone (300+ options)"
+    validation: "Inline validation with error messages below fields"
+
+  states:
+    - name: "loading"
+      description: "Skeleton loaders for form fields"
+    - name: "success"
+      description: "Form pre-filled with org name from registration"
+    - name: "error"
+      description: "Red borders on invalid fields, inline error text"
+    - name: "submitting"
+      description: "Disabled Next button with spinner"
+
+  form_fields:
+    - field: "name"
+      label: "Organization Name"
+      type: "text"
+      placeholder: "e.g., Bakery Fresh Ltd"
+      required: true
+      validation: "2-100 characters"
+
+    - field: "timezone"
+      label: "Timezone"
+      type: "searchable_select"
+      options: "IANA timezones (300+)"
+      default: "Browser detected"
+      required: true
+
+    - field: "language"
+      label: "Language"
+      type: "select"
+      options:
+        - { value: "pl", label: "Polski" }
+        - { value: "en", label: "English" }
+        - { value: "de", label: "Deutsch" }
+        - { value: "fr", label: "Francais" }
+      default: "Browser detected or 'en'"
+      required: true
+
+    - field: "currency"
+      label: "Currency"
+      type: "select"
+      options:
+        - { value: "PLN", label: "PLN - Polish Zloty" }
+        - { value: "EUR", label: "EUR - Euro" }
+        - { value: "USD", label: "USD - US Dollar" }
+        - { value: "GBP", label: "GBP - British Pound" }
+      default: "EUR"
+      required: true
+
+# Validation Rules
+validation_rules:
+  name:
+    type: "string"
+    required: true
+    min: 2
+    max: 100
+    errors:
+      empty: "Organization name is required"
+      min: "Organization name must be at least 2 characters"
+      max: "Organization name must be at most 100 characters"
+
+  timezone:
+    type: "string"
+    required: true
+    validation: "Must be valid IANA timezone"
+    default: "Auto-detect: Intl.DateTimeFormat().resolvedOptions().timeZone"
+    error: "Invalid timezone"
+
+  language:
+    type: "enum"
+    required: true
+    values: ["pl", "en", "de", "fr"]
+    default: "Auto-detect from browser, fallback to 'en'"
+
+  currency:
+    type: "enum"
+    required: true
+    values: ["PLN", "EUR", "USD", "GBP"]
+    default: "EUR"

@@ -1,0 +1,139 @@
+# Story 06.27 - CoA Templates API Endpoints
+
+endpoints:
+  - method: GET
+    path: /api/quality/coa-templates
+    auth: required
+    roles: [QA_INSPECTOR, QA_MANAGER, QUALITY_DIRECTOR]
+    description: "List templates with filters"
+    query_params:
+      status: "draft|pending_approval|approved|archived"
+      product_id: UUID
+      product_type: string
+      is_active: boolean
+      search: string
+      sort_by: "template_number|name|created_at|version"
+      sort_order: "asc|desc"
+      page: number
+      limit: number
+    response:
+      templates: CoATemplate[]
+      pagination: {total, page, limit, pages}
+
+  - method: GET
+    path: /api/quality/coa-templates/:id
+    auth: required
+    description: "Get template detail with parameters"
+    response: CoATemplate with expanded parameters
+
+  - method: POST
+    path: /api/quality/coa-templates
+    auth: required
+    roles: [QA_INSPECTOR, QA_MANAGER]
+    description: "Create new template"
+    body: CreateCoATemplateRequest
+    validation: createCoATemplateSchema
+
+  - method: PUT
+    path: /api/quality/coa-templates/:id
+    auth: required
+    description: "Update draft template"
+    body: UpdateCoATemplateRequest
+    validation: updateCoATemplateSchema
+    constraint: "status = 'draft' only"
+
+  - method: DELETE
+    path: /api/quality/coa-templates/:id
+    auth: required
+    description: "Delete draft template"
+    constraint: "status = 'draft' only"
+
+  - method: POST
+    path: /api/quality/coa-templates/:id/approve
+    auth: required
+    roles: [QA_MANAGER, QUALITY_DIRECTOR]
+    description: "Approve template"
+    body: {approval_notes?: string}
+
+  - method: POST
+    path: /api/quality/coa-templates/:id/activate
+    auth: required
+    roles: [QA_MANAGER]
+    description: "Set template as active (deactivates others)"
+
+  - method: POST
+    path: /api/quality/coa-templates/:id/duplicate
+    auth: required
+    description: "Duplicate template with new name"
+    body: {name: string}
+
+  - method: POST
+    path: /api/quality/coa-templates/:id/upload-logo
+    auth: required
+    description: "Upload logo file"
+    content_type: multipart/form-data
+    validation: "PNG/JPEG/SVG, max 2MB"
+
+  - method: GET
+    path: /api/quality/coa-templates/:id/preview
+    auth: required
+    description: "Generate preview HTML"
+    query_params:
+      sample_data: boolean
+
+  - method: GET
+    path: /api/quality/coa-templates/:id/versions
+    auth: required
+    description: "Get version history"
+
+validation_schemas:
+  createCoATemplateSchema:
+    fields:
+      name: string (3-200 chars)
+      description: string (max 1000) optional
+      product_id: UUID optional
+      product_type: string optional
+      header_template: string (max 5000) optional
+      footer_template: string (max 5000) optional
+      parameters_config: ParameterConfig[]
+      compliance_statements: string[] (max 500 each)
+      layout_config: LayoutConfig optional
+    rules:
+      - "Cannot specify both product_id and product_type"
+
+  parameterConfigSchema:
+    fields:
+      parameter_id: UUID
+      display_name: string (max 100) optional
+      show_spec: boolean default true
+      show_method: boolean default true
+      order: integer min 0
+
+  layoutConfigSchema:
+    fields:
+      show_header: boolean default true
+      show_footer: boolean default true
+      show_logo: boolean default true
+      parameter_columns: string[] default [name, spec, result, method, status]
+      font_family: string default Arial
+      font_size: integer 8-14 default 10
+      page_size: "A4|Letter|Legal" default A4
+      orientation: "portrait|landscape" default portrait
+
+service_layer:
+  file: lib/services/coa-template-service.ts
+  class: CoATemplateService
+  methods:
+    - list(params): PaginatedResult<CoATemplate>
+    - getById(id): CoATemplate | null
+    - getActiveTemplate(productId?, productType?): CoATemplate | null
+    - create(input): CoATemplate
+    - update(id, input): CoATemplate
+    - submitForApproval(id): CoATemplate
+    - approve(id, notes?, userId): CoATemplate
+    - activate(id): CoATemplate
+    - duplicate(id, newName): CoATemplate
+    - uploadLogo(templateId, file): string (URL)
+    - generatePreview(id, useSampleData?): PreviewResponse
+    - getVersionHistory(id): TemplateVersion[]
+    - generateTemplateNumber(): string

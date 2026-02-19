@@ -1,0 +1,200 @@
+story:
+  id: "09.25"
+  name: "Variance Root Cause & Approval"
+  epic: "09-finance"
+  phase: "3"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "fullstack"
+
+dependencies:
+  required:
+    - story: "09.13"
+      provides: ["cost_variances table (material)"]
+    - story: "09.14"
+      provides: ["cost_variances table (labor)"]
+    - story: "09.15"
+      provides: ["cost_variances table (yield/scrap)"]
+    - story: "01.1"
+      provides: ["users", "roles for approval"]
+  optional: []
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/finance.md"
+  prd_sections: ["FR-9.4.7", "FR-9.4.8", "FR-9.1.8"]
+  story: "docs/2-MANAGEMENT/epics/current/09-finance/09.25.variance-root-cause-approval.md"
+  patterns:
+    - "apps/frontend/components/finance/variance/VarianceRootCauseModal.tsx"
+
+files_to_create:
+  database:
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_enhance_cost_variances_root_cause.sql"
+      type: "migration"
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_create_variance_approval_thresholds.sql"
+      type: "migration"
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_create_variance_attachments.sql"
+      type: "migration"
+  api:
+    - path: "apps/frontend/app/api/finance/variances/[id]/root-cause/route.ts"
+      methods: ["PATCH"]
+    - path: "apps/frontend/app/api/finance/variances/[id]/submit-for-approval/route.ts"
+      methods: ["POST"]
+    - path: "apps/frontend/app/api/finance/variances/[id]/approve/route.ts"
+      methods: ["POST"]
+    - path: "apps/frontend/app/api/finance/variances/[id]/reject/route.ts"
+      methods: ["POST"]
+    - path: "apps/frontend/app/api/finance/variances/[id]/request-info/route.ts"
+      methods: ["POST"]
+    - path: "apps/frontend/app/api/finance/variances/[id]/corrective-action/route.ts"
+      methods: ["PATCH"]
+    - path: "apps/frontend/app/api/finance/variances/pending-approvals/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/finance/reports/variance-root-causes/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/finance/settings/variance-approval-thresholds/route.ts"
+      methods: ["GET", "POST"]
+    - path: "apps/frontend/app/api/finance/settings/variance-approval-thresholds/[id]/route.ts"
+      methods: ["PATCH"]
+  services:
+    - path: "apps/frontend/lib/services/variance-approval-service.ts"
+  validation:
+    - path: "apps/frontend/lib/validation/variance-approval.ts"
+  pages:
+    - path: "apps/frontend/app/(authenticated)/finance/variances/approvals/page.tsx"
+    - path: "apps/frontend/app/(authenticated)/finance/reports/variance-root-causes/page.tsx"
+  components:
+    - path: "apps/frontend/components/finance/variance/VarianceRootCauseModal.tsx"
+    - path: "apps/frontend/components/finance/variance/VarianceApprovalDashboard.tsx"
+    - path: "apps/frontend/components/finance/variance/CorrectiveActionTracker.tsx"
+    - path: "apps/frontend/components/finance/variance/RootCauseAnalysisReport.tsx"
+    - path: "apps/frontend/components/finance/variance/RootCauseParetoChart.tsx"
+
+database:
+  tables:
+    - name: "cost_variances"
+      columns:
+        - "root_cause_category"
+        - "root_cause_notes"
+        - "root_cause_documented_by"
+        - "root_cause_documented_at"
+        - "corrective_action"
+        - "corrective_action_type"
+        - "assigned_to"
+        - "target_resolution_date"
+        - "corrective_action_status"
+        - "completed_at"
+        - "completion_notes"
+        - "action_effective"
+        - "approval_required"
+        - "approval_threshold_amount"
+        - "approval_threshold_percent"
+        - "approved_by"
+        - "approved_at"
+        - "approval_notes"
+        - "rejection_reason"
+      rls: true
+      indexes:
+        - "org_id, root_cause_category"
+        - "org_id, status"
+        - "assigned_to"
+    - name: "variance_approval_thresholds"
+      columns:
+        - "id"
+        - "org_id"
+        - "variance_category"
+        - "tier_name"
+        - "amount_threshold"
+        - "percent_threshold"
+        - "approver_role"
+        - "is_active"
+      rls: true
+      indexes:
+        - "org_id"
+    - name: "variance_attachments"
+      columns:
+        - "id"
+        - "org_id"
+        - "variance_id"
+        - "file_name"
+        - "file_path"
+        - "file_type"
+        - "file_size_bytes"
+        - "uploaded_by"
+        - "uploaded_at"
+      rls: true
+      indexes:
+        - "variance_id"
+
+api_endpoints:
+  - method: "PATCH"
+    path: "/api/finance/variances/:id/root-cause"
+    auth: true
+    roles: ["cost_accountant", "finance_manager"]
+  - method: "POST"
+    path: "/api/finance/variances/:id/approve"
+    auth: true
+    roles: ["cost_accountant", "finance_manager", "cfo"]
+  - method: "GET"
+    path: "/api/finance/variances/pending-approvals"
+    auth: true
+    roles: ["cost_accountant", "finance_manager", "cfo"]
+  - method: "GET"
+    path: "/api/finance/reports/variance-root-causes"
+    auth: true
+    roles: ["finance_manager", "cfo"]
+
+ux:
+  wireframes:
+    - id: "FIN-025"
+      description: "Variance Root Cause & Approval"
+      components:
+        - "Root cause categorization modal"
+        - "Approval dashboard with pending list"
+        - "Root cause analysis Pareto chart"
+  patterns:
+    modal: "ShadCN Dialog"
+    workflow: "Multi-step approval process"
+    chart: "Recharts BarChart (Pareto)"
+
+validation_rules:
+  root_cause_notes: "Min 20 characters"
+  corrective_action: "Required for variances >$5K or >10%"
+  approval_threshold: "Amount OR Percent triggers approval"
+  rejection_reason: "Required (min 20 characters)"
+
+patterns:
+  rls: "ADR-013"
+  api: "REST with org_id filter"
+  service: "class-based with static methods"
+  validation: "zod schemas"
+  file_upload: "Supabase Storage"
+
+acceptance_checklist:
+  - "cost_variances table enhanced with root cause fields"
+  - "variance_approval_thresholds table created"
+  - "variance_attachments table created"
+  - "Root cause categorization works"
+  - "Corrective action assignment works"
+  - "Variance approval workflow works"
+  - "Variance rejection with reason works"
+  - "Pending approvals dashboard displays"
+  - "Root cause analysis report displays"
+  - "Root cause Pareto chart renders"
+  - "File attachment upload works"
+  - "Approval notifications sent"
+  - "All tests pass"
+
+output_artifacts:
+  - "Migration: Enhance cost_variances table"
+  - "Migration: variance_approval_thresholds table"
+  - "Migration: variance_attachments table"
+  - "API: 10 variance approval endpoints"
+  - "Service: VarianceApprovalService"
+  - "Component: VarianceRootCauseModal"
+  - "Component: VarianceApprovalDashboard"
+  - "Component: CorrectiveActionTracker"
+  - "Component: RootCauseAnalysisReport"
+  - "Component: RootCauseParetoChart"
+  - "Page: Variance approvals page"
+  - "Page: Root cause analysis report page"
+  - "Tests: Unit, integration, E2E"

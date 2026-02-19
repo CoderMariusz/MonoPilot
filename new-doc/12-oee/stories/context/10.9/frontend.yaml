@@ -1,0 +1,37 @@
+# Story 10.9 - Frontend Specification
+# Historical Trend Analysis
+
+components:
+  - path: "apps/frontend/components/oee/analytics/TrendChart.tsx"
+    description: "Multi-line chart showing OEE trends over time"
+    features:
+      - "Toggle series (OEE, Availability, Performance, Quality)"
+      - "Granularity selector (Daily, Weekly, Monthly)"
+      - "Date range picker"
+      - "Target line overlay"
+
+  - path: "apps/frontend/components/oee/analytics/ComparisonCard.tsx"
+    description: "Card showing period-over-period comparison"
+    displays:
+      - "Period 1 vs Period 2 OEE"
+      - "Delta (absolute and percentage)"
+      - "Trend indicator (▲/▼)"
+
+  - path: "apps/frontend/components/oee/analytics/HistoricalDataTable.tsx"
+    description: "Table showing historical OEE data with export"
+
+pages:
+  - path: "apps/frontend/app/(authenticated)/oee/analytics/page.tsx"
+    route: "/oee/analytics"
+    title: "OEE Analytics & Trends"
+
+hooks:
+  - name: "useOEETrends"
+    type: "query"
+    params: ["params"]
+    queryKey: "['oee-trends', params]"
+
+ux:
+  wireframes:
+    - id: "OEE-ANALYTICS-001"
+      title: "OEE Trends & Comparisons"

@@ -1,0 +1,89 @@
+# Story 10.3 - API Specification
+# Downtime Event Tracking
+
+endpoints:
+  - method: "GET"
+    path: "/api/oee/downtime"
+    description: "List downtime events with filtering"
+    auth: "required"
+    roles: ["*"]
+    query_params:
+      machine_id: "UUID (optional)"
+      line_id: "UUID (optional)"
+      work_order_id: "UUID (optional)"
+      downtime_type: "string (optional) - planned|unplanned"
+      start_date: "YYYY-MM-DD (optional)"
+      end_date: "YYYY-MM-DD (optional)"
+      active_only: "boolean (optional) - filter where end_time IS NULL"
+      severity: "string (optional) - minor|moderate|major"
+    response:
+      status: 200
+
+  - method: "POST"
+    path: "/api/oee/downtime"
+    description: "Create downtime event (start downtime)"
+    auth: "required"
+    roles: ["operator", "supervisor", "production_manager", "admin"]
+    request:
+      body:
+        machine_id: "UUID (required if no line_id)"
+        line_id: "UUID (required if no machine_id)"
+        work_order_id: "UUID (optional)"
+        reason_code_id: "UUID (required)"
+        start_time: "ISO 8601 timestamp (default: now)"
+        notes: "string (optional)"
+    response:
+      status: 201
+
+  - method: "PATCH"
+    path: "/api/oee/downtime/:id/end"
+    description: "End active downtime event (sets end_time)"
+    auth: "required"
+    roles: ["operator", "supervisor", "production_manager", "admin"]
+    request:
+      body:
+        end_time: "ISO 8601 timestamp (default: now)"
+        notes: "string (optional) - append to existing notes"
+    response:
+      status: 200
+
+  - method: "PATCH"
+    path: "/api/oee/downtime/:id"
+    description: "Update downtime event details"
+    auth: "required"
+    roles: ["supervisor", "production_manager", "admin"]
+    response:
+      status: 200
+
+  - method: "DELETE"
+    path: "/api/oee/downtime/:id"
+    description: "Delete downtime event"
+    auth: "required"
+    roles: ["production_manager", "admin"]
+    response:
+      status: 204
+
+services:
+  - path: "apps/frontend/lib/services/downtime-event-service.ts"
+    description: "Downtime event tracking service"
+    methods:
+      - { name: "list", params: ["filters"], returns: "Promise<DowntimeEvent[]>" }
+      - { name: "create", params: ["input"], returns: "Promise<DowntimeEvent>" }
+      - { name: "endEvent", params: ["id", "endTime?"], returns: "Promise<DowntimeEvent>" }
+      - { name: "update", params: ["id", "input"], returns: "Promise<DowntimeEvent>" }
+      - { name: "delete", params: ["id"], returns: "Promise<void>" }
+      - { name: "getActiveEvents", params: ["machineId?"], returns: "Promise<DowntimeEvent[]>" }
+
+validation:
+  - name: "createDowntimeEventSchema"
+    rules:
+      - "machine_id: uuid().optional()"
+      - "line_id: uuid().optional()"
+      - "reason_code_id: uuid()"
+      - "start_time: string().datetime().default(() => new Date().toISOString())"
+      - "refine: at least one of machine_id or line_id required"
+
+types:
+  - "DowntimeEvent"
+  - "DowntimeSeverity"
+  - "CreateDowntimeEventInput"

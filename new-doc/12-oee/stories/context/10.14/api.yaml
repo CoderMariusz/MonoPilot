@@ -1,0 +1,63 @@
+# Story 10.14 - API Specification
+# Purpose: Handover notes and email notification endpoints
+# Agent: BACKEND-DEV
+
+endpoints:
+  - method: "GET"
+    path: "/api/oee/handover-notes"
+    description: "List handover notes"
+    auth: "required"
+    query_params:
+      shift_id: "string (optional) - filter by target shift"
+      unacknowledged_only: "boolean (optional)"
+
+  - method: "POST"
+    path: "/api/oee/handover-notes"
+    description: "Create handover note"
+    auth: "required"
+    request:
+      body:
+        note_type: "string (required) - 'issue' | 'action_item' | 'information'"
+        priority: "string (optional) - 'low' | 'normal' | 'high' | 'urgent'"
+        subject: "string (required)"
+        message: "string (required)"
+        to_shift_id: "string (optional)"
+        machine_id: "string (optional)"
+        line_id: "string (optional)"
+
+  - method: "POST"
+    path: "/api/oee/handover-notes/:id/acknowledge"
+    description: "Acknowledge handover note"
+    auth: "required"
+    request:
+      body:
+        acknowledgment_notes: "string (optional)"
+
+  - method: "POST"
+    path: "/api/oee/alerts/:id/send-email"
+    description: "Send email notification for alert"
+    auth: "required"
+
+services:
+  - path: "apps/frontend/lib/services/handover-notes-service.ts"
+    exports:
+      - name: "HandoverNotesService"
+        methods:
+          - "list"
+          - "create"
+          - "acknowledge"
+
+  - path: "apps/frontend/lib/services/email-notification-service.ts"
+    exports:
+      - name: "EmailNotificationService"
+        methods:
+          - "sendAlertEmail"
+          - "sendShiftSummaryEmail"
+
+types:
+  - path: "apps/frontend/lib/types/handover-notes.ts"
+    exports:
+      - "HandoverNote"
+      - "NoteType"
+      - "Priority"
+      - "CreateNoteInput"

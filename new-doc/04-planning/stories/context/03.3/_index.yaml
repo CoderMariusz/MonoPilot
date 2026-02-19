@@ -1,0 +1,136 @@
+# Story 03.3 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "03.3"
+  name: "PO CRUD + Lines"
+  slug: "po-crud-lines"
+  epic: "03-planning"
+  phase: "MVP"
+  complexity: "L"
+  estimate_days: 5-7
+  type: "full-stack"
+  state: "ready"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, RLS, triggers, seed data
+  - api.yaml         # Endpoints, services, validation schemas
+  - frontend.yaml    # Pages, components, wireframe references
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["org_id context", "RLS patterns", "permission checks"]
+    - story: "01.8"
+      name: "Warehouses CRUD"
+      provides: ["warehouses table", "warehouse_id FK"]
+    - story: "01.13"
+      name: "Tax Codes CRUD"
+      provides: ["tax_codes table", "tax_code_id FK"]
+    - story: "02.1"
+      name: "Products CRUD"
+      provides: ["products table", "product_id FK"]
+    - story: "03.1"
+      name: "Suppliers CRUD"
+      provides: ["suppliers table", "supplier_id FK"]
+    - story: "03.2"
+      name: "Supplier-Product Assignment"
+      provides: ["supplier_products table", "price defaults"]
+
+  blocks:
+    - story: "03.4"
+      name: "Bulk PO Creation"
+      reason: "Builds on PO CRUD foundation"
+    - story: "03.5"
+      name: "PO Approval Workflow"
+      reason: "Extends PO status lifecycle"
+    - story: "03.6"
+      name: "Configurable PO Statuses"
+      reason: "Customizes status list"
+    - story: "05.11"
+      name: "GRN from PO"
+      reason: "Creates receiving from PO lines"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/planning.md"
+    sections:
+      - "FR-PLAN-005"  # PO CRUD
+      - "FR-PLAN-006"  # PO Line Management
+      - "FR-PLAN-007"  # PO Status Lifecycle
+      - "FR-PLAN-010"  # PO Totals Calculation
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/planning.md"
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/03-planning/03.3.po-crud-lines.md"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-004-po-list.md"
+      screens: ["PO List", "KPI Cards", "Filters", "Status Badges"]
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-005-po-create-edit-modal.md"
+      screens: ["PO Header Form", "Lines Table", "Totals Section"]
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-006-po-detail.md"
+      screens: ["PO Detail", "Lines Tab", "History Tab", "Documents Tab"]
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-009-add-po-line-modal.md"
+      screens: ["Add Line Modal", "Product Search", "Price Auto-Fill"]
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for purchase_orders and po_lines"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 3
+    description: "purchase_orders, purchase_order_lines, po_status_history tables + RLS + triggers"
+  - type: "service"
+    count: 1
+    description: "purchase-order-service.ts with full CRUD + status transitions"
+  - type: "validation"
+    count: 1
+    description: "purchase-order.ts Zod schemas for header + lines"
+  - type: "api"
+    count: 8
+    description: "CRUD + status actions + line operations endpoints"
+  - type: "pages"
+    count: 3
+    description: "List page, detail page, create/edit page"
+  - type: "components"
+    count: 15
+    description: "PODataTable, POForm, POLinesTable, POLineModal, etc."
+  - type: "tests"
+    count: 4
+    description: "Unit + integration + E2E tests"
+
+# Technical notes
+technical_notes:
+  - "Master-Detail pattern: PO header + lines in atomic transactions"
+  - "Use ADR-013 RLS pattern: org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+  - "PO lines RLS via FK to purchase_orders (no direct org_id)"
+  - "Triggers auto-calculate line totals and header totals"
+  - "PO number auto-generated as PO-YYYY-NNNNN per org/year"
+  - "Status lifecycle: draft -> submitted -> confirmed -> receiving -> closed"
+  - "Return 404 (not 403) for cross-tenant access"
+  - "Price cascade: supplier_products.unit_price > products.std_price"
+  - "Currency cascade: supplier.currency > manual entry"
+  - "Tax code cascade: supplier.tax_code_id > manual entry"
+
+# PRD Coverage Map
+prd_coverage:
+  - fr_id: "FR-PLAN-005"
+    requirement: "PO CRUD"
+    coverage: "Full - create, read, update, delete purchase orders"
+  - fr_id: "FR-PLAN-006"
+    requirement: "PO Line Management"
+    coverage: "Full - add, edit, remove lines with validation"
+  - fr_id: "FR-PLAN-007"
+    requirement: "PO Status Lifecycle"
+    coverage: "Full - basic lifecycle (draft to closed)"
+  - fr_id: "FR-PLAN-010"
+    requirement: "PO Totals Calculation"
+    coverage: "Full - subtotal, tax, total auto-calculated"

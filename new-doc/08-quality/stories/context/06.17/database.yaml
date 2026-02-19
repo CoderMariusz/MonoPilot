@@ -1,0 +1,816 @@
+# Story 06.17 - Database Context
+# Generated: 2026-01-15
+# Purpose: Database schema, migrations, RLS, seed data
+
+# =============================================================================
+# TABLES
+# =============================================================================
+
+tables:
+  # ---------------------------------------------------------------------------
+  # Quality Alert Templates
+  # ---------------------------------------------------------------------------
+  - name: quality_alert_templates
+    description: "Configurable message templates for different alert types"
+    columns:
+      - name: id
+        type: UUID
+        pk: true
+        default: gen_random_uuid()
+      - name: org_id
+        type: UUID
+        nullable: false
+        fk: organizations(id)
+        on_delete: CASCADE
+      - name: template_code
+        type: TEXT
+        nullable: false
+        description: "Unique code: ccp_deviation, ncr_critical, etc."
+      - name: name
+        type: TEXT
+        nullable: false
+      - name: description
+        type: TEXT
+        nullable: true
+      - name: severity
+        type: quality_alert_severity
+        nullable: false
+        description: "critical, high, medium, low"
+      - name: subject_template
+        type: TEXT
+        nullable: false
+        description: "Mustache template: CRITICAL: CCP {{ccp_name}} Deviation"
+      - name: body_template
+        type: TEXT
+        nullable: false
+        description: "Mustache template for body"
+      - name: sms_template
+        type: TEXT
+        nullable: true
+        description: "Short SMS version (max 160 chars)"
+      - name: default_recipients
+        type: JSONB
+        nullable: true
+        description: "Role codes: [\"QA_MANAGER\", \"PRODUCTION_LEAD\"]"
+      - name: escalation_roles
+        type: JSONB
+        nullable: true
+        description: "Roles for escalation: [\"QUALITY_DIRECTOR\"]"
+      - name: escalation_timeout_min
+        type: INTEGER
+        default: 60
+        description: "Minutes before escalation"
+      - name: channels_enabled
+        type: JSONB
+        nullable: false
+        default: "[\"websocket\", \"email\"]"
+      - name: auto_trigger_enabled
+        type: BOOLEAN
+        nullable: false
+        default: true
+      - name: trigger_conditions
+        type: JSONB
+        nullable: true
+        description: "Conditions for auto-trigger"
+      - name: is_active
+        type: BOOLEAN
+        nullable: false
+        default: true
+      - name: created_at
+        type: TIMESTAMPTZ
+        nullable: false
+        default: now()
+      - name: created_by
+        type: UUID
+        nullable: true
+        fk: users(id)
+      - name: updated_at
+        type: TIMESTAMPTZ
+        nullable: false
+        default: now()
+      - name: updated_by
+        type: UUID
+        nullable: true
+        fk: users(id)
+    constraints:
+      - type: UNIQUE
+        name: uq_alert_template_code
+        columns: [org_id, template_code]
+    indexes:
+      - name: idx_alert_templates_org
+        columns: [org_id]
+      - name: idx_alert_templates_active
+        columns: [org_id, is_active]
+        where: "is_active = true"
+
+  # ---------------------------------------------------------------------------
+  # Quality Alerts
+  # ---------------------------------------------------------------------------
+  - name: quality_alerts
+    description: "Quality alert records with delivery tracking"
+    columns:
+      - name: id
+        type: UUID
+        pk: true
+        default: gen_random_uuid()
+      - name: org_id
+        type: UUID
+        nullable: false
+        fk: organizations(id)
+        on_delete: CASCADE
+      - name: alert_number
+        type: TEXT
+        nullable: false
+        description: "QA-YYYY-NNNNN"
+      - name: template_id
+        type: UUID
+        nullable: true
+        fk: quality_alert_templates(id)
+      - name: alert_type
+        type: TEXT
+        nullable: false
+        description: "ccp_deviation, ncr_critical, inspection_failed, etc."
+      - name: severity
+        type: quality_alert_severity
+        nullable: false
+      - name: subject
+        type: TEXT
+        nullable: false
+      - name: body
+        type: TEXT
+        nullable: false
+      - name: sms_body
+        type: TEXT
+        nullable: true
+      - name: source_type
+        type: TEXT
+        nullable: true
+        description: "ncr, inspection, hold, ccp_monitoring, capa, etc."
+      - name: source_id
+        type: UUID
+        nullable: true
+      - name: source_reference
+        type: TEXT
+        nullable: true
+        description: "Human-readable: NCR-2025-00123"
+      - name: status
+        type: quality_alert_status
+        nullable: false
+        default: pending
+      - name: channels_sent
+        type: JSONB
+        default: "[]"
+      - name: created_at
+        type: TIMESTAMPTZ
+        nullable: false
+        default: now()
+      - name: expires_at
+        type: TIMESTAMPTZ
+        nullable: true
+      - name: delivered_at
+        type: TIMESTAMPTZ
+        nullable: true
+      - name: first_read_at
+        type: TIMESTAMPTZ
+        nullable: true
+      - name: acknowledged_at
+        type: TIMESTAMPTZ
+        nullable: true
+      - name: acknowledged_by
+        type: UUID
+        nullable: true
+        fk: users(id)
+      - name: escalation_level
+        type: INTEGER
+        default: 0
+      - name: escalated_at
+        type: TIMESTAMPTZ
+        nullable: true
+      - name: next_escalation_at
+        type: TIMESTAMPTZ
+        nullable: true
+      - name: metadata
+        type: JSONB
+        nullable: true
+    constraints:
+      - type: UNIQUE
+        name: uq_alert_number
+        columns: [org_id, alert_number]
+    indexes:
+      - name: idx_qa_alerts_org_status
+        columns: [org_id, status]
+      - name: idx_qa_alerts_org_severity
+        columns: [org_id, severity]
+      - name: idx_qa_alerts_created
+        columns: [org_id, created_at]
+        order: DESC
+      - name: idx_qa_alerts_source
+        columns: [source_type, source_id]
+      - name: idx_qa_alerts_pending_escalation
+        columns: [next_escalation_at]
+        where: "status = 'pending' AND next_escalation_at IS NOT NULL"
+
+  # ---------------------------------------------------------------------------
+  # Quality Alert Recipients
+  # ---------------------------------------------------------------------------
+  - name: quality_alert_recipients
+    description: "Alert recipients with per-user delivery status"
+    columns:
+      - name: id
+        type: UUID
+        pk: true
+        default: gen_random_uuid()
+      - name: alert_id
+        type: UUID
+        nullable: false
+        fk: quality_alerts(id)
+        on_delete: CASCADE
+      - name: user_id
+        type: UUID
+        nullable: false
+        fk: users(id)
+        on_delete: CASCADE
+      - name: status
+        type: quality_alert_status
+        nullable: false
+        default: pending
+      - name: websocket_sent_at
+        type: TIMESTAMPTZ
+        nullable: true
+      - name: websocket_delivered_at
+        type: TIMESTAMPTZ
+        nullable: true
+      - name: email_sent_at
+        type: TIMESTAMPTZ
+        nullable: true
+      - name: email_delivered_at
+        type: TIMESTAMPTZ
+        nullable: true
+      - name: email_opened_at
+        type: TIMESTAMPTZ
+        nullable: true
+      - name: sms_sent_at
+        type: TIMESTAMPTZ
+        nullable: true
+      - name: sms_delivered_at
+        type: TIMESTAMPTZ
+        nullable: true
+      - name: read_at
+        type: TIMESTAMPTZ
+        nullable: true
+      - name: acknowledged_at
+        type: TIMESTAMPTZ
+        nullable: true
+      - name: acknowledgment_notes
+        type: TEXT
+        nullable: true
+      - name: escalation_level
+        type: INTEGER
+        default: 0
+        description: "0 = original, 1 = first escalation, etc."
+      - name: created_at
+        type: TIMESTAMPTZ
+        nullable: false
+        default: now()
+    constraints:
+      - type: UNIQUE
+        name: uq_alert_recipient
+        columns: [alert_id, user_id]
+    indexes:
+      - name: idx_qa_alert_recipients_user
+        columns: [user_id, status]
+      - name: idx_qa_alert_recipients_alert
+        columns: [alert_id]
+      - name: idx_qa_alert_recipients_unread
+        columns: [user_id, read_at]
+        where: "read_at IS NULL"
+
+  # ---------------------------------------------------------------------------
+  # User Alert Preferences
+  # ---------------------------------------------------------------------------
+  - name: user_alert_preferences
+    description: "Per-user alert delivery preferences"
+    columns:
+      - name: id
+        type: UUID
+        pk: true
+        default: gen_random_uuid()
+      - name: user_id
+        type: UUID
+        nullable: false
+        fk: users(id)
+        on_delete: CASCADE
+      - name: org_id
+        type: UUID
+        nullable: false
+        fk: organizations(id)
+        on_delete: CASCADE
+      - name: alerts_enabled
+        type: BOOLEAN
+        nullable: false
+        default: true
+      - name: quiet_hours_enabled
+        type: BOOLEAN
+        nullable: false
+        default: false
+      - name: quiet_hours_start
+        type: TIME
+        nullable: true
+        description: "22:00"
+      - name: quiet_hours_end
+        type: TIME
+        nullable: true
+        description: "07:00"
+      - name: quiet_hours_timezone
+        type: TEXT
+        default: UTC
+      - name: websocket_enabled
+        type: BOOLEAN
+        nullable: false
+        default: true
+      - name: email_enabled
+        type: BOOLEAN
+        nullable: false
+        default: true
+      - name: sms_enabled
+        type: BOOLEAN
+        nullable: false
+        default: false
+      - name: push_enabled
+        type: BOOLEAN
+        nullable: false
+        default: false
+      - name: severity_preferences
+        type: JSONB
+        nullable: true
+        description: "{\"critical\": {\"websocket\": true, \"email\": true, \"sms\": true}}"
+      - name: alert_type_preferences
+        type: JSONB
+        nullable: true
+        description: "{\"ccp_deviation\": {\"email\": false}}"
+      - name: email_address
+        type: TEXT
+        nullable: true
+        description: "Override user email (optional)"
+      - name: sms_phone_number
+        type: TEXT
+        nullable: true
+        description: "E.164 format: +1234567890"
+      - name: created_at
+        type: TIMESTAMPTZ
+        nullable: false
+        default: now()
+      - name: updated_at
+        type: TIMESTAMPTZ
+        nullable: false
+        default: now()
+    constraints:
+      - type: UNIQUE
+        name: uq_user_alert_preferences
+        columns: [user_id, org_id]
+    indexes:
+      - name: idx_user_alert_prefs_user
+        columns: [user_id]
+      - name: idx_user_alert_prefs_org
+        columns: [org_id]
+
+  # ---------------------------------------------------------------------------
+  # Quality Alert Delivery Log (Immutable Audit Trail)
+  # ---------------------------------------------------------------------------
+  - name: quality_alert_delivery_log
+    description: "Immutable audit trail for alert deliveries"
+    columns:
+      - name: id
+        type: UUID
+        pk: true
+        default: gen_random_uuid()
+      - name: alert_id
+        type: UUID
+        nullable: false
+        fk: quality_alerts(id)
+        on_delete: CASCADE
+      - name: recipient_id
+        type: UUID
+        nullable: true
+        fk: quality_alert_recipients(id)
+        on_delete: SET NULL
+      - name: user_id
+        type: UUID
+        nullable: true
+        fk: users(id)
+      - name: channel
+        type: quality_alert_channel
+        nullable: false
+        description: "websocket, email, sms, push"
+      - name: status
+        type: TEXT
+        nullable: false
+        description: "pending, sent, delivered, failed, bounced, opened"
+      - name: provider
+        type: TEXT
+        nullable: true
+        description: "sendgrid, twilio, internal"
+      - name: provider_message_id
+        type: TEXT
+        nullable: true
+      - name: provider_response
+        type: JSONB
+        nullable: true
+      - name: error_message
+        type: TEXT
+        nullable: true
+      - name: retry_count
+        type: INTEGER
+        default: 0
+      - name: next_retry_at
+        type: TIMESTAMPTZ
+        nullable: true
+      - name: created_at
+        type: TIMESTAMPTZ
+        nullable: false
+        default: now()
+    constraints:
+      - type: CHECK
+        name: check_status
+        expression: "status IN ('pending', 'sent', 'delivered', 'failed', 'bounced', 'opened')"
+    indexes:
+      - name: idx_qa_delivery_log_alert
+        columns: [alert_id]
+      - name: idx_qa_delivery_log_user
+        columns: [user_id]
+      - name: idx_qa_delivery_log_retry
+        columns: [next_retry_at]
+        where: "status = 'failed' AND next_retry_at IS NOT NULL"
+    notes:
+      - "This table is append-only for audit compliance"
+      - "No UPDATE or DELETE policies should be created"
+
+  # ---------------------------------------------------------------------------
+  # Quality Alert Sequences
+  # ---------------------------------------------------------------------------
+  - name: quality_alert_sequences
+    description: "Per-org, per-year sequence for alert numbers"
+    columns:
+      - name: id
+        type: UUID
+        pk: true
+        default: gen_random_uuid()
+      - name: org_id
+        type: UUID
+        nullable: false
+        fk: organizations(id)
+        on_delete: CASCADE
+      - name: year
+        type: INTEGER
+        nullable: false
+      - name: current_value
+        type: BIGINT
+        nullable: false
+        default: 0
+      - name: updated_at
+        type: TIMESTAMPTZ
+        nullable: false
+        default: now()
+    constraints:
+      - type: UNIQUE
+        columns: [org_id, year]
+
+# =============================================================================
+# ENUMS
+# =============================================================================
+
+enums:
+  - name: quality_alert_severity
+    values:
+      - critical
+      - high
+      - medium
+      - low
+  - name: quality_alert_status
+    values:
+      - pending
+      - delivered
+      - read
+      - acknowledged
+      - expired
+  - name: quality_alert_channel
+    values:
+      - websocket
+      - email
+      - sms
+      - push
+
+# =============================================================================
+# FUNCTIONS
+# =============================================================================
+
+functions:
+  - name: generate_alert_number
+    description: "Generate alert number in QA-YYYY-NNNNN format"
+    parameters:
+      - name: p_org_id
+        type: UUID
+    returns: TEXT
+    language: plpgsql
+    body: |
+      DECLARE
+          v_year INTEGER;
+          v_next_val BIGINT;
+          v_alert_number TEXT;
+      BEGIN
+          v_year := EXTRACT(YEAR FROM CURRENT_DATE);
+
+          INSERT INTO quality_alert_sequences (org_id, year, current_value)
+          VALUES (p_org_id, v_year, 1)
+          ON CONFLICT (org_id, year)
+          DO UPDATE SET
+              current_value = quality_alert_sequences.current_value + 1,
+              updated_at = NOW()
+          RETURNING current_value INTO v_next_val;
+
+          v_alert_number := 'QA-' || v_year::TEXT || '-' || LPAD(v_next_val::TEXT, 5, '0');
+
+          RETURN v_alert_number;
+      END;
+
+# =============================================================================
+# RLS POLICIES
+# =============================================================================
+
+rls_policies:
+  quality_alert_templates:
+    - name: alert_templates_select
+      operation: SELECT
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - name: alert_templates_insert
+      operation: INSERT
+      with_check: |
+        org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        AND EXISTS (
+            SELECT 1 FROM users u
+            JOIN roles r ON u.role_id = r.id
+            WHERE u.id = auth.uid() AND r.code IN ('SUPER_ADMIN', 'ADMIN', 'QA_MANAGER')
+        )
+    - name: alert_templates_update
+      operation: UPDATE
+      using: |
+        org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        AND EXISTS (
+            SELECT 1 FROM users u
+            JOIN roles r ON u.role_id = r.id
+            WHERE u.id = auth.uid() AND r.code IN ('SUPER_ADMIN', 'ADMIN', 'QA_MANAGER')
+        )
+
+  quality_alerts:
+    - name: alerts_select
+      operation: SELECT
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - name: alerts_insert
+      operation: INSERT
+      with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+  quality_alert_recipients:
+    - name: alert_recipients_select
+      operation: SELECT
+      using: |
+        user_id = auth.uid()
+        OR EXISTS (
+            SELECT 1 FROM quality_alerts a
+            WHERE a.id = alert_id
+            AND a.org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+            AND EXISTS (
+                SELECT 1 FROM users u
+                JOIN roles r ON u.role_id = r.id
+                WHERE u.id = auth.uid() AND r.code IN ('SUPER_ADMIN', 'ADMIN', 'QA_MANAGER')
+            )
+        )
+    - name: alert_recipients_update
+      operation: UPDATE
+      using: "user_id = auth.uid()"
+
+  user_alert_preferences:
+    - name: user_prefs_select
+      operation: SELECT
+      using: "user_id = auth.uid()"
+    - name: user_prefs_insert
+      operation: INSERT
+      with_check: "user_id = auth.uid()"
+    - name: user_prefs_update
+      operation: UPDATE
+      using: "user_id = auth.uid()"
+
+  quality_alert_delivery_log:
+    - name: delivery_log_select
+      operation: SELECT
+      using: |
+        EXISTS (
+            SELECT 1 FROM quality_alerts a
+            WHERE a.id = alert_id
+            AND a.org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        )
+    # No INSERT/UPDATE/DELETE policies - service role only (append-only)
+
+# =============================================================================
+# TRIGGERS
+# =============================================================================
+
+triggers:
+  - name: update_alert_templates_updated_at
+    table: quality_alert_templates
+    timing: BEFORE UPDATE
+    event: UPDATE
+    function: update_updated_at_column()
+  - name: update_user_alert_prefs_updated_at
+    table: user_alert_preferences
+    timing: BEFORE UPDATE
+    event: UPDATE
+    function: update_updated_at_column()
+
+# =============================================================================
+# SEED DATA
+# =============================================================================
+
+seed_data:
+  quality_alert_templates:
+    - template_code: ccp_deviation
+      name: CCP Deviation Alert
+      severity: critical
+      subject_template: "CRITICAL: CCP Deviation at {{ccp_name}}"
+      body_template: |
+        CCP: {{ccp_name}}
+        Recorded Value: {{value}} {{unit}}
+        Limit: {{limit_min}} - {{limit_max}} {{unit}}
+        Work Order: {{work_order_number}}
+        Operator: {{operator_name}}
+        Time: {{recorded_at}}
+
+        IMMEDIATE ACTION REQUIRED
+      sms_template: "CCP {{ccp_name}} DEVIATION: {{value}} (limit: {{limit_min}}-{{limit_max}})"
+      default_recipients: ["QA_MANAGER", "PRODUCTION_LEAD"]
+      escalation_roles: ["QUALITY_DIRECTOR"]
+      escalation_timeout_min: 30
+      channels_enabled: ["websocket", "email", "sms"]
+
+    - template_code: ncr_critical
+      name: Critical NCR Alert
+      severity: critical
+      subject_template: "CRITICAL NCR: {{ncr_number}} - {{title}}"
+      body_template: |
+        NCR Number: {{ncr_number}}
+        Title: {{title}}
+        Severity: CRITICAL
+        Detection Point: {{detection_point}}
+        Detected By: {{detected_by}}
+        Description: {{description}}
+
+        This is a food safety critical issue requiring immediate attention.
+      sms_template: "CRITICAL NCR {{ncr_number}}: {{title}}"
+      default_recipients: ["QA_MANAGER", "QUALITY_DIRECTOR"]
+      escalation_roles: ["SUPER_ADMIN"]
+      escalation_timeout_min: 60
+      channels_enabled: ["websocket", "email", "sms"]
+
+    - template_code: inspection_failed
+      name: Failed Inspection Alert
+      severity: critical
+      subject_template: "FAILED: Inspection {{inspection_number}}"
+      body_template: |
+        Inspection Number: {{inspection_number}}
+        Type: {{inspection_type}}
+        Result: FAILED
+        Product: {{product_name}}
+        Reference: {{reference_number}}
+        Inspector: {{inspector_name}}
+        Failed Parameters:
+        {{#failed_parameters}}
+        - {{parameter_name}}: {{measured_value}} (spec: {{spec_value}})
+        {{/failed_parameters}}
+      sms_template: "FAILED Inspection {{inspection_number}} - {{product_name}}"
+      default_recipients: ["QA_MANAGER"]
+      escalation_roles: ["QUALITY_DIRECTOR"]
+      escalation_timeout_min: 60
+      channels_enabled: ["websocket", "email", "sms"]
+
+    - template_code: inspection_due
+      name: Inspection Due Alert
+      severity: high
+      subject_template: "Inspection Due: {{product_name}}"
+      body_template: |
+        Scheduled Inspection Due
+
+        Product: {{product_name}}
+        Inspection Type: {{inspection_type}}
+        Due Date: {{due_date}}
+        Reference: {{reference_number}}
+
+        Please complete the inspection by the due date.
+      default_recipients: ["QA_INSPECTOR"]
+      escalation_roles: ["QA_MANAGER"]
+      escalation_timeout_min: 240
+      channels_enabled: ["websocket", "email"]
+
+    - template_code: hold_aging
+      name: Quality Hold Aging Alert
+      severity: high
+      subject_template: "Hold Aging: {{hold_number}} - {{age_hours}}h"
+      body_template: |
+        Quality Hold Aging Alert
+
+        Hold Number: {{hold_number}}
+        Reason: {{reason}}
+        Age: {{age_hours}} hours
+        Items on Hold: {{item_count}}
+        Held By: {{held_by}}
+
+        This hold has exceeded the 48-hour threshold. Please review and resolve.
+      default_recipients: ["QA_MANAGER"]
+      channels_enabled: ["websocket", "email"]
+
+    - template_code: ncr_overdue
+      name: NCR Overdue Alert
+      severity: high
+      subject_template: "OVERDUE: NCR {{ncr_number}}"
+      body_template: |
+        NCR Overdue Alert
+
+        NCR Number: {{ncr_number}}
+        Title: {{title}}
+        Current Status: {{status}}
+        Days Since Last Update: {{days_since_update}}
+        Assigned To: {{assigned_to}}
+
+        This NCR has not progressed within the required timeframe.
+      default_recipients: ["QA_MANAGER"]
+      escalation_roles: ["QUALITY_DIRECTOR"]
+      escalation_timeout_min: 480
+      channels_enabled: ["websocket", "email"]
+
+    - template_code: batch_pending_release
+      name: Batch Pending Release Alert
+      severity: medium
+      subject_template: "Batch Pending Release: {{batch_number}}"
+      body_template: |
+        Batch Pending QA Release
+
+        Batch Number: {{batch_number}}
+        Product: {{product_name}}
+        Completed At: {{completed_at}}
+        Waiting Since: {{waiting_hours}} hours
+
+        Please review and release or reject this batch.
+      default_recipients: ["QA_MANAGER"]
+      channels_enabled: ["websocket", "email"]
+
+    - template_code: capa_effectiveness_due
+      name: CAPA Effectiveness Check Due
+      severity: medium
+      subject_template: "CAPA Effectiveness Due: {{capa_number}}"
+      body_template: |
+        CAPA Effectiveness Check Due
+
+        CAPA Number: {{capa_number}}
+        Title: {{title}}
+        Due Date: {{due_date}}
+        Owner: {{owner_name}}
+
+        Please complete the effectiveness verification.
+      default_recipients: ["QA_MANAGER"]
+      channels_enabled: ["websocket", "email"]
+
+    - template_code: supplier_audit_due
+      name: Supplier Audit Due
+      severity: low
+      subject_template: "Supplier Audit Due: {{supplier_name}}"
+      body_template: |
+        Supplier Audit Due
+
+        Supplier: {{supplier_name}}
+        Last Audit: {{last_audit_date}}
+        Due Date: {{due_date}}
+        Audit Type: {{audit_type}}
+
+        Please schedule and conduct the supplier audit.
+      default_recipients: ["QUALITY_DIRECTOR"]
+      channels_enabled: ["websocket", "email"]
+
+    - template_code: manual_alert
+      name: Manual Alert
+      severity: medium
+      subject_template: "{{subject}}"
+      body_template: "{{body}}"
+      default_recipients: []
+      auto_trigger_enabled: false
+      channels_enabled: ["websocket", "email"]
+
+# =============================================================================
+# MIGRATION NOTES
+# =============================================================================
+
+migration_notes:
+  - "Create enums first: quality_alert_severity, quality_alert_status, quality_alert_channel"
+  - "Create tables in order: templates -> alerts -> recipients -> preferences -> delivery_log -> sequences"
+  - "Run function creation after tables"
+  - "Enable RLS on all tables"
+  - "Create policies after RLS enabled"
+  - "Seed default templates after org creation (not in base migration)"
+  - "Delivery log is append-only - no UPDATE/DELETE policies"

@@ -1,0 +1,74 @@
+# Story 10.18 - Mobile Downtime Logging Context (Entry Point)
+# Generated: 2025-01-15
+# Phase: 3 (Mobile Features)
+
+story:
+  id: "10.18"
+  name: "Mobile Downtime Logging"
+  slug: "mobile-downtime-logging"
+  epic: "10-oee"
+  phase: "3"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "frontend (mobile)"
+  state: "ready"
+  priority: "P0"
+
+context_files:
+  - _index.yaml
+  - database.yaml
+  - api.yaml
+  - frontend.yaml
+  - tests.yaml
+
+dependencies:
+  required:
+    - story: "10.2"
+      name: "Downtime Reason Codes"
+      provides: ["downtime_reasons table"]
+    - story: "10.3"
+      name: "Downtime Event Tracking"
+      provides: ["oee_downtime_events table", "downtime API"]
+
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/oee.md"
+    sections: ["FR-OEE-025 - Mobile Downtime Logging"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/10-oee/10.18.mobile-downtime-logging.md"
+
+deliverables:
+  - type: "page"
+    count: 1
+    description: "/scanner/downtime - mobile downtime log page"
+  - type: "components"
+    count: 5
+    description: "QR scanner, reason buttons, photo capture, offline storage"
+  - type: "service"
+    count: 1
+    description: "Offline sync service"
+
+technical_notes:
+  - "Mobile-first responsive design"
+  - "QR code scan for machine selection"
+  - "Large touch targets (min 44x44px)"
+  - "Camera integration for photo capture"
+  - "Offline mode with IndexedDB (max 50 events)"
+  - "Auto-sync when online"
+  - "PWA support for add to home screen"
+
+summary: |
+  Story 10.18 implements mobile-friendly downtime logging for operators.
+
+  MVP SCOPE:
+  - Mobile downtime log page (/scanner/downtime)
+  - QR code scan for machine selection
+  - Quick reason selection with large buttons
+  - Optional photo capture
+  - Offline mode (IndexedDB, 50 events max)
+  - Auto-sync when connection restored
+
+  OUT OF SCOPE (Phase 4):
+  - Native mobile app
+  - Biometric auth
+  - NFC tag support

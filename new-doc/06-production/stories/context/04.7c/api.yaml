@@ -1,0 +1,257 @@
+# Story 04.7c - API Specification
+# Purpose: Endpoints for by-product registration
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  - method: "POST"
+    path: "/api/production/outputs/by-products"
+    description: "Register by-product output LP"
+    file: "apps/frontend/app/api/production/outputs/by-products/route.ts"
+    auth: "required"
+    roles: ["operator", "production_manager", "admin", "owner"]
+    permission: "production.outputs.create"
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      body:
+        type: "RegisterByProductRequest"
+        schema:
+          wo_id: "UUID - required - Work Order ID"
+          main_output_lp_id: "UUID - required - Main output LP for genealogy"
+          by_product_id: "UUID - required - Product ID of by-product"
+          by_product_material_id: "UUID - required - wo_materials reference"
+          quantity: "decimal - required - Actual quantity"
+          uom: "string - required - Unit of measure"
+          batch_number: "string - optional - Auto-generated if not provided"
+          qa_status: "string - optional - Quality status"
+          location_id: "UUID - required - Storage location"
+          expiry_date: "date - optional - Auto-calculated if not provided"
+          notes: "string - optional - Additional notes"
+        example:
+          wo_id: "456e4567-e89b-12d3-a456-426614174111"
+          main_output_lp_id: "789e4567-e89b-12d3-a456-426614174222"
+          by_product_id: "abc12345-e89b-12d3-a456-426614174333"
+          by_product_material_id: "def67890-e89b-12d3-a456-426614174444"
+          quantity: 45.0
+          uom: "kg"
+          batch_number: "B-2025-0156-BP-BRAN"
+          qa_status: "pending"
+          location_id: "loc12345-e89b-12d3-a456-426614174555"
+          expiry_date: "2025-03-14"
+          notes: "By-product from batch B-2025-0156"
+
+    response:
+      status: 200
+      type: "ByProductRegistrationResult"
+      schema:
+        success: "boolean"
+        lp: "LP object with id, lp_number, qty, status"
+        genealogy: "array of genealogy links copied from main output"
+        output_record: "production_outputs record"
+        message: "string"
+      example:
+        success: true
+        lp:
+          id: "lp-new-12345"
+          lp_number: "LP-2025-05486"
+          product_id: "abc12345-e89b-12d3-a456-426614174333"
+          product_name: "Wheat Bran"
+          qty: 45.0
+          uom: "kg"
+          batch_number: "B-2025-0156-BP-BRAN"
+          qa_status: "pending"
+          location_id: "loc12345-e89b-12d3-a456-426614174555"
+          is_by_product: true
+        genealogy:
+          - parent_lp_id: "uuid-lp-401"
+            parent_lp_number: "LP-2025-05401"
+            qty_consumed: 400
+          - parent_lp_id: "uuid-lp-402"
+            parent_lp_number: "LP-2025-05402"
+            qty_consumed: 50
+        output_record:
+          id: "output-new-12345"
+          wo_id: "456e4567-e89b-12d3-a456-426614174111"
+          is_by_product: true
+          parent_output_id: "main-output-id"
+        message: "By-product LP-2025-05486 created with 45 kg"
+
+    errors:
+      - status: 400
+        code: "INVALID_BY_PRODUCT"
+        message: "Product is not a by-product in this WO"
+        when: "Product not in wo_materials with is_by_product=true"
+      - status: 400
+        code: "MAIN_OUTPUT_NOT_FOUND"
+        message: "Main output LP not found"
+        when: "main_output_lp_id doesn't exist"
+      - status: 400
+        code: "QUANTITY_REQUIRED"
+        message: "Quantity is required"
+        when: "quantity is null or undefined"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token"
+      - status: 404
+        code: "WO_NOT_FOUND"
+        message: "Work order not found"
+        when: "WO doesn't exist or different org"
+
+  - method: "GET"
+    path: "/api/production/work-orders/:id/by-products"
+    description: "Get by-product status for WO"
+    file: "apps/frontend/app/api/production/work-orders/[id]/by-products/route.ts"
+    auth: "required"
+    roles: ["operator", "production_manager", "admin", "owner"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        id: "UUID - Work Order ID"
+
+    response:
+      status: 200
+      type: "ByProductStatusResponse"
+      schema:
+        wo_id: "UUID"
+        wo_number: "string"
+        auto_create_enabled: "boolean"
+        by_products: "array of by-product status objects"
+      example:
+        wo_id: "456e4567-e89b-12d3-a456-426614174111"
+        wo_number: "WO-2025-0156"
+        auto_create_enabled: true
+        by_products:
+          - product_id: "uuid-bp-1"
+            product_name: "Wheat Bran"
+            product_code: "SKU-BP-BRAN"
+            yield_percent: 5.0
+            expected_qty: 250
+            actual_qty: 160
+            uom: "kg"
+            lp_count: 6
+            status: "registered"
+            last_registered_at: "2025-12-14T08:15:00Z"
+          - product_id: "uuid-bp-2"
+            product_name: "Wheat Germ"
+            product_code: "SKU-BP-GERM"
+            yield_percent: 2.0
+            expected_qty: 100
+            actual_qty: 0
+            uom: "kg"
+            lp_count: 0
+            status: "not_registered"
+            last_registered_at: null
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/by-product-service.ts"
+    description: "By-product registration service"
+    exports:
+      - name: "registerByProduct"
+        type: "async function"
+        params:
+          - "request: RegisterByProductRequest"
+        returns: "Promise<ByProductRegistrationResult>"
+        description: "Create by-product LP with genealogy"
+
+      - name: "autoCreateByProducts"
+        type: "async function"
+        params:
+          - "woId: string"
+          - "mainOutputLpId: string"
+          - "parentOutputId: string"
+        returns: "Promise<ByProductRegistrationResult[]>"
+        description: "Auto-create all by-product LPs for WO"
+
+      - name: "calculateExpectedByProductQty"
+        type: "function"
+        params:
+          - "plannedQty: number"
+          - "yieldPercent: number"
+        returns: "number"
+        description: "Calculate expected by-product quantity"
+        implementation: "return plannedQty * yieldPercent / 100"
+
+      - name: "getByProductsForWO"
+        type: "async function"
+        params:
+          - "woId: string"
+        returns: "Promise<ByProductStatus[]>"
+        description: "Get all by-products with registration status"
+
+      - name: "generateByProductBatch"
+        type: "function"
+        params:
+          - "mainBatch: string"
+          - "productCode: string"
+        returns: "string"
+        description: "Generate batch number for by-product"
+        implementation: "return `${mainBatch}-BP-${productCode}`"
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/production.ts"
+    exports:
+      - name: "RegisterByProductRequest"
+        type: "interface"
+        fields:
+          - "wo_id: string"
+          - "main_output_lp_id: string"
+          - "by_product_id: string"
+          - "by_product_material_id: string"
+          - "quantity: number"
+          - "uom: string"
+          - "batch_number?: string"
+          - "qa_status?: QAStatus"
+          - "location_id: string"
+          - "expiry_date?: string"
+          - "notes?: string"
+
+      - name: "ByProductStatus"
+        type: "interface"
+        fields:
+          - "product_id: string"
+          - "product_name: string"
+          - "product_code: string"
+          - "material_id: string"
+          - "yield_percent: number"
+          - "expected_qty: number"
+          - "actual_qty: number"
+          - "uom: string"
+          - "lp_count: number"
+          - "status: 'registered' | 'not_registered'"
+          - "last_registered_at: string | null"
+
+      - name: "ByProductRegistrationResult"
+        type: "interface"
+        fields:
+          - "success: boolean"
+          - "lp: LicensePlate"
+          - "genealogy: GenealogyLink[]"
+          - "output_record: ProductionOutput"
+          - "message: string"
+
+# Validation
+validation:
+  - path: "apps/frontend/lib/validation/by-product-schemas.ts"
+    exports:
+      - name: "registerByProductSchema"
+        type: "zod schema"
+        schema: |
+          z.object({
+            wo_id: z.string().uuid('Invalid WO ID'),
+            main_output_lp_id: z.string().uuid('Invalid main output LP ID'),
+            by_product_id: z.string().uuid('Invalid by-product ID'),
+            by_product_material_id: z.string().uuid('Invalid material ID'),
+            quantity: z.number().min(0, 'Quantity cannot be negative'),
+            uom: z.string().min(1, 'UoM is required'),
+            batch_number: z.string().max(50).optional(),
+            qa_status: z.enum(['approved', 'pending', 'rejected']).optional(),
+            location_id: z.string().uuid('Invalid location ID'),
+            expiry_date: z.string().optional(),
+            notes: z.string().max(500).optional()
+          })

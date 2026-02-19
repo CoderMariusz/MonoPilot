@@ -1,0 +1,486 @@
+# Story 07.12 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  - method: "POST"
+    path: "/api/shipping/scanner/pack"
+    description: "Add item to box (main packing transaction)"
+    file: "apps/frontend/app/api/shipping/scanner/pack/route.ts"
+    auth: "required"
+    roles: ["WAREHOUSE_PACKER", "WAREHOUSE_MANAGER", "SUPER_ADMIN"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+        Content-Type: "application/json"
+      body:
+        shipment_id: "string UUID (required, must exist and be packable)"
+        box_id: "string UUID (required, must exist in shipment)"
+        license_plate_id: "string UUID (required, must be allocated to SO)"
+        so_line_id: "string UUID (required, links to SO line)"
+        quantity: "number (required, positive, <= LP available qty)"
+        notes: "string (optional, max 500 chars)"
+      example: |
+        {
+          "shipment_id": "uuid-ship-001",
+          "box_id": "uuid-box-001",
+          "license_plate_id": "uuid-lp-001",
+          "so_line_id": "uuid-line-001",
+          "quantity": 100
+        }
+
+    response:
+      status: 201
+      type: "PackItemResponse"
+      schema:
+        box_content:
+          id: "string UUID"
+          quantity: "number"
+          product_name: "string"
+          lot_number: "string"
+        box_summary:
+          item_count: "integer"
+          total_weight_est: "number"
+          items: "array of { product_name, quantity, uom }"
+        so_line_status:
+          packed_qty: "number"
+          remaining_qty: "number"
+          status: "partial | complete"
+        allergen_warning: "object or null"
+      example: |
+        {
+          "box_content": {
+            "id": "uuid-content-001",
+            "quantity": 100,
+            "product_name": "Chocolate Milk",
+            "lot_number": "BATCH-001"
+          },
+          "box_summary": {
+            "item_count": 3,
+            "total_weight_est": 25.5,
+            "items": [
+              { "product_name": "Chocolate Milk", "quantity": 100, "uom": "KG" },
+              { "product_name": "Vanilla Milk", "quantity": 50, "uom": "KG" },
+              { "product_name": "Strawberry Milk", "quantity": 75, "uom": "KG" }
+            ]
+          },
+          "so_line_status": {
+            "packed_qty": 100,
+            "remaining_qty": 0,
+            "status": "complete"
+          }
+        }
+
+    errors:
+      - status: 400
+        code: "VALIDATION_ERROR"
+        message: "Invalid request body"
+        when: "Zod schema validation fails"
+
+      - status: 400
+        code: "LP_NOT_ALLOCATED"
+        message: "License plate not allocated to this shipment"
+        when: "LP not in pick_list for this SO"
+
+      - status: 400
+        code: "QUANTITY_EXCEEDS_AVAILABLE"
+        message: "Quantity (120) exceeds available (100)"
+        when: "quantity > LP available_qty"
+
+      - status: 404
+        code: "NOT_FOUND"
+        message: "Shipment not found"
+        when: "Shipment ID doesn't exist or belongs to different org"
+
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Insufficient permissions"
+        when: "User not WAREHOUSE_PACKER role or higher"
+
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token"
+
+  - method: "POST"
+    path: "/api/shipping/scanner/pack/box/create"
+    description: "Create new box for shipment"
+    file: "apps/frontend/app/api/shipping/scanner/pack/box/create/route.ts"
+    auth: "required"
+    roles: ["WAREHOUSE_PACKER", "WAREHOUSE_MANAGER", "SUPER_ADMIN"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+        Content-Type: "application/json"
+      body:
+        shipment_id: "string UUID (required)"
+      example: |
+        {
+          "shipment_id": "uuid-ship-001"
+        }
+
+    response:
+      status: 201
+      type: "CreateBoxResponse"
+      schema:
+        box:
+          id: "string UUID"
+          box_number: "integer"
+          status: "open"
+      example: |
+        {
+          "box": {
+            "id": "uuid-box-002",
+            "box_number": 2,
+            "status": "open"
+          }
+        }
+
+    errors:
+      - status: 400
+        code: "VALIDATION_ERROR"
+        message: "Invalid shipment ID"
+
+      - status: 404
+        code: "SHIPMENT_NOT_FOUND"
+        message: "Shipment not found or not packable"
+
+  - method: "POST"
+    path: "/api/shipping/scanner/pack/box/close"
+    description: "Close box with optional weight/dimensions"
+    file: "apps/frontend/app/api/shipping/scanner/pack/box/close/route.ts"
+    auth: "required"
+    roles: ["WAREHOUSE_PACKER", "WAREHOUSE_MANAGER", "SUPER_ADMIN"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+        Content-Type: "application/json"
+      body:
+        box_id: "string UUID (required)"
+        weight: "number (optional, kg, positive)"
+        length: "number (optional, cm, positive)"
+        width: "number (optional, cm, positive)"
+        height: "number (optional, cm, positive)"
+      example: |
+        {
+          "box_id": "uuid-box-001",
+          "weight": 25.50,
+          "length": 40,
+          "width": 30,
+          "height": 20
+        }
+
+    response:
+      status: 200
+      type: "CloseBoxResponse"
+      schema:
+        box:
+          id: "string UUID"
+          status: "closed"
+          weight: "number"
+          dimensions: "object"
+      example: |
+        {
+          "box": {
+            "id": "uuid-box-001",
+            "status": "closed",
+            "weight": 25.50,
+            "dimensions": { "length": 40, "width": 30, "height": 20 }
+          }
+        }
+
+    errors:
+      - status: 400
+        code: "EMPTY_BOX"
+        message: "Cannot close empty box"
+        when: "Box has no contents"
+
+      - status: 400
+        code: "INVALID_WEIGHT"
+        message: "Weight must be positive"
+        when: "weight <= 0 or invalid"
+
+      - status: 404
+        code: "NOT_FOUND"
+        message: "Box not found"
+
+  - method: "GET"
+    path: "/api/shipping/scanner/pack/shipments"
+    description: "Get list of packable shipments for packing workflow"
+    file: "apps/frontend/app/api/shipping/scanner/pack/shipments/route.ts"
+    auth: "required"
+    roles: ["WAREHOUSE_PACKER", "WAREHOUSE_MANAGER", "SUPER_ADMIN", "VIEWER"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      query_params:
+        limit: "integer (default: 50, max: 100)"
+        search: "string (optional, filters SO number or customer)"
+        warehouse_id: "string UUID (optional, default: user's warehouse)"
+
+    response:
+      status: 200
+      type: "GetShipmentsResponse"
+      schema:
+        shipments: "array"
+        total: "integer"
+      example: |
+        {
+          "shipments": [
+            {
+              "id": "uuid-ship-001",
+              "shipment_number": "SH-2025-00001",
+              "so_number": "SO-2025-00042",
+              "customer_name": "Acme Foods",
+              "status": "pending",
+              "promised_ship_date": "2025-12-20",
+              "lines_total": 5,
+              "lines_packed": 0,
+              "boxes_count": 0,
+              "allergen_alert": false
+            }
+          ],
+          "total": 1
+        }
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+
+  - method: "GET"
+    path: "/api/shipping/scanner/pack/lookup/:barcode"
+    description: "Lookup shipment or LP by barcode (SO or LP barcode)"
+    file: "apps/frontend/app/api/shipping/scanner/pack/lookup/[barcode]/route.ts"
+    auth: "required"
+    roles: ["WAREHOUSE_PACKER", "WAREHOUSE_MANAGER", "SUPER_ADMIN"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        barcode: "string (SO number or LP number)"
+
+    response:
+      status: 200
+      type: "LookupResponse"
+      schema:
+        type: "shipment | license_plate"
+        data: "object"
+      example: |
+        {
+          "type": "shipment",
+          "data": {
+            "id": "uuid-ship-001",
+            "shipment_number": "SH-2025-00001",
+            "so_number": "SO-2025-00042",
+            "customer_name": "Acme Foods",
+            "lines_total": 5,
+            "allergen_restrictions": ["Milk", "Eggs"]
+          }
+        }
+
+    errors:
+      - status: 404
+        code: "NOT_FOUND"
+        message: "Barcode not found"
+
+  - method: "GET"
+    path: "/api/shipping/scanner/pack/box/:boxId"
+    description: "Get box details with contents"
+    file: "apps/frontend/app/api/shipping/scanner/pack/box/[boxId]/route.ts"
+    auth: "required"
+    roles: ["WAREHOUSE_PACKER", "WAREHOUSE_MANAGER", "SUPER_ADMIN", "VIEWER"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        boxId: "string UUID"
+
+    response:
+      status: 200
+      type: "BoxDetailsResponse"
+      schema:
+        box:
+          id: "string UUID"
+          box_number: "integer"
+          status: "open | closed"
+          weight: "number or null"
+        contents: "array"
+        summary:
+          item_count: "integer"
+          total_weight_est: "number"
+      example: |
+        {
+          "box": {
+            "id": "uuid-box-001",
+            "box_number": 1,
+            "status": "open",
+            "weight": null
+          },
+          "contents": [
+            {
+              "id": "uuid-content-001",
+              "product_name": "Chocolate Milk",
+              "lot_number": "BATCH-001",
+              "lp_number": "LP-2025-00001",
+              "quantity": 100
+            }
+          ],
+          "summary": {
+            "item_count": 1,
+            "total_weight_est": 25.5
+          }
+        }
+
+    errors:
+      - status: 404
+        code: "NOT_FOUND"
+        message: "Box not found"
+
+  - method: "DELETE"
+    path: "/api/shipping/scanner/pack/box/:boxId/item/:contentId"
+    description: "Remove item from box (undo pack)"
+    file: "apps/frontend/app/api/shipping/scanner/pack/box/[boxId]/item/[contentId]/route.ts"
+    auth: "required"
+    roles: ["WAREHOUSE_PACKER", "WAREHOUSE_MANAGER", "SUPER_ADMIN"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        boxId: "string UUID"
+        contentId: "string UUID"
+
+    response:
+      status: 200
+      schema:
+        success: "boolean"
+
+    errors:
+      - status: 404
+        code: "NOT_FOUND"
+        message: "Item not found"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/packing-scanner-service.ts"
+    description: "Packing scanner operations (lookup, add item, box management)"
+    exports:
+      - name: "PackingScannerService"
+        type: "class"
+        methods:
+          - name: "addItemToBox"
+            params:
+              - "input: PackItemInput"
+            returns: "Promise<PackItemResult>"
+            description: "Main packing transaction - validate LP, create box_content, update SO line"
+
+          - name: "createBox"
+            params:
+              - "shipmentId: string"
+            returns: "Promise<ShipmentBox>"
+            description: "Create new box with auto box_number"
+
+          - name: "closeBox"
+            params:
+              - "boxId: string"
+              - "weight?: number"
+              - "dimensions?: { length, width, height }"
+            returns: "Promise<ShipmentBox>"
+            description: "Close box with validation"
+
+          - name: "getPendingShipments"
+            params:
+              - "warehouseId?: string"
+            returns: "Promise<PendingShipmentSummary[]>"
+            description: "Get packable shipments filtered by status and warehouse"
+
+          - name: "lookupShipment"
+            params:
+              - "barcode: string"
+            returns: "Promise<Shipment | null>"
+            description: "Lookup shipment by SO barcode or shipment number"
+
+          - name: "lookupLP"
+            params:
+              - "barcode: string"
+              - "shipmentId: string"
+            returns: "Promise<{ lp: LicensePlate; allocated: boolean; soLineId: string | null; availableQty: number } | null>"
+            description: "Lookup LP and validate allocation"
+
+          - name: "getBoxDetails"
+            params:
+              - "boxId: string"
+            returns: "Promise<{ box: ShipmentBox; contents: BoxContent[]; summary: BoxSummary }>"
+            description: "Get box with contents"
+
+          - name: "removeItemFromBox"
+            params:
+              - "boxContentId: string"
+            returns: "Promise<void>"
+            description: "Remove item from box (undo pack)"
+
+          - name: "checkAllergenConflict"
+            params:
+              - "customerId: string"
+              - "productId: string"
+              - "boxId?: string"
+            returns: "Promise<AllergenWarning | null>"
+            description: "Check allergen conflicts for customer/product"
+
+# Validation Schemas (Zod)
+validation:
+  - path: "apps/frontend/lib/validation/packing-scanner.ts"
+    description: "Zod validation schemas for packing scanner operations"
+    schemas:
+      - name: "packItemSchema"
+        fields:
+          shipment_id: "z.string().uuid('Invalid shipment ID')"
+          box_id: "z.string().uuid('Invalid box ID')"
+          license_plate_id: "z.string().uuid('Invalid LP ID')"
+          so_line_id: "z.string().uuid('Invalid SO line ID')"
+          quantity: "z.number().positive('Quantity must be positive').max(999999999)"
+          notes: "z.string().max(500).optional()"
+
+      - name: "createBoxSchema"
+        fields:
+          shipment_id: "z.string().uuid('Invalid shipment ID')"
+
+      - name: "closeBoxSchema"
+        fields:
+          box_id: "z.string().uuid('Invalid box ID')"
+          weight: "z.number().positive().max(1000).optional()"
+          length: "z.number().positive().max(500).optional()"
+          width: "z.number().positive().max(500).optional()"
+          height: "z.number().positive().max(500).optional()"
+
+      - name: "pendingShipmentsQuerySchema"
+        fields:
+          warehouse_id: "z.string().uuid().optional()"
+          search: "z.string().optional()"
+          limit: "z.coerce.number().int().min(1).max(100).default(50)"
+
+      - name: "lookupBarcodeSchema"
+        fields:
+          barcode: "z.string().min(1).max(100)"
+
+# Implementation Notes
+implementation_notes:
+  scan_performance: "LP lookup should complete in <200ms"
+  pack_item: "API call should complete in <500ms"
+  box_creation: "Box created in <100ms"
+  allergen_check: "Allergen warning check in <100ms"
+  bulk_operations: "Handle 50 items in box efficiently"
+  response_times:
+    lp_lookup: "<200ms"
+    pack_item_online: "<500ms"
+    box_create: "<100ms"
+    allergen_check: "<100ms"
+  error_handling: "All errors return meaningful messages for scanner display"
+  audit_trail: "All pack operations logged with user_id, timestamp, device_id"

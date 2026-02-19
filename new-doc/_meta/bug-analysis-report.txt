@@ -1,0 +1,179 @@
+# Bug Fix Analysis Report
+**Total Commits Analyzed**: 341
+
+## Distribution by Module
+| Module | Count | % |
+|--------|-------|----|
+| 00-dashboard | 7 | 2.1% |
+| 00-foundation | 94 | 27.6% |
+| 00-testing | 12 | 3.5% |
+| 01-settings | 76 | 22.3% |
+| 02-technical | 86 | 25.2% |
+| 03-planning | 28 | 8.2% |
+| 04-production | 1 | 0.3% |
+| 05-scanner | 5 | 1.5% |
+| 05-warehouse | 13 | 3.8% |
+| 06-quality | 17 | 5.0% |
+| 07-shipping | 2 | 0.6% |
+
+## Distribution by Bug Type
+| Type | Count | % |
+|------|-------|----|
+| API | 118 | 34.6% |
+| UI | 109 | 32.0% |
+| Security | 104 | 30.5% |
+| Data/DB | 95 | 27.9% |
+| E2E/Testing | 76 | 22.3% |
+| Type/TypeScript | 69 | 20.2% |
+| Other | 59 | 17.3% |
+| Validation | 46 | 13.5% |
+| Routing | 30 | 8.8% |
+| State Management | 20 | 5.9% |
+| UX | 20 | 5.9% |
+| Performance | 13 | 3.8% |
+| Integration | 8 | 2.3% |
+
+## Bug Types by Module
+
+### 00-dashboard
+- Security: 2
+- Other: 2
+- API: 1
+- UI: 1
+- E2E/Testing: 1
+
+### 00-foundation
+- Other: 30
+- Data/DB: 23
+- Security: 20
+- API: 20
+- UI: 20
+
+### 00-testing
+- E2E/Testing: 12
+- API: 6
+- Data/DB: 2
+- Routing: 1
+- State Management: 1
+
+### 01-settings
+- API: 41
+- Security: 36
+- UI: 31
+- Data/DB: 29
+- E2E/Testing: 16
+
+### 02-technical
+- UI: 33
+- API: 32
+- Security: 27
+- Type/TypeScript: 27
+- Data/DB: 25
+
+### 03-planning
+- UI: 11
+- Type/TypeScript: 9
+- Other: 7
+- E2E/Testing: 6
+- UX: 5
+
+### 04-production
+- Other: 1
+
+### 05-scanner
+- Other: 2
+- Validation: 2
+- Security: 1
+- Routing: 1
+- Data/DB: 1
+
+### 05-warehouse
+- UI: 5
+- Data/DB: 4
+- API: 3
+- Security: 2
+- UX: 2
+
+### 06-quality
+- Security: 10
+- API: 9
+- Data/DB: 7
+- UI: 7
+- E2E/Testing: 5
+
+### 07-shipping
+- Other: 1
+- API: 1
+- UI: 1
+
+## Sample Commits by Module
+
+### 00-dashboard (7 fixes)
+- `dc63ec10`: fix(dashboard): Fix TC-DASH-003, TC-DASH-004, TC-DASH-006 rendering issues
+- `7ffa32d1`: fix(dashboard): Handle null user gracefully, remove non-null assertions
+- `104e109f`: Merge pull request #51 from CoderMariusz/claude/fix-dashboard-layout-013WWxQoPwQyWXHRimTW6iyk
+- `9c8d57a2`: fix(dashboard): handle null data and correct product filtering
+- `355f20a6`: fix(vercel): remove vercel.json to use dashboard configuration
+
+### 00-foundation (94 fixes)
+- `66e4ca3d`: Add structured handoff files and bug-fixing skill; implement testing patterns for MonoPilot
+- `d253cf62`: Fix: Add 10s timeout to auth login to prevent hanging on Supabase connection
+- `2b8f40fe`: docs: Update Bug-002 status to fixed with final test results and commit info
+- `462b97d8`: fix(BUG-018): Use server-side /api/auth/login for session persistence (fixes cookie race condition)
+- `2ecb99ac`: fix(BUG-018): Implement document.cookie handlers in browser Supabase client
+
+### 00-testing (12 fixes)
+- `bd28449c`: docs: consolidate test and bug files - major cleanup
+- `fc3918ad`: FIX-Q12-001: Improve pagination UX by resetting to page 1 on filter changes
+- `a8de2cee`: fix(e2e): Fix seeding script to match actual database schema
+- `d11523bb`: fix(story-03.3): Fix critical test infrastructure issues - integration tests and RLS tests
+- `0b1e4c84`: fix(context): Synchronize 01.2 split context files with main context.yaml
+
+### 01-settings (76 fixes)
+- `fa2c473a`: fix: dashboard ui and settings stats display issues
+- `31d343bb`: docs: Update bugs.md - Mark all 7 Settings bugs as FIXED (commit 176b7381)
+- `176b7381`: fix(settings): BUG-SET-001,002,003,004,005,006,007 - Enhance UI visibility for all Settings module critical bugs
+- `4817afa3`: test(consolidate): All QA batches merged into bugs.md - Settings 1-4 (153 bugs) + Dashboard 1-2 complete
+- `216f99dd`: docs: add comprehensive warehouse bug fix documentation
+
+### 02-technical (86 fixes)
+- `0f956dc2`: fix(technical): CORS, security headers, pagination endpoint
+- `d97c6174`: fix(technical): auth endpoints, security headers, rate limiting, CSRF protection
+- `a7e172f0`: BUG-W-002: Add barcode uniqueness validation to prevent duplicate barcodes
+- `17306c3e`: fix(warehouse): W6 - Resolve duplicate barcode validation and packing slip PDF weight issues
+- `ae7875df`: Fix(Quality-Q2): Extend filter schema for reason and product
+
+### 03-planning (28 fixes)
+- `72b8c676`: Fix Warehouse bugs W7: Complete transfer order workflow with approvals
+- `d63af099`: Fix(B7-003): Transfer Orders page controls now always render - fix loading state blocking UI
+- `0df76aad`: Fix: Verify and document row click navigation handlers in Planning module (Bug-B7-001)
+- `b20e613a`: Fix: Add logout button to Planning module header (B7-002)
+- `c95e154f`: docs(bugs): Mark all Planning Work Orders Batch 4 bugs as FIXED with verification
+
+### 04-production (1 fixes)
+- `0ecfef45`: fix(vercel): add rootDirectory and fix outputDirectory path
+
+### 05-scanner (5 fixes)
+- `f5778b1c`: Fix BUG-SC-001: Create /scanner/transfer route and fix routing
+- `e102bb88`: fix(deploy): standardize on pnpm package manager
+- `195c8507`: fix(vercel): Add package-lock.json and use npm ci
+- `30aaf7c3`: fix: update package.json paths and add pre-push hook script
+- `fe1292c2`: fix: resolve type error in scanner process page
+
+### 05-warehouse (13 fixes)
+- `106993e2`: feat(routes): add missing page.tsx files for 404 routes
+- `749ff918`: fix: expired LPs now show correct status, safety improvement
+- `e2eadd76`: fix: resolve scanner crashes for Receive, Pick, Pack workflows
+- `52d5cf67`: fix(migrations): Rename 097_add_asn_search_indexes to 146
+- `b23f759d`: fix(warehouse): Epic 5 E2E - Final fixes and documentation
+
+### 06-quality (17 fixes)
+- `25d6707c`: BUG-W-003: Ensure packing slip PDF always includes weight column
+- `14e34486`: Fix Quality bugs: Enable Edit button and add Resolve/Delete buttons on Holds detail page
+- `814eedc9`: docs: Add comprehensive error codes and response schemas to quality holds endpoints
+- `1f1b4570`: Fix(Quality-Q2): Implement reason filtering in getHoldsList service
+- `246a5814`: Fix(Quality-Q2): Add missing Reason and Product filters on Holds list page
+
+### 07-shipping (2 fixes)
+- `afdf6d8c`: fix(BUG-011, BUG-017): Add missing Create Sales Order page
+- `f5884d2d`: fix(shipping): resolve organization context loading on dashboard

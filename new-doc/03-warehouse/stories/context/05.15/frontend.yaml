@@ -1,0 +1,265 @@
+# Story 05.15 - Frontend Specification
+# Purpose: Pages, components, hooks, UX patterns
+# Agent: FRONTEND-DEV (UI focus)
+
+# Pages
+pages:
+  - path: "apps/frontend/app/(authenticated)/warehouse/settings/page.tsx"
+    description: "Warehouse settings page - add over-receipt section"
+    type: "enhancement"
+    action: "Add OverReceiptSettings component to existing page"
+
+  - path: "apps/frontend/app/(authenticated)/warehouse/approvals/page.tsx"
+    description: "Over-receipt approval list page (managers)"
+    type: "new"
+    layout: "Standard warehouse module layout"
+    features:
+      - "DataTable with pending/approved/rejected tabs"
+      - "Filters: status, date range, requester"
+      - "Approve/Reject inline actions"
+      - "Click row to see details"
+
+  - path: "apps/frontend/app/(authenticated)/warehouse/approvals/[id]/page.tsx"
+    description: "Approval detail page"
+    type: "new"
+    features:
+      - "Full approval details"
+      - "PO and line item info"
+      - "Approve/Reject actions (if pending)"
+      - "Review history"
+
+# Components
+components:
+  # Settings Components
+  - path: "apps/frontend/components/warehouse/settings/OverReceiptSettings.tsx"
+    description: "Over-receipt settings section for warehouse settings page"
+    props:
+      - "settings: WarehouseSettings"
+      - "onSave: (settings: Partial<WarehouseSettings>) => Promise<void>"
+    features:
+      - "Toggle: Allow Over-Receipt"
+      - "Number input: Tolerance % (0-100)"
+      - "Tolerance input disabled when allow_over_receipt=false"
+      - "Validation feedback"
+      - "Save button with loading state"
+    ui_elements:
+      - type: "switch"
+        label: "Allow Over-Receipt"
+        help: "Allow receiving more than ordered quantity"
+      - type: "number"
+        label: "Over-Receipt Tolerance %"
+        help: "Maximum over-receipt percentage allowed (0-100)"
+        min: 0
+        max: 100
+        step: 0.01
+
+  # Warning/Error Components
+  - path: "apps/frontend/components/warehouse/over-receipt/OverReceiptWarning.tsx"
+    description: "Inline warning banner for within-tolerance over-receipt (yellow)"
+    props:
+      - "overReceiptPct: number"
+      - "tolerancePct: number"
+    ui_pattern: "Alert variant='warning'"
+    example_message: "Over-receipt: 8% (within 10% tolerance)"
+
+  - path: "apps/frontend/components/warehouse/over-receipt/OverReceiptError.tsx"
+    description: "Inline error banner for over-tolerance (red)"
+    props:
+      - "overReceiptPct: number"
+      - "tolerancePct: number"
+      - "maxAllowedQty: number"
+      - "onRequestApproval: () => void"
+    ui_pattern: "Alert variant='destructive'"
+    example_message: "Over-receipt: 15% exceeds tolerance (10%). Max allowed: 110 units. Approval required."
+    includes_action: "Request Approval button"
+
+  # Approval Modal Components
+  - path: "apps/frontend/components/warehouse/over-receipt/OverReceiptApprovalModal.tsx"
+    description: "Modal for requesting over-receipt approval"
+    props:
+      - "open: boolean"
+      - "onOpenChange: (open: boolean) => void"
+      - "poLine: POLine"
+      - "receivingQty: number"
+      - "overReceiptPct: number"
+      - "tolerancePct: number"
+      - "onSubmit: (reason: string) => Promise<void>"
+    ui_pattern: "ShadCN Dialog"
+    form_fields:
+      - "Product info (read-only)"
+      - "Quantities (read-only): ordered, receiving, over %"
+      - "Reason (textarea, required, min 10 chars)"
+    actions:
+      - "Submit Approval Request"
+      - "Cancel"
+
+  - path: "apps/frontend/components/warehouse/over-receipt/OverReceiptApprovalForm.tsx"
+    description: "Form inside approval modal"
+    props:
+      - "onSubmit: (reason: string) => Promise<void>"
+      - "isSubmitting: boolean"
+    validation:
+      reason: "Required, min 10 characters"
+
+  - path: "apps/frontend/components/warehouse/over-receipt/PendingApprovalStatus.tsx"
+    description: "Status display when waiting for approval"
+    props:
+      - "approval: OverReceiptApproval"
+      - "onRefresh: () => void"
+    states:
+      pending: "Approval request submitted. A warehouse manager will review shortly."
+      approved: "Approval granted. You can proceed with receipt."
+      rejected: "Approval rejected. Reduce quantity or create new approval."
+    features:
+      - "Auto-refresh status (polling)"
+      - "Show reviewer and notes if reviewed"
+
+  # Manager Approval Components
+  - path: "apps/frontend/components/warehouse/over-receipt/ApprovalDataTable.tsx"
+    description: "DataTable for manager approval list"
+    columns:
+      - "Request Date"
+      - "PO Number (link)"
+      - "Product"
+      - "Ordered Qty"
+      - "Receiving Qty"
+      - "Over %"
+      - "Requested By"
+      - "Reason (truncated)"
+      - "Actions (Approve/Reject)"
+    features:
+      - "Sorting by date, over %"
+      - "Filtering by status, requester, date"
+      - "Pagination"
+      - "Row click to view details"
+    ui_pattern: "ShadCN DataTable with column visibility"
+
+  - path: "apps/frontend/components/warehouse/over-receipt/ApprovalReviewModal.tsx"
+    description: "Modal for approving/rejecting requests"
+    props:
+      - "approval: OverReceiptApproval"
+      - "action: 'approve' | 'reject'"
+      - "onConfirm: (reviewNotes?: string) => Promise<void>"
+      - "onCancel: () => void"
+    form_fields:
+      - "Approval details (read-only)"
+      - "Review notes (required for reject, optional for approve)"
+    ui_pattern: "ShadCN Dialog"
+
+  - path: "apps/frontend/components/warehouse/over-receipt/ApprovalDetailPanel.tsx"
+    description: "Full approval detail view"
+    props:
+      - "approval: OverReceiptApprovalDetail"
+    sections:
+      - "Request Info: date, requester, reason"
+      - "PO Info: PO number, supplier, line item"
+      - "Quantities: ordered, already received, requesting, total"
+      - "Over-Receipt: percentage, tolerance"
+      - "Review: status, reviewer, notes (if reviewed)"
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-over-receipt-approvals.ts"
+    exports:
+      - name: "useOverReceiptApprovals"
+        description: "List approvals with React Query"
+        params: "filters: ApprovalListParams"
+        returns: "UseQueryResult<PaginatedResult<OverReceiptApproval>>"
+
+      - name: "useOverReceiptApproval"
+        description: "Get single approval"
+        params: "id: string"
+        returns: "UseQueryResult<OverReceiptApprovalDetail>"
+
+      - name: "useCreateApproval"
+        description: "Create approval mutation"
+        returns: "UseMutationResult"
+
+      - name: "useApproveRequest"
+        description: "Approve mutation"
+        returns: "UseMutationResult"
+
+      - name: "useRejectRequest"
+        description: "Reject mutation"
+        returns: "UseMutationResult"
+
+  - path: "apps/frontend/lib/hooks/use-validate-over-receipt.ts"
+    exports:
+      - name: "useValidateOverReceipt"
+        description: "Validate over-receipt on qty change"
+        params: "poLineId: string, receivingQty: number"
+        returns: "UseQueryResult<OverReceiptValidationResult>"
+
+# UX Patterns
+ux:
+  states:
+    loading:
+      - "Skeleton loaders for data table"
+      - "Button loading spinners for actions"
+    empty:
+      - "No pending approvals message with icon"
+    error:
+      - "Toast notifications for API errors"
+      - "Form validation errors inline"
+    success:
+      - "Toast notification on approval/rejection"
+      - "Auto-refresh list after action"
+
+  accessibility:
+    - "ARIA labels on all interactive elements"
+    - "Keyboard navigation for data table"
+    - "Focus management in modals"
+    - "Screen reader announcements for status changes"
+
+  responsive:
+    - "Mobile: Stack columns, slide-out detail panel"
+    - "Tablet: Condensed table, modal actions"
+    - "Desktop: Full table with inline actions"
+
+  color_coding:
+    pending: "Yellow/amber badge"
+    approved: "Green badge"
+    rejected: "Red badge"
+    warning: "Yellow border/background"
+    error: "Red border/background"
+
+# Integration with GRN Wizard
+grn_wizard_integration:
+  location: "Step 3 (Enter Details) of GRN wizard"
+  behavior:
+    on_qty_change:
+      - "Call validateOverReceipt API"
+      - "Show OverReceiptWarning if within tolerance"
+      - "Show OverReceiptError if exceeds tolerance"
+      - "Disable Confirm Receipt button if approval required and not approved"
+    on_request_approval:
+      - "Open OverReceiptApprovalModal"
+      - "On submit, show PendingApprovalStatus"
+      - "Poll for approval status"
+    on_approval_received:
+      - "Enable Confirm Receipt button"
+      - "Show approval reference"
+
+# File Structure Summary
+file_structure:
+  pages:
+    - "apps/frontend/app/(authenticated)/warehouse/settings/page.tsx (enhance)"
+    - "apps/frontend/app/(authenticated)/warehouse/approvals/page.tsx (new)"
+    - "apps/frontend/app/(authenticated)/warehouse/approvals/[id]/page.tsx (new)"
+
+  components:
+    settings:
+      - "components/warehouse/settings/OverReceiptSettings.tsx"
+    over_receipt:
+      - "components/warehouse/over-receipt/OverReceiptWarning.tsx"
+      - "components/warehouse/over-receipt/OverReceiptError.tsx"
+      - "components/warehouse/over-receipt/OverReceiptApprovalModal.tsx"
+      - "components/warehouse/over-receipt/OverReceiptApprovalForm.tsx"
+      - "components/warehouse/over-receipt/PendingApprovalStatus.tsx"
+      - "components/warehouse/over-receipt/ApprovalDataTable.tsx"
+      - "components/warehouse/over-receipt/ApprovalReviewModal.tsx"
+      - "components/warehouse/over-receipt/ApprovalDetailPanel.tsx"
+
+  hooks:
+    - "lib/hooks/use-over-receipt-approvals.ts"
+    - "lib/hooks/use-validate-over-receipt.ts"

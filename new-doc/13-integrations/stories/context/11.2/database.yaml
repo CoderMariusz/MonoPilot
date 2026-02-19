@@ -1,0 +1,144 @@
+# Story 11.2 - Database Context
+# Tables, indexes, RLS policies for API Keys Management
+
+tables:
+  integration_api_keys:
+    purpose: "Store API keys for external system authentication"
+    columns:
+      - name: "id"
+        type: "UUID PRIMARY KEY"
+        description: "API key ID"
+      - name: "org_id"
+        type: "UUID NOT NULL REFERENCES organizations(id)"
+        description: "Organization (multi-tenant)"
+      - name: "name"
+        type: "VARCHAR(255) NOT NULL"
+        description: "Key name (e.g., 'Mobile App Production')"
+      - name: "key_value_hash"
+        type: "VARCHAR(255) UNIQUE NOT NULL"
+        description: "Bcrypt hash of API key (cost 12)"
+      - name: "key_prefix"
+        type: "VARCHAR(20) NOT NULL"
+        description: "First 8 chars for display (e.g., 'mp_live_abc123...')"
+      - name: "scopes"
+        type: "JSONB NOT NULL DEFAULT '[]'"
+        description: "Array of scopes ['read:products', 'write:orders']"
+      - name: "rate_limit_tier"
+        type: "VARCHAR(20) NOT NULL DEFAULT 'basic'"
+        constraint: "CHECK (rate_limit_tier IN ('basic', 'standard', 'premium'))"
+      - name: "status"
+        type: "VARCHAR(20) NOT NULL DEFAULT 'active'"
+        constraint: "CHECK (status IN ('active', 'suspended', 'revoked'))"
+      - name: "expires_at"
+        type: "TIMESTAMPTZ"
+        description: "Optional expiration date"
+      - name: "last_used_at"
+        type: "TIMESTAMPTZ"
+        description: "Last API request timestamp"
+      - name: "request_count"
+        type: "INTEGER DEFAULT 0"
+        description: "Total requests made with this key"
+      - name: "created_by"
+        type: "UUID REFERENCES users(id)"
+        description: "User who created the key"
+      - name: "created_at"
+        type: "TIMESTAMPTZ NOT NULL DEFAULT now()"
+      - name: "updated_at"
+        type: "TIMESTAMPTZ NOT NULL DEFAULT now()"
+      - name: "revoked_at"
+        type: "TIMESTAMPTZ"
+        description: "When key was revoked (if applicable)"
+      - name: "revoked_by"
+        type: "UUID REFERENCES users(id)"
+        description: "User who revoked the key"
+      - name: "revocation_reason"
+        type: "TEXT"
+        description: "Reason for revocation"
+
+    indexes:
+      - name: "idx_api_keys_org"
+        columns: ["org_id"]
+        description: "RLS filter performance"
+      - name: "idx_api_keys_status"
+        columns: ["org_id", "status"]
+        description: "Filter by status"
+      - name: "idx_api_keys_hash"
+        columns: ["key_value_hash"]
+        description: "Fast lookup during authentication"
+      - name: "idx_api_keys_active"
+        columns: ["org_id"]
+        where: "status = 'active' AND (expires_at IS NULL OR expires_at > now())"
+        description: "Active keys only"
+
+    constraints:
+      - type: "UNIQUE"
+        columns: ["org_id", "name"]
+        name: "uq_api_key_name"
+        description: "Unique key names per org"
+
+    rls_policies:
+      - name: "api_keys_select"
+        operation: "SELECT"
+        using: |
+          org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+          AND (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid()) IN ('SUPER_ADMIN', 'ADMIN', 'IT_MANAGER')
+      - name: "api_keys_insert"
+        operation: "INSERT"
+        check: |
+          org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+          AND (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid()) IN ('SUPER_ADMIN', 'ADMIN')
+      - name: "api_keys_update"
+        operation: "UPDATE"
+        using: |
+          org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+          AND (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid()) IN ('SUPER_ADMIN', 'ADMIN')
+      - name: "api_keys_delete"
+        operation: "DELETE"
+        using: |
+          org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+          AND (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid()) IN ('SUPER_ADMIN', 'ADMIN')
+
+    triggers:
+      - name: "update_api_keys_updated_at"
+        timing: "BEFORE UPDATE"
+        event: "UPDATE"
+        function: "update_updated_at_column()"
+
+  rate_limit_tiers:
+    purpose: "Define rate limit configurations"
+    columns:
+      - name: "tier"
+        type: "VARCHAR(20) PRIMARY KEY"
+        description: "Tier name (basic, standard, premium)"
+      - name: "requests_per_minute"
+        type: "INTEGER NOT NULL"
+      - name: "requests_per_hour"
+        type: "INTEGER NOT NULL"
+      - name: "burst_limit"
+        type: "INTEGER NOT NULL"
+        description: "Max burst requests"
+      - name: "description"
+        type: "TEXT"
+
+seed_data:
+  rate_limit_tiers:
+    - tier: "basic"
+      requests_per_minute: 60
+      requests_per_hour: 1000
+      burst_limit: 10
+      description: "Basic tier - 60 req/min, 1K req/hour"
+    - tier: "standard"
+      requests_per_minute: 300
+      requests_per_hour: 10000
+      burst_limit: 50
+      description: "Standard tier - 300 req/min, 10K req/hour"
+    - tier: "premium"
+      requests_per_minute: 1000
+      requests_per_hour: 50000
+      burst_limit: 200
+      description: "Premium tier - 1K req/min, 50K req/hour"
+
+migration_file:
+  name: "YYYYMMDDHHMMSS_create_integration_api_keys.sql"
+  order: 2
+  dependencies: ["integration_health"]

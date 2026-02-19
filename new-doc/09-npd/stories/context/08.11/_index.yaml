@@ -1,0 +1,165 @@
+story:
+  id: "08.11"
+  name: "Handoff Wizard"
+  epic: "08-npd"
+  phase: "1A"
+  complexity: "L"
+  estimate_days: 5-6
+
+dependencies:
+  required:
+    - story: "08.2"
+      provides: ["npd_projects", "ProjectService"]
+    - story: "08.4"
+      provides: ["npd_formulations", "FormulationService"]
+    - story: "08.6"
+      provides: ["gate_approvals", "GateApprovalService"]
+    - story: "08.7"
+      provides: ["formulation_costing", "CostingService"]
+    - story: "08.8"
+      provides: ["npd_documents", "DocumentService"]
+    - story: "02.1"
+      provides: ["products", "ProductService"]
+    - story: "02.2"
+      provides: ["boms", "BOMService"]
+    - story: "03.2"
+      provides: ["work_orders", "WorkOrderService"]
+    - story: "01.1"
+      provides: ["organizations", "users", "RLS"]
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/npd.md"
+  prd_sections: ["Section 8", "FR-NPD-37", "FR-NPD-38", "FR-NPD-39", "FR-NPD-40", "FR-NPD-41", "FR-NPD-42", "FR-NPD-43", "FR-NPD-44", "FR-NPD-45", "FR-NPD-46", "FR-NPD-47"]
+  story: "docs/2-MANAGEMENT/epics/current/08-npd/08.11.handoff-wizard.md"
+  architecture: "docs/1-BASELINE/architecture/modules/npd.md"
+  patterns:
+    - "docs/2-MANAGEMENT/epics/current/03-planning/03.5.sales-order-wizard.md"
+
+files_to_create:
+  api:
+    - path: "apps/frontend/app/api/npd/projects/[projectId]/handoff/validate/route.ts"
+      methods: ["POST"]
+    - path: "apps/frontend/app/api/npd/projects/[projectId]/handoff/execute/route.ts"
+      methods: ["POST"]
+
+  services:
+    - path: "apps/frontend/lib/services/npd-handoff-service.ts"
+
+  validation:
+    - path: "apps/frontend/lib/validation/npd/handoff-schemas.ts"
+
+  pages:
+    - path: "apps/frontend/app/(authenticated)/npd/projects/[id]/handoff/page.tsx"
+
+  components:
+    - path: "apps/frontend/components/npd/handoff/HandoffWizard.tsx"
+    - path: "apps/frontend/components/npd/handoff/HandoffStep.tsx"
+    - path: "apps/frontend/components/npd/handoff/ValidationChecklistStep.tsx"
+    - path: "apps/frontend/components/npd/handoff/ProductDecisionStep.tsx"
+    - path: "apps/frontend/components/npd/handoff/BOMPreviewStep.tsx"
+    - path: "apps/frontend/components/npd/handoff/PilotWOToggleStep.tsx"
+    - path: "apps/frontend/components/npd/handoff/RoutingSelectionStep.tsx"
+    - path: "apps/frontend/components/npd/handoff/SummaryReviewStep.tsx"
+    - path: "apps/frontend/components/npd/handoff/ExecuteHandoffStep.tsx"
+    - path: "apps/frontend/components/npd/handoff/SuccessConfirmationStep.tsx"
+    - path: "apps/frontend/components/npd/handoff/HandoffProgressBar.tsx"
+    - path: "apps/frontend/components/npd/handoff/ValidationCheckItem.tsx"
+    - path: "apps/frontend/components/npd/handoff/BlockerAlert.tsx"
+
+api_endpoints:
+  - method: "POST"
+    path: "/api/npd/projects/:projectId/handoff/validate"
+    auth: true
+    roles: ["NPD_LEAD", "ADMIN"]
+    returns: "HandoffValidationResponse"
+    description: "Pre-handoff validation checklist"
+
+  - method: "POST"
+    path: "/api/npd/projects/:projectId/handoff/execute"
+    auth: true
+    roles: ["NPD_LEAD", "ADMIN"]
+    returns: "HandoffExecutionResponse"
+    description: "Execute handoff transactionally"
+
+ux:
+  wireframes:
+    - id: "NPD-008"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/NPD-008-handoff-wizard-8-steps.md"
+      relevance: "8-step handoff wizard with validation, preview, and execution"
+      components:
+        - "HandoffWizard"
+        - "HandoffProgressBar"
+        - "ValidationChecklistStep"
+        - "ProductDecisionStep"
+        - "BOMPreviewStep"
+        - "PilotWOToggleStep"
+        - "RoutingSelectionStep"
+        - "SummaryReviewStep"
+        - "ExecuteHandoffStep"
+        - "SuccessConfirmationStep"
+
+  patterns:
+    wizard: "Multi-step wizard with progress bar and navigation"
+    validation: "Checklist with pass/fail indicators"
+    preview: "Read-only table showing transformation (formulation -> BOM)"
+    execution: "Loading state with transaction status updates"
+    success: "Confirmation with links to created records"
+
+  states:
+    - "loading: Fetching validation data"
+    - "validation_blocked: One or more validation checks failed"
+    - "validation_passed: All checks passed, can proceed"
+    - "step_N_active: User on step N (1-8)"
+    - "executing: Handoff transaction in progress"
+    - "success: Handoff completed successfully"
+    - "error: Handoff failed, rollback initiated"
+
+validation_rules:
+  handoff_prerequisites:
+    - "Project at Gate G4"
+    - "Formulation status = 'locked'"
+    - "Costing status = 'approved'"
+    - "All required compliance documents uploaded"
+    - "G4 checklist 100% complete"
+  product_decision:
+    - "If new product: product_name required"
+    - "If existing product: product_id required"
+  bom_generation:
+    - "All formulation items have valid product mappings"
+    - "Total qty matches formulation total_qty"
+  pilot_wo:
+    - "If enabled: target_date required"
+    - "If routing enabled: routing_id required"
+
+patterns:
+  rls: "ADR-013 - RLS enforces org isolation"
+  api: "REST with org_id filter from auth.uid()"
+  service: "class-based with static methods (NPDHandoffService)"
+  validation: "zod schemas for request validation"
+  transaction: "Database transaction with rollback on failure"
+  wizard: "Multi-step wizard with state machine"
+
+acceptance_checklist:
+  - "Handoff wizard loads within 500ms"
+  - "Validation checklist shows pass/fail for each item"
+  - "Blocker prevents progression if validation fails"
+  - "Product decision supports new/existing product"
+  - "BOM preview shows formulation -> BOM mapping"
+  - "Pilot WO toggle enables/disables routing step"
+  - "Summary shows all actions to be executed"
+  - "Execute step shows transaction progress"
+  - "Success step links to created records"
+  - "Error state shows rollback message"
+  - "Project status updated to 'launched'"
+  - "Formulation status remains 'locked'"
+
+output_artifacts:
+  - "POST /api/npd/projects/:projectId/handoff/validate endpoint"
+  - "POST /api/npd/projects/:projectId/handoff/execute endpoint"
+  - "NPDHandoffService with validation and execution methods"
+  - "8-step wizard UI at /npd/projects/:id/handoff"
+  - "HandoffWizard component with step navigation"
+  - "All 8 step components"
+  - "Unit tests: NPDHandoffService methods"
+  - "Integration tests: Validate and Execute endpoints"
+  - "E2E tests: Full handoff workflow"

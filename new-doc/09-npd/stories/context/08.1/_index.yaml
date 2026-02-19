@@ -1,0 +1,109 @@
+# Story 08.1 - Index File (Entry Point)
+# Generated: 2025-01-15
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "08.1"
+  name: "NPD Settings & Module Config"
+  slug: "npd-settings-module-config"
+  epic: "08-npd"
+  phase: "1"
+  complexity: "S"
+  estimate_days: 1-2
+  type: "backend"
+  state: "ready"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # npd_settings table, RLS policies
+  - api.yaml         # GET/PUT /api/npd/settings endpoints
+  - validation.yaml  # Zod schemas for settings
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["org_id context", "RLS patterns", "auth helpers"]
+  optional:
+    - story: "02.3"
+      name: "Routings"
+      provides: ["default_pilot_routing foreign key"]
+      note: "Soft dependency - nullable FK"
+  blocked_by: []
+  blocks:
+    - story: "08.2"
+      name: "NPD Dashboard"
+      reason: "Needs settings to check module enablement"
+    - story: "08.3"
+      name: "NPD Projects"
+      reason: "Needs settings for validation"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/npd.md"
+    sections: ["Section 1", "FR-NPD-01", "Database Tables"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/npd.md"
+    sections: ["NPD Settings", "Feature Flags"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/08-npd/08.1.npd-settings-module-config.md"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS for npd_settings table"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "npd_settings table with constraints"
+  - type: "migration"
+    count: 1
+    description: "Extensions to work_orders, products, boms tables"
+  - type: "service"
+    count: 1
+    description: "npd-settings-service.ts"
+  - type: "api"
+    count: 2
+    description: "GET/PUT /api/npd/settings endpoints"
+  - type: "validation"
+    count: 1
+    description: "Zod schemas for NPD settings"
+  - type: "test"
+    count: 3
+    description: "Unit + integration + E2E tests"
+
+# Technical notes
+technical_notes:
+  - "npd_settings table has org_id UNIQUE constraint (one row per org)"
+  - "Default settings auto-created on first GET if not exists"
+  - "RLS enforces org_id isolation - users can only access own org settings"
+  - "Admin-only updates (SUPER_ADMIN, ADMIN roles)"
+  - "Cost variance thresholds: warning <= blocker (database constraint)"
+  - "NPD module toggle controls access to /npd/* routes"
+  - "Soft FK to routings table for default_pilot_routing (nullable)"
+  - "Extensions to existing tables: work_orders.type, work_orders.npd_project_id, products.source, boms.source"
+  - "Foreign keys to npd_projects/npd_formulations added in later stories"
+
+# Settings schema quick reference
+settings_fields:
+  module_activation:
+    - enable_npd_module: "boolean, default false"
+    - npd_only_mode: "boolean, default false"
+  pilot_wo:
+    - enable_pilot_wo: "boolean, default true"
+    - default_pilot_routing: "FK to routings, nullable"
+  costing:
+    - require_costing_approval: "boolean, default true"
+    - cost_variance_warning_pct: "decimal(5,2), default 20"
+    - cost_variance_blocker_pct: "decimal(5,2), default 50"
+  compliance:
+    - require_compliance_docs: "boolean, default true"
+  formulation:
+    - max_formulation_versions: "integer, default 10"
+    - enable_formulation_export: "boolean, default true"
+  events:
+    - event_retention_days: "integer, default 90"

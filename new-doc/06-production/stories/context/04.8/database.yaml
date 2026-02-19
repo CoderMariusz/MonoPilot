@@ -1,0 +1,148 @@
+# Story 04.8 - Material Reservations
+# Database schema and migrations
+# Generated: 2026-01-14
+
+tables:
+  - name: "material_reservations"
+    description: "Links License Plates to WO materials with quantity tracking"
+    columns:
+      - name: "id"
+        type: "UUID"
+        constraints: "PRIMARY KEY DEFAULT gen_random_uuid()"
+      - name: "org_id"
+        type: "UUID"
+        constraints: "REFERENCES organizations(id) NOT NULL"
+      - name: "wo_id"
+        type: "UUID"
+        constraints: "REFERENCES work_orders(id) NOT NULL"
+      - name: "wo_material_id"
+        type: "UUID"
+        constraints: "REFERENCES wo_materials(id) NOT NULL"
+      - name: "lp_id"
+        type: "UUID"
+        constraints: "REFERENCES license_plates(id) NOT NULL"
+      - name: "reserved_qty"
+        type: "NUMERIC"
+        constraints: "NOT NULL CHECK (reserved_qty > 0)"
+      - name: "consumed_qty"
+        type: "NUMERIC"
+        constraints: "DEFAULT 0 CHECK (consumed_qty >= 0)"
+      - name: "status"
+        type: "TEXT"
+        constraints: "DEFAULT 'active' CHECK (status IN ('active', 'released', 'consumed'))"
+      - name: "reserved_at"
+        type: "TIMESTAMPTZ"
+        constraints: "DEFAULT now()"
+      - name: "reserved_by"
+        type: "UUID"
+        constraints: "REFERENCES auth.users(id) NOT NULL"
+      - name: "released_at"
+        type: "TIMESTAMPTZ"
+        constraints: "NULL"
+      - name: "released_by"
+        type: "UUID"
+        constraints: "REFERENCES auth.users(id) NULL"
+      - name: "created_at"
+        type: "TIMESTAMPTZ"
+        constraints: "DEFAULT now()"
+      - name: "updated_at"
+        type: "TIMESTAMPTZ"
+        constraints: "NULL"
+    indexes:
+      - name: "idx_material_reservations_wo"
+        columns: ["wo_id"]
+      - name: "idx_material_reservations_lp"
+        columns: ["lp_id"]
+      - name: "idx_material_reservations_status"
+        columns: ["status"]
+      - name: "idx_material_reservations_wo_material"
+        columns: ["wo_material_id"]
+      - name: "idx_material_reservations_org"
+        columns: ["org_id"]
+    rls:
+      enabled: true
+      policies:
+        - name: "material_reservations_select"
+          operation: "SELECT"
+          check: "org_id = auth.jwt()->>'org_id'"
+        - name: "material_reservations_insert"
+          operation: "INSERT"
+          check: "org_id = auth.jwt()->>'org_id'"
+        - name: "material_reservations_update"
+          operation: "UPDATE"
+          check: "org_id = auth.jwt()->>'org_id'"
+        - name: "material_reservations_delete"
+          operation: "DELETE"
+          check: "org_id = auth.jwt()->>'org_id'"
+
+functions:
+  - name: "get_available_lps_for_material"
+    description: "Returns LPs sorted by FIFO or FEFO with reservation deductions"
+    params:
+      - name: "p_org_id"
+        type: "UUID"
+      - name: "p_product_id"
+        type: "UUID"
+      - name: "p_warehouse_id"
+        type: "UUID"
+      - name: "p_sort"
+        type: "TEXT"
+        default: "'fifo'"
+    returns: "TABLE(lp_id UUID, lp_number TEXT, lot_number TEXT, expiry_date DATE, location TEXT, total_qty NUMERIC, reserved_qty NUMERIC, available_qty NUMERIC, created_at TIMESTAMPTZ)"
+    logic: |
+      SELECT
+        lp.id AS lp_id,
+        lp.lp_number,
+        lp.lot_number,
+        lp.expiry_date,
+        lp.location,
+        lp.quantity AS total_qty,
+        COALESCE(SUM(mr.reserved_qty - mr.consumed_qty) FILTER (WHERE mr.status = 'active'), 0) AS reserved_qty,
+        lp.quantity - COALESCE(SUM(mr.reserved_qty - mr.consumed_qty) FILTER (WHERE mr.status = 'active'), 0) AS available_qty,
+        lp.created_at
+      FROM license_plates lp
+      LEFT JOIN material_reservations mr ON lp.id = mr.lp_id
+      WHERE lp.org_id = p_org_id
+        AND lp.product_id = p_product_id
+        AND lp.warehouse_id = p_warehouse_id
+        AND lp.status = 'available'
+        AND lp.qa_status = 'passed'
+        AND (lp.expiry_date IS NULL OR lp.expiry_date >= CURRENT_DATE)
+      GROUP BY lp.id
+      HAVING lp.quantity - COALESCE(SUM(mr.reserved_qty - mr.consumed_qty) FILTER (WHERE mr.status = 'active'), 0) > 0
+      ORDER BY
+        CASE WHEN p_sort = 'fifo' THEN lp.created_at END ASC,
+        CASE WHEN p_sort = 'fifo' THEN lp.expiry_date END ASC NULLS LAST,
+        CASE WHEN p_sort = 'fefo' THEN lp.expiry_date END ASC NULLS LAST,
+        CASE WHEN p_sort = 'fefo' THEN lp.created_at END ASC
+
+  - name: "release_wo_reservations"
+    description: "Releases all active reservations for a completed/cancelled WO"
+    params:
+      - name: "p_wo_id"
+        type: "UUID"
+      - name: "p_user_id"
+        type: "UUID"
+    returns: "INTEGER"
+    logic: |
+      UPDATE material_reservations
+      SET status = 'released',
+          released_at = now(),
+          released_by = p_user_id,
+          updated_at = now()
+      WHERE wo_id = p_wo_id
+        AND status = 'active'
+      RETURNING COUNT(*)
+
+triggers:
+  - name: "trg_material_reservations_updated_at"
+    table: "material_reservations"
+    event: "BEFORE UPDATE"
+    action: "SET NEW.updated_at = now()"
+
+migration:
+  file: "supabase/migrations/XXX_material_reservations.sql"
+  dependencies:
+    - "license_plates table"
+    - "wo_materials table"
+    - "work_orders table"

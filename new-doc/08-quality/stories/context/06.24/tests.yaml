@@ -1,0 +1,482 @@
+# Story 06.24 - CCP Monitoring Scanner - Tests Context
+# Generated: 2025-01-15
+
+test_coverage:
+  target: ">80%"
+  focus_areas:
+    - "Offline storage and sync"
+    - "Barcode scanning"
+    - "Audio/vibration feedback"
+    - "Real-time validation (mobile)"
+    - "Batch sync API"
+
+unit_tests:
+  file: "lib/services/mobile-ccp-monitoring-service.test.ts"
+  framework: "Vitest"
+  coverage_target: ">80%"
+  test_suites:
+    - suite: "OfflineMonitoringService"
+      tests:
+        - name: "saves monitoring record to IndexedDB"
+          assertions:
+            - "Record saved with generated UUID"
+            - "synced = false initially"
+            - "created_offline_at timestamp set"
+
+        - name: "enforces 50-record queue limit"
+          assertions:
+            - "Returns error if queue has 50 records"
+            - "Error message: 'Offline queue full'"
+
+        - name: "retrieves offline queue (FIFO order)"
+          assertions:
+            - "Records ordered by monitored_at ASC"
+            - "Only returns records with synced=false"
+
+        - name: "syncs offline records to API"
+          setup: "5 offline records in queue"
+          assertions:
+            - "POST /batch with 5 records"
+            - "synced=true for successful records"
+            - "sync_error populated for failed records"
+            - "Returns { synced: 5, failed: 0 }"
+
+        - name: "handles sync errors gracefully"
+          setup: "Network error on sync"
+          assertions:
+            - "sync_error = 'Network request failed'"
+            - "synced = false (not marked synced)"
+            - "Retry on next sync attempt"
+
+        - name: "deduplicates already-synced records"
+          setup: "Sync same record twice"
+          assertions:
+            - "Second sync returns idempotent response"
+            - "No duplicate records in database"
+
+    - suite: "AudioFeedbackService"
+      tests:
+        - name: "plays pass beep (500Hz, 1s)"
+          assertions:
+            - "Web Audio API oscillator created"
+            - "Frequency = 500Hz"
+            - "Duration = 1s"
+
+        - name: "plays fail alarm (1kHz, 3 beeps)"
+          assertions:
+            - "Frequency = 1000Hz"
+            - "3 beeps with 100ms gaps"
+
+        - name: "requires user gesture before first play"
+          assertions:
+            - "AudioContext suspended until user interaction"
+            - "First play after click/tap works"
+
+    - suite: "VibrationService"
+      tests:
+        - name: "vibrates on pass (single 100ms)"
+          assertions:
+            - "navigator.vibrate([100]) called"
+
+        - name: "vibrates on fail (3 bursts)"
+          assertions:
+            - "navigator.vibrate([100, 100, 100, 100, 100]) called"
+
+        - name: "fallback if vibration not supported"
+          assertions:
+            - "No error if navigator.vibrate undefined"
+
+    - suite: "MobileCCPMonitoringService.batchSync"
+      tests:
+        - name: "batch syncs 10 records successfully"
+          setup: "10 offline records"
+          assertions:
+            - "POST /batch with 10 records"
+            - "All records marked synced=true"
+            - "Returns { synced: 10, failed: 0 }"
+
+        - name: "handles partial sync failure"
+          setup: "5 records, 2 invalid"
+          assertions:
+            - "3 records synced successfully"
+            - "2 records have sync_error"
+            - "Returns { synced: 3, failed: 2 }"
+
+        - name: "enforces 50-record batch limit"
+          setup: "60 records in queue"
+          assertions:
+            - "Only first 50 sent in batch"
+            - "Remaining 10 synced in second batch"
+
+integration_tests:
+  file: "app/api/quality/haccp/ccp-monitoring/batch/route.test.ts"
+  framework: "Vitest + Supertest"
+  test_suites:
+    - suite: "POST /api/quality/haccp/ccp-monitoring/batch"
+      tests:
+        - name: "batch sync 12 offline records"
+          request:
+            method: "POST"
+            body: |
+              {
+                "records": [
+                  { "id": "uuid1", "ccp_id": "...", "monitored_value": 2.5, ... },
+                  ...12 total
+                ]
+              }
+          assertions:
+            - "Returns 200 OK"
+            - "Response: { synced: 12, failed: 0, errors: [] }"
+            - "All 12 records inserted into haccp_ccp_monitoring"
+            - "monitored_by = auth.uid() from request"
+
+        - name: "returns 400 for batch > 50 records"
+          request:
+            body: "{ records: [... 51 records] }"
+          assertions:
+            - "Returns 400 Bad Request"
+            - "Error: 'Batch limited to 50 records'"
+
+        - name: "idempotent sync (duplicate offline IDs)"
+          setup: "Record with offline_id 'uuid1' already synced"
+          request:
+            body: "{ records: [{ id: 'uuid1', ... }] }"
+          assertions:
+            - "Returns 200 OK (no error)"
+            - "synced: 1, failed: 0 (idempotent)"
+            - "No duplicate record inserted"
+
+        - name: "validates each record in batch"
+          request:
+            body: |
+              {
+                "records": [
+                  { "id": "uuid1", "ccp_id": "valid", ... },
+                  { "id": "uuid2", "ccp_id": null }  // Invalid
+                ]
+              }
+          assertions:
+            - "Returns 200 OK (partial success)"
+            - "synced: 1, failed: 1"
+            - "errors: [{ id: 'uuid2', error: 'ccp_id required' }]"
+
+    - suite: "GET /api/quality/haccp/ccp-monitoring/mobile/ccps"
+      tests:
+        - name: "returns active CCPs with critical limits"
+          request:
+            method: "GET"
+          assertions:
+            - "Returns 200 OK"
+            - "Response includes: id, ccp_number, critical_limit_min/max, unit_of_measure"
+            - "Only status='active' CCPs returned"
+
+        - name: "filters CCPs by work order routing"
+          request:
+            query: "?wo_id=wo-uuid"
+          assertions:
+            - "Returns only CCPs linked to WO's routing"
+            - "Other CCPs excluded"
+
+    - suite: "POST /api/quality/haccp/ccp/:id/qr-code"
+      tests:
+        - name: "generates QR code for CCP"
+          request:
+            method: "POST"
+            path: "/api/quality/haccp/ccp/:id/qr-code"
+          assertions:
+            - "Returns 200 OK"
+            - "Response: { qr_code_url: 'data:image/png;base64,...', ... }"
+            - "qr_code_data = '/quality/haccp/ccp-monitoring/mobile?ccp=CCP-1'"
+
+    - suite: "POST /api/barcode/scan/wo"
+      tests:
+        - name: "looks up work order by barcode"
+          request:
+            method: "POST"
+            body: "{ barcode: 'WO-2025-001' }"
+          assertions:
+            - "Returns 200 OK"
+            - "Response includes: wo_id, product_id, batch_number, ccp_ids"
+
+        - name: "returns 404 for invalid barcode"
+          request:
+            body: "{ barcode: 'INVALID' }"
+          assertions:
+            - "Returns 404 Not Found"
+            - "Error: 'Work order not found'"
+
+e2e_tests:
+  file: "tests/e2e/quality/mobile-ccp-monitoring.spec.ts"
+  framework: "Playwright"
+  test_suites:
+    - suite: "Mobile CCP Monitoring Workflow"
+      tests:
+        - name: "complete workflow: scan WO -> select CCP -> enter value -> pass -> submit"
+          steps:
+            - "Navigate to /quality/haccp/ccp-monitoring/mobile"
+            - "Click [Scan WO Barcode]"
+            - "Mock camera scan (WO-2025-001)"
+            - "WO-2025-001 displayed in header"
+            - "CCP dropdown filtered to WO routing CCPs"
+            - "Select CCP-1 (Receiving Temperature)"
+            - "Enter monitored value: 2.5"
+            - "Validation indicator shows GREEN checkmark"
+            - "Hear pass beep (mock audio)"
+            - "Feel vibration (mock, single 100ms)"
+            - "Click [Submit]"
+            - "Success toast: 'Monitoring recorded - PASS'"
+            - "Form resets for next entry"
+          assertions:
+            - "Monitoring record created in database"
+            - "result = 'pass'"
+            - "deviation_detected = false"
+            - "monitored_by = current user"
+
+        - name: "fail workflow: enter out-of-spec value -> corrective action -> submit"
+          steps:
+            - "Navigate to mobile monitoring page"
+            - "Scan WO and select CCP-1 (limits 0-4°C)"
+            - "Enter monitored value: 6.5"
+            - "Validation indicator shows RED X"
+            - "Hear fail alarm (3 beeps, 1kHz)"
+            - "Feel vibration (3 bursts)"
+            - "Fullscreen red warning appears"
+            - "Corrective action field appears (mandatory)"
+            - "Select template 'Rejected batch and quarantined'"
+            - "Click [Submit with Corrective Action]"
+            - "Success toast: 'Deviation recorded - QA notified'"
+          assertions:
+            - "Monitoring record created"
+            - "result = 'fail'"
+            - "deviation_detected = true"
+            - "corrective_action_taken = 'Rejected batch...'"
+            - "Deviation alert triggered (story 06.26)"
+
+    - suite: "Offline Mode Workflow"
+      tests:
+        - name: "offline mode: record 5 entries -> go offline -> record 3 more -> reconnect -> sync"
+          steps:
+            - "Navigate to mobile monitoring page"
+            - "Record 5 monitoring entries (online)"
+            - "Verify 5 records synced to server"
+            - "Simulate offline (navigator.onLine = false)"
+            - "Offline indicator shows 'Offline (0/50 pending)'"
+            - "Record 3 more entries offline"
+            - "Toast: 'Saved offline (3/50)'"
+            - "Verify 3 records in IndexedDB"
+            - "Simulate reconnect (navigator.onLine = true)"
+            - "Auto-sync triggered"
+            - "Toast: 'Synced 3 records'"
+            - "Offline indicator shows 'Online'"
+            - "IndexedDB queue cleared"
+          assertions:
+            - "8 total records in database (5 online + 3 offline)"
+            - "All 3 offline records synced successfully"
+            - "synced=true for all 3"
+
+        - name: "offline queue full (50 records) -> block new entries"
+          steps:
+            - "Go offline"
+            - "Record 50 monitoring entries"
+            - "Attempt to record 51st entry"
+            - "Error toast: 'Offline queue full (50/50). Sync pending records.'"
+            - "Submit button disabled"
+            - "Click [Sync Now] button"
+            - "Reconnect online"
+            - "Sync all 50 records"
+            - "Queue cleared"
+            - "Submit button re-enabled"
+          assertions:
+            - "51st entry not saved (blocked)"
+            - "50 records synced successfully after reconnect"
+
+    - suite: "Barcode Scanning"
+      tests:
+        - name: "scan WO barcode -> auto-load WO context"
+          steps:
+            - "Navigate to mobile monitoring page"
+            - "Click [Scan WO Barcode]"
+            - "Camera access granted"
+            - "Scan barcode 'WO-2025-001'"
+            - "Barcode detected (beep + vibration)"
+            - "WO-2025-001 displayed in header"
+            - "Product: 'Bread' displayed"
+            - "Batch: 'B-2025-001' displayed"
+            - "CCP dropdown filtered to routing CCPs (CCP-1, CCP-2)"
+          assertions:
+            - "WO context loaded correctly"
+            - "CCPs filtered by routing"
+
+        - name: "scan CCP QR code -> auto-select CCP"
+          steps:
+            - "QA Manager generates QR code for CCP-1"
+            - "Print QR code and post on production line"
+            - "Operator scans QR code"
+            - "Deep link opens: /quality/haccp/ccp-monitoring/mobile?ccp=CCP-1"
+            - "CCP-1 auto-selected in dropdown"
+            - "Value input focused (ready for entry)"
+          assertions:
+            - "CCP-1 pre-selected"
+            - "Operator enters value immediately (fast workflow)"
+
+    - suite: "Audio and Vibration Feedback"
+      tests:
+        - name: "audio feedback on pass"
+          setup: "User gesture (tap screen) to enable audio"
+          steps:
+            - "Enter value within limits (pass)"
+            - "Validation shows GREEN"
+            - "Hear beep (500Hz, 1s)"
+          assertions:
+            - "Audio plays (mock Web Audio API)"
+
+        - name: "audio feedback on fail"
+          steps:
+            - "Enter value outside limits (fail)"
+            - "Validation shows RED"
+            - "Hear alarm (1kHz, 3 beeps, urgent)"
+          assertions:
+            - "Alarm plays (mock)"
+
+        - name: "vibration feedback on fail"
+          setup: "Device supports vibration"
+          steps:
+            - "Enter value outside limits"
+            - "Vibration triggered (3 bursts)"
+          assertions:
+            - "navigator.vibrate([100, 100, 100, 100, 100]) called"
+
+    - suite: "Corrective Action Templates"
+      tests:
+        - name: "select corrective action template"
+          steps:
+            - "Enter out-of-spec value (fail)"
+            - "Corrective action field appears"
+            - "Click template 'Adjusted temperature to bring within limits'"
+            - "Template text populated in field"
+            - "Optionally add custom notes"
+            - "Submit"
+          assertions:
+            - "corrective_action_taken = template + custom notes"
+
+        - name: "enter custom corrective action"
+          steps:
+            - "Select template 'Custom (enter below)'"
+            - "Textarea appears"
+            - "Enter custom action"
+            - "Submit"
+          assertions:
+            - "corrective_action_taken = custom text"
+
+# Acceptance Criteria Coverage
+ac_coverage:
+  - id: "AC-1"
+    name: "Mobile CCP Monitoring Page"
+    tests:
+      - "e2e_tests: Mobile page displays correctly"
+  - id: "AC-2"
+    name: "Barcode Scan WO"
+    tests:
+      - "e2e_tests: scan WO barcode workflow"
+  - id: "AC-3"
+    name: "Offline Mode - Record Monitoring"
+    tests:
+      - "e2e_tests: offline mode workflow (record offline)"
+  - id: "AC-4"
+    name: "Offline Mode - Sync on Reconnect"
+    tests:
+      - "e2e_tests: offline sync workflow"
+  - id: "AC-5"
+    name: "Audio Feedback - Pass"
+    tests:
+      - "e2e_tests: audio feedback on pass"
+  - id: "AC-6"
+    name: "Audio Feedback - Fail"
+    tests:
+      - "e2e_tests: audio feedback on fail"
+  - id: "AC-7"
+    name: "Simplified Corrective Action Templates"
+    tests:
+      - "e2e_tests: corrective action templates"
+  - id: "AC-8"
+    name: "Large Touch Targets"
+    tests:
+      - "Manual test: verify all elements >= 48px"
+  - id: "AC-9"
+    name: "QR Code for CCP Quick Access"
+    tests:
+      - "e2e_tests: scan CCP QR code workflow"
+
+# Manual Tests (Device-Specific)
+manual_tests:
+  - test: "Audio feedback on real device"
+    device: "iPhone 14, Android Pixel 7"
+    steps:
+      - "Record monitoring on device"
+      - "Enter pass value -> verify beep plays"
+      - "Enter fail value -> verify alarm plays"
+    expected: "Audio plays correctly, no browser blocking"
+
+  - test: "Vibration feedback on real device"
+    device: "iPhone 14, Android Pixel 7"
+    steps:
+      - "Enter fail value"
+      - "Verify vibration (3 bursts)"
+    expected: "Vibration pattern correct"
+
+  - test: "Offline mode on real device"
+    device: "iPhone 14, Android Pixel 7"
+    steps:
+      - "Enable airplane mode"
+      - "Record 5 entries"
+      - "Verify saved to IndexedDB"
+      - "Disable airplane mode"
+      - "Verify auto-sync"
+    expected: "All 5 records synced successfully"
+
+  - test: "Camera barcode scanning"
+    device: "iPhone 14, Android Pixel 7"
+    steps:
+      - "Click [Scan WO Barcode]"
+      - "Grant camera permission"
+      - "Scan physical barcode (WO-2025-001)"
+      - "Verify barcode detected"
+    expected: "Barcode scanned successfully, WO loaded"
+
+  - test: "Touch targets accessibility"
+    device: "iPhone 14, Android Pixel 7"
+    steps:
+      - "Verify all buttons >= 48px height"
+      - "Test one-handed use (portrait)"
+      - "Verify spacing between targets >= 8px"
+    expected: "All touch targets meet accessibility guidelines"
+
+# Performance Tests (Mobile)
+performance_tests:
+  - scenario: "Page load on 3G network"
+    target: "<2s"
+    test: "Load mobile monitoring page on simulated 3G"
+  - scenario: "Offline storage write"
+    target: "<100ms"
+    test: "Save monitoring record to IndexedDB"
+  - scenario: "Batch sync 50 records"
+    target: "<2s"
+    test: "POST /batch with 50 records"
+  - scenario: "Barcode detection latency"
+    target: "<500ms"
+    test: "Time from barcode in frame to detection"
+  - scenario: "Audio feedback latency"
+    target: "<100ms"
+    test: "Time from validation change to audio play"
+
+# Security Tests
+security_tests:
+  - test: "Offline data encryption"
+    scenario: "Offline records stored in IndexedDB"
+    expected: "IndexedDB data encrypted (if supported by browser)"
+  - test: "Auth token in offline mode"
+    scenario: "Device offline for 24h"
+    expected: "Auth token refreshed on reconnect, expired tokens rejected"
+  - test: "Cross-org offline data isolation"
+    scenario: "User A offline, switches to User B (different org)"
+    expected: "User A offline queue not visible to User B"

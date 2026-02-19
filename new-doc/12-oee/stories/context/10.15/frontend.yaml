@@ -1,0 +1,35 @@
+# Story 10.15 - Frontend Specification
+# Purpose: Production rate visualization
+# Agent: FRONTEND-DEV
+
+components:
+  - path: "apps/frontend/components/oee/analytics/RateTrendChart.tsx"
+    description: "Line chart showing actual vs target rate"
+    features:
+      - "Dual lines: actual (solid) and target (dashed)"
+      - "Below-target periods highlighted in red"
+      - "Hover tooltip with values"
+
+  - path: "apps/frontend/components/oee/analytics/RateVarianceIndicator.tsx"
+    description: "Variance percentage display"
+    props:
+      - { name: "variance", type: "number" }
+      - { name: "efficiency", type: "number" }
+    displays:
+      - "Variance: -16.7%"
+      - "Efficiency: 83.3%"
+      - "Color coded: green > 100%, yellow 80-100%, red < 80%"
+
+  - path: "apps/frontend/components/oee/dashboard/RateWidget.tsx"
+    description: "Dashboard widget for rate metrics"
+
+pages:
+  - path: "apps/frontend/app/(authenticated)/oee/analytics/rate/page.tsx"
+    route: "/oee/analytics/rate"
+    title: "Production Rate Analysis"
+
+hooks:
+  - path: "apps/frontend/lib/hooks/use-production-rate.ts"
+    exports:
+      - "useProductionRate"
+      - "useRateTrend"

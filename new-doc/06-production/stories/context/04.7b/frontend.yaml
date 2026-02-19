@@ -1,0 +1,319 @@
+# Story 04.7b: Output Registration Scanner - Frontend Components
+
+pages:
+  - path: "apps/frontend/app/(authenticated)/scanner/output/page.tsx"
+    description: "7-step scanner wizard for production output registration"
+    route: "/scanner/output"
+    mobile_optimized: true
+    screen_width: "320px-480px"
+
+components:
+  - name: "ScanWOStep"
+    file_path: "apps/frontend/app/(authenticated)/scanner/output/components/ScanWOStep.tsx"
+    props:
+      onWOValidated:
+        type: "function"
+        required: true
+      onError:
+        type: "function"
+        required: true
+    internal_state:
+      - name: "barcode"
+        type: "string"
+      - name: "isValidating"
+        type: "boolean"
+      - name: "error"
+        type: "string | null"
+      - name: "woData"
+        type: "WOValidationResult | null"
+    description: "Step 1 - Auto-focus barcode input, validate WO within 500ms"
+
+  - name: "EnterQuantityStep"
+    file_path: "apps/frontend/app/(authenticated)/scanner/output/components/EnterQuantityStep.tsx"
+    props:
+      woData:
+        type: "WOValidationResult"
+        required: true
+      onQuantityConfirmed:
+        type: "function"
+        required: true
+      onBack:
+        type: "function"
+        required: true
+    internal_state:
+      - name: "quantity"
+        type: "string"
+      - name: "showOverproductionWarning"
+        type: "boolean"
+    description: "Step 2 - Number pad input (64x64dp keys), progress preview"
+
+  - name: "SelectQAStatusStep"
+    file_path: "apps/frontend/app/(authenticated)/scanner/output/components/SelectQAStatusStep.tsx"
+    props:
+      productName:
+        type: "string"
+        required: true
+      quantity:
+        type: "number"
+        required: true
+      batchNumber:
+        type: "string"
+        required: true
+      onStatusSelected:
+        type: "function"
+        required: true
+      onBack:
+        type: "function"
+        required: true
+    internal_state:
+      - name: "selectedStatus"
+        type: "string | null"
+    description: "Step 3 - Large QA buttons (64dp height) with color coding"
+
+  - name: "ReviewOutputStep"
+    file_path: "apps/frontend/app/(authenticated)/scanner/output/components/ReviewOutputStep.tsx"
+    props:
+      outputData:
+        type: "OutputReviewData"
+        required: true
+      lpNumberPreview:
+        type: "string"
+        required: true
+      onConfirm:
+        type: "function"
+        required: true
+      onBack:
+        type: "function"
+        required: true
+    internal_state:
+      - name: "isConfirming"
+        type: "boolean"
+    description: "Step 4 - Summary card with all details and LP preview"
+
+  - name: "LPCreatedStep"
+    file_path: "apps/frontend/app/(authenticated)/scanner/output/components/LPCreatedStep.tsx"
+    props:
+      lpData:
+        type: "CreatedLPData"
+        required: true
+      woProgress:
+        type: "WOProgress"
+        required: true
+      onNext:
+        type: "function"
+        required: true
+    internal_state:
+      - name: "autoAdvanceTimer"
+        type: "number"
+    description: "Step 5 - Success animation, voice announcement, 2s auto-advance"
+
+  - name: "PrintLabelStep"
+    file_path: "apps/frontend/app/(authenticated)/scanner/output/components/PrintLabelStep.tsx"
+    props:
+      lpData:
+        type: "CreatedLPData"
+        required: true
+      printerConfig:
+        type: "PrinterConfig | null"
+        required: true
+      onPrint:
+        type: "function"
+        required: true
+      onSkip:
+        type: "function"
+        required: true
+    internal_state:
+      - name: "isPrinting"
+        type: "boolean"
+      - name: "printStatus"
+        type: "pending | success | error"
+      - name: "zplPreview"
+        type: "string"
+    description: "Step 6 - Label preview, print button (disabled if no printer)"
+
+  - name: "ByProductPromptStep"
+    file_path: "apps/frontend/app/(authenticated)/scanner/output/components/ByProductPromptStep.tsx"
+    props:
+      mainOutput:
+        type: "CreatedLPData"
+        required: true
+      byProducts:
+        type: "ByProduct[]"
+        required: true
+      onRegisterByProduct:
+        type: "function"
+        required: true
+      onSkipAll:
+        type: "function"
+        required: true
+      onComplete:
+        type: "function"
+        required: true
+    internal_state:
+      - name: "currentByProductIndex"
+        type: "number"
+      - name: "registeredByProducts"
+        type: "RegisteredByProduct[]"
+      - name: "showZeroWarning"
+        type: "boolean"
+    description: "Step 7 - By-product list with expected qty, Yes/No prompt"
+
+  - name: "NumberPad"
+    file_path: "apps/frontend/app/(authenticated)/scanner/output/components/NumberPad.tsx"
+    props:
+      value:
+        type: "string"
+        required: true
+      onChange:
+        type: "function"
+        required: true
+      maxDecimalPlaces:
+        type: "number"
+        default: 2
+    internal_state: []
+    description: "Reusable number pad with 64x64dp keys, backspace, clear, decimal"
+
+  - name: "QAStatusButton"
+    file_path: "apps/frontend/app/(authenticated)/scanner/output/components/QAStatusButton.tsx"
+    props:
+      status:
+        type: "approved | pending | rejected"
+        required: true
+      label:
+        type: "string"
+        required: true
+      description:
+        type: "string"
+        required: true
+      selected:
+        type: "boolean"
+        required: false
+      onSelect:
+        type: "function"
+        required: true
+    internal_state: []
+    description: "64dp height button with color coding and selection state"
+
+hooks:
+  - name: "useScannerOutput"
+    file_path: "apps/frontend/lib/hooks/use-scanner-output.ts"
+    returns:
+      - "currentStep: number"
+      - "woData: WOValidationResult | null"
+      - "outputData: OutputData | null"
+      - "lpData: CreatedLPData | null"
+      - "isProcessing: boolean"
+      - "error: Error | null"
+      - "validateWO: (barcode: string) => Promise<void>"
+      - "registerOutput: (data: RegisterOutputInput) => Promise<void>"
+      - "printLabel: () => Promise<void>"
+      - "registerByProduct: (data: RegisterByProductInput) => Promise<void>"
+      - "goToStep: (step: number) => void"
+      - "reset: () => void"
+    description: "Custom hook managing 7-step scanner wizard state"
+
+  - name: "useAudioFeedback"
+    file_path: "apps/frontend/lib/hooks/use-audio-feedback.ts"
+    returns:
+      - "playSuccess: () => void"
+      - "playError: () => void"
+      - "playWarning: () => void"
+      - "speak: (text: string) => void"
+      - "vibrate: (pattern: number[]) => void"
+    description: "Audio/vibration feedback for scanner workflow"
+
+services:
+  - name: "ScannerOutputService"
+    file_path: "apps/frontend/lib/services/scanner-output-service.ts"
+    methods:
+      - "validateWO(barcode: string): Promise<WOValidationResult>"
+      - "registerOutput(data: ScannerRegisterInput): Promise<RegisterOutputResponse>"
+      - "getByProducts(woId: string): Promise<ByProduct[]>"
+      - "registerByProduct(data: ScannerByProductInput): Promise<RegisterByProductResponse>"
+
+  - name: "LabelService"
+    file_path: "apps/frontend/lib/services/label-service.ts"
+    methods:
+      - "generateZPL(lpId: string, templateId?: string): Promise<ZPLContent>"
+      - "sendToPrinter(zpl: string, printerId?: string): Promise<PrintResult>"
+      - "getPrinterStatus(locationId?: string): Promise<PrinterStatus>"
+
+  - name: "OfflineQueueService"
+    file_path: "apps/frontend/lib/services/offline-queue-service.ts"
+    methods:
+      - "queueOperation(operation: OfflineOperation): Promise<void>"
+      - "syncQueue(): Promise<SyncResult>"
+      - "getPendingCount(): number"
+      - "clearQueue(): void"
+
+validation:
+  file_path: "apps/frontend/lib/validation/scanner-output.ts"
+  schemas:
+    - name: "scannerOutputSchema"
+      fields:
+        wo_id: "z.string().uuid()"
+        quantity: "z.number().positive()"
+        qa_status: "z.enum(['approved', 'pending', 'rejected'])"
+        batch_number: "z.string().min(1)"
+        expiry_date: "z.date()"
+    - name: "byProductSchema"
+      fields:
+        quantity: "z.number().min(0)"
+        qa_status: "z.enum(['approved', 'pending', 'rejected'])"
+        zero_qty_confirmed: "z.boolean().optional()"
+
+wireframe_refs:
+  - wireframe_id: "PROD-006"
+    path: "docs/3-ARCHITECTURE/ux/wireframes/PROD-006-scanner-register-output.md"
+    sections:
+      - "Step 1: Scan WO Barcode"
+      - "Step 2: Enter Quantity Produced"
+      - "Step 3: Select QA Status"
+      - "Step 4: Review Output Details"
+      - "Step 5: LP Created"
+      - "Step 6: Print LP Label"
+      - "Step 7: By-Product Prompt"
+
+ui_states:
+  loading:
+    description: "Centered spinner with operation-specific text"
+    examples:
+      - "Looking up WO-2025-0156..."
+      - "Creating LP..."
+      - "Sending to printer..."
+  empty:
+    description: "No active work orders state with guidance"
+    message: "No active work orders. Please start a work order in Production module first."
+    actions: ["Go to Production", "Refresh"]
+  error:
+    description: "Error icon with message and retry/back options"
+    feedback:
+      visual: "Red X icon (96dp)"
+      audio: "2 short beeps (200ms each)"
+      haptic: "100ms vibration"
+  success:
+    description: "Green check with confirmation and auto-advance"
+    feedback:
+      visual: "Green check icon (96dp)"
+      audio: "500ms beep + 'LP created' voice"
+      haptic: "200ms vibration"
+
+mobile_requirements:
+  screen_width: "320px-480px"
+  touch_targets:
+    minimum: "48x48dp"
+    number_pad: "64x64dp"
+    qa_buttons: "full width x 64dp"
+  font_sizes:
+    heading: "24px"
+    body: "18px"
+    quantity_input: "32px"
+  contrast: ">= 4.5:1 for all text"
+
+device_support:
+  - "Zebra TC52/TC57"
+  - "Honeywell CT60/CK65"
+  - "iPhone (iOS 14+)"
+  - "Android (API 28+)"
+  - "Bluetooth ring scanners"
+  - "Zebra ZPL printers"

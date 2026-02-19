@@ -1,0 +1,247 @@
+# Story 03.9b - Frontend Specification
+# Purpose: Components, hooks, types, UX patterns
+# Agent: FRONTEND-DEV
+# Status: DEFERRED - Requires Epic 05 license_plates table
+
+is_full_stack: true
+deferred: true
+blocked_by: "Epic 05 license_plates table"
+
+# Components to create
+components:
+  - path: "apps/frontend/app/(authenticated)/planning/transfer-orders/[id]/components/LPPickerModal.tsx"
+    description: "LP selection modal with filters and multi-select"
+    props:
+      toId: "string"
+      toLine: "TransferOrderLine"
+      fromWarehouse: "Warehouse"
+      onClose: "() => void"
+      onSuccess: "() => void"
+    features:
+      - "Filter by lot number (text input)"
+      - "Filter by expiry date range (date pickers)"
+      - "Search by LP number (text input)"
+      - "Warehouse and Product readonly (auto-filled from TO)"
+      - "Multi-select table with checkboxes"
+      - "Per-row quantity input (defaults to available_qty)"
+      - "Total selected vs required progress indicator"
+      - "Assign LPs and Cancel buttons"
+    wireframe_ref: "PLAN-012 TO Detail - LP Picker concept"
+
+  - path: "apps/frontend/app/(authenticated)/planning/transfer-orders/[id]/components/TOLineLPAssignments.tsx"
+    description: "Display LP assignments for a TO line (expandable section)"
+    props:
+      toLineId: "string"
+      assignments: "TOLineLPAssignment[]"
+      totalRequired: "number"
+      canEdit: "boolean"
+      onRemove: "(lpId: string) => void"
+    features:
+      - "Expandable table showing assigned LPs"
+      - "Columns: LP Number, Lot, Expiry, Location, Assigned Qty, Actions"
+      - "Remove button (X icon) per LP"
+      - "Confirmation dialog before removal"
+      - "Empty state: 'No License Plates assigned'"
+
+  - path: "apps/frontend/app/(authenticated)/planning/transfer-orders/[id]/components/LPAssignmentBadge.tsx"
+    description: "Badge showing LP assignment status on TO line"
+    props:
+      assignedQty: "number"
+      requiredQty: "number"
+      lpCount: "number"
+    variants:
+      complete:
+        condition: "assignedQty >= requiredQty && lpCount > 0"
+        display: "{lpCount} LPs Assigned"
+        color: "green"
+      partial:
+        condition: "assignedQty > 0 && assignedQty < requiredQty"
+        display: "Partial Assignment ({assignedQty}/{requiredQty})"
+        color: "yellow"
+      none:
+        condition: "lpCount === 0"
+        display: "None"
+        color: "gray"
+
+# Component updates
+component_updates:
+  - path: "apps/frontend/app/(authenticated)/planning/transfer-orders/[id]/components/TOLineActionsMenu.tsx"
+    description: "Add 'Assign LPs' action to line actions menu"
+    changes:
+      - "Add 'Assign LPs' menu item"
+      - "Visible when TO status in (draft, planned)"
+      - "Opens LPPickerModal on click"
+      - "Show badge with current assignment count"
+
+  - path: "apps/frontend/app/(authenticated)/planning/transfer-orders/[id]/page.tsx"
+    description: "Update TO Detail page to show LP assignments"
+    changes:
+      - "Add 'LP Assignments' column to lines table"
+      - "Show LPAssignmentBadge per line"
+      - "Add expandable row for TOLineLPAssignments"
+      - "Add 'Assign LPs' button to line actions"
+      - "Load LP assignments data on page load"
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-to-lp-assignments.ts"
+    description: "React Query hook for TO LP assignments"
+    exports:
+      - name: "useTOLineLPAssignments"
+        params: ["toId: string", "toLineId: string"]
+        returns: "UseQueryResult<{ assignments: TOLineLPAssignment[]; total_assigned: number; total_required: number; is_complete: boolean }>"
+      - name: "useAvailableLPs"
+        params: ["toId: string", "toLineId: string", "filters?: LPFilters"]
+        returns: "UseQueryResult<AvailableLP[]>"
+      - name: "useAssignLPs"
+        returns: "UseMutationResult<AssignLPsResponse, Error, AssignLPsRequest>"
+      - name: "useRemoveLP"
+        returns: "UseMutationResult<void, Error, { toId: string; toLineId: string; lpId: string }>"
+
+# UX Specifications
+ux:
+  wireframes:
+    - id: "PLAN-012"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-012-transfer-order-detail.md"
+      description: "TO Detail page with LP assignments column and expandable rows"
+      components: ["TOLineLPAssignments", "LPAssignmentBadge"]
+
+  lp_picker_modal:
+    layout: |
+      +------------------------------------------------------------------+
+      | Assign License Plates - Product A (100 units needed)        [X]  |
+      +------------------------------------------------------------------+
+      | Filters:                                                          |
+      | Warehouse: [Main Warehouse] (readonly)                           |
+      | Product:   [Product A] (readonly)                                |
+      | Lot Number: [____________]  Expiry: [From] to [To]              |
+      | Search:    [____________]                                        |
+      +------------------------------------------------------------------+
+      | [ ] | LP Number      | Lot    | Expiry    | Location | Avail | Assign |
+      +------------------------------------------------------------------+
+      | [x] | LP-2024-00123 | ABC-01 | 2025-06-01 | A-01-01 | 50    | [50]   |
+      | [x] | LP-2024-00124 | ABC-02 | 2025-07-01 | A-01-02 | 30    | [30]   |
+      | [ ] | LP-2024-00125 | ABC-03 | 2025-08-01 | A-02-01 | 100   | [--]   |
+      +------------------------------------------------------------------+
+      | Total Selected: 80 / 100 units                                   |
+      |                                                                   |
+      |                              [Cancel]  [Assign LPs]             |
+      +------------------------------------------------------------------+
+
+  states:
+    loading:
+      - "Skeleton loader for LP list"
+      - "Disabled assign button"
+    empty:
+      - "No available LPs in source warehouse"
+      - "Message: 'No License Plates available for this product in {warehouse}'"
+      - "Suggestion: 'Create inventory in Warehouse module'"
+    error:
+      - "Error toast for validation failures"
+      - "Inline error messages for quantity validation"
+      - "Modal remains open on error"
+    success:
+      - "Success toast: '{N} License Plates assigned successfully'"
+      - "Modal closes"
+      - "TO Detail page refreshes"
+
+  accessibility:
+    touch_targets: "48dp minimum for all buttons"
+    contrast: "4.5:1 for all text"
+    keyboard:
+      - "Tab: Navigate between filters, table rows, buttons"
+      - "Space/Enter: Toggle checkbox, activate button"
+      - "Escape: Close modal"
+    aria:
+      - "Modal: role='dialog', aria-labelledby='modal-title'"
+      - "Table: role='grid' with row selection announcement"
+      - "Progress: aria-live='polite' for total selected updates"
+
+  responsive:
+    desktop: "Full modal with 6-column table"
+    tablet: "Full modal with scrollable table"
+    mobile: "Full-screen modal with stacked cards instead of table"
+
+# TypeScript types
+types:
+  - path: "apps/frontend/lib/types/to-lp.ts"
+    content: |
+      export interface TOLineLPAssignment {
+        id: string;
+        to_line_id: string;
+        lp_id: string;
+        quantity: number;
+        created_at: string;
+        created_by: string | null;
+        // Joined from license_plates
+        lp_number: string;
+        lot_number: string | null;
+        expiry_date: string | null;
+        location: string | null;
+      }
+
+      export interface AvailableLP {
+        id: string;
+        lp_number: string;
+        lot_number: string | null;
+        expiry_date: string | null;
+        location: string | null;
+        available_qty: number;
+        uom: string;
+        warehouse: {
+          id: string;
+          code: string;
+          name: string;
+        };
+        product: {
+          id: string;
+          code: string;
+          name: string;
+        };
+      }
+
+      export interface LPSelection {
+        lp_id: string;
+        quantity: number;
+      }
+
+      export interface AssignLPsRequest {
+        lps: LPSelection[];
+      }
+
+      export interface AssignLPsResponse {
+        success: boolean;
+        assignments?: TOLineLPAssignment[];
+        message: string;
+      }
+
+      export interface GetLPAssignmentsResponse {
+        assignments: TOLineLPAssignment[];
+        total_assigned: number;
+        total_required: number;
+        is_complete: boolean;
+      }
+
+      export interface LPFilters {
+        lot_number?: string;
+        expiry_from?: string;
+        expiry_to?: string;
+        search?: string;
+      }
+
+# Settings UI (to be added to Planning Settings page)
+settings_ui:
+  path: "apps/frontend/app/(authenticated)/settings/planning/components/TOLPSettings.tsx"
+  description: "Settings toggles for TO LP selection requirements"
+  fields:
+    - name: "to_require_lp_selection"
+      label: "Require License Plate Selection for Transfer Orders"
+      description: "When enabled, Transfer Orders cannot be shipped without pre-assigned License Plates"
+      type: "toggle"
+      default: false
+    - name: "to_require_exact_qty_match"
+      label: "Require Exact Quantity Match"
+      description: "Sum of assigned LP quantities must equal TO line quantity"
+      type: "toggle"
+      default: false
+      visible_when: "to_require_lp_selection === true"

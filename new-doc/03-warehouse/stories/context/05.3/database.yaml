@@ -1,0 +1,178 @@
+# Story 05.3 - Database Schema
+# Purpose: Tables, RLS policies, indexes, constraints
+# Agent: BACKEND-DEV (database focus)
+
+migrations:
+  - path: "supabase/migrations/060_create_lp_reservations_table.sql"
+    type: "migration"
+    description: "LP reservations table with RLS and indexes"
+
+tables:
+  - name: "lp_reservations"
+    description: "Track LP reservations for Work Orders and Transfer Orders"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id)" }
+      - { name: "lp_id", type: "UUID", constraints: "NOT NULL REFERENCES license_plates(id)" }
+      - { name: "wo_id", type: "UUID", constraints: "REFERENCES work_orders(id)" }
+      - { name: "to_id", type: "UUID", constraints: "REFERENCES transfer_orders(id)" }
+      - { name: "wo_material_id", type: "UUID", constraints: "REFERENCES wo_materials(id)" }
+      - { name: "reserved_qty", type: "DECIMAL(15,4)", constraints: "NOT NULL" }
+      - { name: "consumed_qty", type: "DECIMAL(15,4)", constraints: "NOT NULL DEFAULT 0" }
+      - { name: "status", type: "TEXT", constraints: "NOT NULL DEFAULT 'active'" }
+      - { name: "reserved_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT NOW()" }
+      - { name: "released_at", type: "TIMESTAMPTZ", constraints: "" }
+      - { name: "reserved_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_reservation_lp ON lp_reservations(lp_id)"
+      - "idx_reservation_wo ON lp_reservations(wo_id) WHERE wo_id IS NOT NULL"
+      - "idx_reservation_to ON lp_reservations(to_id) WHERE to_id IS NOT NULL"
+      - "idx_reservation_status ON lp_reservations(org_id, status)"
+      - "idx_reservation_org_lp ON lp_reservations(org_id, lp_id, status)"
+      - "idx_reservation_wo_material ON lp_reservations(wo_material_id) WHERE wo_material_id IS NOT NULL"
+    constraints:
+      - "CONSTRAINT valid_status CHECK (status IN ('active', 'released', 'consumed'))"
+      - "CONSTRAINT positive_qty CHECK (reserved_qty > 0)"
+      - "CONSTRAINT consumed_lte_reserved CHECK (consumed_qty <= reserved_qty)"
+      - "CONSTRAINT wo_or_to_required CHECK (wo_id IS NOT NULL OR to_id IS NOT NULL)"
+
+# RLS Policies (ADR-013)
+rls_policies:
+  pattern: "Users Table Lookup"
+  pattern_sql: "(SELECT org_id FROM users WHERE id = auth.uid())"
+  rationale:
+    - "Single source of truth (users table)"
+    - "User org reassignment takes effect immediately"
+    - "No custom JWT claim configuration required"
+    - "Performance overhead <1ms per query"
+
+  policies:
+    - table: "lp_reservations"
+      name: "reservation_org_isolation"
+      operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - table: "lp_reservations"
+      name: "reservation_insert"
+      operation: "INSERT"
+      with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - table: "lp_reservations"
+      name: "reservation_update"
+      operation: "UPDATE"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - table: "lp_reservations"
+      name: "reservation_delete"
+      operation: "DELETE"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+# FIFO/FEFO Query Patterns
+fifo_fefo_queries:
+  fifo_query: |
+    -- FIFO query (when enable_fifo = true, enable_fefo = false)
+    SELECT
+      lp.*,
+      lp.quantity - COALESCE(SUM(r.reserved_qty) FILTER (WHERE r.status = 'active'), 0) as available_qty
+    FROM license_plates lp
+    LEFT JOIN lp_reservations r ON lp.id = r.lp_id AND r.status = 'active'
+    WHERE lp.org_id = $org_id
+      AND lp.product_id = $product_id
+      AND lp.status = 'available'
+      AND lp.qa_status = 'passed'
+      AND (lp.expiry_date IS NULL OR lp.expiry_date > CURRENT_DATE)
+      AND ($warehouse_id IS NULL OR lp.warehouse_id = $warehouse_id)
+    GROUP BY lp.id
+    HAVING lp.quantity - COALESCE(SUM(r.reserved_qty) FILTER (WHERE r.status = 'active'), 0) > 0
+    ORDER BY lp.created_at ASC;
+
+  fefo_query: |
+    -- FEFO query (when enable_fefo = true)
+    SELECT
+      lp.*,
+      lp.quantity - COALESCE(SUM(r.reserved_qty) FILTER (WHERE r.status = 'active'), 0) as available_qty
+    FROM license_plates lp
+    LEFT JOIN lp_reservations r ON lp.id = r.lp_id AND r.status = 'active'
+    WHERE lp.org_id = $org_id
+      AND lp.product_id = $product_id
+      AND lp.status = 'available'
+      AND lp.qa_status = 'passed'
+      AND (lp.expiry_date IS NULL OR lp.expiry_date > CURRENT_DATE)
+      AND ($warehouse_id IS NULL OR lp.warehouse_id = $warehouse_id)
+    GROUP BY lp.id
+    HAVING lp.quantity - COALESCE(SUM(r.reserved_qty) FILTER (WHERE r.status = 'active'), 0) > 0
+    ORDER BY
+      CASE WHEN lp.expiry_date IS NULL THEN 1 ELSE 0 END,  -- NULLs last
+      lp.expiry_date ASC,
+      lp.created_at ASC;
+
+  available_qty_query: |
+    -- Calculate available quantity for an LP
+    SELECT
+      lp.quantity - COALESCE(SUM(r.reserved_qty) FILTER (WHERE r.status = 'active'), 0) as available_qty
+    FROM license_plates lp
+    LEFT JOIN lp_reservations r ON lp.id = r.lp_id
+    WHERE lp.id = $lp_id
+    GROUP BY lp.id;
+
+# LP Status Update Trigger
+triggers:
+  - name: "update_lp_status_on_reservation"
+    description: "Update LP status to 'reserved' when fully reserved"
+    logic: |
+      -- When available_qty = 0, set LP status to 'reserved'
+      -- When released and available_qty > 0, set LP status back to 'available'
+    note: "Can be implemented as trigger or in application service layer"
+
+# Migration SQL
+migration_sql: |
+  -- Create lp_reservations table
+  CREATE TABLE lp_reservations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id UUID NOT NULL REFERENCES organizations(id),
+    lp_id UUID NOT NULL REFERENCES license_plates(id),
+    wo_id UUID REFERENCES work_orders(id),
+    to_id UUID REFERENCES transfer_orders(id),
+    wo_material_id UUID REFERENCES wo_materials(id),
+    reserved_qty DECIMAL(15,4) NOT NULL,
+    consumed_qty DECIMAL(15,4) NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'active',
+    reserved_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    released_at TIMESTAMPTZ,
+    reserved_by UUID REFERENCES users(id),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+
+    CONSTRAINT valid_status CHECK (status IN ('active', 'released', 'consumed')),
+    CONSTRAINT positive_qty CHECK (reserved_qty > 0),
+    CONSTRAINT consumed_lte_reserved CHECK (consumed_qty <= reserved_qty),
+    CONSTRAINT wo_or_to_required CHECK (wo_id IS NOT NULL OR to_id IS NOT NULL)
+  );
+
+  -- Indexes for performance
+  CREATE INDEX idx_reservation_lp ON lp_reservations(lp_id);
+  CREATE INDEX idx_reservation_wo ON lp_reservations(wo_id) WHERE wo_id IS NOT NULL;
+  CREATE INDEX idx_reservation_to ON lp_reservations(to_id) WHERE to_id IS NOT NULL;
+  CREATE INDEX idx_reservation_status ON lp_reservations(org_id, status);
+  CREATE INDEX idx_reservation_org_lp ON lp_reservations(org_id, lp_id, status);
+  CREATE INDEX idx_reservation_wo_material ON lp_reservations(wo_material_id) WHERE wo_material_id IS NOT NULL;
+
+  -- Enable RLS
+  ALTER TABLE lp_reservations ENABLE ROW LEVEL SECURITY;
+
+  -- RLS Policies
+  CREATE POLICY "reservation_org_isolation" ON lp_reservations
+    FOR SELECT USING (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+
+  CREATE POLICY "reservation_insert" ON lp_reservations
+    FOR INSERT WITH CHECK (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+
+  CREATE POLICY "reservation_update" ON lp_reservations
+    FOR UPDATE USING (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+
+  CREATE POLICY "reservation_delete" ON lp_reservations
+    FOR DELETE USING (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+
+  -- Comments
+  COMMENT ON TABLE lp_reservations IS 'LP reservations for Work Orders and Transfer Orders';
+  COMMENT ON COLUMN lp_reservations.wo_material_id IS 'Links reservation to specific WO material line for Epic 04.8';
+  COMMENT ON COLUMN lp_reservations.consumed_qty IS 'Tracks partial consumption of reserved quantity';

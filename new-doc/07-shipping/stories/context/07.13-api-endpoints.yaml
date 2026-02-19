@@ -1,0 +1,546 @@
+api_endpoints:
+  generate_sscc:
+    method: "POST"
+    path: "/api/shipping/shipments/:id/generate-sscc"
+    auth: true
+    roles: ["Warehouse Manager", "Shipping Manager", "Admin"]
+    description: "Generate SSCC-18 for all boxes in shipment (idempotent - skips boxes with existing SSCC)"
+
+    request:
+      content_type: "application/json"
+      body:
+        force_regenerate:
+          type: "boolean"
+          required: false
+          default: false
+          description: "If true, regenerate SSCC even if box already has one"
+
+    response_success:
+      status: 200
+      content_type: "application/json"
+      body:
+        success: true
+        data:
+          generated_count:
+            type: "integer"
+            description: "Number of new SSCC codes generated"
+            example: 2
+          skipped_count:
+            type: "integer"
+            description: "Number of boxes with existing SSCC (skipped)"
+            example: 1
+          boxes:
+            type: "array[object]"
+            items:
+              box_id:
+                type: "string (UUID)"
+                example: "a1b2c3d4-e5f6-47g8-h9i0-j1k2l3m4n5o6"
+              box_number:
+                type: "integer"
+                description: "Sequential box number in shipment"
+                example: 1
+              sscc:
+                type: "string (18 digits)"
+                description: "Generated SSCC-18 barcode"
+                example: "006141410000123452"
+              sscc_formatted:
+                type: "string"
+                description: "Human-readable SSCC with spaces"
+                example: "00 6141 4100 0012 3456 2"
+
+    response_errors:
+      status_400:
+        code: "INVALID_REQUEST"
+        message: "Invalid request parameters"
+        example:
+          success: false
+          error:
+            code: "INVALID_REQUEST"
+            message: "force_regenerate must be boolean"
+
+      status_400:
+        code: "GS1_PREFIX_NOT_CONFIGURED"
+        message: "GS1 Company Prefix not configured for organization"
+        example:
+          success: false
+          error:
+            code: "GS1_PREFIX_NOT_CONFIGURED"
+            message: "GS1 Company Prefix not configured"
+            details:
+              settings_link: "/settings/shipping/gs1-configuration"
+
+      status_400:
+        code: "MISSING_BOX_DATA"
+        message: "One or more boxes missing required weight or dimensions"
+        example:
+          success: false
+          error:
+            code: "MISSING_BOX_DATA"
+            message: "Box 1: missing weight, Box 3: missing dimensions"
+            boxes_missing:
+              - box_id: "uuid-box-001"
+                box_number: 1
+                missing_fields: ["weight"]
+
+      status_400:
+        code: "SHIPMENT_NOT_PACKED"
+        message: "Shipment must be in 'packed' status to generate SSCC"
+        example:
+          success: false
+          error:
+            code: "SHIPMENT_NOT_PACKED"
+            message: "Shipment status must be 'packed', current: 'packing'"
+
+      status_404:
+        code: "SHIPMENT_NOT_FOUND"
+        message: "Shipment not found"
+
+      status_403:
+        code: "FORBIDDEN"
+        message: "User does not have permission to generate SSCC"
+
+    business_logic:
+      - "Idempotent: only generates SSCC for boxes with sscc = NULL"
+      - "Uses SELECT FOR UPDATE on organizations.next_sscc_sequence to prevent concurrent duplicates"
+      - "SSCC format: Extension(0) + GS1Prefix(7-10) + Serial(6-9) + Check(1) = 18 total digits"
+      - "Check digit calculated using MOD 10 algorithm per GS1 standard"
+      - "SSCC uniqueness enforced globally via UNIQUE constraint on shipment_boxes.sscc"
+      - "organizations.next_sscc_sequence incremented by number of boxes processed"
+      - "Response includes formatted SSCC (with spaces) for display purposes"
+
+    example_curl: |
+      curl -X POST https://api.monopilot.io/api/shipping/shipments/a1b2c3d4-e5f6/generate-sscc \
+        -H "Authorization: Bearer YOUR_TOKEN" \
+        -H "Content-Type: application/json" \
+        -d '{}'
+
+  generate_bol:
+    method: "POST"
+    path: "/api/shipping/shipments/:id/generate-bol"
+    auth: true
+    roles: ["Warehouse Manager", "Shipping Manager", "Admin"]
+    description: "Generate BOL PDF with carrier info, carton list, product summary, signatures"
+
+    request:
+      content_type: "application/json"
+      body:
+        force_regenerate:
+          type: "boolean"
+          required: false
+          default: false
+          description: "If true, regenerate PDF even if cached"
+
+        include_product_list:
+          type: "boolean"
+          required: false
+          default: true
+          description: "Include detailed product summary per carton"
+
+    response_success:
+      status: 200
+      content_type: "application/json"
+      body:
+        success: true
+        data:
+          bol_number:
+            type: "string"
+            format: "BOL-YYYY-XXXXXX"
+            example: "BOL-2025-001234"
+
+          pdf_url:
+            type: "string (URL)"
+            description: "Signed URL to download PDF from Supabase Storage"
+            example: "https://storage.supabase.co/object/public/bol/org-id/shipment-id.pdf?token=..."
+
+          generated_at:
+            type: "string (ISO 8601)"
+            example: "2025-01-15T14:30:00Z"
+
+          file_size_kb:
+            type: "integer"
+            example: 245
+
+    response_errors:
+      status_400:
+        code: "NO_CARRIER_ASSIGNED"
+        message: "Carrier must be assigned to shipment before generating BOL"
+        example:
+          success: false
+          error:
+            code: "NO_CARRIER_ASSIGNED"
+            message: "No carrier assigned to shipment"
+            suggestions:
+              - "Assign carrier on shipment detail page"
+              - "Set tracking number for carrier"
+
+      status_400:
+        code: "MISSING_SSCC"
+        message: "All boxes must have SSCC before BOL generation"
+        example:
+          success: false
+          error:
+            code: "MISSING_SSCC"
+            message: "3 boxes missing SSCC barcode"
+            boxes_missing:
+              - box_id: "uuid-box-001"
+                box_number: 1
+
+      status_400:
+        code: "MISSING_BOX_DATA"
+        message: "One or more boxes missing weight or dimensions"
+        example:
+          success: false
+          error:
+            code: "MISSING_BOX_DATA"
+            message: "Box 2: missing weight, Box 3: missing dimensions"
+            boxes_missing:
+              - box_id: "uuid-box-002"
+                box_number: 2
+                missing_fields: ["weight"]
+
+      status_400:
+        code: "MISSING_ADDRESS"
+        message: "Customer shipping address required"
+
+      status_400:
+        code: "SHIPMENT_NOT_READY"
+        message: "Shipment must be 'packed' or later status"
+
+      status_504:
+        code: "PDF_GENERATION_TIMEOUT"
+        message: "BOL PDF generation took too long (>30 seconds)"
+        example:
+          success: false
+          error:
+            code: "PDF_GENERATION_TIMEOUT"
+            message: "PDF generation timeout after 30 seconds"
+            retry_after: 5
+
+      status_404:
+        code: "SHIPMENT_NOT_FOUND"
+        message: "Shipment not found"
+
+      status_403:
+        code: "FORBIDDEN"
+        message: "User does not have permission"
+
+    business_logic:
+      - "Validates shipment status is 'packed', 'manifested', 'shipped', or 'delivered'"
+      - "Requires carrier to be assigned (shipments.carrier_id NOT NULL)"
+      - "All boxes must have SSCC, weight, length, width, height"
+      - "BOL numbering: BOL-YYYY-XXXXXX per organization (auto-incremented annually)"
+      - "PDF cached in Redis for 24 hours, manual invalidation on shipment update"
+      - "PDF storage: Supabase Storage at /bol/{org_id}/{shipment_id}.pdf"
+      - "PDF dimensions: 8.5\" x 11\" letter size"
+      - "Page break after 10 cartons or 25 product lines (whichever comes first)"
+
+    example_curl: |
+      curl -X POST https://api.monopilot.io/api/shipping/shipments/a1b2c3d4-e5f6/generate-bol \
+        -H "Authorization: Bearer YOUR_TOKEN" \
+        -H "Content-Type: application/json" \
+        -d '{"force_regenerate": false, "include_product_list": true}'
+
+  print_labels:
+    method: "POST"
+    path: "/api/shipping/shipments/:id/print-labels"
+    auth: true
+    roles: ["Warehouse Manager", "Shipping Manager", "Packer", "Admin"]
+    description: "Generate ZPL or PDF shipping labels for boxes (GS1-128 barcode format)"
+
+    request:
+      content_type: "application/json"
+      body:
+        format:
+          type: "enum"
+          values: ["4x6", "4x8"]
+          required: true
+          description: "Label size: 4x6\" (standard carton) or 4x8\" (pallet)"
+          example: "4x6"
+
+        output:
+          type: "enum"
+          values: ["zpl", "pdf"]
+          required: true
+          description: "Output format: zpl (Zebra) or pdf (universal)"
+          example: "zpl"
+
+        box_ids:
+          type: "array[string (UUID)]"
+          required: false
+          description: "Optional: specific box IDs to print. If omitted, prints all boxes."
+          example: ["uuid-box-001", "uuid-box-002"]
+
+    response_success:
+      status: 200
+      content_type: "application/json"
+      body:
+        success: true
+        data:
+          labels:
+            type: "array[object]"
+            items:
+              box_id:
+                type: "string (UUID)"
+              box_number:
+                type: "integer"
+              sscc:
+                type: "string (18 digits)"
+
+              zpl:
+                type: "string"
+                description: "ZPL code (if output=zpl)"
+                example: |
+                  ^XA
+                  ^CF0,30
+                  ^LH0,0
+                  ^FO50,50^BY3
+                  ^BCN,150,Y,N,N
+                  ^FD>800614141000012345X^FS
+                  ^FO50,230
+                  ^A0N,35,35
+                  ^FDSSCC: 00 6141 4100 0012 3456 2^FS
+                  ^XZ
+
+              pdf_url:
+                type: "string (URL)"
+                description: "PDF URL (if output=pdf)"
+                example: "https://storage.../labels/shipment-id/box-001.pdf"
+
+    response_errors:
+      status_400:
+        code: "MISSING_SSCC"
+        message: "All boxes must have SSCC before printing labels"
+
+      status_400:
+        code: "INVALID_FORMAT"
+        message: "Format must be '4x6' or '4x8'"
+
+      status_400:
+        code: "INVALID_OUTPUT"
+        message: "Output must be 'zpl' or 'pdf'"
+
+      status_404:
+        code: "SHIPMENT_NOT_FOUND"
+        message: "Shipment not found"
+
+      status_403:
+        code: "FORBIDDEN"
+        message: "User does not have permission"
+
+    business_logic:
+      - "All boxes must have SSCC barcode (generated in generate-sscc endpoint)"
+      - "ZPL format includes: GS1-128 barcode, SSCC (formatted), ship-to address, order info, weight"
+      - "Label formats: 4x6\" = 813x1219 dots @ 203 DPI, 4x8\" = 813x1629 dots"
+      - "Barcode encoding: GS1-128 with FNC1 start, Application Identifier (00) for SSCC"
+      - "bwip-js library with parsefnc: true for proper GS1 formatting"
+      - "PDF labels can be printed with any standard printer (fallback)"
+      - "box_ids parameter optional: if provided, filters to specific boxes; if omitted, all boxes"
+
+    example_curl: |
+      curl -X POST https://api.monopilot.io/api/shipping/shipments/a1b2c3d4-e5f6/print-labels \
+        -H "Authorization: Bearer YOUR_TOKEN" \
+        -H "Content-Type: application/json" \
+        -d '{"format": "4x6", "output": "zpl"}'
+
+  print_packing_slip:
+    method: "POST"
+    path: "/api/shipping/shipments/:id/print-packing-slip"
+    auth: true
+    roles: ["Warehouse Manager", "Shipping Manager", "Admin"]
+    description: "Generate packing slip PDF with line items, lot numbers, allergen warnings"
+
+    request:
+      content_type: "application/json"
+      body:
+        force_regenerate:
+          type: "boolean"
+          required: false
+          default: false
+          description: "If true, regenerate PDF even if cached"
+
+    response_success:
+      status: 200
+      content_type: "application/json"
+      body:
+        success: true
+        data:
+          pdf_url:
+            type: "string (URL)"
+            example: "https://storage.supabase.co/object/public/packing-slip/org-id/shipment-id.pdf?token=..."
+
+          generated_at:
+            type: "string (ISO 8601)"
+            example: "2025-01-15T14:30:00Z"
+
+          file_size_kb:
+            type: "integer"
+            example: 180
+
+    response_errors:
+      status_400:
+        code: "MISSING_SSCC"
+        message: "All boxes must have SSCC before packing slip generation"
+
+      status_400:
+        code: "MISSING_LOT_NUMBERS"
+        message: "All line items must have lot numbers"
+
+      status_400:
+        code: "MISSING_ADDRESS"
+        message: "Customer shipping address required"
+
+      status_504:
+        code: "PDF_GENERATION_TIMEOUT"
+        message: "Packing slip PDF generation took too long"
+
+      status_404:
+        code: "SHIPMENT_NOT_FOUND"
+        message: "Shipment not found"
+
+      status_403:
+        code: "FORBIDDEN"
+        message: "User does not have permission"
+
+    business_logic:
+      - "Validates shipment has boxes with SSCC"
+      - "Validates all shipment_box_contents have lot_number"
+      - "Includes: sales order info, ship-to/ship-from addresses, line items with lots and BBD"
+      - "Includes: carton summary with SSCC, weight, dimensions"
+      - "Includes: allergen warnings if customer has allergen restrictions"
+      - "PDF cached for 24 hours, invalidate on shipment update"
+      - "PDF dimensions: 8.5\" x 11\" letter size"
+
+    example_curl: |
+      curl -X POST https://api.monopilot.io/api/shipping/shipments/a1b2c3d4-e5f6/print-packing-slip \
+        -H "Authorization: Bearer YOUR_TOKEN" \
+        -H "Content-Type: application/json" \
+        -d '{"force_regenerate": false}'
+
+  label_preview:
+    method: "GET"
+    path: "/api/shipping/shipments/:id/boxes/:boxId/label-preview"
+    auth: true
+    roles: ["All authenticated"]
+    description: "Get SSCC label preview with barcode image, metadata, formatting options"
+
+    request:
+      query_params:
+        format:
+          type: "enum"
+          values: ["4x6", "4x8"]
+          required: false
+          default: "4x6"
+          description: "Label format for preview"
+
+    response_success:
+      status: 200
+      content_type: "application/json"
+      body:
+        success: true
+        data:
+          sscc:
+            type: "string (18 digits)"
+            example: "006141410000123452"
+
+          sscc_formatted:
+            type: "string"
+            description: "Human-readable SSCC with spaces"
+            example: "00 6141 4100 0012 3456 2"
+
+          barcode_image_base64:
+            type: "string"
+            description: "Base64-encoded PNG barcode image (GS1-128 format)"
+            example: "iVBORw0KGgoAAAANSUhEUgAAAyAAAASwCAYAAAD1d8owAAAgAElEQVR4nO3d..."
+
+          label_content:
+            type: "object"
+            properties:
+              ship_to:
+                customer_name:
+                  type: "string"
+                  example: "Blue Mountain Restaurant"
+                address_line1:
+                  type: "string"
+                  example: "789 Main Street"
+                city_state_zip:
+                  type: "string"
+                  example: "Denver, CO 80210"
+
+              order_number:
+                type: "string"
+                example: "SO-2025-00123"
+
+              box_number:
+                type: "string"
+                description: "Box X of Y"
+                example: "1 of 2"
+
+              weight:
+                type: "string"
+                example: "48.5 kg"
+
+              handling_instructions:
+                type: "string"
+                nullable: true
+                example: "Keep Refrigerated, Fragile - Handle with Care"
+
+    response_errors:
+      status_404:
+        code: "SHIPMENT_NOT_FOUND"
+        message: "Shipment not found"
+
+      status_404:
+        code: "BOX_NOT_FOUND"
+        message: "Box not found"
+
+      status_400:
+        code: "NO_SSCC"
+        message: "Box does not have SSCC barcode"
+
+      status_403:
+        code: "FORBIDDEN"
+        message: "User does not have permission"
+
+    business_logic:
+      - "Returns PNG barcode image (base64-encoded) for display in UI"
+      - "Barcode is GS1-128 format with FNC1 start character"
+      - "Application Identifier (00) indicates SSCC data type"
+      - "label_content includes all metadata needed for label preview"
+      - "Format parameter can be used to adjust label size preview"
+
+    example_curl: |
+      curl -X GET "https://api.monopilot.io/api/shipping/shipments/a1b2c3d4-e5f6/boxes/xyz789/label-preview?format=4x6" \
+        -H "Authorization: Bearer YOUR_TOKEN"
+
+error_codes_summary:
+  authentication:
+    - "UNAUTHORIZED: Missing or invalid authentication token"
+    - "FORBIDDEN: User does not have required role/permission"
+
+  validation:
+    - "INVALID_REQUEST: Malformed request or invalid parameters"
+    - "MISSING_REQUIRED_FIELD: Required field missing from request body"
+
+  business_logic:
+    - "GS1_PREFIX_NOT_CONFIGURED: Organization GS1 Company Prefix not configured"
+    - "MISSING_BOX_DATA: Box missing required weight/dimensions/lot"
+    - "MISSING_SSCC: Box missing SSCC barcode"
+    - "NO_CARRIER_ASSIGNED: Shipment missing carrier assignment"
+    - "MISSING_ADDRESS: Customer shipping address not defined"
+    - "SHIPMENT_NOT_PACKED: Shipment status must be 'packed' or later"
+    - "SHIPMENT_NOT_READY: Shipment missing required data for operation"
+
+  service:
+    - "PDF_GENERATION_TIMEOUT: PDF generation exceeded 30-second timeout"
+    - "PDF_GENERATION_FAILED: Internal PDF generation error"
+    - "BARCODE_GENERATION_FAILED: Barcode image generation failed"
+
+  resource:
+    - "SHIPMENT_NOT_FOUND: Shipment does not exist"
+    - "BOX_NOT_FOUND: Box does not exist"
+
+version_history:
+  - version: "1.0"
+    date: "2025-12-18"
+    changes: "API endpoint specifications for Story 07.13"
+    author: "TECH-WRITER"

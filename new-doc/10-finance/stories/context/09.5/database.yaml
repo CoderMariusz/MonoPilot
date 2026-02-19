@@ -1,0 +1,17 @@
+tables:
+  cost_rollups:
+    columns:
+      - "id UUID PRIMARY KEY"
+      - "org_id UUID"
+      - "product_id UUID"
+      - "bom_id UUID REFERENCES boms"
+      - "material_cost NUMERIC(15,4)"
+      - "labor_cost NUMERIC(15,4)"
+      - "overhead_cost NUMERIC(15,4)"
+      - "total_cost NUMERIC(15,4)"
+      - "effective_date DATE"
+    constraints:
+      - "CHECK (total_cost = material_cost + labor_cost + overhead_cost)"
+
+functions:
+  - "calculate_bom_cost(org_id, bom_id) - calc BOM cost from standard costs"

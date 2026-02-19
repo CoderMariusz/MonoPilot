@@ -1,0 +1,80 @@
+# Story 01.4 - Index File (Entry Point)
+# Generated: 2025-12-16
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "01.4"
+  name: "Organization Profile Step (Wizard Step 1)"
+  slug: "organization-profile-step"
+  epic: "01-settings"
+  phase: "1A"
+  complexity: "M"
+  estimate_days: 2
+  type: "frontend + backend"
+  state: "ready"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Minimal - uses existing columns
+  - api.yaml         # POST step 1 endpoint
+  - frontend.yaml    # PRIMARY - step component, form, validation
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.3"
+      name: "Onboarding Wizard Launcher"
+      provides:
+        - "WizardModal component"
+        - "wizard shell and navigation"
+        - "progress tracking framework"
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides:
+        - "organizations table"
+        - "org_id context"
+        - "RLS policies"
+  optional: []
+  blocks:
+    - story: "01.14"
+      name: "Wizard Steps 2-6"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/settings.md"
+    sections: ["FR-SET-001", "FR-SET-003", "FR-SET-004", "FR-SET-181"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/settings.md"
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/01-settings/01.4.organization-profile-step.md"
+  patterns:
+    - "apps/frontend/lib/validation/*.ts"
+    - "apps/frontend/components/ui/form.tsx"
+    - "apps/frontend/components/ui/select.tsx"
+
+# High-level deliverables
+deliverables:
+  - type: "api"
+    count: 1
+    description: "POST /api/v1/settings/onboarding/step/1"
+  - type: "component"
+    count: 2
+    description: "OrganizationProfileStep, TimezoneSelect"
+  - type: "validation"
+    count: 1
+    description: "organization-profile-step.ts Zod schema"
+  - type: "utility"
+    count: 1
+    description: "browser-detection.ts"
+
+# Technical notes
+technical_notes:
+  - "First step of 6-step wizard"
+  - "Auto-detect timezone from browser"
+  - "Auto-detect language from browser"
+  - "Pre-fill org name from registration"
+  - "4 supported languages: PL, EN, DE, FR"
+  - "4 supported currencies: PLN, EUR, USD, GBP"

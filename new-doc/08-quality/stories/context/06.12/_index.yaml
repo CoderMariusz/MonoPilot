@@ -1,0 +1,251 @@
+# Story 06.12 - Batch Release Approval (Entry Point)
+# Generated: 2025-01-15
+# Purpose: Story metadata, dependencies, overview - read this first
+# Phase: 2B (In-Process & Final - Advanced)
+
+story:
+  id: "06.12"
+  name: "Batch Release Approval"
+  slug: "batch-release-approval"
+  epic: "06-quality"
+  phase: "2B"
+  complexity: "M"
+  estimate_days: 2-3
+  type: "fullstack"
+  state: "ready"
+  priority: "P0"
+  regulatory_critical: true
+  fr: "FR-QA-010"
+
+# Files in this context folder
+context_files:
+  - _index.yaml           # This file - metadata, dependencies, overview
+  - database.yaml         # Tables, RLS, migrations, triggers, indexes
+  - api.yaml              # Endpoints, request/response schemas, services
+  - frontend.yaml         # Components, pages, types, hooks, UX
+  - tests.yaml            # Acceptance criteria, test specifications, E2E scenarios
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["org_id context", "RLS pattern", "users table", "roles table"]
+    - story: "01.1"
+      name: "User Roles"
+      provides: ["QA_MANAGER role", "QUALITY_DIRECTOR role"]
+    - story: "05.1"
+      name: "License Plates CRUD"
+      provides: ["license_plates table", "LP service"]
+    - story: "05.7"
+      name: "LP QA Status Management"
+      provides: ["LP release_status field"]
+    - story: "06.0"
+      name: "Quality Settings"
+      provides: ["quality_settings.require_batch_release"]
+    - story: "06.11"
+      name: "Final Inspection & Batch Release"
+      provides: ["batch_release_records table", "final inspection completion", "release workflow foundation"]
+    - story: "06.6"
+      name: "Test Results Recording"
+      provides: ["quality_test_results table", "test results for conditions validation"]
+
+  soft:
+    - story: "06.10"
+      name: "In-Process Inspection"
+      provides: ["in-process inspection results for conditions validation"]
+    - story: "06.9"
+      name: "NCR Creation"
+      provides: ["NCR records for blocking validation", "NCR creation on rejection"]
+
+  blocked_by: []
+
+  blocks:
+    - story: "06.27"
+      name: "CoA Templates"
+      reason: "Release approval triggers CoA generation"
+    - story: "06.28"
+      name: "CoA Generation"
+      reason: "Approved releases trigger auto-CoA"
+    - epic: "07"
+      name: "Shipping Module"
+      reason: "LP.release_status='released' gates shipping eligibility"
+    - epic: "09"
+      name: "Finance Module"
+      reason: "Released batches eligible for invoicing"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/quality.md"
+    sections: ["FR-QA-010", "Section 11 - Quality Status Types", "Section 14 - User Roles"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/quality.md"
+    sections: ["batch_release_records table", "E-Signature", "RLS policies"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/06-quality/06.12.batch-release-approval.md"
+  related_story:
+    path: "docs/2-MANAGEMENT/epics/current/06-quality/06.11.final-inspection-batch-release.md"
+    relevance: "Predecessor story - provides base batch release workflow"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "PRIMARY - RLS policy pattern for release_conditions_log"
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-001-multi-tenancy-isolation.md"
+      relevance: "Multi-tenancy isolation across quality tables"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/QA-010-batch-release.md"
+      relevance: "Batch release queue, approval workflow, e-signature"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 2
+    description: "E-signature fields in batch_release_records, release_conditions_log table"
+  - type: "function"
+    count: 1
+    description: "validate_release_conditions() SQL function"
+  - type: "service"
+    count: 1
+    description: "release-approval-service.ts with e-signature validation, conditions check, approval workflow"
+  - type: "validation"
+    count: 3
+    description: "approveReleaseSchema, rejectReleaseSchema, pendingReleasesQuerySchema"
+  - type: "api"
+    count: 5
+    description: "POST approve, POST reject, GET pending, GET conditions, GET certificate"
+  - type: "components"
+    count: 12
+    description: "ESignatureModal, ReleaseConditionsPanel, ApprovalHistoryTimeline, etc."
+  - type: "page"
+    count: 2
+    description: "/quality/release-approvals, /quality/release-approvals/[id]"
+  - type: "test"
+    count: 3
+    description: "Unit tests (service), Integration tests (API), E2E tests (approval workflow)"
+
+# Technical notes
+technical_notes:
+  - "E-signature captures: user_id, meaning, timestamp, method, intent, IP, user agent"
+  - "Signature methods MVP: password (default), PIN, email_confirm"
+  - "FDA 21 CFR Part 11 compliance: unique user ID, timestamp, meaning statement"
+  - "7 release conditions validated: final_inspection, ccp_records, in_process_inspections, operation_checkpoints, quality_holds, ncr_review, specification_compliance"
+  - "Only QA_MANAGER or QUALITY_DIRECTOR can approve/reject"
+  - "Rejection requires minimum 20 character reason"
+  - "Release records immutable once approved/rejected"
+  - "Certificate PDF generated on-demand after approval"
+  - "Audit trail captures all approval/rejection decisions with full context"
+  - "Failed signature attempts logged and rate-limited"
+  - "Return 404 (not 403) for cross-tenant access per ADR-013"
+
+# Business Rules
+business_rules:
+  - rule: "QA Manager Exclusive Approval"
+    description: "Only QA_MANAGER or QUALITY_DIRECTOR role can approve or reject releases"
+    enforcement: "RLS policy + service layer role check + UI button visibility"
+
+  - rule: "E-Signature Required"
+    description: "All approval/rejection decisions require valid electronic signature"
+    enforcement: "API validates signature credential before processing"
+
+  - rule: "Signature Meaning Captured"
+    description: "Statement 'I approve/reject release of batch X' stored with signature"
+    enforcement: "Database column signature_meaning NOT NULL for approved/rejected"
+
+  - rule: "Conditions Must Pass"
+    description: "Cannot approve if any blocking condition fails"
+    enforcement: "API checks validate_release_conditions() before allowing approval"
+
+  - rule: "Rejection Reason Required"
+    description: "Minimum 20 characters explanation required for rejection"
+    enforcement: "Zod schema validation with min(20)"
+
+  - rule: "Immutable After Decision"
+    description: "Approved/rejected records cannot be modified"
+    enforcement: "RLS DELETE policy only for pending, UPDATE blocked after decision"
+
+  - rule: "Audit Trail Complete"
+    description: "All actions logged with user, timestamp, IP, user agent"
+    enforcement: "Service layer creates quality_audit_log entry for every action"
+
+  - rule: "Certificate After Approval Only"
+    description: "Release certificate PDF only available after approval"
+    enforcement: "GET certificate endpoint returns 400 if not approved"
+
+  - rule: "LP Status Auto-Update"
+    description: "Approval triggers LP.release_status = 'released'"
+    enforcement: "Database trigger update_lp_release_status_on_batch_release()"
+
+  - rule: "NCR Prompt on Rejection"
+    description: "Offer to create NCR when rejecting batch"
+    enforcement: "UI checkbox + optional NCR creation in reject API"
+
+# Context Summary
+summary: |
+  Story 06.12 implements the Batch Release Approval workflow with QA Manager sign-off and e-signature support.
+
+  SCOPE:
+  This story EXTENDS 06.11 (Final Inspection & Batch Release) by adding:
+  1. E-signature capture (FDA 21 CFR Part 11 compliant)
+  2. Release conditions validation (7-point checklist)
+  3. Approval queue management for QA Managers
+  4. Release certificate PDF generation
+  5. Rejection workflow with reason capture and NCR creation
+
+  E-SIGNATURE (FDA 21 CFR Part 11):
+  - Unique user identification (signature_user_id)
+  - Signature meaning ("I approve/reject release of batch X")
+  - Timestamp (signature_timestamp)
+  - Method (password/PIN/email_confirm)
+  - Intent (approve/reject)
+  - IP address and user agent for audit
+
+  RELEASE CONDITIONS (7 CHECKS):
+  1. Final inspection passed (or conditional with warning)
+  2. All CCP records within limits
+  3. All in-process inspections passed
+  4. All operation checkpoints passed
+  5. No active quality holds
+  6. No open NCRs linked to batch
+  7. All specification compliance verified
+
+  PERMISSION MODEL:
+  - QA_INSPECTOR: Can view, cannot approve/reject
+  - QA_MANAGER: Can approve/reject with e-signature
+  - QUALITY_DIRECTOR: Can approve/reject/override
+
+  MVP INCLUDES:
+  - E-signature fields in batch_release_records
+  - release_conditions_log table for validation history
+  - validate_release_conditions() SQL function
+  - POST /approve and POST /reject with e-signature
+  - GET /pending for approval queue
+  - GET /conditions for validation status
+  - GET /certificate for PDF generation
+  - Approval queue page
+  - E-signature modal
+  - Conditions validation panel
+  - Release certificate preview/download
+
+  DEFERRED (Phase 3+):
+  - Biometric e-signature (fingerprint, face)
+  - Third-party integration (DocuSign, Adobe Sign)
+  - Multi-level approval (Manager + Director)
+  - Batch release analytics dashboard
+
+  KEY INTEGRATION POINTS:
+  - Extends 06.11 batch_release_records table
+  - Triggers LP.release_status update via database trigger
+  - Links to NCR creation (06.9) on rejection
+  - Provides release status for Shipping (Epic 07)
+  - Provides released batches for Finance (Epic 09)
+  - Triggers CoA generation (06.27-06.29)
+
+  REGULATORY ALIGNMENT:
+  - FDA 21 CFR Part 11: E-signature requirements
+  - FSMA: Batch release by authorized personnel
+  - HACCP: Verification of all CCPs before release
+  - ISO 9001: Documented approval process
+
+# Reference for other stories
+blocks_story: "06.27"
+provides_to: ["Epic 07 Shipping", "Epic 09 Finance", "06.27-06.29 CoA"]

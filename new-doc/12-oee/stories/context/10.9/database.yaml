@@ -1,0 +1,45 @@
+# Story 10.9 - Database Schema
+# Historical Trend Analysis
+
+# No new tables - uses existing:
+# - oee_snapshots
+# - oee_daily_summary
+# - oee_hourly_summary
+
+views:
+  - name: "v_oee_trends_daily"
+    description: "Daily OEE trends for charting"
+    definition: |
+      SELECT
+        org_id,
+        machine_id,
+        summary_date,
+        oee_avg,
+        availability_avg,
+        performance_avg,
+        quality_avg
+      FROM oee_daily_summary
+      ORDER BY summary_date DESC
+
+  - name: "v_oee_trends_weekly"
+    description: "Weekly aggregated OEE trends"
+    definition: |
+      SELECT
+        org_id,
+        machine_id,
+        DATE_TRUNC('week', summary_date) AS week_start,
+        AVG(oee_avg) AS oee_avg,
+        AVG(availability_avg) AS availability_avg,
+        AVG(performance_avg) AS performance_avg,
+        AVG(quality_avg) AS quality_avg
+      FROM oee_daily_summary
+      GROUP BY org_id, machine_id, week_start
+
+functions:
+  - name: "get_oee_trend"
+    params: ["p_machine_id UUID", "p_start_date DATE", "p_end_date DATE", "p_granularity TEXT"]
+    returns: "TABLE (period DATE, oee_avg DECIMAL, availability_avg DECIMAL, performance_avg DECIMAL, quality_avg DECIMAL)"
+    description: "Get OEE trend with granularity (daily, weekly, monthly)"
+
+indexes:
+  - "Additional indexes on oee_daily_summary for trend queries"

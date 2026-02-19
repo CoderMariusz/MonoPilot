@@ -1,0 +1,69 @@
+# Story 11.11 - Index File (Entry Point)
+# Generated: 2026-01-15
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "11.11"
+  name: "Import Templates (Products/BOMs)"
+  slug: "import-templates"
+  epic: "11-integrations"
+  phase: "2"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "fullstack"
+  state: "ready"
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["organizations"]
+    - story: "02.1"
+      name: "Products CRUD"
+      provides: ["products table"]
+    - story: "02.2"
+      name: "BOMs CRUD"
+      provides: ["boms, bom_items tables"]
+    - story: "11.1"
+      name: "Integrations Dashboard"
+      provides: ["Import section in nav"]
+    - story: "11.3"
+      name: "Integration Logs"
+      provides: ["Import event logging"]
+  blocks: []
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/integrations.md"
+    sections: ["FR-INT-018", "FR-INT-019"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/11-integrations/11.11.import-templates.md"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "import_jobs table"
+  - type: "service"
+    count: 1
+    description: "import-service.ts (CSV parser, validation)"
+  - type: "api"
+    count: 8
+    description: "Template download, validate, execute, job status, error log (x2 for products/BOMs)"
+  - type: "page"
+    count: 3
+    description: "Import products, import BOMs, import history"
+  - type: "test"
+    count: 4
+    description: "Unit + integration + RLS + E2E tests"
+
+# Technical notes
+technical_notes:
+  - "CSV parser with Zod validation"
+  - "Preview import (first 20 rows)"
+  - "Conflict resolution (skip/update/ask)"
+  - "Async processing (files >1k rows)"
+  - "Error log downloadable (CSV with failed rows)"
+  - "Max 10k rows per import"

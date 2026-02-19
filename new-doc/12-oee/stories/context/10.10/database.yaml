@@ -1,0 +1,119 @@
+# Story 10.10 - Database Schema
+# Purpose: Tables, views, indexes for utilization heatmap
+# Agent: BACKEND-DEV (database focus)
+
+# Note: This story primarily uses existing tables (oee_snapshots, machines)
+# No new tables required - only a materialized view for performance
+
+views:
+  - name: "machine_utilization_hourly"
+    description: "Aggregated hourly utilization by machine for heatmap"
+    sql: |
+      CREATE OR REPLACE VIEW machine_utilization_hourly AS
+      SELECT
+          s.org_id,
+          s.machine_id,
+          m.name as machine_name,
+          m.code as machine_code,
+          DATE_TRUNC('hour', s.snapshot_time) as hour_start,
+          DATE(s.snapshot_time) as snapshot_date,
+          AVG(
+            CASE
+              WHEN s.planned_production_time > 0
+              THEN (s.actual_production_time::numeric / s.planned_production_time * 100)
+              ELSE 0
+            END
+          ) as utilization_pct,
+          SUM(s.actual_production_time) as total_actual_time,
+          SUM(s.planned_production_time) as total_planned_time,
+          COUNT(*) as snapshot_count
+      FROM oee_snapshots s
+      JOIN machines m ON s.machine_id = m.id
+      WHERE s.org_id = m.org_id
+      GROUP BY
+          s.org_id,
+          s.machine_id,
+          m.name,
+          m.code,
+          DATE_TRUNC('hour', s.snapshot_time),
+          DATE(s.snapshot_time);
+    rls_note: "RLS inherited from oee_snapshots base table"
+
+  - name: "machine_utilization_daily"
+    description: "Aggregated daily utilization by machine for heatmap"
+    sql: |
+      CREATE OR REPLACE VIEW machine_utilization_daily AS
+      SELECT
+          s.org_id,
+          s.machine_id,
+          m.name as machine_name,
+          m.code as machine_code,
+          DATE(s.snapshot_time) as date,
+          AVG(
+            CASE
+              WHEN s.planned_production_time > 0
+              THEN (s.actual_production_time::numeric / s.planned_production_time * 100)
+              ELSE 0
+            END
+          ) as utilization_pct,
+          SUM(s.actual_production_time) as total_actual_time,
+          SUM(s.planned_production_time) as total_planned_time,
+          COUNT(*) as snapshot_count
+      FROM oee_snapshots s
+      JOIN machines m ON s.machine_id = m.id
+      WHERE s.org_id = m.org_id
+      GROUP BY
+          s.org_id,
+          s.machine_id,
+          m.name,
+          m.code,
+          DATE(s.snapshot_time);
+    rls_note: "RLS inherited from oee_snapshots base table"
+
+# Indexes for performance
+indexes:
+  - table: "oee_snapshots"
+    name: "idx_oee_snapshots_heatmap"
+    columns: ["org_id", "machine_id", "snapshot_time"]
+    description: "Optimizes heatmap aggregation queries"
+
+# Existing tables used
+existing_tables:
+  - name: "oee_snapshots"
+    columns_used:
+      - "org_id"
+      - "machine_id"
+      - "snapshot_time"
+      - "actual_production_time"
+      - "planned_production_time"
+    join_with: "machines via machine_id"
+
+  - name: "machines"
+    columns_used:
+      - "id"
+      - "org_id"
+      - "name"
+      - "code"
+      - "line_id"
+
+  - name: "production_lines"
+    columns_used:
+      - "id"
+      - "name"
+    purpose: "Optional filtering by production line"
+
+# No migrations needed - views created inline or as optional performance optimization
+migrations: []
+
+# RLS Policies
+rls_notes:
+  - "Utilization views inherit RLS from oee_snapshots table"
+  - "All queries automatically filtered by org_id through existing RLS"
+  - "No additional RLS policies needed for this story"
+
+# Performance Notes
+performance:
+  - "Views provide aggregation without materialization cost"
+  - "Index on (org_id, machine_id, snapshot_time) covers heatmap queries"
+  - "For high-volume orgs, consider materialized view with hourly refresh"
+  - "Daily view query should complete <500ms for 30-day range"

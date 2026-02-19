@@ -1,0 +1,98 @@
+# Story 10.12 - Frontend Specification
+# Purpose: Dashboard page with KPI cards and chart widgets
+# Agent: FRONTEND-DEV
+
+components:
+  # KPI Cards (10)
+  - path: "apps/frontend/components/oee/dashboard/KPICard.tsx"
+    description: "Reusable KPI metric card"
+    props:
+      - { name: "title", type: "string", required: true }
+      - { name: "value", type: "number | string", required: true }
+      - { name: "format", type: "'percentage' | 'number' | 'duration'", required: true }
+      - { name: "trend", type: "number", required: false }
+      - { name: "target", type: "number", required: false }
+      - { name: "status", type: "'good' | 'warning' | 'critical'", required: false }
+      - { name: "onClick", type: "() => void", required: false }
+
+  - path: "apps/frontend/components/oee/dashboard/KPIGrid.tsx"
+    description: "Grid of 10 KPI cards"
+    cards:
+      - { id: "oee", title: "OEE Today", format: "percentage" }
+      - { id: "availability", title: "Availability", format: "percentage" }
+      - { id: "performance", title: "Performance", format: "percentage" }
+      - { id: "quality", title: "Quality", format: "percentage" }
+      - { id: "total_output", title: "Total Output", format: "number" }
+      - { id: "good_output", title: "Good Output", format: "number" }
+      - { id: "scrap", title: "Scrap %", format: "percentage" }
+      - { id: "downtime", title: "Downtime Today", format: "duration" }
+      - { id: "alerts", title: "Active Alerts", format: "number" }
+      - { id: "energy", title: "Energy Consumed", format: "number", unit: "kWh" }
+
+  # Chart Widgets (6)
+  - path: "apps/frontend/components/oee/dashboard/OEETrendChart.tsx"
+    description: "7-day OEE trend line chart"
+
+  - path: "apps/frontend/components/oee/dashboard/DowntimeParetoWidget.tsx"
+    description: "Embedded Pareto chart (from 10.11)"
+
+  - path: "apps/frontend/components/oee/dashboard/MachineStatusGrid.tsx"
+    description: "Machine status cards with live updates"
+
+  - path: "apps/frontend/components/oee/dashboard/UtilizationHeatmapWidget.tsx"
+    description: "Embedded heatmap (from 10.10)"
+
+  - path: "apps/frontend/components/oee/dashboard/EnergyByMachineChart.tsx"
+    description: "Bar chart of energy by machine"
+
+  - path: "apps/frontend/components/oee/dashboard/QualityYieldChart.tsx"
+    description: "Quality yield trend line chart"
+
+  # Dashboard Layout
+  - path: "apps/frontend/components/oee/dashboard/DashboardLayout.tsx"
+    description: "Responsive grid layout for dashboard"
+    features:
+      - "CSS Grid with responsive breakpoints"
+      - "Auto-refresh indicator"
+      - "Export to PDF button"
+      - "Fullscreen toggle"
+
+pages:
+  - path: "apps/frontend/app/(authenticated)/oee/dashboard/page.tsx"
+    route: "/oee/dashboard"
+    title: "OEE Performance Dashboard"
+    description: "Executive dashboard with all OEE metrics"
+    layout: "DashboardLayout with KPIGrid and 6 chart widgets"
+    features:
+      - "Auto-refresh every 30 seconds"
+      - "Date range selector"
+      - "Line/Machine filter"
+      - "Export to PDF"
+      - "Click widget to drill-down"
+
+hooks:
+  - path: "apps/frontend/lib/hooks/use-dashboard.ts"
+    exports:
+      - name: "useDashboard"
+        type: "query"
+        params: ["params: DashboardParams"]
+        returns: "UseQueryResult<DashboardResponse>"
+        options:
+          refetchInterval: 30000  # 30 seconds
+
+ux:
+  patterns:
+    layout: "CSS Grid responsive dashboard"
+    cards: "ShadCN Card with metric display"
+    charts: "Recharts or Chart.js"
+
+  states:
+    - loading: "Skeleton cards and chart placeholders"
+    - empty: "Empty state for each widget"
+    - error: "Error boundary per widget"
+
+  interactions:
+    - "Click KPI card to drill-down to detail"
+    - "Click chart data point to see detailed view"
+    - "Hover shows tooltips"
+    - "Auto-refresh indicator in header"

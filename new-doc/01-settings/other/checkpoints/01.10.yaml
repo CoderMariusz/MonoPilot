@@ -1,0 +1,117 @@
+# Story 01.10 - Machines CRUD
+# Type: fullstack
+# Epic: 01-settings
+# Audit Date: 2026-01-08
+
+story:
+  id: "01.10"
+  name: "Machines CRUD"
+  epic: "01-settings"
+  phase: "1A"
+  complexity: "M"
+
+audit:
+  code_exists: true
+  estimated_completion: 75
+
+  files_found:
+    migrations:
+      - path: "supabase/migrations/014_create_machines_table.sql"
+        status: "COMPLETE"
+        features:
+          - "9 machine types (MIXER, OVEN, FILLER, etc.)"
+          - "4 status enums (ACTIVE, MAINTENANCE, OFFLINE, DECOMMISSIONED)"
+          - "Capacity fields"
+          - "Location FK"
+          - "Soft delete support"
+      - path: "supabase/migrations/015_machines_rls_policies.sql"
+        status: "COMPLETE"
+
+    services:
+      - path: "apps/frontend/lib/services/machine-service.ts"
+        lines: 441
+        methods: 10
+        status: "COMPLETE"
+
+    validation:
+      - path: "apps/frontend/lib/validation/machine-schemas.ts"
+        lines: 80
+        status: "COMPLETE"
+
+    types:
+      - path: "apps/frontend/lib/types/machine.ts"
+        lines: 153
+        status: "COMPLETE"
+
+    api_routes:
+      - "GET /api/v1/settings/machines - COMPLETE"
+      - "POST /api/v1/settings/machines - COMPLETE"
+      - "GET /api/v1/settings/machines/:id - COMPLETE"
+      - "PUT /api/v1/settings/machines/:id - COMPLETE"
+      - "PATCH /api/v1/settings/machines/:id/status - COMPLETE"
+      - "DELETE /api/v1/settings/machines/:id - MISSING"
+      - "POST /validate-code - unclear"
+
+    hooks:
+      - path: "apps/frontend/lib/hooks/use-machines.ts"
+        lines: 51
+        status: "COMPLETE"
+      - path: "apps/frontend/lib/hooks/use-machine.ts"
+        lines: 50
+        status: "COMPLETE"
+      - "use-create-machine.ts - EMPTY (0 bytes)"
+      - "use-update-machine.ts - EMPTY (0 bytes)"
+      - "use-delete-machine.ts - EMPTY (0 bytes)"
+
+    components:
+      - "MachineModal.tsx (524 lines) - COMPLETE"
+      - "MachinesDataTable.tsx (294 lines) - COMPLETE"
+      - "MachineTypeBadge.tsx - COMPLETE"
+      - "MachineStatusBadge.tsx - COMPLETE"
+      - "MachineFilters.tsx - COMPLETE"
+      - "MachineLocationSelect.tsx - COMPLETE"
+      - "MachineCapacityDisplay.tsx - COMPLETE"
+
+    pages:
+      - "apps/frontend/app/(authenticated)/settings/machines/page.tsx - COMPLETE"
+      - "apps/frontend/app/(authenticated)/settings/machines/[id]/page.tsx - COMPLETE"
+
+  tests_exist: true
+  test_files:
+    - path: "apps/frontend/lib/services/__tests__/machine-service.test.ts"
+      lines: 1197
+    - path: "apps/frontend/__tests__/01-settings/01.10.machines-api.test.ts"
+      lines: 1151
+  total_test_lines: 2830
+
+gaps:
+  critical:
+    - "Mutation hooks empty (0 bytes): create, update, delete"
+    - "DELETE API route missing"
+
+status: PARTIAL
+
+phases:
+  P1: "COMPLETE"
+  P2: "COMPLETE"
+  P3: "PARTIAL - hooks empty, DELETE missing"
+  P4: "PENDING"
+  P5: "PENDING"
+  P6: "PENDING"
+  P7: "PENDING"
+
+recommendation: |
+  QUICK FIXES NEEDED:
+  1. Implement mutation hooks (create, update, delete)
+  2. Implement DELETE API route
+
+  Estimated: 2-4 hours
+
+next_phase: P3
+next_agent: backend-dev
+P3-FIX: ✓ backend-dev 20:13 files:4 hooks:3 api:1(exists) tests:preexisting-db-issues
+P4: ✓ senior-dev 21:50 refactored:5 hooks:4 tests:48/48 complexity:reduced
+P5: ✓ code-reviewer 22:16 issues:0 decision:approved
+P6: ✓ qa-agent 23:01 ac:5/5 bugs:0 decision:pass
+P7: ✓ tech-writer 23:04 docs:done status:complete
+P1: ✓ test-writer 23:59 files:1 tests:22 status:red

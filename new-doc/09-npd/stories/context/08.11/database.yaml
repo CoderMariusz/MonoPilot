@@ -1,0 +1,70 @@
+# Story 08.11 - Database Schema
+# Purpose: Handoff Wizard - No new tables (uses existing)
+# Agent: BACKEND-DEV
+
+# NOTE: This story does NOT create new database tables.
+# It uses existing tables from dependent stories:
+# - npd_projects (08.2)
+# - npd_formulations (08.4)
+# - products (02.1)
+# - boms (02.2)
+# - work_orders (03.2)
+# - npd_events (08.15)
+
+# Database Extensions
+extensions:
+  - table: "products"
+    columns_added_by: "08.12"
+    columns:
+      - { name: "npd_project_id", type: "INTEGER", constraints: "REFERENCES npd_projects(id)" }
+      - { name: "npd_origin", type: "BOOLEAN", constraints: "DEFAULT false" }
+      - { name: "source", type: "VARCHAR(30)" }
+    note: "Columns added by story 08.12, used by handoff wizard"
+
+  - table: "boms"
+    columns_added_by: "08.12"
+    columns:
+      - { name: "npd_formulation_id", type: "INTEGER", constraints: "REFERENCES npd_formulations(id)" }
+      - { name: "source", type: "VARCHAR(30)" }
+    note: "Columns added by story 08.12, used by handoff wizard"
+
+  - table: "work_orders"
+    columns_added_by: "08.13"
+    columns:
+      - { name: "type", type: "VARCHAR(20)", constraints: "DEFAULT 'production'" }
+      - { name: "npd_project_id", type: "INTEGER", constraints: "REFERENCES npd_projects(id)" }
+    note: "Columns added by story 08.13, used by handoff wizard"
+
+# Transaction Support
+transactions:
+  - description: "Handoff wizard uses database transactions for atomic execution"
+    flow:
+      - "BEGIN"
+      - "Lock formulation (UPDATE status = 'locked')"
+      - "Create/update product"
+      - "Create BOM"
+      - "Copy formulation_items to bom_items"
+      - "Create pilot WO (optional)"
+      - "Update project status to 'launched'"
+      - "Log handoff event"
+      - "COMMIT (or ROLLBACK on any failure)"
+    note: "Ensures all-or-nothing execution with rollback capability"
+
+# No migrations required
+migrations: []
+
+# Dependencies
+dependencies:
+  required_tables:
+    - "npd_projects (08.2)"
+    - "npd_formulations (08.4)"
+    - "npd_formulation_items (08.4)"
+    - "products (02.1)"
+    - "boms (02.2)"
+    - "bom_items (02.2)"
+    - "work_orders (03.2)"
+    - "gate_approvals (08.6)"
+    - "npd_costing (08.7)"
+    - "npd_documents (08.8)"
+    - "npd_events (08.15)"
+  note: "All tables provided by dependent stories, no new tables created"

@@ -1,0 +1,14 @@
+unit_tests:
+  BOMCostService:
+    - "calculate() sums ingredient costs correctly"
+    - "Packaging costs included"
+    - "Labor from routing operations included"
+    - "Overhead allocated based on settings"
+
+integration_tests:
+  - "GET /bom-costs/:id returns cost breakdown"
+  - "POST /bom-costs/:id/calculate recalculates cost"
+
+e2e_tests:
+  - "Create BOM → Calculate cost → View breakdown"
+  - "Update BOM → Auto-recalculate cost (if auto_calculate_bom_costs=true)"

@@ -1,0 +1,285 @@
+# Database Context: 08.18 - Access Control & Audit Trail
+
+database:
+  new_tables:
+    - name: "npd_audit_log"
+      description: "Immutable audit trail for all NPD operations"
+      columns:
+        - name: "id"
+          type: "SERIAL PRIMARY KEY"
+          description: "Audit log entry ID"
+        - name: "org_id"
+          type: "UUID NOT NULL"
+          references: "organizations(id)"
+          description: "Organization ID"
+        - name: "user_id"
+          type: "UUID NOT NULL"
+          references: "auth.users(id)"
+          description: "User who performed action"
+        - name: "event_type"
+          type: "VARCHAR(50) NOT NULL"
+          description: "Event type (e.g., NPD.npd_formulations.UPDATE)"
+        - name: "entity_type"
+          type: "VARCHAR(50) NOT NULL"
+          description: "Table name (npd_project, npd_formulation, etc.)"
+        - name: "entity_id"
+          type: "INTEGER NOT NULL"
+          description: "Entity ID (project/formulation/costing ID)"
+        - name: "entity_name"
+          type: "VARCHAR(200)"
+          description: "Entity name (project name, formulation number) for readability"
+        - name: "action"
+          type: "VARCHAR(20) NOT NULL"
+          check: "action IN ('INSERT', 'UPDATE', 'DELETE')"
+          description: "CRUD action"
+        - name: "old_values"
+          type: "JSONB"
+          nullable: true
+          description: "Old row values (for UPDATE/DELETE)"
+        - name: "new_values"
+          type: "JSONB"
+          nullable: true
+          description: "New row values (for INSERT/UPDATE)"
+        - name: "changed_fields"
+          type: "TEXT[]"
+          nullable: true
+          description: "Array of changed field names (for UPDATE)"
+        - name: "ip_address"
+          type: "INET"
+          nullable: true
+          description: "User IP address"
+        - name: "user_agent"
+          type: "TEXT"
+          nullable: true
+          description: "User agent string"
+        - name: "created_at"
+          type: "TIMESTAMPTZ NOT NULL DEFAULT NOW()"
+          description: "When audit log entry created"
+      indexes:
+        - name: "idx_npd_audit_log_org_created"
+          columns: ["org_id", "created_at DESC"]
+        - name: "idx_npd_audit_log_user"
+          columns: ["user_id"]
+        - name: "idx_npd_audit_log_entity"
+          columns: ["entity_type", "entity_id"]
+        - name: "idx_npd_audit_log_event_type"
+          columns: ["event_type"]
+      rules:
+        - name: "npd_audit_log_no_update"
+          type: "UPDATE"
+          action: "DO INSTEAD NOTHING"
+          description: "Prevent updates to audit log (immutable)"
+        - name: "npd_audit_log_no_delete"
+          type: "DELETE"
+          action: "DO INSTEAD NOTHING"
+          description: "Prevent deletes from audit log (immutable)"
+
+  rls_policies:
+    - table: "npd_audit_log"
+      policies:
+        - name: "audit_log_admin_select"
+          type: "SELECT"
+          role: "ADMIN, QUALITY_DIRECTOR"
+          rule: |
+            org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+            AND EXISTS (
+              SELECT 1 FROM user_roles
+              WHERE user_id = auth.uid()
+              AND role IN ('ADMIN', 'QUALITY_DIRECTOR')
+            )
+          description: "Admins and Quality Directors can view all audit logs"
+
+        - name: "audit_log_user_select"
+          type: "SELECT"
+          role: "ALL"
+          rule: |
+            org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+            AND user_id = auth.uid()
+          description: "Users can view their own audit log entries"
+
+        - name: "audit_log_system_insert"
+          type: "INSERT"
+          role: "SYSTEM"
+          rule: "true"
+          description: "System can insert audit logs (via triggers)"
+
+    - table: "npd_projects"
+      policies:
+        - name: "npd_projects_npd_lead_all"
+          type: "ALL"
+          role: "NPD_LEAD"
+          rule: |
+            org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+            AND (
+              owner_id = auth.uid()
+              OR EXISTS (
+                SELECT 1 FROM user_roles
+                WHERE user_id = auth.uid()
+                AND role IN ('ADMIN', 'NPD_LEAD')
+              )
+            )
+          description: "NPD Lead can CRUD own projects"
+
+        - name: "npd_projects_rd_select"
+          type: "SELECT"
+          role: "R&D"
+          rule: |
+            org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+            AND EXISTS (
+              SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'R&D'
+            )
+            AND EXISTS (
+              SELECT 1 FROM npd_formulations f
+              WHERE f.project_id = npd_projects.id
+              AND f.assigned_to = auth.uid()
+            )
+          description: "R&D can view projects with assigned formulations"
+
+        - name: "npd_projects_finance_select"
+          type: "SELECT"
+          role: "FINANCE"
+          rule: |
+            org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+            AND EXISTS (
+              SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'FINANCE'
+            )
+          description: "Finance can view all projects (read-only)"
+
+        - name: "npd_projects_production_select"
+          type: "SELECT"
+          role: "PRODUCTION"
+          rule: |
+            org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+            AND status = 'launched'
+            AND EXISTS (
+              SELECT 1 FROM user_roles
+              WHERE user_id = auth.uid()
+              AND role IN ('PRODUCTION_MANAGER', 'PRODUCTION_OPERATOR')
+            )
+          description: "Production can view launched projects only"
+
+    - table: "npd_formulations"
+      policies:
+        - name: "npd_formulations_npd_lead_all"
+          type: "ALL"
+          role: "NPD_LEAD"
+          rule: |
+            org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+            AND EXISTS (
+              SELECT 1 FROM npd_projects p
+              WHERE p.id = npd_formulations.project_id
+              AND (p.owner_id = auth.uid() OR EXISTS (
+                SELECT 1 FROM user_roles
+                WHERE user_id = auth.uid()
+                AND role IN ('ADMIN', 'NPD_LEAD')
+              ))
+            )
+          description: "NPD Lead can CRUD all formulations in own projects"
+
+        - name: "npd_formulations_rd_assigned"
+          type: "SELECT"
+          role: "R&D"
+          rule: |
+            org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+            AND assigned_to = auth.uid()
+            AND EXISTS (
+              SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'R&D'
+            )
+          description: "R&D can view assigned formulations"
+
+        - name: "npd_formulations_rd_update"
+          type: "UPDATE"
+          role: "R&D"
+          rule: |
+            org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+            AND assigned_to = auth.uid()
+            AND status NOT IN ('locked', 'approved')
+            AND EXISTS (
+              SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'R&D'
+            )
+          description: "R&D can edit assigned formulations (if not locked)"
+
+    - table: "npd_costing"
+      policies:
+        - name: "npd_costing_finance_select"
+          type: "SELECT"
+          role: "FINANCE"
+          rule: |
+            org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+            AND EXISTS (
+              SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'FINANCE'
+            )
+          description: "Finance can view all costing"
+
+        - name: "npd_costing_finance_update"
+          type: "UPDATE"
+          role: "FINANCE"
+          rule: |
+            org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+            AND status = 'submitted'
+            AND EXISTS (
+              SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'FINANCE'
+            )
+          description: "Finance can update submitted costing (approve/reject)"
+
+    - table: "npd_compliance_documents"
+      policies:
+        - name: "npd_compliance_docs_all_select"
+          type: "SELECT"
+          role: "ALL"
+          rule: |
+            org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+          description: "All users can view compliance documents"
+
+        - name: "npd_compliance_docs_regulatory_all"
+          type: "ALL"
+          role: "REGULATORY"
+          rule: |
+            org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+            AND EXISTS (
+              SELECT 1 FROM user_roles
+              WHERE user_id = auth.uid()
+              AND role IN ('REGULATORY', 'ADMIN')
+            )
+          description: "Regulatory can upload/delete compliance documents"
+
+  triggers:
+    - name: "npd_audit_trigger_func"
+      type: "FUNCTION"
+      description: "Generic audit trigger function"
+      returns: "TRIGGER"
+      logic: |
+        - Get current user ID via auth.uid()
+        - Determine entity name based on table
+        - Build old_values (for UPDATE/DELETE) and new_values (for INSERT/UPDATE) from row_to_json()
+        - Calculate changed_fields array (keys where old != new)
+        - INSERT into npd_audit_log
+      security: "SECURITY DEFINER"
+
+    - triggers:
+        - table: "npd_projects"
+          name: "npd_projects_audit_trigger"
+          when: "AFTER INSERT OR UPDATE OR DELETE"
+        - table: "npd_formulations"
+          name: "npd_formulations_audit_trigger"
+          when: "AFTER INSERT OR UPDATE OR DELETE"
+        - table: "npd_formulation_items"
+          name: "npd_formulation_items_audit_trigger"
+          when: "AFTER INSERT OR UPDATE OR DELETE"
+        - table: "npd_costing"
+          name: "npd_costing_audit_trigger"
+          when: "AFTER INSERT OR UPDATE OR DELETE"
+        - table: "npd_compliance_documents"
+          name: "npd_compliance_documents_audit_trigger"
+          when: "AFTER INSERT OR UPDATE OR DELETE"
+        - table: "npd_gate_checklists"
+          name: "npd_gate_checklists_audit_trigger"
+          when: "AFTER INSERT OR UPDATE OR DELETE"
+
+migration_file: "YYYYMMDDHHMMSS_create_npd_audit_trail.sql"
+migration_notes:
+  - "Create npd_audit_log table with immutability rules"
+  - "Create RLS policies for all NPD tables (6 roles)"
+  - "Create audit trigger function"
+  - "Apply audit triggers to 6 NPD tables"
+  - "Indexes for audit log query performance"

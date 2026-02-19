@@ -1,0 +1,500 @@
+# Story 02.9 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/costing-service.test.ts"
+    type: "unit"
+    description: "Unit tests for costing service functions"
+  - path: "apps/frontend/app/api/v1/technical/boms/[id]/cost/__tests__/route.test.ts"
+    type: "integration"
+    description: "API integration tests for cost endpoints"
+  - path: "apps/frontend/components/technical/bom/cost/__tests__/CostSummary.test.tsx"
+    type: "unit"
+    description: "Component tests for CostSummary"
+  - path: "tests/e2e/technical/bom-costing.spec.ts"
+    type: "e2e"
+    description: "E2E tests for BOM costing flow"
+
+# Acceptance Criteria from Story
+acceptance_criteria:
+  # BOM-Routing Link
+  - id: "AC-01"
+    prd: "FR-2.37"
+    given: "user creates/edits BOM"
+    when: "routing dropdown shown"
+    then: "all active routings display for selection"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-02"
+    prd: "FR-2.37"
+    given: "BOM has routing_id assigned"
+    when: "BOM detail loads"
+    then: "routing name displays with link to routing detail"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-03"
+    prd: "FR-2.37"
+    given: "BOM has no routing assigned"
+    when: "cost calculation attempted"
+    then: "error 'Assign routing to BOM to calculate labor costs' displays"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-04"
+    prd: "FR-2.37"
+    given: "BOM has routing assigned"
+    when: "routing is deleted"
+    then: "error prevents deletion 'Routing in use by {N} BOMs'"
+    test_type: "integration"
+    priority: "P1"
+
+  # Material Cost Calculation (FR-2.36)
+  - id: "AC-05"
+    prd: "FR-2.36"
+    given: "BOM with 10 ingredients"
+    when: "cost calculation runs"
+    then: "material cost = SUM(ingredient.cost_per_unit x bom_item.quantity) within 500ms"
+    test_type: "unit"
+    priority: "P0"
+    performance: "500ms"
+
+  - id: "AC-06"
+    prd: "FR-2.36"
+    given: "ingredient has scrap_percent = 2%"
+    when: "cost calculation runs"
+    then: "scrap cost added: material_cost x (scrap_percent / 100)"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-07"
+    prd: "FR-2.36"
+    given: "ingredient RM-001 has no cost data (cost_per_unit is NULL or 0)"
+    when: "cost calculation runs"
+    then: "error 'Missing cost data for: RM-001 (Flour)' displays"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-08"
+    prd: "FR-2.36"
+    given: "ingredient cost updated on products table"
+    when: "cost calculation runs"
+    then: "current cost_per_unit value used"
+    test_type: "integration"
+    priority: "P0"
+
+  # Operation Labor Cost (FR-2.50, FR-2.73)
+  - id: "AC-09"
+    prd: "FR-2.50, FR-2.73"
+    given: "routing with 5 operations"
+    when: "cost calculation runs"
+    then: "operation labor cost = SUM((duration/60) x labor_cost_per_hour)"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-10"
+    prd: "FR-2.73"
+    given: "operation has setup_time = 15 min, labor_rate = $45/hr"
+    when: "calculated"
+    then: "setup cost = (15/60) x 45 = $11.25"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-11"
+    prd: "FR-2.73"
+    given: "operation has cleanup_time = 10 min, labor_rate = $35/hr"
+    when: "calculated"
+    then: "cleanup cost = (10/60) x 35 = $5.83"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-12"
+    prd: "FR-2.73"
+    given: "operation has no labor_cost_per_hour"
+    when: "calculation runs"
+    then: "org default labor rate used (or error if none)"
+    test_type: "unit"
+    priority: "P1"
+
+  - id: "AC-13"
+    prd: "FR-2.73"
+    given: "BOM has production line override (bom_production_lines.labor_cost_per_hour)"
+    when: "calculation runs"
+    then: "line override takes precedence over routing operation rate"
+    test_type: "integration"
+    priority: "P1"
+
+  # Routing-Level Costs (FR-2.51, FR-2.52, FR-2.53, FR-2.77)
+  - id: "AC-14"
+    prd: "FR-2.51, FR-2.77"
+    given: "routing has setup_cost = $50"
+    when: "cost calculation runs"
+    then: "fixed setup cost of $50 added to total"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-15"
+    prd: "FR-2.52, FR-2.77"
+    given: "routing has working_cost_per_unit = $0.15, batch size = 100 kg"
+    when: "calculated"
+    then: "routing working cost = 100 x 0.15 = $15"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-16"
+    prd: "FR-2.53, FR-2.74"
+    given: "routing has overhead_percent = 12%, subtotal = $200"
+    when: "calculated"
+    then: "overhead = 200 x 0.12 = $24"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-17"
+    prd: "FR-2.77"
+    given: "routing has no cost fields (defaults to 0)"
+    when: "calculation runs"
+    then: "cost calculation succeeds with routing costs = $0"
+    test_type: "unit"
+    priority: "P0"
+
+  # Total Cost Calculation (FR-2.72)
+  - id: "AC-18"
+    prd: "FR-2.72"
+    given: "all cost components calculated"
+    when: "total computed"
+    then: "Total = Material + Labor + Setup + Working + Overhead"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-19"
+    prd: "FR-2.72"
+    given: "total cost = $245.50, batch size = 100 kg"
+    when: "cost per unit calculated"
+    then: "cost_per_kg = $2.46 (rounded to 2 decimals)"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-20"
+    prd: "FR-2.72"
+    given: "calculation completes successfully"
+    when: "result stored"
+    then: "product_costs record created with effective_from = today"
+    test_type: "integration"
+    priority: "P1"
+
+  # API Endpoints
+  - id: "AC-21"
+    prd: "FR-2.70"
+    given: "GET /api/technical/boms/:id/cost called"
+    when: "BOM has cost data"
+    then: "returns full breakdown (material, labor, overhead, total)"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-22"
+    prd: "FR-2.70"
+    given: "POST /api/technical/boms/:id/recalculate-cost called"
+    when: "all prerequisites met"
+    then: "new cost record created and returned within 2 seconds"
+    test_type: "integration"
+    priority: "P0"
+    performance: "2000ms"
+
+  - id: "AC-23"
+    prd: "FR-2.77"
+    given: "GET /api/technical/routings/:id/cost called"
+    when: "routing has operations"
+    then: "returns routing-only cost (labor + routing costs, no materials)"
+    test_type: "integration"
+    priority: "P1"
+
+  # Permission Enforcement
+  - id: "AC-24"
+    prd: "NFR"
+    given: "user without technical read permission"
+    when: "cost API called"
+    then: "403 Forbidden returned"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-25"
+    prd: "NFR"
+    given: "user with read-only permission"
+    when: "[Recalculate] button rendered"
+    then: "button hidden or disabled"
+    test_type: "e2e"
+    priority: "P1"
+
+  # Future Features Hidden (AC-9.1)
+  - id: "AC-26"
+    prd: "Epic 02.0"
+    given: "user viewing BOM cost breakdown"
+    when: "MVP is active (Phase 0)"
+    then: "Phase 1+ features (currency, lock, variance) are hidden"
+    test_type: "e2e"
+    priority: "P1"
+
+# Unit Test Cases
+unit_tests:
+  costing_service:
+    - name: "calculateTotalBOMCost returns full breakdown for valid BOM"
+      setup: "Mock BOM with 3 ingredients and routing with 2 operations"
+      expected: "Returns BOMCostBreakdown with all cost components"
+      assertions:
+        - "materialCost > 0"
+        - "laborCost > 0"
+        - "totalCost = materialCost + laborCost + setupCost + workingCost + overheadCost"
+
+    - name: "calculateTotalBOMCost handles scrap percent correctly"
+      setup: "BOM item with quantity=10, cost_per_unit=5, scrap_percent=2"
+      expected: "Material cost = 10 * 5 * 1.02 = $51.00"
+      assertions:
+        - "lineCost equals 51.00"
+
+    - name: "calculateTotalBOMCost returns error for BOM without routing"
+      setup: "BOM with routing_id = null"
+      expected: "Returns error with code NO_ROUTING"
+      assertions:
+        - "success equals false"
+        - "error.code equals NO_ROUTING"
+
+    - name: "calculateTotalBOMCost returns error for missing ingredient costs"
+      setup: "BOM with ingredient having cost_per_unit = null"
+      expected: "Returns error with code MISSING_INGREDIENT_COSTS"
+      assertions:
+        - "success equals false"
+        - "error.code equals DATABASE_ERROR or MISSING_COSTS"
+
+    - name: "calculateTotalBOMCost calculates operation labor cost correctly"
+      setup: "Operation with duration=60min, setup=15min, cleanup=10min, rate=$45/hr"
+      expected: "Labor cost = ((60+15+10)/60) * 45 = $63.75"
+      assertions:
+        - "laborCost equals 63.75"
+
+    - name: "calculateTotalBOMCost applies routing setup cost"
+      setup: "Routing with setup_cost=50"
+      expected: "Setup cost in breakdown equals $50"
+      assertions:
+        - "setupCost equals 50"
+
+    - name: "calculateTotalBOMCost applies routing working cost"
+      setup: "Routing with working_cost_per_unit=0.15, quantity=100"
+      expected: "Working cost = 0.15 * 100 = $15"
+      assertions:
+        - "workingCost equals 15"
+
+    - name: "calculateTotalBOMCost applies overhead percentage"
+      setup: "Routing with overhead_percent=12, subtotal=$200"
+      expected: "Overhead = 200 * 0.12 = $24"
+      assertions:
+        - "overheadCost equals 24"
+
+    - name: "calculateUnitCost returns correct per-unit cost"
+      setup: "BOM with total cost $500, output_qty=200"
+      expected: "Unit cost = 500/200 = $2.50"
+      assertions:
+        - "unitCost equals 2.50"
+
+    - name: "compareBOMCosts returns difference between two BOMs"
+      setup: "BOM1 with total $100, BOM2 with total $120"
+      expected: "Difference = $20, percentChange = 20%"
+      assertions:
+        - "difference.totalCost equals 20"
+        - "difference.percentChange equals 20"
+
+    - name: "roundCurrency rounds to 2 decimal places"
+      setup: "Value 12.345"
+      expected: "Returns 12.35"
+      assertions:
+        - "result equals 12.35"
+
+# Integration Test Cases
+integration_tests:
+  api_endpoints:
+    - name: "GET /api/v1/technical/boms/:id/cost returns 200 for valid BOM"
+      setup: "Create BOM with ingredients, routing, and cost data"
+      action: "GET /api/v1/technical/boms/:id/cost"
+      expected: "Status 200 with full cost breakdown"
+      assertions:
+        - "response.status equals 200"
+        - "response.body.total_cost is number"
+        - "response.body.breakdown.materials is array"
+
+    - name: "GET /api/v1/technical/boms/:id/cost returns 404 for missing BOM"
+      setup: "No BOM created"
+      action: "GET /api/v1/technical/boms/nonexistent-uuid/cost"
+      expected: "Status 404 with error message"
+      assertions:
+        - "response.status equals 404"
+        - "response.body.error contains 'not found'"
+
+    - name: "GET /api/v1/technical/boms/:id/cost returns 403 without permission"
+      setup: "User with no technical.R permission"
+      action: "GET /api/v1/technical/boms/:id/cost"
+      expected: "Status 403 Forbidden"
+      assertions:
+        - "response.status equals 403"
+
+    - name: "POST /api/v1/technical/boms/:id/recalculate-cost creates cost record"
+      setup: "BOM with routing and ingredients with costs"
+      action: "POST /api/v1/technical/boms/:id/recalculate-cost"
+      expected: "Status 200, product_costs record created"
+      assertions:
+        - "response.status equals 200"
+        - "response.body.success equals true"
+        - "product_costs table has new record"
+
+    - name: "POST /api/v1/technical/boms/:id/recalculate-cost returns 422 for missing costs"
+      setup: "BOM with ingredient having null cost_per_unit"
+      action: "POST /api/v1/technical/boms/:id/recalculate-cost"
+      expected: "Status 422 with specific error"
+      assertions:
+        - "response.status equals 422"
+        - "response.body.error contains 'Missing cost data'"
+
+    - name: "GET /api/v1/technical/routings/:id/cost returns routing-only cost"
+      setup: "Routing with 3 operations, setup_cost=50"
+      action: "GET /api/v1/technical/routings/:id/cost?batch_size=100"
+      expected: "Status 200 with operation and routing costs (no materials)"
+      assertions:
+        - "response.status equals 200"
+        - "response.body.breakdown.operations is array"
+        - "response.body.breakdown.materials is undefined"
+
+    - name: "Cost calculation performance < 2 seconds for 50 items"
+      setup: "BOM with 50 ingredients"
+      action: "POST /api/v1/technical/boms/:id/recalculate-cost"
+      expected: "Response within 2000ms"
+      assertions:
+        - "response.time < 2000"
+      performance: true
+
+  rls_isolation:
+    - name: "User cannot access cost for BOM in different org"
+      setup: "Org A with BOM A, Org B with User B"
+      action: "User B calls GET /api/v1/technical/boms/:bomAId/cost"
+      expected: "Status 404 (not 403 to prevent existence leak)"
+      assertions:
+        - "response.status equals 404"
+      security: true
+
+# E2E Test Cases
+e2e_tests:
+  - name: "Full costing flow - view cost on BOM detail"
+    steps:
+      - "Login as Production Manager"
+      - "Navigate to Technical > BOMs"
+      - "Click on BOM with routing"
+      - "Verify Cost Summary section displays"
+      - "Verify material/labor/overhead breakdown visible"
+      - "Verify margin analysis shows if std_price set"
+    expected: "Cost breakdown displays correctly with all components"
+
+  - name: "Recalculate cost flow"
+    steps:
+      - "Login as Admin"
+      - "Navigate to BOM detail page"
+      - "Click Recalculate button"
+      - "Verify loading state shows"
+      - "Verify cost values update"
+      - "Verify success toast appears"
+    expected: "Cost recalculates and displays updated values"
+
+  - name: "Error state - missing ingredient costs"
+    steps:
+      - "Login as Admin"
+      - "Navigate to BOM with ingredient missing cost_per_unit"
+      - "Verify error state displays"
+      - "Verify specific missing ingredients listed"
+      - "Verify 'Configure Ingredient Costs' link appears"
+    expected: "Error message shows with fix instructions"
+
+  - name: "Error state - no routing assigned"
+    steps:
+      - "Login as Admin"
+      - "Navigate to BOM without routing_id"
+      - "Verify error 'Assign routing to BOM' displays"
+      - "Verify 'Assign Routing' link appears"
+    expected: "Error message shows with routing assignment link"
+
+  - name: "Permission check - read-only user cannot recalculate"
+    steps:
+      - "Login as Viewer role"
+      - "Navigate to BOM detail page"
+      - "Verify Cost Summary displays (read)"
+      - "Verify Recalculate button is hidden or disabled"
+    expected: "Read access allowed, write access denied"
+
+  - name: "Phase 1+ features hidden in MVP"
+    steps:
+      - "Login as Admin"
+      - "Navigate to BOM detail page"
+      - "Verify no currency selector visible"
+      - "Verify no 'Lock Cost' button"
+      - "Verify no 'Compare to Actual' button"
+      - "Verify no cost trend chart"
+    expected: "Future features are completely hidden (not Coming Soon)"
+
+# Definition of Done
+definition_of_done:
+  - "BOM-routing linkage works (routing_id FK enforced)"
+  - "Material cost calculation accurate within $0.01"
+  - "Operation labor cost includes setup + run + cleanup time"
+  - "Routing-level costs (setup, working, overhead) applied correctly"
+  - "Total cost formula matches PRD specification"
+  - "Cost per unit calculated correctly (total / batch_size)"
+  - "GET /api/technical/boms/:id/cost returns full breakdown"
+  - "POST recalculate-cost creates new product_costs record"
+  - "Cost breakdown displays on BOM detail page"
+  - "Stale cost warning displays when costs outdated"
+  - "Margin analysis shows actual vs target margin"
+  - "Performance: calculation completes in <2 seconds"
+  - "Missing ingredient cost shows specific error message"
+  - "All API endpoints have integration tests"
+  - "Unit tests cover costing-service (>80% coverage)"
+  - "TEC-013 wireframe core features implemented"
+  - "Phase 1+ features are hidden per Future Feature Handling guidance"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    reason: "Core calculation logic requires high coverage"
+  integration:
+    target: 70
+    reason: "API endpoints must be thoroughly tested"
+  files:
+    - "lib/services/costing-service.ts: 80%"
+    - "app/api/v1/technical/boms/[id]/cost/route.ts: 70%"
+    - "app/api/v1/technical/boms/[id]/recalculate-cost/route.ts: 70%"
+    - "components/technical/bom/cost/CostSummary.tsx: 70%"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "Calculation precision errors with floating point"
+    mitigation: "Round all currency values to 2 decimals consistently"
+    severity: "medium"
+    test_coverage: "unit_tests.costing_service (rounding tests)"
+
+  - id: "RISK-02"
+    description: "Performance degradation with large BOMs (50+ items)"
+    mitigation: "Performance test with 50 items, optimize queries"
+    severity: "medium"
+    test_coverage: "integration_tests.api_endpoints (performance test)"
+
+  - id: "RISK-03"
+    description: "Stale cost detection missing some change scenarios"
+    mitigation: "Test ingredient, BOM item, and routing change triggers"
+    severity: "low"
+    test_coverage: "integration_tests (stale detection tests)"
+
+  - id: "RISK-04"
+    description: "Permission bypass allowing unauthorized recalculation"
+    mitigation: "Permission check tests, RLS isolation tests"
+    severity: "high"
+    test_coverage: "integration_tests.rls_isolation"

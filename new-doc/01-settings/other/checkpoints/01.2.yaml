@@ -1,0 +1,18 @@
+# Checkpoint Log for Story 01.2
+# Story: Settings Shell - Navigation + Role Guards
+# Epic: 01-settings
+# Phase: P3 Iteration 2 (Bug Fixes)
+
+P1: ✓ ux-designer 14:35 wireframes:3 approved:yes
+P2: ✓ test-writer 01:25 files:5 tests:49 status:red
+P3: ✓ backend-dev 01:41 files:4 tests:7/27
+P3-iter2: ✓ backend-dev 02:25 files:1 tests:23/23 issues-fixed:1
+P5: ✓ code-reviewer 02:30 issues:0 decision:approved block:NO
+P5: ✓ code-reviewer 15:05 issues:0 decision:approved
+P6: ✓ qa-agent 15:16 ac:5/6 bugs:0 decision:pass
+P7: tech-writer 15:20 report:done docs:updated
+P7: tech-writer 15:20 report:done docs:updated
+P5: ✓ code-reviewer 16:01 issues:3-minor decision:approved
+P7: ✓ tech-writer 16:10 report:done docs:updated
+P1: ✓ test-writer 14:30 files:1 tests:40 status:red
+P1-QA: ✓ test-writer 12:08 files:1 tests:43 status:fixed errors:0 method:selector-repair

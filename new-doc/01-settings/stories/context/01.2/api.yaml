@@ -1,0 +1,109 @@
+# Story 01.2 - API Specification
+# Purpose: Endpoints consumed (no new endpoints created)
+# Agent: BACKEND-DEV (API focus)
+
+# Note: This story consumes APIs from 01.1, does not create new ones.
+creates_endpoints: false
+
+# Endpoints Consumed
+endpoints_consumed:
+  - method: "GET"
+    path: "/api/v1/settings/context"
+    source: "Story 01.1"
+    description: "Get org context, user role, and permissions"
+    auth: true
+    usage: "Called on settings page load to determine navigation visibility"
+    response:
+      org_id: "uuid"
+      user_id: "uuid"
+      role: "string"
+      permissions: "object"
+
+  - method: "GET"
+    path: "/api/settings/modules"
+    source: "Story 01.7"
+    description: "Get enabled modules for navigation filtering"
+    auth: true
+    usage: "Called to filter navigation items by enabled modules"
+    note: "Will be implemented in 01.7, for now show all items"
+
+# Service to Create
+services:
+  - path: "apps/frontend/lib/services/settings-navigation-service.ts"
+    description: "Service to build navigation based on permissions/modules"
+    exports:
+      - name: "buildSettingsNavigation"
+        type: "function"
+        params:
+          - "context: OrgContext"
+          - "enabledModules?: string[]"
+        returns: "NavigationSection[]"
+        description: "Builds navigation structure filtered by role permissions and enabled modules"
+
+      - name: "NavigationSection"
+        type: "interface"
+        fields:
+          - "section: string"
+          - "items: NavigationItem[]"
+
+      - name: "NavigationItem"
+        type: "interface"
+        fields:
+          - "name: string"
+          - "path: string"
+          - "icon: LucideIcon"
+          - "roles: RoleCode[]"
+          - "implemented: boolean"
+          - "moduleCode?: string"
+
+    pattern: |
+      // apps/frontend/lib/services/settings-navigation-service.ts
+      import { OrgContext } from '@/lib/types/organization';
+      import { LucideIcon, Building, Users, Warehouse, Settings } from 'lucide-react';
+
+      export interface NavigationItem {
+        name: string;
+        path: string;
+        icon: LucideIcon;
+        roles: string[];
+        implemented: boolean;
+        moduleCode?: string;
+      }
+
+      export interface NavigationSection {
+        section: string;
+        items: NavigationItem[];
+      }
+
+      const NAVIGATION_CONFIG: NavigationSection[] = [
+        {
+          section: 'Organization',
+          items: [
+            { name: 'Organization Profile', path: '/settings/organization', icon: Building, roles: ['super_admin', 'admin'], implemented: true },
+          ],
+        },
+        {
+          section: 'Users & Roles',
+          items: [
+            { name: 'Users', path: '/settings/users', icon: Users, roles: ['super_admin', 'admin'], implemented: true },
+            { name: 'Invitations', path: '/settings/invitations', icon: Users, roles: ['super_admin', 'admin'], implemented: false },
+          ],
+        },
+        // ... more sections
+      ];
+
+      export function buildSettingsNavigation(
+        context: OrgContext,
+        enabledModules: string[] = []
+      ): NavigationSection[] {
+        return NAVIGATION_CONFIG.map(section => ({
+          section: section.section,
+          items: section.items.filter(item => {
+            // Filter by role
+            const hasRole = item.roles.includes(context.role);
+            // Filter by module (if specified)
+            const moduleEnabled = !item.moduleCode || enabledModules.includes(item.moduleCode);
+            return hasRole && moduleEnabled;
+          }),
+        })).filter(section => section.items.length > 0);
+      }

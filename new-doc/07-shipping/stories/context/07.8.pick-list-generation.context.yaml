@@ -1,0 +1,341 @@
+story:
+  id: "07.8"
+  name: "Pick List Generation + Wave Picking"
+  epic: "07-shipping"
+  phase: "1B"
+  complexity: "M"
+  estimate_days: 3
+  priority: "P0"
+  state: "ready"
+  type: "backend + frontend"
+
+dependencies:
+  required:
+    - story: "07.7"
+      provides: ["inventory_allocations", "allocation_service"]
+      blocking: true
+    - story: "07.3"
+      provides: ["sales_orders", "sales_order_lines"]
+    - story: "07.4"
+      provides: ["sales_order_lines", "line_management"]
+    - story: "07.5"
+      provides: ["so_confirmation", "status_workflow"]
+    - epic: "01-settings"
+      provides: ["organizations", "users", "roles", "rlp_policies"]
+    - epic: "05-warehouse"
+      provides: ["license_plates", "locations", "zone_aisle_bin_hierarchy"]
+    - epic: "02-technical"
+      provides: ["products", "allergens"]
+
+provides_to:
+  - story: "07.9"
+    consumes: ["pick_lists", "pick_list_lines"]
+  - story: "07.10"
+    consumes: ["pick_lists", "pick_list_lines", "pick_scanning"]
+  - story: "07.11"
+    consumes: ["pick_lists"]
+
+files_to_read:
+  prd:
+    - "docs/1-BASELINE/product/modules/shipping.md"
+    - sections: ["FR-7.21", "FR-7.22", "FR-7.23"]
+
+  architecture:
+    - "docs/1-BASELINE/architecture/modules/shipping.md"
+    - sections: ["Pick List Generation", "Wave Picking", "Location Sequencing"]
+
+  story:
+    - "docs/2-MANAGEMENT/epics/current/07-shipping/07.8.pick-list-generation.md"
+
+  wireframes:
+    - "docs/3-ARCHITECTURE/ux/wireframes/SHIP-012-pick-list-list.md"
+    - "docs/3-ARCHITECTURE/ux/wireframes/SHIP-013-wave-picking.md"
+
+  patterns:
+    - "docs/1-BASELINE/architecture/patterns/multi-tenancy.md"
+    - "docs/1-BASELINE/architecture/patterns/rls-isolation.md"
+
+files_to_create:
+  database:
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_create_pick_lists_tables.sql"
+      type: "migration"
+      description: "Create pick_lists, pick_list_lines tables with RLS and auto-numbering"
+
+  api:
+    - path: "apps/frontend/app/api/shipping/pick-lists/route.ts"
+      methods: ["GET", "POST"]
+    - path: "apps/frontend/app/api/shipping/pick-lists/[id]/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/shipping/pick-lists/[id]/assign/route.ts"
+      methods: ["POST"]
+    - path: "apps/frontend/app/api/shipping/pick-lists/[id]/lines/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/shipping/pick-lists/my-picks/route.ts"
+      methods: ["GET"]
+
+  services:
+    - path: "lib/services/pick-list-service.ts"
+      description: "Core pick list generation, wave picking, location sequencing logic"
+
+  validation:
+    - path: "lib/validation/pick-list-schema.ts"
+      description: "Zod schemas for create, assign, filter operations"
+
+  pages:
+    - path: "apps/frontend/app/(authenticated)/shipping/pick-lists/page.tsx"
+      description: "Pick list list page with filters, search, pagination"
+    - path: "apps/frontend/app/(authenticated)/shipping/pick-lists/[id]/page.tsx"
+      description: "Pick list detail page with pick lines grouped by location"
+    - path: "apps/frontend/app/(authenticated)/shipping/pick-lists/my-picks/page.tsx"
+      description: "Picker view showing assigned pick lists"
+
+  components:
+    - path: "apps/frontend/app/(authenticated)/shipping/pick-lists/components/PickListTable.tsx"
+      description: "Sortable, filterable table with status badges"
+    - path: "apps/frontend/app/(authenticated)/shipping/pick-lists/components/PickLinesTable.tsx"
+      description: "Grouped table by location (zone→aisle→bin) with pick sequence"
+    - path: "apps/frontend/app/(authenticated)/shipping/pick-lists/components/AssignPickerModal.tsx"
+      description: "Modal for assigning picker with user dropdown"
+    - path: "apps/frontend/app/(authenticated)/shipping/pick-lists/components/PickListHeader.tsx"
+      description: "Header with pick list details, status, assigned to"
+
+database:
+  tables:
+    - name: "pick_lists"
+      columns:
+        - "id UUID PRIMARY KEY"
+        - "org_id UUID NOT NULL (FK organizations)"
+        - "pick_list_number TEXT NOT NULL (PL-YYYY-NNNNN format)"
+        - "pick_type TEXT CHECK (single_order|wave)"
+        - "status TEXT CHECK (pending|assigned|in_progress|completed|cancelled)"
+        - "priority TEXT DEFAULT 'normal' CHECK (low|normal|high|urgent)"
+        - "assigned_to UUID (FK users, nullable)"
+        - "wave_id UUID (optional grouping)"
+        - "created_at TIMESTAMPTZ"
+        - "created_by UUID (FK users)"
+        - "started_at TIMESTAMPTZ (nullable)"
+        - "completed_at TIMESTAMPTZ (nullable)"
+        - "UNIQUE(org_id, pick_list_number)"
+      rls: true
+      indexes:
+        - "idx_pick_lists_org_status ON pick_lists(org_id, status)"
+        - "idx_pick_lists_assigned ON pick_lists(assigned_to)"
+        - "idx_pick_lists_org_created ON pick_lists(org_id, created_at DESC)"
+
+    - name: "pick_list_lines"
+      columns:
+        - "id UUID PRIMARY KEY"
+        - "org_id UUID NOT NULL (FK organizations)"
+        - "pick_list_id UUID NOT NULL (FK pick_lists, ON DELETE CASCADE)"
+        - "sales_order_line_id UUID NOT NULL (FK sales_order_lines)"
+        - "license_plate_id UUID (FK license_plates, suggested LP)"
+        - "location_id UUID NOT NULL (FK locations)"
+        - "product_id UUID NOT NULL (FK products)"
+        - "lot_number TEXT (from license plate)"
+        - "quantity_to_pick DECIMAL(15,4) NOT NULL"
+        - "quantity_picked DECIMAL(15,4) DEFAULT 0"
+        - "pick_sequence INTEGER (route optimization order)"
+        - "status TEXT DEFAULT 'pending' CHECK (pending|picked|short)"
+        - "picked_license_plate_id UUID (FK license_plates, actual picked LP)"
+        - "picked_at TIMESTAMPTZ (nullable)"
+        - "picked_by UUID (FK users)"
+      rls: true
+      indexes:
+        - "idx_pick_list_lines_list ON pick_list_lines(pick_list_id)"
+        - "idx_pick_list_lines_status ON pick_list_lines(status)"
+        - "idx_pick_list_lines_location ON pick_list_lines(location_id)"
+        - "idx_pick_list_lines_sequence ON pick_list_lines(pick_list_id, pick_sequence)"
+
+api_endpoints:
+  - method: "POST"
+    path: "/api/shipping/pick-lists"
+    auth: true
+    roles: ["Warehouse Manager", "Shipping Manager", "Admin"]
+    description: "Create pick list from single SO or multiple SOs (wave)"
+    request_body:
+      sales_order_ids: "UUID[] (1 for single, 2+ for wave)"
+      priority: "low|normal|high|urgent (optional)"
+      assigned_to: "UUID (optional immediate assignment)"
+    response:
+      pick_list_id: "UUID"
+      pick_list_number: "PL-YYYY-NNNNN"
+      line_count: "integer"
+
+  - method: "GET"
+    path: "/api/shipping/pick-lists"
+    auth: true
+    roles: ["All authenticated"]
+    description: "List pick lists with filters, search, pagination"
+    query_params:
+      status: "comma-separated (pending,assigned,in_progress,completed,cancelled)"
+      assigned_to: "UUID or 'unassigned'"
+      priority: "low|normal|high|urgent"
+      date_from: "YYYY-MM-DD"
+      date_to: "YYYY-MM-DD"
+      page: "integer (default: 1)"
+      limit: "1-20 (default: 20)"
+      sort_by: "pick_list_number|created_at|assigned_at|status"
+      sort_order: "asc|desc"
+      search: "text search"
+    response:
+      pick_lists: "PickList[]"
+      total: "integer"
+      page: "integer"
+      pages: "integer"
+
+  - method: "GET"
+    path: "/api/shipping/pick-lists/:id"
+    auth: true
+    roles: ["All authenticated"]
+    description: "Get pick list detail with all lines"
+    response:
+      pick_list: "PickList (full)"
+      lines: "PickListLine[] (sorted by pick_sequence)"
+
+  - method: "POST"
+    path: "/api/shipping/pick-lists/:id/assign"
+    auth: true
+    roles: ["Warehouse Manager", "Shipping Manager", "Admin"]
+    description: "Assign pick list to picker"
+    request_body:
+      assigned_to: "UUID (user_id)"
+    response:
+      pick_list: "PickList (status updated to assigned)"
+
+  - method: "GET"
+    path: "/api/shipping/pick-lists/:id/lines"
+    auth: true
+    roles: ["All authenticated"]
+    description: "Get pick lines for a pick list"
+    response:
+      lines: "PickListLine[] (with product, location details)"
+
+  - method: "GET"
+    path: "/api/shipping/pick-lists/my-picks"
+    auth: true
+    roles: ["Picker", "Warehouse Manager", "Admin"]
+    description: "Get pick lists assigned to current user"
+    response:
+      pick_lists: "PickList[] (status IN assigned,in_progress)"
+
+ux:
+  wireframes:
+    - id: "SHIP-012"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SHIP-012-pick-list-list.md"
+      components:
+        - "PickListTable (desktop 7 cols, tablet 5 cols, mobile cards)"
+        - "Status badges (Draft, Assigned, In Progress, Completed, Cancelled)"
+        - "Filter dropdown (status, assigned_to, date_range)"
+        - "Search bar (pick_list_number, so_number, customer_name)"
+        - "Bulk actions (Assign, Complete, Cancel, Print)"
+        - "Pagination (25 default, max 50)"
+      screens:
+        - "success: Full table with pick lists"
+        - "loading: Skeleton rows with progress bar"
+        - "empty: No pick lists, CTA to create first"
+        - "error: Failed to load, retry button"
+
+    - id: "SHIP-013"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SHIP-013-wave-picking.md"
+      components:
+        - "Wave wizard (3 steps: select SOs, choose strategy, review)"
+        - "SO selection table with filters"
+        - "Strategy selector (Zone/Route/FIFO based)"
+        - "Wave preview with consolidated lines and pick sequence"
+      screens:
+        - "step_1: Select sales orders"
+        - "step_2: Choose optimization strategy"
+        - "step_3: Review consolidated lines"
+
+  patterns:
+    table: "ShadCN DataTable with sortable, filterable columns"
+    modal: "ShadCN Dialog for picker assignment"
+    badge: "Status badges with color and icon (WCAG AA compliant)"
+    layout: "Responsive: desktop full table, tablet compact, mobile cards"
+
+  states:
+    - "loading"
+    - "empty"
+    - "error"
+    - "success"
+    - "paused (for future pick confirmation)"
+
+validation_rules:
+  pick_list_creation:
+    sales_order_ids: "UUID[] array with 1+ elements, must be confirmed status"
+    priority: "enum(low|normal|high|urgent), default: normal"
+    assigned_to: "optional UUID, must be active user with picker role"
+
+  pick_list_filtering:
+    status: "enum(pending|assigned|in_progress|completed|cancelled)"
+    assigned_to: "UUID or 'unassigned'"
+    date_range: "from_date <= to_date, both YYYY-MM-DD format"
+    priority: "enum(low|normal|high|urgent)"
+
+  pick_sequence_validation:
+    location_hierarchy: "zone (alphabetical) → aisle (numeric) → bin (numeric)"
+    sequence_values: "integer 1, 2, 3, ... per pick_list"
+
+  wave_picking:
+    consolidation: "group by location, sum quantities for same product+location"
+    max_orders: "no hard limit, warn if >10"
+
+patterns:
+  rls: "org_id isolation on all tables (pick_lists, pick_list_lines)"
+  api: "REST endpoints, POST creates, GET reads, filters via query params"
+  service: "class-based PickListService with static async methods"
+  validation: "Zod schemas for all request bodies"
+  numbering: "Database function generate_pick_list_number(org_id) → PL-YYYY-NNNNN"
+  auto_increment: "Per-org sequence that resets annually by year"
+  sorting: "Location-based: zone→aisle→bin, assigned values as pick_sequence"
+
+acceptance_checklist:
+  - "pick_lists table created with unique pick_list_number per org"
+  - "pick_list_lines table created with location_id, pick_sequence columns"
+  - "generate_pick_list_number() function generates PL-YYYY-NNNNN format"
+  - "POST /api/shipping/pick-lists creates pick list from 1 or 2+ SOs"
+  - "Single-order pick lists set pick_type='single_order'"
+  - "Wave pick lists set pick_type='wave' and consolidate lines by location"
+  - "Pick lines auto-sorted by location hierarchy (zone→aisle→bin)"
+  - "pick_sequence assigned 1, 2, 3, ... based on location sort order"
+  - "POST /api/shipping/pick-lists/:id/assign updates status to 'assigned'"
+  - "GET /api/shipping/pick-lists lists with filters (status, assigned_to, priority, date)"
+  - "GET /api/shipping/pick-lists/my-picks returns current user's assigned picks"
+  - "PickListTable component displays with status badges, filters, pagination"
+  - "PickLinesTable groups by location (zone/aisle/bin with collapses)"
+  - "AssignPickerModal opens on [Assign] click, filters to picker role users"
+  - "Sales order status updates to 'picking' when pick list created"
+  - "RLS policies prevent cross-org access to pick lists and lines"
+  - "Cascade delete: deleting SO deletes associated pick_lists (pending/assigned only)"
+  - "Unit tests: >80% coverage for PickListService"
+  - "E2E test: Create single-order pick list → Verify lines sorted by location"
+  - "E2E test: Create wave from 3 SOs → Verify consolidation and sorting"
+
+output_artifacts:
+  - "Migration file creating pick_lists, pick_list_lines tables"
+  - "PickListService with createPickList(), assignPicker(), getPickLists() methods"
+  - "API routes for all 5 endpoints (create, list, get detail, assign, my-picks)"
+  - "PickListTable component with filters, search, pagination, status badges"
+  - "PickLinesTable component grouped by location with pick_sequence display"
+  - "AssignPickerModal component for operator assignment"
+  - "Unit tests for PickListService (allocation, sorting, numbering)"
+  - "E2E tests for pick list generation workflows (single-order, wave)"
+  - "Validation schemas for create, filter operations"
+
+notes:
+  - "Wave picking consolidates by (location_id, product_id), sums quantity_to_pick"
+  - "Pick sequence calculation: sort by location hierarchy, assign 1-based index"
+  - "Pick list number auto-incremented per org per calendar year (resets Jan 1)"
+  - "Status workflow: pending → assigned → in_progress → completed"
+  - "Sales order status updated to 'picking' immediately after pick list creation"
+  - "Wave grouping optional (future use for advanced wave management)"
+  - "Picker assignment only allows users with Picker/Warehouse/Manager/Admin roles"
+  - "Location hierarchy requires: zone defined, aisle defined, bin defined"
+  - "Out of scope: pick confirmation workflow (Story 07.9), route optimization (Phase 2)"
+  - "Depends on: Story 07.7 inventory allocations completed first"
+
+version_history:
+  - version: "1.0"
+    date: "2025-12-18"
+    changes: "Initial YAML context creation for Story 07.8"
+    author: "TECH-WRITER"

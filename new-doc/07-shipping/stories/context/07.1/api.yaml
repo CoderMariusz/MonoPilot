@@ -1,0 +1,727 @@
+api:
+  base_path: "/api/shipping"
+  auth: "Required (Supabase Auth)"
+  response_format: "JSON"
+
+  endpoints:
+    customers_list:
+      method: "GET"
+      path: "/customers"
+      summary: "List all customers for org with pagination and filters"
+      auth: true
+      roles: ["admin", "manager", "sales", "warehouse_mgr"]
+
+      request:
+        query_params:
+          - name: "page"
+            type: "integer"
+            required: false
+            default: 1
+            description: "Page number (1-indexed)"
+
+          - name: "limit"
+            type: "integer"
+            required: false
+            default: 50
+            min: 10
+            max: 500
+            description: "Results per page"
+
+          - name: "search"
+            type: "string"
+            required: false
+            description: "Search by customer_code or name (case-insensitive partial match)"
+
+          - name: "category"
+            type: "string"
+            required: false
+            enum: ["retail", "wholesale", "distributor"]
+            description: "Filter by category"
+
+          - name: "is_active"
+            type: "boolean"
+            required: false
+            description: "Filter by active status (default: show all)"
+
+          - name: "sort_by"
+            type: "string"
+            required: false
+            default: "created_at"
+            enum: ["name", "created_at", "customer_code"]
+            description: "Sort field"
+
+          - name: "sort_order"
+            type: "string"
+            required: false
+            default: "asc"
+            enum: ["asc", "desc"]
+
+      response:
+        status: 200
+        body:
+          type: "object"
+          properties:
+            data:
+              type: "array"
+              items: "$ref: #/components/schemas/Customer"
+            pagination:
+              type: "object"
+              properties:
+                page: "integer"
+                limit: "integer"
+                total: "integer"
+                pages: "integer"
+
+      error_cases:
+        - status: 401
+          message: "Unauthorized"
+        - status: 403
+          message: "Forbidden (role check failed)"
+
+    customers_create:
+      method: "POST"
+      path: "/customers"
+      summary: "Create new customer"
+      auth: true
+      roles: ["admin", "manager", "sales"]
+
+      request:
+        content_type: "application/json"
+        body:
+          type: "object"
+          required: ["customer_code", "name", "category"]
+          properties:
+            customer_code:
+              type: "string"
+              min_length: 3
+              max_length: 20
+              pattern: "^[A-Za-z0-9_-]+$"
+              description: "Unique per org identifier"
+
+            name:
+              type: "string"
+              min_length: 1
+              max_length: 255
+              description: "Company name"
+
+            category:
+              type: "string"
+              enum: ["retail", "wholesale", "distributor"]
+              description: "Customer classification"
+
+            email:
+              type: "string"
+              format: "email"
+              description: "Optional contact email"
+
+            phone:
+              type: "string"
+              description: "Optional phone number"
+
+            tax_id:
+              type: "string"
+              max_length: 50
+              description: "VAT/EIN (encrypted at storage)"
+
+            credit_limit:
+              type: "number"
+              min: 0
+              max: 999999.99
+              description: "Optional credit limit"
+
+            payment_terms_days:
+              type: "integer"
+              min: 1
+              max: 365
+              default: 30
+              description: "Net days for payment"
+
+            allergen_restrictions:
+              type: "array"
+              items:
+                type: "string"
+                format: "uuid"
+              max_items: 20
+              description: "Array of allergen IDs customer cannot receive"
+
+            is_active:
+              type: "boolean"
+              default: true
+
+            notes:
+              type: "string"
+              description: "Internal notes"
+
+      response:
+        status: 201
+        body: "$ref: #/components/schemas/Customer"
+
+      error_cases:
+        - status: 400
+          message: "Bad Request - validation error (missing required field, invalid format)"
+        - status: 401
+          message: "Unauthorized"
+        - status: 403
+          message: "Forbidden"
+        - status: 409
+          message: "Conflict - customer_code already exists in org"
+
+    customers_get:
+      method: "GET"
+      path: "/customers/{id}"
+      summary: "Get customer detail with nested contacts and addresses"
+      auth: true
+      roles: ["admin", "manager", "sales", "warehouse_mgr"]
+
+      request:
+        path_params:
+          - name: "id"
+            type: "uuid"
+            required: true
+
+      response:
+        status: 200
+        body:
+          type: "object"
+          properties:
+            id: "string (uuid)"
+            org_id: "string (uuid)"
+            customer_code: "string"
+            name: "string"
+            email: "string"
+            phone: "string"
+            tax_id: "string (encrypted)"
+            credit_limit: "number"
+            payment_terms_days: "integer"
+            category: "string"
+            allergen_restrictions: "array of uuids"
+            is_active: "boolean"
+            notes: "string"
+            created_at: "string (ISO 8601)"
+            created_by: "string (uuid)"
+            updated_at: "string (ISO 8601)"
+            contacts:
+              type: "array"
+              items: "$ref: #/components/schemas/CustomerContact"
+            addresses:
+              type: "array"
+              items: "$ref: #/components/schemas/CustomerAddress"
+
+      error_cases:
+        - status: 401
+          message: "Unauthorized"
+        - status: 404
+          message: "Not Found (customer doesn't exist or cross-tenant access)"
+
+    customers_update:
+      method: "PUT"
+      path: "/customers/{id}"
+      summary: "Update customer (partial update allowed)"
+      auth: true
+      roles: ["admin", "manager", "sales"]
+
+      request:
+        path_params:
+          - name: "id"
+            type: "uuid"
+            required: true
+
+        body:
+          type: "object"
+          properties:
+            name: "string"
+            email: "string"
+            phone: "string"
+            tax_id: "string"
+            credit_limit: "number"
+            payment_terms_days: "integer"
+            category: "string"
+            allergen_restrictions: "array of uuids"
+            is_active: "boolean"
+            notes: "string"
+
+      response:
+        status: 200
+        body: "$ref: #/components/schemas/Customer"
+
+      error_cases:
+        - status: 400
+          message: "Bad Request - validation error"
+        - status: 401
+          message: "Unauthorized"
+        - status: 404
+          message: "Not Found"
+        - status: 409
+          message: "Conflict (e.g., cannot deactivate customer with open orders)"
+
+    customers_delete:
+      method: "DELETE"
+      path: "/customers/{id}"
+      summary: "Archive customer (soft delete via is_active=false)"
+      auth: true
+      roles: ["admin", "manager"]
+
+      request:
+        path_params:
+          - name: "id"
+            type: "uuid"
+            required: true
+
+      response:
+        status: 200
+        body:
+          type: "object"
+          properties:
+            success: "boolean"
+            message: "string"
+
+      error_cases:
+        - status: 401
+          message: "Unauthorized"
+        - status: 403
+          message: "Forbidden (insufficient role)"
+        - status: 404
+          message: "Not Found"
+        - status: 409
+          message: "Conflict (cannot delete customer with open orders)"
+
+    contacts_list:
+      method: "GET"
+      path: "/customers/{id}/contacts"
+      summary: "List all contacts for customer"
+      auth: true
+      roles: ["admin", "manager", "sales", "warehouse_mgr"]
+
+      request:
+        path_params:
+          - name: "id"
+            type: "uuid"
+            required: true
+
+      response:
+        status: 200
+        body:
+          type: "array"
+          items: "$ref: #/components/schemas/CustomerContact"
+
+      error_cases:
+        - status: 404
+          message: "Not Found"
+
+    contacts_create:
+      method: "POST"
+      path: "/customers/{id}/contacts"
+      summary: "Add contact to customer"
+      auth: true
+      roles: ["admin", "manager", "sales"]
+
+      request:
+        path_params:
+          - name: "id"
+            type: "uuid"
+            required: true
+
+        body:
+          type: "object"
+          required: ["name"]
+          properties:
+            name:
+              type: "string"
+              min_length: 1
+              max_length: 255
+
+            title:
+              type: "string"
+              description: "Job title"
+
+            email:
+              type: "string"
+              format: "email"
+
+            phone:
+              type: "string"
+
+            is_primary:
+              type: "boolean"
+              default: false
+
+      response:
+        status: 201
+        body: "$ref: #/components/schemas/CustomerContact"
+
+      error_cases:
+        - status: 400
+          message: "Bad Request"
+        - status: 404
+          message: "Customer not found"
+        - status: 409
+          message: "Conflict (duplicate email for this customer)"
+
+    contacts_update:
+      method: "PUT"
+      path: "/customers/{id}/contacts/{contactId}"
+      summary: "Update contact"
+      auth: true
+      roles: ["admin", "manager", "sales"]
+
+      request:
+        path_params:
+          - name: "id"
+            type: "uuid"
+            required: true
+          - name: "contactId"
+            type: "uuid"
+            required: true
+
+        body:
+          type: "object"
+          properties:
+            name: "string"
+            title: "string"
+            email: "string"
+            phone: "string"
+            is_primary: "boolean"
+
+      response:
+        status: 200
+        body: "$ref: #/components/schemas/CustomerContact"
+
+      error_cases:
+        - status: 404
+          message: "Not Found"
+
+    contacts_delete:
+      method: "DELETE"
+      path: "/customers/{id}/contacts/{contactId}"
+      summary: "Remove contact"
+      auth: true
+      roles: ["admin", "manager", "sales"]
+
+      request:
+        path_params:
+          - name: "id"
+            type: "uuid"
+            required: true
+          - name: "contactId"
+            type: "uuid"
+            required: true
+
+      response:
+        status: 200
+        body:
+          type: "object"
+          properties:
+            success: "boolean"
+
+      error_cases:
+        - status: 404
+          message: "Not Found"
+
+    addresses_list:
+      method: "GET"
+      path: "/customers/{id}/addresses"
+      summary: "List all addresses for customer"
+      auth: true
+      roles: ["admin", "manager", "sales", "warehouse_mgr"]
+
+      request:
+        path_params:
+          - name: "id"
+            type: "uuid"
+            required: true
+
+      response:
+        status: 200
+        body:
+          type: "array"
+          items: "$ref: #/components/schemas/CustomerAddress"
+
+      error_cases:
+        - status: 404
+          message: "Not Found"
+
+    addresses_create:
+      method: "POST"
+      path: "/customers/{id}/addresses"
+      summary: "Add address to customer"
+      auth: true
+      roles: ["admin", "manager", "sales"]
+
+      request:
+        path_params:
+          - name: "id"
+            type: "uuid"
+            required: true
+
+        body:
+          type: "object"
+          required: ["address_type", "address_line1", "city", "postal_code", "country"]
+          properties:
+            address_type:
+              type: "string"
+              enum: ["billing", "shipping"]
+
+            address_line1:
+              type: "string"
+              min_length: 1
+              max_length: 255
+
+            address_line2:
+              type: "string"
+
+            city:
+              type: "string"
+
+            state:
+              type: "string"
+
+            postal_code:
+              type: "string"
+
+            country:
+              type: "string"
+
+            dock_hours:
+              type: "object"
+              description: "Optional weekly delivery window"
+              example:
+                mon: "08:00-17:00"
+                tue: "08:00-17:00"
+                wed: null
+
+            notes:
+              type: "string"
+
+            is_default:
+              type: "boolean"
+              default: false
+
+      response:
+        status: 201
+        body: "$ref: #/components/schemas/CustomerAddress"
+
+      error_cases:
+        - status: 400
+          message: "Bad Request"
+        - status: 404
+          message: "Customer not found"
+
+    addresses_update:
+      method: "PUT"
+      path: "/customers/{id}/addresses/{addressId}"
+      summary: "Update address"
+      auth: true
+      roles: ["admin", "manager", "sales"]
+
+      request:
+        path_params:
+          - name: "id"
+            type: "uuid"
+            required: true
+          - name: "addressId"
+            type: "uuid"
+            required: true
+
+        body:
+          type: "object"
+          properties:
+            address_type: "string"
+            address_line1: "string"
+            address_line2: "string"
+            city: "string"
+            state: "string"
+            postal_code: "string"
+            country: "string"
+            dock_hours: "object"
+            notes: "string"
+            is_default: "boolean"
+
+      response:
+        status: 200
+        body: "$ref: #/components/schemas/CustomerAddress"
+
+      error_cases:
+        - status: 404
+          message: "Not Found"
+
+    addresses_delete:
+      method: "DELETE"
+      path: "/customers/{id}/addresses/{addressId}"
+      summary: "Remove address"
+      auth: true
+      roles: ["admin", "manager", "sales"]
+
+      request:
+        path_params:
+          - name: "id"
+            type: "uuid"
+            required: true
+          - name: "addressId"
+            type: "uuid"
+            required: true
+
+      response:
+        status: 200
+        body:
+          type: "object"
+          properties:
+            success: "boolean"
+
+      error_cases:
+        - status: 404
+          message: "Not Found"
+
+    addresses_set_default:
+      method: "PUT"
+      path: "/customers/{id}/addresses/{addressId}/set-default"
+      summary: "Set address as default for its type (billing or shipping)"
+      auth: true
+      roles: ["admin", "manager", "sales"]
+
+      request:
+        path_params:
+          - name: "id"
+            type: "uuid"
+            required: true
+          - name: "addressId"
+            type: "uuid"
+            required: true
+
+      response:
+        status: 200
+        body: "$ref: #/components/schemas/CustomerAddress"
+
+      error_cases:
+        - status: 404
+          message: "Not Found"
+
+components:
+  schemas:
+    Customer:
+      type: "object"
+      properties:
+        id:
+          type: "string"
+          format: "uuid"
+        org_id:
+          type: "string"
+          format: "uuid"
+        customer_code:
+          type: "string"
+          description: "Unique per org"
+        name:
+          type: "string"
+        email:
+          type: "string"
+          nullable: true
+        phone:
+          type: "string"
+          nullable: true
+        tax_id:
+          type: "string"
+          nullable: true
+          description: "Encrypted at storage"
+        credit_limit:
+          type: "number"
+          nullable: true
+        payment_terms_days:
+          type: "integer"
+        category:
+          type: "string"
+          enum: ["retail", "wholesale", "distributor"]
+        allergen_restrictions:
+          type: "array"
+          items:
+            type: "string"
+            format: "uuid"
+          nullable: true
+        is_active:
+          type: "boolean"
+        notes:
+          type: "string"
+          nullable: true
+        created_at:
+          type: "string"
+          format: "date-time"
+        created_by:
+          type: "string"
+          format: "uuid"
+        updated_at:
+          type: "string"
+          format: "date-time"
+
+    CustomerContact:
+      type: "object"
+      properties:
+        id:
+          type: "string"
+          format: "uuid"
+        customer_id:
+          type: "string"
+          format: "uuid"
+        name:
+          type: "string"
+        title:
+          type: "string"
+          nullable: true
+        email:
+          type: "string"
+          nullable: true
+        phone:
+          type: "string"
+          nullable: true
+        is_primary:
+          type: "boolean"
+        created_at:
+          type: "string"
+          format: "date-time"
+
+    CustomerAddress:
+      type: "object"
+      properties:
+        id:
+          type: "string"
+          format: "uuid"
+        customer_id:
+          type: "string"
+          format: "uuid"
+        address_type:
+          type: "string"
+          enum: ["billing", "shipping"]
+        address_line1:
+          type: "string"
+        address_line2:
+          type: "string"
+          nullable: true
+        city:
+          type: "string"
+        state:
+          type: "string"
+          nullable: true
+        postal_code:
+          type: "string"
+        country:
+          type: "string"
+        dock_hours:
+          type: "object"
+          nullable: true
+          description: "{day: 'HH:MM-HH:MM' or null}"
+        notes:
+          type: "string"
+          nullable: true
+        is_default:
+          type: "boolean"
+        created_at:
+          type: "string"
+          format: "date-time"
+
+implementation_notes: |
+  - All endpoints enforce org_id isolation via RLS
+  - Cross-tenant access returns 404 (not 403) to prevent existence leak
+  - customer_code is case-insensitive unique (apply LOWER() in queries)
+  - tax_id encryption handled transparently (application or pgcrypto)
+  - allergen_restrictions validated against allergens table
+  - Soft delete: archive via is_active=false instead of hard delete
+  - Timestamps (created_at, updated_at) auto-managed by database
+  - created_by required on customer creation (API responsibility)
+  - Set-default address endpoint auto-unsets other defaults for same type

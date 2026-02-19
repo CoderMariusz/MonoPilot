@@ -1,0 +1,359 @@
+# CODE REVIEW HANDOFF: Story 02.11
+# Date: 2025-12-28
+# Reviewer: CODE-REVIEWER (AI Agent)
+# Decision: REQUEST_CHANGES
+
+story: "02.11"
+name: "Shelf Life Calculation + Expiry Management"
+epic: "02-technical"
+phase: "Code Review (Post-GREEN)"
+
+decision: "request_changes"
+overall_score: 7.0
+overall_status: "85% complete - Critical bugs blocking approval"
+
+# SCORES BY CATEGORY
+scores:
+  security: 7
+  business_logic: 6
+  code_quality: 8
+  performance: 8
+  testing: 9
+
+# ISSUE SUMMARY
+issues_summary:
+  critical: 2  # Down from 3 (CRITICAL-3 downgraded to MINOR)
+  major: 5
+  minor: 5
+  total: 12
+
+# CRITICAL ISSUES (BLOCKING)
+critical_issues:
+  - id: "CRITICAL-1"
+    title: "Database Trigger Case-Sensitivity Bug"
+    file: "supabase/migrations/054_shelf_life_recalc_trigger.sql"
+    line: 30
+    severity: "CRITICAL"
+    category: "Business Logic"
+    ac_violated: "AC-11.16"
+    description: "Trigger checks 'Active' but database has 'active' - trigger will never fire"
+    impact: "Recalculation automation completely broken"
+    fix_time: "1 hour"
+    fix_required: "Change 'Active' to 'active' in trigger AND service layer (2 locations)"
+    code_snippet: |
+      -- WRONG (line 30):
+      AND b.status = 'Active'
+      -- CORRECT:
+      AND b.status = 'active'
+
+  - id: "CRITICAL-2"
+    title: "Missing Safety Buffer Days Calculation"
+    file: "apps/frontend/lib/services/shelf-life-service.ts"
+    line: 771
+    severity: "CRITICAL"
+    category: "Business Logic"
+    ac_violated: "AC-11.02"
+    description: "final_days doesn't properly account for override vs calculated"
+    impact: "Incorrect shelf life calculations when override is used"
+    fix_time: "2 hours"
+    fix_required: "Update final_days logic to check override_days first"
+    code_snippet: |
+      // WRONG (line 771-773):
+      final_days: existingConfig?.processing_impact_days !== undefined
+        ? calculatedDays
+        : calculatedDays,
+      // CORRECT:
+      final_days: existingConfig?.override_days
+        ? existingConfig.override_days
+        : calculatedDays,
+
+# MAJOR ISSUES (RECOMMENDED)
+major_issues:
+  - id: "MAJOR-1"
+    title: "Missing 404 vs 403 Enforcement in Service Layer"
+    file: "apps/frontend/lib/services/shelf-life-service.ts"
+    severity: "MAJOR"
+    category: "Security"
+    ac_violated: "AC-11.19"
+    description: "Service doesn't explicitly check org_id before RLS filtering"
+    impact: "Could leak 403 instead of 404 if RLS disabled"
+    fix_time: "2 hours"
+
+  - id: "MAJOR-2"
+    title: "No Input Sanitization for Audit Log JSON"
+    file: "apps/frontend/lib/services/shelf-life-service.ts"
+    line: 362
+    severity: "MAJOR"
+    category: "Security"
+    description: "Audit log accepts arbitrary JSON without size/depth limits"
+    impact: "Storage exhaustion, JSON bombs, potential PII leakage"
+    fix_time: "3 hours"
+
+  - id: "MAJOR-3"
+    title: "Race Condition in Bulk Recalculation"
+    file: "apps/frontend/lib/services/shelf-life-service.ts"
+    line: 893
+    severity: "MAJOR"
+    category: "Performance, Data Integrity"
+    description: "Sequential processing with no transaction or locking"
+    impact: "Duplicate audit entries, lost updates on concurrent access"
+    fix_time: "4 hours"
+
+  - id: "MAJOR-4"
+    title: "Incomplete Best Before Date Calculation"
+    file: "apps/frontend/lib/services/shelf-life-service.ts"
+    line: 940
+    severity: "MAJOR"
+    category: "Business Logic"
+    ac_violated: "AC-11.10, AC-11.11"
+    description: "Missing validation for production date, rolling mode edge cases"
+    impact: "Accepts invalid dates, silent fallback to fixed mode"
+    fix_time: "2 hours"
+
+  - id: "MAJOR-5"
+    title: "Missing Index on Audit Log"
+    file: "supabase/migrations/053_create_shelf_life_audit_log.sql"
+    severity: "MAJOR"
+    category: "Performance"
+    description: "No index for user-based or action-based queries"
+    impact: "Slow audit queries by user or action type"
+    fix_time: "30 minutes"
+
+# MINOR ISSUES (OPTIONAL)
+minor_issues:
+  - id: "MINOR-1"
+    title: "Inconsistent Null Handling in Types"
+    severity: "MINOR"
+    fix_time: "15 minutes"
+
+  - id: "MINOR-2"
+    title: "Magic Numbers in Validation"
+    severity: "MINOR"
+    fix_time: "30 minutes"
+
+  - id: "MINOR-3"
+    title: "Overly Broad Error Messages"
+    severity: "MINOR"
+    fix_time: "1 hour"
+
+  - id: "MINOR-4"
+    title: "TypeScript 'as unknown as' Casting"
+    severity: "MINOR"
+    fix_time: "2 hours"
+
+  - id: "MINOR-5"
+    title: "Missing JSDoc for Complex Functions"
+    severity: "MINOR"
+    fix_time: "2 hours"
+
+# ACCEPTANCE CRITERIA COVERAGE
+ac_coverage:
+  total: 19
+  passing: 14
+  failing: 5
+  percentage: 73
+
+ac_status:
+  - id: "AC-11.01"
+    status: "PASS"
+    description: "MIN ingredient shelf life rule"
+
+  - id: "AC-11.02"
+    status: "CRITICAL-2"
+    description: "Safety buffer application"
+
+  - id: "AC-11.03"
+    status: "PASS"
+    description: "Processing impact reduction"
+
+  - id: "AC-11.04"
+    status: "CRITICAL-1"
+    description: "Error when no active BOM"
+
+  - id: "AC-11.05"
+    status: "PASS"
+    description: "Error for missing ingredient"
+
+  - id: "AC-11.06"
+    status: "PASS"
+    description: "Manual override with reason"
+
+  - id: "AC-11.07"
+    status: "PASS"
+    description: "Override reason required"
+
+  - id: "AC-11.08"
+    status: "PASS"
+    description: "Warning for override exceeding"
+
+  - id: "AC-11.09"
+    status: "MAJOR-2"
+    description: "Audit log captures changes"
+
+  - id: "AC-11.10"
+    status: "PASS"
+    description: "Best Before fixed mode"
+
+  - id: "AC-11.11"
+    status: "MAJOR-4"
+    description: "Best Before rolling mode"
+
+  - id: "AC-11.12"
+    status: "PASS"
+    description: "Storage temp validation"
+
+  - id: "AC-11.13"
+    status: "PASS"
+    description: "FEFO block enforcement"
+
+  - id: "AC-11.14"
+    status: "PASS"
+    description: "FEFO suggest enforcement"
+
+  - id: "AC-11.15"
+    status: "PASS"
+    description: "FEFO warn enforcement"
+
+  - id: "AC-11.16"
+    status: "CRITICAL-1"
+    description: "Recalc trigger on ingredient"
+
+  - id: "AC-11.17"
+    status: "MAJOR-3"
+    description: "Bulk recalculation"
+
+  - id: "AC-11.18"
+    status: "PASS"
+    description: "Multi-tenancy org isolation"
+
+  - id: "AC-11.19"
+    status: "MAJOR-1"
+    description: "404 for cross-org (not 403)"
+
+# TEST RESULTS
+tests:
+  total: 340
+  passing: 340
+  failing: 0
+  coverage_percent: 90
+  status: "EXCELLENT"
+
+test_breakdown:
+  validation: 110
+  service: 93
+  api_routes: 97
+  database_rls: 40
+
+# FILES REVIEWED
+files_reviewed:
+  database:
+    - "supabase/migrations/052_extend_product_shelf_life.sql"
+    - "supabase/migrations/053_create_shelf_life_audit_log.sql"
+    - "supabase/migrations/054_shelf_life_recalc_trigger.sql"
+
+  services:
+    - "apps/frontend/lib/services/shelf-life-service.ts"
+    - "apps/frontend/lib/types/shelf-life.ts"
+    - "apps/frontend/lib/validation/shelf-life-schemas.ts"
+
+  api_routes:
+    - "apps/frontend/app/api/technical/shelf-life/products/[id]/route.ts"
+    - "apps/frontend/app/api/technical/shelf-life/products/[id]/calculate/route.ts"
+    - "apps/frontend/app/api/technical/shelf-life/bulk-recalculate/route.ts"
+    # 3 more routes not fully reviewed (audited structure only)
+
+  total_files: 12
+  lines_of_code: 3500
+
+# POSITIVE FEEDBACK
+strengths:
+  - "Excellent test coverage (340 tests, all passing)"
+  - "Strong Zod validation schemas with comprehensive refinements"
+  - "Clean service layer architecture with separation of concerns"
+  - "Consistent ADR-013 RLS pattern implementation"
+  - "Proper auth and role-based access control"
+  - "Good audit logging foundation"
+  - "Efficient database queries (no N+1)"
+  - "Well-structured migrations"
+
+# REQUIRED FIXES (BLOCKING APPROVAL)
+required_fixes:
+  - fix: "CRITICAL-1: Fix trigger case sensitivity"
+    files:
+      - "supabase/migrations/054_shelf_life_recalc_trigger.sql:30"
+      - "apps/frontend/lib/services/shelf-life-service.ts:134,694"
+    change: "Replace 'Active' with 'active'"
+    estimated_time: "1 hour"
+
+  - fix: "CRITICAL-2: Fix final_days calculation logic"
+    files:
+      - "apps/frontend/lib/services/shelf-life-service.ts:771-773"
+    change: "Update to check override_days first"
+    estimated_time: "2 hours"
+
+# RECOMMENDED FIXES (NON-BLOCKING)
+recommended_fixes:
+  - "MAJOR-1: Add explicit 404/403 enforcement (2 hours)"
+  - "MAJOR-2: Add audit log sanitization (3 hours)"
+  - "MAJOR-3: Add optimistic locking to bulk ops (4 hours)"
+  - "MAJOR-4: Add date validation to Best Before calc (2 hours)"
+  - "MAJOR-5: Add missing audit log indexes (30 min)"
+
+# OPTIONAL IMPROVEMENTS
+optional_improvements:
+  - "MINOR-1: Fix type inconsistency (15 min)"
+  - "MINOR-2: Extract magic numbers to constants (30 min)"
+  - "MINOR-3: Add request IDs to errors (1 hour)"
+  - "MINOR-4: Replace type assertions with generated types (2 hours)"
+  - "MINOR-5: Add JSDoc to all functions (2 hours)"
+
+# HANDOFF INFORMATION
+handoff:
+  to: "DEV"
+  priority: "P0"
+  estimated_fix_time: "3-4 hours"
+  next_reviewer: "CODE-REVIEWER"
+  next_action: "Fix CRITICAL issues → Re-submit for review"
+
+  blockers:
+    - "CRITICAL-1: Recalculation trigger broken (will never fire)"
+    - "CRITICAL-2: Shelf life calculation incorrect with overrides"
+
+  success_criteria:
+    - "Both CRITICAL issues fixed"
+    - "All 340 tests still passing"
+    - "Manual test of trigger (update ingredient shelf life)"
+    - "Manual test of override calculation"
+
+# METADATA
+review_metadata:
+  reviewer: "CODE-REVIEWER"
+  review_type: "Comprehensive (Security, Quality, Business Logic)"
+  review_date: "2025-12-28"
+  review_duration: "Full comprehensive review"
+  story_phase: "GREEN (Implementation Complete)"
+  next_phase: "Fix Critical Issues → Re-Review → QA"
+
+# DECISION CRITERIA MET
+decision_criteria:
+  all_ac_implemented: false  # 14/19 = 73%
+  tests_pass: true  # 340/340
+  no_critical_security: false  # 2 CRITICAL issues
+  no_blocking_quality: false  # CRITICAL issues present
+
+decision_result: "REQUEST_CHANGES"
+
+# NOTES
+notes: |
+  The implementation is 85% complete with strong test coverage and good
+  architecture, but has 2 critical bugs that will break core functionality:
+
+  1. Recalculation trigger will never fire (wrong BOM status value)
+  2. Final days calculation doesn't properly handle override scenarios
+
+  These are quick fixes (estimated 3 hours total) and once resolved,
+  the code will be ready for QA testing.
+
+  Recommendation: Fix CRITICAL-1 and CRITICAL-2, then re-submit for review.
+
+  Overall assessment: Good quality work with fixable issues. Not far from approval.

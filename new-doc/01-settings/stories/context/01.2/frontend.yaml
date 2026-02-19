@@ -1,0 +1,319 @@
+# Story 01.2 - Frontend Specification (PRIMARY)
+# Purpose: Components, hooks, pages, UX patterns
+# Agent: FRONTEND-DEV
+
+# Note: This is the PRIMARY specification for this frontend story.
+is_frontend_focused: true
+
+# Pages to Create
+pages:
+  - path: "apps/frontend/app/(authenticated)/settings/page.tsx"
+    description: "Settings landing/dashboard page"
+    pattern: |
+      'use client';
+
+      import { SettingsLayout } from '@/components/settings/SettingsLayout';
+
+      export default function SettingsPage() {
+        return (
+          <div className="space-y-6">
+            <div>
+              <h1 className="text-2xl font-bold">Settings</h1>
+              <p className="text-muted-foreground">
+                Manage your organization settings and preferences.
+              </p>
+            </div>
+            {/* Dashboard content or redirect to first section */}
+          </div>
+        );
+      }
+
+  - path: "apps/frontend/app/(authenticated)/settings/layout.tsx"
+    description: "Settings module layout with navigation sidebar"
+    pattern: |
+      import { SettingsNav } from '@/components/settings/SettingsNav';
+
+      export default function SettingsLayout({
+        children,
+      }: {
+        children: React.ReactNode;
+      }) {
+        return (
+          <div className="flex h-full">
+            <SettingsNav />
+            <main className="flex-1 overflow-auto p-6">
+              {children}
+            </main>
+          </div>
+        );
+      }
+
+# Components to Create
+components:
+  - path: "apps/frontend/components/settings/SettingsLayout.tsx"
+    description: "Settings shell layout component with consistent styling"
+    props:
+      - "children: React.ReactNode"
+      - "title?: string"
+      - "description?: string"
+
+  - path: "apps/frontend/components/settings/SettingsNav.tsx"
+    description: "Navigation sidebar with section groupings"
+    props: []
+    features:
+      - "Vertical sidebar with icons and section headers"
+      - "Collapsible sections"
+      - "Active state highlighting"
+      - "Permission-based filtering"
+      - "Module toggle filtering"
+      - "Mobile responsive (Sheet component)"
+    pattern: |
+      'use client';
+
+      import { useOrgContext } from '@/lib/hooks/use-org-context';
+      import { buildSettingsNavigation } from '@/lib/services/settings-navigation-service';
+      import { SettingsNavItem } from './SettingsNavItem';
+      import { Skeleton } from '@/components/ui/skeleton';
+
+      export function SettingsNav() {
+        const { data: context, isLoading } = useOrgContext();
+
+        if (isLoading) {
+          return <SettingsNavSkeleton />;
+        }
+
+        if (!context) {
+          return null;
+        }
+
+        const navigation = buildSettingsNavigation(context);
+
+        return (
+          <nav className="w-64 border-r bg-muted/10 p-4">
+            {navigation.map((section) => (
+              <div key={section.section} className="mb-6">
+                <h3 className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
+                  {section.section}
+                </h3>
+                <div className="space-y-1">
+                  {section.items.map((item) => (
+                    <SettingsNavItem key={item.path} item={item} />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </nav>
+        );
+      }
+
+  - path: "apps/frontend/components/settings/SettingsNavItem.tsx"
+    description: "Individual navigation item with role/permission handling"
+    props:
+      - "item: NavigationItem"
+    features:
+      - "Active state based on current path"
+      - "Disabled state for unimplemented routes"
+      - "Icon + label layout"
+    pattern: |
+      'use client';
+
+      import Link from 'next/link';
+      import { usePathname } from 'next/navigation';
+      import { cn } from '@/lib/utils';
+      import { NavigationItem } from '@/lib/services/settings-navigation-service';
+
+      interface Props {
+        item: NavigationItem;
+      }
+
+      export function SettingsNavItem({ item }: Props) {
+        const pathname = usePathname();
+        const isActive = pathname === item.path;
+        const Icon = item.icon;
+
+        if (!item.implemented) {
+          return (
+            <div className="flex items-center gap-3 px-3 py-2 text-sm text-muted-foreground cursor-not-allowed opacity-50">
+              <Icon className="h-4 w-4" />
+              <span>{item.name}</span>
+              <span className="ml-auto text-xs">Soon</span>
+            </div>
+          );
+        }
+
+        return (
+          <Link
+            href={item.path}
+            className={cn(
+              'flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors',
+              isActive
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+            )}
+          >
+            <Icon className="h-4 w-4" />
+            <span>{item.name}</span>
+          </Link>
+        );
+      }
+
+  - path: "apps/frontend/components/settings/SettingsEmptyState.tsx"
+    description: "Coming soon state for unimplemented routes"
+    props:
+      - "title: string"
+      - "description?: string"
+    pattern: |
+      import { Construction } from 'lucide-react';
+
+      interface Props {
+        title: string;
+        description?: string;
+      }
+
+      export function SettingsEmptyState({ title, description }: Props) {
+        return (
+          <div className="flex flex-col items-center justify-center h-[400px] text-center">
+            <Construction className="h-12 w-12 text-muted-foreground mb-4" />
+            <h2 className="text-xl font-semibold mb-2">{title}</h2>
+            <p className="text-muted-foreground max-w-md">
+              {description || 'This feature is coming soon. Check back later!'}
+            </p>
+          </div>
+        );
+      }
+
+# Hooks to Create
+hooks:
+  - path: "apps/frontend/lib/hooks/useSettingsGuard.ts"
+    description: "Reusable guard hook for role checks"
+    exports:
+      - name: "useSettingsGuard"
+        params:
+          - "requiredRole?: RoleCode | RoleCode[]"
+        returns: "{ allowed: boolean; loading: boolean; role: RoleCode | null }"
+    pattern: |
+      import { useMemo } from 'react';
+      import { useOrgContext } from './use-org-context';
+      import { RoleCode } from '@/lib/types/user';
+
+      export function useSettingsGuard(requiredRole?: RoleCode | RoleCode[]) {
+        const { data: context, isLoading } = useOrgContext();
+
+        const allowed = useMemo(() => {
+          if (!context) return false;
+          if (!requiredRole) return true;
+          const roles = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
+          return roles.includes(context.role as RoleCode);
+        }, [context, requiredRole]);
+
+        return {
+          allowed,
+          loading: isLoading,
+          role: context?.role as RoleCode | null,
+        };
+      }
+
+  - path: "apps/frontend/lib/hooks/useSettingsPermissions.ts"
+    description: "Hook to get user's settings permissions"
+    exports:
+      - name: "useSettingsPermissions"
+        returns: "{ canRead: boolean; canWrite: boolean; canDelete: boolean }"
+    pattern: |
+      import { useMemo } from 'react';
+      import { useOrgContext } from './use-org-context';
+      import { hasPermission } from '@/lib/services/permission-service';
+
+      export function useSettingsPermissions() {
+        const { data: context, isLoading } = useOrgContext();
+
+        return useMemo(() => {
+          if (!context) {
+            return { canRead: false, canWrite: false, canDelete: false, loading: isLoading };
+          }
+          return {
+            canRead: hasPermission(context, 'settings', 'R'),
+            canWrite: hasPermission(context, 'settings', 'U') || hasPermission(context, 'settings', 'C'),
+            canDelete: hasPermission(context, 'settings', 'D'),
+            loading: isLoading,
+          };
+        }, [context, isLoading]);
+      }
+
+# UX Specification
+ux:
+  wireframes:
+    - id: "COMP-001"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/COMP-001-settings-navigation-sidebar.md"
+      description: "Settings navigation sidebar component specification"
+      components:
+        - "SettingsNav"
+        - "SettingsNavItem"
+        - "SettingsNavSkeleton"
+    - id: "COMP-002"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/COMP-002-settings-empty-state.md"
+      description: "Settings empty/coming soon state component"
+      components:
+        - "SettingsEmptyState"
+    - id: "COMP-003"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/COMP-003-settings-layout.md"
+      description: "Settings shell layout component specification"
+      components:
+        - "SettingsLayout"
+
+  navigation_sections:
+    - section: "Organization"
+      items:
+        - { name: "Organization Profile", path: "/settings/organization", roles: ["SUPER_ADMIN", "ADMIN"] }
+    - section: "Users & Roles"
+      items:
+        - { name: "Users", path: "/settings/users", roles: ["SUPER_ADMIN", "ADMIN"] }
+        - { name: "Roles & Permissions", path: "/settings/roles", roles: ["SUPER_ADMIN", "ADMIN"] }
+        - { name: "Invitations", path: "/settings/invitations", roles: ["SUPER_ADMIN", "ADMIN"] }
+    - section: "Infrastructure"
+      items:
+        - { name: "Warehouses", path: "/settings/warehouses", roles: ["SUPER_ADMIN", "ADMIN", "WAREHOUSE_MANAGER"] }
+        - { name: "Machines", path: "/settings/machines", roles: ["SUPER_ADMIN", "ADMIN", "PRODUCTION_MANAGER"] }
+        - { name: "Production Lines", path: "/settings/production-lines", roles: ["SUPER_ADMIN", "ADMIN", "PRODUCTION_MANAGER"] }
+    - section: "Master Data"
+      items:
+        - { name: "Allergens", path: "/settings/allergens", roles: ["SUPER_ADMIN", "ADMIN", "QUALITY_MANAGER"] }
+        - { name: "Tax Codes", path: "/settings/tax-codes", roles: ["SUPER_ADMIN", "ADMIN"] }
+    - section: "Integrations"
+      items:
+        - { name: "API Keys", path: "/settings/api-keys", roles: ["SUPER_ADMIN", "ADMIN"] }
+        - { name: "Webhooks", path: "/settings/webhooks", roles: ["SUPER_ADMIN", "ADMIN"] }
+    - section: "System"
+      items:
+        - { name: "Modules", path: "/settings/modules", roles: ["SUPER_ADMIN", "ADMIN"] }
+        - { name: "Security", path: "/settings/security", roles: ["SUPER_ADMIN", "ADMIN"] }
+        - { name: "Audit Logs", path: "/settings/audit-logs", roles: ["SUPER_ADMIN", "ADMIN"] }
+
+  patterns:
+    layout: "ShadCN sidebar layout with collapsible sections"
+    navigation: "Vertical sidebar with icons and section headers"
+    guard: "Client-side redirect with loading state, server-side API protection"
+
+  states:
+    - name: "loading"
+      description: "Skeleton loader while permissions load"
+      component: "SettingsNavSkeleton"
+    - name: "error"
+      description: "Error state with retry button"
+      component: "SettingsErrorState"
+    - name: "empty"
+      description: "'Coming soon' for unimplemented routes"
+      component: "SettingsEmptyState"
+    - name: "success"
+      description: "Normal content display"
+
+  behavior:
+    - "Navigation items hidden for users without permission"
+    - "Disabled modules hide their related navigation items"
+    - "Clicking unimplemented route shows 'Coming Soon' state"
+    - "Role change reflects immediately on navigation"
+
+# Validation Rules
+validation_rules:
+  route_access: "User must have role with module permission"
+  admin_routes: "SUPER_ADMIN or ADMIN role required for org/user management"
+  redirect_on_denied: "Redirect to dashboard with toast message"

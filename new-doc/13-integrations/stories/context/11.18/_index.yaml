@@ -1,0 +1,77 @@
+# Story 11.18 - Index File (Entry Point)
+# Generated: 2026-01-15
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "11.18"
+  name: "API Marketplace & Bi-directional Webhooks"
+  slug: "api-marketplace-bidirectional-webhooks"
+  epic: "11-integrations"
+  phase: "3"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "fullstack"
+  state: "ready"
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["organizations"]
+    - story: "11.2"
+      name: "API Keys Management"
+      provides: ["API key authentication patterns"]
+      status: "ready"
+    - story: "11.3"
+      name: "Integration Logs"
+      provides: ["integration_logs table"]
+      status: "ready"
+    - story: "11.4"
+      name: "Webhook Configuration"
+      provides: ["Webhook patterns (outbound)"]
+      status: "ready"
+  blocks: []
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/integrations.md"
+    sections: ["FR-INT-029", "FR-INT-030"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/11-integrations/11.18.api-marketplace-bidirectional-webhooks.md"
+  patterns:
+    - "docs/2-MANAGEMENT/epics/current/11-integrations/11.2.api-keys-management-scopes.md"
+    - "docs/2-MANAGEMENT/epics/current/11-integrations/11.4.webhook-configuration-events.md"
+
+# High-level deliverables
+deliverables:
+  - type: "database"
+    count: 2
+    description: "inbound_webhooks, inbound_webhook_logs tables"
+  - type: "service"
+    count: 1
+    description: "inbound-webhook-handlers.ts (handler registry, HMAC verification)"
+  - type: "api"
+    count: 5
+    description: "Webhook receiver, marketplace directory, OpenAPI spec, inbound webhook CRUD, logs"
+  - type: "frontend"
+    count: 7
+    description: "Marketplace landing, API directory, Swagger UI, inbound webhook config, logs"
+  - type: "utils"
+    count: 2
+    description: "HMAC verification, OpenAPI spec generator"
+  - type: "test"
+    count: 5
+    description: "Unit (HMAC, handlers) + integration + E2E"
+
+# Technical notes
+technical_notes:
+  - "Public API marketplace (developer portal, no auth)"
+  - "Interactive API explorer (Swagger UI with OpenAPI 3.0 spec)"
+  - "Inbound webhooks: POST /api/webhooks/inbound/:webhook_id"
+  - "HMAC-SHA256 signature verification for webhook auth"
+  - "Handler registry: inventory_update, order_status, custom"
+  - "Webhook logs with full audit trail (request, response, processing)"
+  - "IP whitelist support for webhook security"
+  - "Rate limiting on public webhook endpoint"

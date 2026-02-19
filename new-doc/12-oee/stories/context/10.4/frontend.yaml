@@ -1,0 +1,63 @@
+# Story 10.4 - Frontend Specification
+# OEE Calculation Engine
+
+types:
+  - path: "apps/frontend/lib/types/oee-calculation.ts"
+    exports: ["OEESnapshot", "OEECalculationParams", "OEEMetrics", "CalculationMethod"]
+
+components:
+  - path: "apps/frontend/components/oee/OEEMetricsCard.tsx"
+    description: "Display OEE metrics with visual gauges"
+    props:
+      - { name: "metrics", type: "OEEMetrics", required: true }
+      - { name: "target", type: "PerformanceTarget | undefined", required: false }
+      - { name: "showBreakdown", type: "boolean", default: true }
+    displays:
+      - "OEE gauge (circular progress)"
+      - "Availability/Performance/Quality breakdown"
+      - "Target comparison (if provided)"
+      - "Color coding: green (>target), yellow (warning), red (critical)"
+
+  - path: "apps/frontend/components/oee/OEEGauge.tsx"
+    description: "Circular gauge for OEE percentage"
+    props:
+      - { name: "value", type: "number", required: true }
+      - { name: "target", type: "number | undefined" }
+      - { name: "size", type: "'sm' | 'md' | 'lg'", default: "md" }
+    features:
+      - "Animated fill"
+      - "Color coding based on target thresholds"
+      - "Percentage label in center"
+
+  - path: "apps/frontend/components/oee/OEEBreakdownChart.tsx"
+    description: "Bar/stacked chart showing availability, performance, quality"
+    library: "Recharts"
+    chartType: "Stacked bar chart"
+
+hooks:
+  - name: "useOEECalculation"
+    type: "query"
+    params: ["params: OEECalculationParams"]
+    queryKey: "['oee-calculation', params]"
+
+  - name: "useOEESnapshots"
+    type: "query"
+    params: ["filters"]
+    queryKey: "['oee-snapshots', filters]"
+
+  - name: "useCreateSnapshot"
+    type: "mutation"
+    invalidates: "['oee-snapshots']"
+
+ux:
+  wireframes:
+    - id: "OEE-CALC-001"
+      title: "OEE Metrics Display"
+      components: ["OEEMetricsCard", "OEEGauge", "OEEBreakdownChart"]
+  patterns:
+    gauge: "Circular progress indicator (Recharts RadialBarChart)"
+    chart: "Stacked bar chart for component breakdown"
+
+integration:
+  - description: "OEE metrics used by story 10.5 (Real-Time Dashboard)"
+  - description: "Snapshots created by cron job every 5 minutes (background job)"

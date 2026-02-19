@@ -1,0 +1,185 @@
+# Story 06.10 - In-Process Inspection: Frontend Components & Pages
+# Generated: 2025-12-18
+
+frontend:
+  pages:
+    page_001:
+      path: "/quality/inspections/in-process"
+      name: "In-Process Inspection Queue"
+      description: "Main list view for in-process inspections with WO/operation filters"
+      component: "InProcessInspectionsPage"
+      features:
+        - "Search by WO number or product name (debounced 300ms)"
+        - "Filter by status (scheduled, in_progress, completed)"
+        - "Filter by priority (low, normal, high, urgent)"
+        - "Filter by operation, product, date range"
+        - "Sort by inspection number, scheduled date, created date, priority"
+        - "Pagination (20 per page, configurable)"
+        - "Quick filter buttons for common searches"
+        - "DataTable with row actions"
+        - "Create new inspection button"
+
+    page_002:
+      path: "/quality/inspections/wo/[woId]"
+      name: "WO Inspections List"
+      description: "All inspections for a specific work order grouped by operation"
+      component: "WOInspectionsPage"
+      features:
+        - "WO summary card (WO number, status, product, batch)"
+        - "Overall WO quality status card"
+        - "Inspections grouped by operation sequence"
+        - "Operation timeline with QA status badges"
+
+    page_003:
+      path: "/quality/inspections/[id]"
+      name: "In-Process Inspection Detail"
+      description: "Detailed view of single inspection with WO context and test results"
+      component: "InProcessInspectionDetailPage"
+      features:
+        - "Header with inspection #, status badge, priority badge"
+        - "WO Context Panel: WO number, status, product, batch"
+        - "Operation Context Panel: sequence, name, machine, duration, operator, QA status"
+        - "Specification Info: name, version, link to spec detail"
+        - "Test Results Grid (from story 06.6)"
+        - "Timing: scheduled, started, completed dates"
+        - "Inspector Assignment Info"
+        - "Result Determination: pass/fail/conditional with notes"
+
+  components:
+    component_001:
+      name: "InProcessInspectionDataTable"
+      type: "Data Display"
+      extends: "ShadCN DataTable"
+      columns:
+        - Inspection #: "Link to detail page"
+        - Work Order: "WO number (link to WO detail)"
+        - Operation: "Operation sequence + name"
+        - Product: "Product name"
+        - Batch: "Batch number"
+        - Status: "Badge (scheduled/in_progress/completed)"
+        - Priority: "Badge with color"
+        - Inspector: "User name or 'Unassigned'"
+        - Actions: "Row menu with inline actions"
+
+    component_002:
+      name: "InProcessFilters"
+      type: "Filter Panel"
+      fields:
+        - search_input: "Text input with debounce"
+        - status_select: "Multi-select or dropdown"
+        - priority_select: "Multi-select or dropdown"
+        - operation_select: "Dropdown or searchable select"
+        - product_select: "Searchable select"
+        - date_range: "Date picker range"
+
+    component_003:
+      name: "WOContextPanel"
+      type: "Context Display"
+      sections:
+        - WO Info:
+            - WO Number (link)
+            - Status badge
+            - Product name
+            - Batch number
+        - Operation Info:
+            - Sequence
+            - Name
+            - Machine (if assigned)
+            - Started at
+            - Completed at
+            - Operator name
+            - Duration
+
+    component_004:
+      name: "OperationQATimeline"
+      type: "Timeline Display"
+      features:
+        - "Vertical timeline of all WO operations"
+        - "Each operation shows: sequence, name, QA status badge"
+        - "Current inspection highlighted"
+        - "Clickable to navigate to operation inspection"
+
+    component_005:
+      name: "OperationQABadge"
+      type: "Status Badge"
+      displays:
+        - pending: "yellow 'QA Pending'"
+        - passed: "green with checkmark 'Passed'"
+        - failed: "red with X 'Failed'"
+        - conditional: "orange 'Conditional'"
+
+    component_006:
+      name: "CreateInProcessModal"
+      type: "Modal/Dialog"
+      fields:
+        - wo_select: "Searchable select (pre-filled if from WO context)"
+        - operation_select: "Searchable select (populated based on WO)"
+        - product: "Auto-filled from WO (read-only)"
+        - batch_number: "Auto-filled from WO (read-only)"
+        - spec_select: "Optional searchable select"
+        - priority_select: "Low/Normal/High/Urgent"
+        - scheduled_date: "Date picker (optional)"
+        - inspector_select: "Searchable select of QA users (optional)"
+        - notes: "Text area (max 2000 chars)"
+
+  hooks:
+    hook_001:
+      name: "useInProcessInspections"
+      returns: "{ data, isLoading, error, refetch, filters, setFilters }"
+      description: "Fetch in-process inspections with filters and pagination"
+      uses_api: "GET /api/quality/inspections/in-process"
+
+    hook_002:
+      name: "useWOInspections"
+      params: "woId: string"
+      returns: "{ wo, inspections, summary, isLoading, error }"
+      description: "Fetch all inspections for a specific WO"
+
+    hook_003:
+      name: "useInspectionDetail"
+      params: "inspectionId: string"
+      returns: "{ inspection, wo, operation, isLoading, error, refetch }"
+      description: "Fetch single inspection with full context"
+
+  types:
+    type_001:
+      name: "InProcessInspection"
+      extends: "QualityInspection"
+      fields:
+        - wo_id: "UUID"
+        - wo_operation_id: "UUID"
+        - operation_sequence: "number"
+        - operation_name: "string"
+        - machine_name?: "string"
+        - operator_name?: "string"
+        - wo_number: "string"
+        - wo_status: "string"
+
+  ux_patterns:
+    pattern_1:
+      name: "WO Context Integration"
+      description: "Always show WO context on inspection detail page for quick navigation"
+
+    pattern_2:
+      name: "Operation Timeline"
+      description: "Visual timeline showing progress through WO operations"
+
+    pattern_3:
+      name: "Result Impact Preview"
+      description: "Show user impact of their pass/fail decision before confirming"
+
+    pattern_4:
+      name: "Auto-fill from WO"
+      description: "Reduce data entry by auto-filling product and batch from WO"
+
+  performance:
+    - "Pagination limits DataTable to 20 rows per page"
+    - "Debounced search (300ms)"
+    - "React Query caching with 30-second stale time"
+    - "Lazy load test results (story 06.6) if table is large"
+
+  states_and_errors:
+    loading: "Skeleton loaders for DataTable and detail view"
+    empty: "Helpful message explaining how to create first inspection"
+    error: "Toast notification with error message and retry button"
+    success: "Toast notification: 'Inspection created/started/completed'"

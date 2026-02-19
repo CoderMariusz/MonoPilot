@@ -1,0 +1,590 @@
+# Story 02.3 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  # Read-only allergens list (for dropdowns)
+  - method: "GET"
+    path: "/api/v1/allergens"
+    description: "List all allergens for dropdowns (EU 14 from Settings)"
+    file: "apps/frontend/app/api/v1/allergens/route.ts"
+    auth: "required"
+    roles: ["*"]  # All authenticated users
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      query_params:
+        lang: "string (optional) - Language preference: en|pl|de|fr"
+
+    response:
+      status: 200
+      type: "AllergensListResponse"
+      schema:
+        allergens:
+          type: "array"
+          items:
+            type: "Allergen"
+            fields:
+              id: "string (UUID)"
+              code: "string (A01-A14)"
+              name_en: "string"
+              name_pl: "string"
+              name_de: "string | null"
+              name_fr: "string | null"
+              icon_url: "string | null"
+              is_eu_mandatory: "boolean"
+              display_order: "number"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token provided"
+
+  # Get product allergens
+  - method: "GET"
+    path: "/api/v1/technical/products/:id/allergens"
+    description: "List all allergen declarations for a product"
+    file: "apps/frontend/app/api/v1/technical/products/[id]/allergens/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      path_params:
+        id: "string (UUID) - Product ID"
+
+    response:
+      status: 200
+      type: "ProductAllergensResponse"
+      schema:
+        allergens:
+          type: "array"
+          items:
+            type: "ProductAllergen"
+            fields:
+              id: "string (UUID)"
+              allergen_id: "string (UUID)"
+              allergen_code: "string (A01-A14)"
+              allergen_name: "string"
+              allergen_icon: "string | null"
+              relation_type: "contains | may_contain"
+              source: "auto | manual"
+              source_products: "array (for auto-inherited)"
+              reason: "string | null (for may_contain)"
+              created_at: "string (ISO datetime)"
+              created_by: "string (UUID)"
+        inheritance_status:
+          type: "object"
+          fields:
+            last_calculated: "string | null (ISO datetime)"
+            bom_version: "string | null"
+            ingredients_count: "number"
+            needs_recalculation: "boolean"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 404
+        code: "PRODUCT_NOT_FOUND"
+        message: "Product not found"
+        when: "Product ID invalid or belongs to different org"
+
+  # Add allergen to product
+  - method: "POST"
+    path: "/api/v1/technical/products/:id/allergens"
+    description: "Add allergen declaration to product (manual)"
+    file: "apps/frontend/app/api/v1/technical/products/[id]/allergens/route.ts"
+    auth: "required"
+    roles: ["SUPER_ADMIN", "ADMIN", "PRODUCTION_MANAGER", "PLANNER"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      path_params:
+        id: "string (UUID) - Product ID"
+      body:
+        type: "AddProductAllergenRequest"
+        schema:
+          allergen_id: "string (UUID) - REQUIRED"
+          relation_type: "string (contains|may_contain) - REQUIRED"
+          reason: "string (10-500 chars) - REQUIRED if relation_type=may_contain"
+
+    response:
+      status: 201
+      type: "ProductAllergen"
+      schema:
+        id: "string (UUID)"
+        allergen_id: "string (UUID)"
+        allergen_code: "string"
+        allergen_name: "string"
+        relation_type: "string"
+        source: "manual"
+        reason: "string | null"
+        created_at: "string"
+        created_by: "string"
+
+    errors:
+      - status: 400
+        code: "VALIDATION_ERROR"
+        message: "reason is required for may_contain declarations"
+        when: "relation_type=may_contain and reason missing or <10 chars"
+      - status: 400
+        code: "INVALID_ALLERGEN"
+        message: "Allergen not found"
+        when: "allergen_id does not exist"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Insufficient permissions"
+        when: "User role does not allow write operations"
+      - status: 404
+        code: "PRODUCT_NOT_FOUND"
+        message: "Product not found"
+      - status: 409
+        code: "DUPLICATE_DECLARATION"
+        message: "Allergen already declared with this relation type"
+        when: "Same allergen+relation_type already exists"
+
+  # Remove allergen from product
+  - method: "DELETE"
+    path: "/api/v1/technical/products/:id/allergens/:allergenId"
+    description: "Remove allergen declaration from product"
+    file: "apps/frontend/app/api/v1/technical/products/[id]/allergens/[allergenId]/route.ts"
+    auth: "required"
+    roles: ["SUPER_ADMIN", "ADMIN", "PRODUCTION_MANAGER", "PLANNER"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      path_params:
+        id: "string (UUID) - Product ID"
+        allergenId: "string (UUID) - ProductAllergen record ID"
+      query_params:
+        relation_type: "string (optional) - contains|may_contain to specify which to delete"
+
+    response:
+      status: 204
+      description: "No content - deletion successful"
+
+    errors:
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Insufficient permissions"
+      - status: 404
+        code: "NOT_FOUND"
+        message: "Allergen declaration not found"
+
+  # Recalculate allergen inheritance from BOM
+  - method: "POST"
+    path: "/api/v1/technical/boms/:id/allergens"
+    description: "Recalculate allergen inheritance from BOM ingredients"
+    file: "apps/frontend/app/api/v1/technical/boms/[id]/allergens/route.ts"
+    auth: "required"
+    roles: ["SUPER_ADMIN", "ADMIN", "PRODUCTION_MANAGER", "PLANNER"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      path_params:
+        id: "string (UUID) - BOM ID"
+
+    response:
+      status: 200
+      type: "RecalculateAllergensResponse"
+      schema:
+        inherited_allergens:
+          type: "array"
+          items:
+            type: "ProductAllergen"
+            description: "Auto-inherited allergens from BOM ingredients"
+        manual_allergens:
+          type: "array"
+          items:
+            type: "ProductAllergen"
+            description: "Manual allergens preserved (not overwritten)"
+        removed_count: "number - Count of stale auto-inherited allergens removed"
+        bom_version: "string - BOM version used for calculation"
+
+    errors:
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Insufficient permissions"
+      - status: 404
+        code: "BOM_NOT_FOUND"
+        message: "BOM not found"
+      - status: 422
+        code: "INCOMPLETE_INGREDIENT_DATA"
+        message: "Some BOM ingredients have no allergen declarations"
+        details:
+          missing_allergens: "array of product IDs without allergen data"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/product-allergen-service.ts"
+    description: "Product allergen CRUD and inheritance"
+    exports:
+      - name: "ProductAllergenService"
+        type: "class"
+        methods:
+          - name: "getProductAllergens"
+            params: ["productId: string"]
+            returns: "Promise<ProductAllergensResponse>"
+          - name: "addProductAllergen"
+            params: ["productId: string", "data: AddProductAllergenRequest"]
+            returns: "Promise<ProductAllergen>"
+          - name: "removeProductAllergen"
+            params: ["productId: string", "allergenId: string", "relationType?: string"]
+            returns: "Promise<void>"
+          - name: "recalculateAllergens"
+            params: ["bomId: string"]
+            returns: "Promise<RecalculateAllergensResponse>"
+          - name: "getInheritanceStatus"
+            params: ["productId: string"]
+            returns: "Promise<InheritanceStatus>"
+
+  - path: "apps/frontend/lib/services/allergen-service.ts"
+    description: "Allergen master data service (extended from 01.12)"
+    note: "May already exist from story 01.12 - extend if needed"
+    exports:
+      - name: "AllergenService"
+        type: "class"
+        methods:
+          - name: "getAllergens"
+            params: ["params?: AllergensListParams"]
+            returns: "Promise<AllergensListResponse>"
+          - name: "getAllergensForSelect"
+            params: ["lang?: string"]
+            returns: "Promise<AllergenSelectOption[]>"
+          - name: "getAllergenByCode"
+            params: ["code: string"]
+            returns: "Promise<Allergen | null>"
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/allergen.ts"
+    description: "Allergen TypeScript interfaces"
+    exports:
+      - "Allergen"
+      - "ProductAllergen"
+      - "ProductAllergensResponse"
+      - "AddProductAllergenRequest"
+      - "RecalculateAllergensResponse"
+      - "InheritanceStatus"
+      - "AllergenSelectOption"
+    content: |
+      export interface Allergen {
+        id: string;
+        code: string;
+        name_en: string;
+        name_pl: string;
+        name_de: string | null;
+        name_fr: string | null;
+        icon_url: string | null;
+        is_eu_mandatory: boolean;
+        display_order: number;
+      }
+
+      export interface ProductAllergen {
+        id: string;
+        allergen_id: string;
+        allergen_code: string;
+        allergen_name: string;
+        allergen_icon: string | null;
+        relation_type: 'contains' | 'may_contain';
+        source: 'auto' | 'manual';
+        source_products?: { id: string; code: string; name: string }[];
+        reason?: string;
+        created_at: string;
+        created_by: string;
+      }
+
+      export interface ProductAllergensResponse {
+        allergens: ProductAllergen[];
+        inheritance_status: InheritanceStatus;
+      }
+
+      export interface InheritanceStatus {
+        last_calculated: string | null;
+        bom_version: string | null;
+        ingredients_count: number;
+        needs_recalculation: boolean;
+      }
+
+      export interface AddProductAllergenRequest {
+        allergen_id: string;
+        relation_type: 'contains' | 'may_contain';
+        reason?: string;
+      }
+
+      export interface RecalculateAllergensResponse {
+        inherited_allergens: ProductAllergen[];
+        manual_allergens: ProductAllergen[];
+        removed_count: number;
+        bom_version: string;
+      }
+
+      export interface AllergenSelectOption {
+        value: string;
+        label: string;
+        code: string;
+        icon_url: string | null;
+      }
+
+# Validation
+validation:
+  - path: "apps/frontend/lib/validation/product-allergen-schema.ts"
+    description: "Zod schemas for product allergen operations"
+    content: |
+      import { z } from 'zod';
+
+      export const addProductAllergenSchema = z.object({
+        allergen_id: z.string().uuid('Invalid allergen ID'),
+        relation_type: z.enum(['contains', 'may_contain'], {
+          required_error: 'Relation type is required',
+          invalid_type_error: 'Relation type must be contains or may_contain',
+        }),
+        reason: z.string()
+          .min(10, 'Reason must be at least 10 characters')
+          .max(500, 'Reason must not exceed 500 characters')
+          .optional(),
+      }).refine(
+        (data) => data.relation_type !== 'may_contain' || (data.reason && data.reason.length >= 10),
+        {
+          message: 'Reason is required for May Contain declarations (min 10 characters)',
+          path: ['reason'],
+        }
+      );
+
+      export const productAllergenResponseSchema = z.object({
+        id: z.string().uuid(),
+        allergen_id: z.string().uuid(),
+        allergen_code: z.string(),
+        allergen_name: z.string(),
+        allergen_icon: z.string().nullable(),
+        relation_type: z.enum(['contains', 'may_contain']),
+        source: z.enum(['auto', 'manual']),
+        source_products: z.array(z.object({
+          id: z.string().uuid(),
+          code: z.string(),
+          name: z.string(),
+        })).optional(),
+        reason: z.string().nullable().optional(),
+        created_at: z.string(),
+        created_by: z.string().uuid(),
+      });
+
+      export type AddProductAllergenInput = z.infer<typeof addProductAllergenSchema>;
+      export type ProductAllergenOutput = z.infer<typeof productAllergenResponseSchema>;
+
+# Implementation patterns
+patterns:
+  api_route_get: |
+    // apps/frontend/app/api/v1/technical/products/[id]/allergens/route.ts
+    import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+    import { cookies } from 'next/headers';
+    import { NextResponse } from 'next/server';
+
+    export async function GET(
+      request: Request,
+      { params }: { params: { id: string } }
+    ) {
+      const supabase = createRouteHandlerClient({ cookies });
+
+      // Check auth
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      // Get product allergens with allergen details
+      const { data: allergens, error } = await supabase
+        .from('product_allergens')
+        .select(`
+          id,
+          allergen_id,
+          relation_type,
+          source,
+          source_product_ids,
+          reason,
+          created_at,
+          created_by,
+          allergen:allergens(id, code, name_en, name_pl, icon_url)
+        `)
+        .eq('product_id', params.id)
+        .order('relation_type')
+        .order('created_at');
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          return NextResponse.json({ error: 'Product not found' }, { status: 404 });
+        }
+        throw error;
+      }
+
+      // Get inheritance status
+      const { data: bom } = await supabase
+        .from('boms')
+        .select('id, version, updated_at')
+        .eq('product_id', params.id)
+        .eq('status', 'active')
+        .single();
+
+      const inheritanceStatus = {
+        last_calculated: null,
+        bom_version: bom?.version ?? null,
+        ingredients_count: 0,
+        needs_recalculation: false,
+      };
+
+      return NextResponse.json({ allergens, inheritance_status: inheritanceStatus });
+    }
+
+  api_route_post: |
+    // POST handler for adding allergen
+    export async function POST(
+      request: Request,
+      { params }: { params: { id: string } }
+    ) {
+      const supabase = createRouteHandlerClient({ cookies });
+
+      // Auth check
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      // Permission check (require Technical write)
+      const { data: userData } = await supabase
+        .from('users')
+        .select('org_id, role:roles(permissions)')
+        .eq('id', user.id)
+        .single();
+
+      const techPerm = userData?.role?.permissions?.technical ?? '';
+      if (!techPerm.includes('C') && !techPerm.includes('U')) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+
+      // Parse and validate body
+      const body = await request.json();
+      const validated = addProductAllergenSchema.parse(body);
+
+      // Check for duplicate
+      const { data: existing } = await supabase
+        .from('product_allergens')
+        .select('id')
+        .eq('product_id', params.id)
+        .eq('allergen_id', validated.allergen_id)
+        .eq('relation_type', validated.relation_type)
+        .single();
+
+      if (existing) {
+        return NextResponse.json(
+          { error: 'Allergen already declared with this relation type' },
+          { status: 409 }
+        );
+      }
+
+      // Insert
+      const { data, error } = await supabase
+        .from('product_allergens')
+        .insert({
+          org_id: userData.org_id,
+          product_id: params.id,
+          allergen_id: validated.allergen_id,
+          relation_type: validated.relation_type,
+          source: 'manual',
+          reason: validated.reason,
+          created_by: user.id,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      return NextResponse.json(data, { status: 201 });
+    }
+
+  inheritance_algorithm: |
+    // Allergen inheritance from BOM
+    async function calculateAllergenInheritance(
+      supabase: SupabaseClient,
+      bomId: string,
+      productId: string,
+      orgId: string
+    ): Promise<RecalculateAllergensResponse> {
+      // 1. Get BOM items (ingredients)
+      const { data: bomItems } = await supabase
+        .from('bom_items')
+        .select('id, component_id, product:products(id, code, name)')
+        .eq('bom_id', bomId)
+        .eq('is_output', false);
+
+      // 2. For each ingredient, get allergens (contains only)
+      const inheritedAllergens = new Map<string, {
+        allergenId: string;
+        sourceProducts: { id: string; code: string; name: string }[];
+      }>();
+
+      for (const item of bomItems) {
+        const { data: ingredientAllergens } = await supabase
+          .from('product_allergens')
+          .select('allergen_id')
+          .eq('product_id', item.component_id)
+          .eq('relation_type', 'contains');
+
+        for (const allergen of ingredientAllergens) {
+          if (inheritedAllergens.has(allergen.allergen_id)) {
+            inheritedAllergens.get(allergen.allergen_id)!.sourceProducts.push({
+              id: item.product.id,
+              code: item.product.code,
+              name: item.product.name,
+            });
+          } else {
+            inheritedAllergens.set(allergen.allergen_id, {
+              allergenId: allergen.allergen_id,
+              sourceProducts: [{
+                id: item.product.id,
+                code: item.product.code,
+                name: item.product.name,
+              }],
+            });
+          }
+        }
+      }
+
+      // 3. Upsert auto-inherited allergens
+      for (const [allergenId, data] of inheritedAllergens) {
+        await supabase
+          .from('product_allergens')
+          .upsert({
+            org_id: orgId,
+            product_id: productId,
+            allergen_id: allergenId,
+            relation_type: 'contains',
+            source: 'auto',
+            source_product_ids: data.sourceProducts.map(p => p.id),
+          }, {
+            onConflict: 'product_id,allergen_id,relation_type',
+          });
+      }
+
+      // 4. Remove stale auto-inherited allergens
+      const { data: removed } = await supabase
+        .from('product_allergens')
+        .delete()
+        .eq('product_id', productId)
+        .eq('source', 'auto')
+        .not('allergen_id', 'in', `(${Array.from(inheritedAllergens.keys()).join(',')})`);
+
+      // 5. Return results
+      return {
+        inherited_allergens: [],  // Fetch and return
+        manual_allergens: [],     // Preserved
+        removed_count: removed?.length ?? 0,
+        bom_version: '',
+      };
+    }

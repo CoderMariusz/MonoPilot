@@ -1,0 +1,116 @@
+# Story 10.11 - Downtime Pareto Analysis Context (Entry Point)
+# Generated: 2025-01-15
+# Purpose: Story metadata, dependencies, and overview - read this first
+# Phase: 2 (Advanced Analytics)
+
+story:
+  id: "10.11"
+  name: "Downtime Pareto Analysis"
+  slug: "downtime-pareto-analysis"
+  epic: "10-oee"
+  phase: "2"
+  complexity: "M"
+  estimate_days: 2-3
+  type: "frontend"
+  state: "ready"
+  priority: "P0"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies, overview
+  - database.yaml    # Tables, RLS, migrations, indexes
+  - api.yaml         # Endpoints, request/response schemas, services
+  - frontend.yaml    # Components, pages, types, hooks, UX
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "10.2"
+      name: "Downtime Reason Codes"
+      provides: ["downtime_reasons table", "reason categorization"]
+    - story: "10.3"
+      name: "Downtime Event Tracking"
+      provides: ["oee_downtime_events table", "downtime duration data"]
+
+  blocked_by: []
+
+  blocks:
+    - story: "10.12"
+      name: "Performance Dashboard"
+      reason: "Pareto chart is a widget in executive dashboard"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/oee.md"
+    sections: ["FR-OEE-017 - Downtime Pareto Analysis"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/oee.md"
+    sections: ["Analytics aggregation", "Pareto calculation"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/10-oee/10.11.downtime-pareto-analysis.md"
+
+# High-level deliverables
+deliverables:
+  - type: "api"
+    count: 1
+    description: "GET /api/oee/downtime/analysis - Pareto analysis endpoint"
+  - type: "service"
+    count: 1
+    description: "downtime-analysis-service.ts with Pareto calculation"
+  - type: "components"
+    count: 4
+    description: "Pareto chart, issue summary cards, drill-down navigation"
+  - type: "page"
+    count: 1
+    description: "/oee/analytics/downtime - Pareto analysis page"
+  - type: "test"
+    count: 3
+    description: "Unit (calculation), Integration (API), E2E (chart interaction)"
+
+# Technical notes
+technical_notes:
+  - "Pareto chart: Bars (downtime duration) + Line (cumulative %)"
+  - "Top 10 downtime reasons by default (configurable)"
+  - "80/20 rule visualization - highlight 80% line"
+  - "Time period selection: Today, Week, Month, Custom"
+  - "Drill-down: Click reason bar to see all events with that reason"
+  - "Data source: oee_downtime_events aggregated by reason"
+  - "Chart library: Chart.js or Recharts"
+
+# Business Rules
+business_rules:
+  - rule: "Pareto Principle (80/20)"
+    description: "Top ~20% of reasons typically account for ~80% of downtime"
+    enforcement: "Visual 80% line on chart"
+  - rule: "Duration Aggregation"
+    description: "Sum duration_minutes grouped by reason_code"
+    enforcement: "Service layer aggregation"
+  - rule: "Descending Order"
+    description: "Bars sorted by duration descending (highest first)"
+    enforcement: "API returns pre-sorted data"
+
+# Context Summary
+summary: |
+  Story 10.11 implements Pareto chart visualization for downtime analysis.
+
+  MVP SCOPE (This Story):
+  - GET /api/oee/downtime/analysis endpoint
+  - Pareto chart: bars (duration) + line (cumulative %)
+  - Top 10 downtime reasons
+  - Time period selection
+  - 80% line visualization
+  - Drill-down to filtered downtime events
+
+  KEY FEATURES:
+  - Visual identification of "vital few" root causes
+  - Cumulative percentage line for 80/20 analysis
+  - Drill-down capability for detailed investigation
+  - Summary cards: Total downtime, Top reason, Events count
+
+  INTEGRATION POINTS:
+  - Data from oee_downtime_events table (Story 10.3)
+  - Reason codes from downtime_reasons (Story 10.2)
+  - Embedded in Performance Dashboard (Story 10.12)
+  - Click navigates to downtime events list filtered by reason

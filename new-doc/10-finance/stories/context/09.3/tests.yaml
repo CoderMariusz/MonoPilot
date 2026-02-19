@@ -1,0 +1,12 @@
+unit_tests:
+  MaterialCostService:
+    - "FIFO calculation uses oldest cost layers first"
+    - "WAC calculation uses weighted average"
+    - "Standard cost method uses active standard cost"
+
+integration_tests:
+  - "GET /work-order-costs/:id/material returns summary"
+  - "Material cost created on LP consumption"
+
+e2e_tests:
+  - "Consume LP → Material cost calculated → Linked to WO"

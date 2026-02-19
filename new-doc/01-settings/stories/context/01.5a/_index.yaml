@@ -1,0 +1,109 @@
+# Story 01.5a - Index File (Entry Point)
+# Generated: 2025-12-16
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "01.5a"
+  name: "User Management CRUD (MVP)"
+  slug: "user-management-crud-mvp"
+  epic: "01-settings"
+  phase: "1A"
+  complexity: "L"
+  estimate_days: 3
+  type: "frontend + backend"
+  state: "ready"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Users table schema (from 01.1), no changes
+  - api.yaml         # 5 endpoints for user CRUD
+  - frontend.yaml    # Components, pages, services, types
+  - tests.yaml       # Acceptance criteria, test specifications
+  - gaps.yaml        # Identified gaps, blockers
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides:
+        - "users table with role_id FK"
+        - "roles table with JSONB permissions"
+        - "RLS policies for org isolation"
+        - "getOrgContext() service"
+        - "permission-service.ts"
+    - story: "01.2"
+      name: "Settings Shell Navigation"
+      provides:
+        - "Settings layout and navigation"
+        - "useSettingsGuard hook"
+    - story: "01.6"
+      name: "Role Permissions"
+      provides:
+        - "10 system roles seeded"
+        - "Role dropdown data"
+  blocked_by: []
+  blocks:
+    - story: "01.5b"
+      name: "User Warehouse Access Restrictions"
+    - story: "01.16"
+      name: "User Invitations"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/settings.md"
+    sections: ["FR-SET-010", "FR-SET-012", "FR-SET-017"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/settings.md"
+    sections: ["Database Schema - users table", "API Design", "Security - Role Requirements"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/01-settings/01.5a.user-management-crud-mvp.md"
+  wireframes:
+    - id: "SET-008"
+      path: "docs/2-MANAGEMENT/epics/current/01-settings/context/wireframes/SET-008-user-list.md"
+      description: "User list page with DataTable"
+    - id: "SET-009"
+      path: "docs/2-MANAGEMENT/epics/current/01-settings/context/wireframes/SET-009-user-modal.md"
+      description: "User create/edit modal (MVP subset - no warehouse access)"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-012-role-permission-storage.md"
+      relevance: "Users.role_id FK to roles(id)"
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policies for user isolation"
+  patterns:
+    - "apps/frontend/components/ui/data-table.tsx"
+    - "apps/frontend/components/ui/dialog.tsx"
+
+# High-level deliverables
+deliverables:
+  - type: "api"
+    count: 5
+    description: "GET/POST/PUT/PATCH users endpoints"
+  - type: "page"
+    count: 1
+    description: "Users list page at /settings/users"
+  - type: "component"
+    count: 5
+    description: "UsersDataTable, UserModal, UserRow, UserStatusBadge, DeactivateConfirmDialog"
+  - type: "service"
+    count: 1
+    description: "user-service.ts with CRUD + self-protection"
+  - type: "validation"
+    count: 2
+    description: "createUserSchema, updateUserSchema (Zod)"
+  - type: "test"
+    count: 3
+    description: "Unit tests for user-service, integration tests for API, component tests"
+
+# Technical notes
+technical_notes:
+  - "MVP scope only - warehouse access deferred to 01.5b"
+  - "Users table column warehouse_access_ids exists but NULL in MVP"
+  - "Role dropdown shows 10 system roles from 01.6"
+  - "Self-protection: cannot delete self or last Super Admin"
+  - "Performance target: 500ms for 1000 users, 300ms search"
+  - "Return 404 (not 403) for unauthorized access per ADR-013"
+  - "Uses ShadCN DataTable for list, Dialog for modal"
+  - "Hide warehouse access field in SET-009 wireframe (lines 49-117)"

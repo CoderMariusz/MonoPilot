@@ -1,0 +1,96 @@
+pages:
+  finance_settings:
+    path: "/finance/settings"
+    component: "apps/frontend/app/(authenticated)/finance/settings/page.tsx"
+    description: "Finance module settings management"
+    layout:
+      sections:
+        - name: "Module Control"
+          fields:
+            - "Finance Enabled (toggle)"
+        - name: "Valuation Method"
+          fields:
+            - "Valuation Method (dropdown: FIFO, WAC, Standard)"
+        - name: "Variance Thresholds"
+          fields:
+            - "Warning % (number input 0-100)"
+            - "Critical % (number input 0-100)"
+        - name: "Overhead Allocation"
+          fields:
+            - "Allocation Method (dropdown)"
+        - name: "Cost Centers"
+          fields:
+            - "Hierarchy Levels (1-5)"
+            - "Enable Budgets (checkbox)"
+        - name: "Currency"
+          fields:
+            - "Base Currency (dropdown)"
+        - name: "Automation"
+          fields:
+            - "Auto-calculate WO costs (checkbox)"
+            - "Auto-calculate BOM costs (checkbox)"
+            - "Include scrap in variance (checkbox)"
+        - name: "Rounding"
+          fields:
+            - "Decimals (2-6)"
+      actions:
+        - "Save Settings (validates and saves)"
+        - "Cancel (discards changes)"
+
+components:
+  FinanceSettingsForm:
+    path: "components/finance/settings/FinanceSettingsForm.tsx"
+    props:
+      - "initialSettings: FinanceSettings | null"
+      - "onSave: (settings) => void"
+      - "onCancel: () => void"
+    state:
+      - "formData: FinanceSettings"
+      - "errors: Record<string, string>"
+      - "isSubmitting: boolean"
+    validation:
+      - "Inline validation on blur"
+      - "Submit validation using Zod schema"
+      - "Disable save if errors exist"
+
+  ValuationMethodSelector:
+    path: "components/finance/settings/ValuationMethodSelector.tsx"
+    props:
+      - "value: 'fifo' | 'weighted_average' | 'standard_cost'"
+      - "onChange: (value) => void"
+    options:
+      - value: "fifo"
+        label: "FIFO (First In, First Out)"
+        help: "Uses oldest inventory cost"
+      - value: "weighted_average"
+        label: "Weighted Average Cost"
+        help: "Average of all inventory"
+      - value: "standard_cost"
+        label: "Standard Cost"
+        help: "Pre-defined standard costs"
+
+  VarianceThresholdInputs:
+    path: "components/finance/settings/VarianceThresholdInputs.tsx"
+    props:
+      - "warningPercent: number"
+      - "criticalPercent: number"
+      - "onWarningChange: (value) => void"
+      - "onCriticalChange: (value) => void"
+    validation:
+      - "Warning: 0-100"
+      - "Critical: 0-100"
+      - "Critical >= Warning"
+
+ui_patterns:
+  - "ShadCN Form components"
+  - "Inline validation with error messages"
+  - "Confirmation dialog for critical changes"
+  - "Success/error toast notifications"
+  - "Loading states during save"
+
+states:
+  loading: "Fetching settings"
+  editing: "Form dirty, unsaved changes"
+  saving: "Submitting form"
+  error: "Validation or save error"
+  success: "Settings saved"

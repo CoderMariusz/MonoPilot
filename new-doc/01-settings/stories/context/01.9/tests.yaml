@@ -1,0 +1,332 @@
+# Story 01.9 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/location-service.test.ts"
+    type: "unit"
+    description: "Unit tests for location CRUD and tree operations"
+  - path: "apps/frontend/app/api/settings/warehouses/[warehouseId]/locations/__tests__/route.test.ts"
+    type: "integration"
+    description: "API endpoint integration tests"
+  - path: "supabase/tests/locations-hierarchy.test.sql"
+    type: "integration"
+    description: "Database trigger and hierarchy validation tests"
+  - path: "e2e/settings/locations.spec.ts"
+    type: "e2e"
+    description: "End-to-end tests for location management"
+
+# Acceptance Criteria
+acceptance_criteria:
+  - id: "AC-01"
+    feature: "FR-SET-042"
+    given: "warehouse 'WH-001' exists"
+    when: "admin creates zone with code 'ZONE-A'"
+    then: "location appears in tree with full_path 'WH-001/ZONE-A'"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-02"
+    feature: "FR-SET-042"
+    given: "zone 'ZONE-A' exists"
+    when: "admin creates aisle 'A01' under ZONE-A"
+    then: "location appears as child with full_path 'WH-001/ZONE-A/A01'"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-03"
+    feature: "FR-SET-042"
+    given: "aisle 'A01' exists"
+    when: "admin attempts to create bin directly under aisle"
+    then: "error 'Bins must be under racks, not aisles' displays"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-04"
+    feature: "FR-SET-042"
+    given: "zone 'ZONE-A' has 5 aisles with racks and bins"
+    when: "admin clicks expand icon on ZONE-A"
+    then: "child locations display within 200ms and state persists"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-05"
+    feature: "FR-SET-043"
+    given: "location 'B001' has max_pallets=4 and current_pallets=3"
+    when: "location list viewed"
+    then: "capacity indicator shows '3/4 pallets (75%)' with yellow color"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-06"
+    feature: "FR-SET-043"
+    given: "location 'B001' has max_pallets=4 and current_pallets=4"
+    when: "location viewed"
+    then: "capacity indicator shows '4/4 pallets (100%)' with red color"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-07"
+    feature: "FR-SET-044"
+    given: "admin creates location with type 'staging'"
+    when: "location saved"
+    then: "location displays with 'Staging' badge and distinct icon"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-08"
+    feature: "FR-SET-044"
+    given: "warehouse has 20 locations of various types"
+    when: "admin filters by type 'pallet'"
+    then: "only pallet-type locations display"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-09"
+    given: "location code 'ZONE-A' exists in WH-001"
+    when: "admin creates another location with code 'ZONE-A' in WH-001"
+    then: "error 'Location code must be unique within warehouse' displays"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-10"
+    given: "zone 'ZONE-A' has 3 aisles underneath"
+    when: "admin attempts to delete ZONE-A"
+    then: "error 'Delete child locations first' displays and deletion blocked"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-11"
+    given: "location 'B001' has 5 license plates assigned"
+    when: "admin attempts to delete B001"
+    then: "error 'Location has inventory (5 items). Relocate first.' displays"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-12"
+    given: "User A belongs to Org A with 10 locations"
+    when: "User A requests locations"
+    then: "only Org A's 10 locations return"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-13"
+    given: "Location X belongs to Org B"
+    when: "User A from Org A requests Location X by ID"
+    then: "404 Not Found returns (not 403)"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+# Unit Test Cases
+unit_tests:
+  location_service:
+    - name: "create location with valid data"
+      setup: "Valid CreateLocationInput with zone level"
+      expected: "Location created with full_path computed"
+
+    - name: "create location without code"
+      setup: "CreateLocationInput missing code"
+      expected: "Validation error thrown"
+
+    - name: "create bin without parent"
+      setup: "CreateLocationInput with level=bin, parent_id=null"
+      expected: "Validation error 'Root must be zone'"
+
+    - name: "create aisle under zone"
+      setup: "Zone exists, CreateLocationInput with level=aisle"
+      expected: "Location created with depth=2, full_path computed"
+
+    - name: "create rack under bin"
+      setup: "Bin exists, attempt to create rack as child"
+      expected: "Validation error 'Bins have no children'"
+
+    - name: "duplicate code in same warehouse"
+      setup: "Location 'ZONE-A' exists in WH-001"
+      expected: "Validation error 'Code must be unique'"
+
+    - name: "same code in different warehouses"
+      setup: "ZONE-A in WH-001, ZONE-A in WH-002"
+      expected: "Both created successfully (codes unique per warehouse)"
+
+    - name: "capacity validation - negative pallets"
+      setup: "CreateLocationInput with max_pallets=-1"
+      expected: "Validation error 'Capacity must be positive'"
+
+    - name: "full path computation 4 levels deep"
+      setup: "Create ZONE-A/A01/R01/B001"
+      expected: "full_path = 'WH-001/ZONE-A/A01/R01/B001'"
+
+    - name: "level hierarchy validation"
+      setup: "Attempt various invalid parent-child combinations"
+      expected: "Validation errors for each invalid combination"
+
+# Integration Test Cases
+integration_tests:
+  api_endpoints:
+    - name: "GET /locations returns tree"
+      setup: "Warehouse with 10 locations in hierarchy"
+      action: "GET /api/settings/warehouses/:id/locations?view=tree"
+      expected: "Nested structure with children arrays"
+
+    - name: "POST /locations with missing warehouse"
+      setup: "Non-existent warehouse ID"
+      action: "POST with valid location data"
+      expected: "404 Warehouse Not Found"
+
+    - name: "PUT /locations updates name"
+      setup: "Location 'ZONE-A' exists"
+      action: "PUT with name='Raw Materials Zone'"
+      expected: "Name updated, updated_at refreshed"
+
+    - name: "DELETE /locations with children"
+      setup: "Zone with 2 child aisles"
+      action: "DELETE /locations/:id"
+      expected: "400 error with 'HAS_CHILDREN' code and count"
+
+    - name: "DELETE /locations empty location"
+      setup: "Bin with no children and no inventory"
+      action: "DELETE /locations/:id"
+      expected: "204 No Content, location removed"
+
+    - name: "Cross-tenant access blocked"
+      setup: "Location belongs to Org B"
+      action: "Org A user attempts GET /locations/:id"
+      expected: "404 Not Found (RLS blocks)"
+
+    - name: "RLS filters by org"
+      setup: "Org A has 5 locations, Org B has 3 locations"
+      action: "Org A user requests GET /locations"
+      expected: "Only 5 Org A locations returned"
+
+    - name: "Create 4-level hierarchy"
+      setup: "Warehouse exists"
+      action: "POST zone, aisle, rack, bin in sequence"
+      expected: "All 4 levels created correctly with computed paths"
+
+  database_triggers:
+    - name: "full_path trigger computes correctly"
+      setup: "Create location with parent"
+      action: "INSERT INTO locations"
+      expected: "full_path computed from parent_path + code"
+
+    - name: "hierarchy trigger blocks invalid level"
+      setup: "Zone exists"
+      action: "INSERT location with level=rack, parent_id=zone"
+      expected: "Trigger raises exception 'Aisles required under zones'"
+
+    - name: "depth computed correctly"
+      setup: "Create nested 4-level structure"
+      action: "SELECT depth FROM locations"
+      expected: "Depths: 1, 2, 3, 4 respectively"
+
+# E2E Test Cases
+e2e_tests:
+  location_management:
+    - name: "Create zone via UI"
+      steps:
+        - "Navigate to /settings/warehouses/:id/locations"
+        - "Click 'Add Location' button"
+        - "Enter code='ZONE-A', name='Zone A', level='zone'"
+        - "Click 'Create'"
+      expected: "Zone appears in tree within 1 second"
+
+    - name: "Expand/collapse tree node"
+      steps:
+        - "Navigate to locations page with hierarchical data"
+        - "Click expand icon on zone"
+        - "Wait for children to load"
+        - "Click collapse icon"
+      expected: "Children show/hide with smooth animation"
+
+    - name: "Edit location name"
+      steps:
+        - "Double-click on location row"
+        - "Update name field"
+        - "Click 'Save'"
+      expected: "Name updates in tree immediately"
+
+    - name: "Delete location flow"
+      steps:
+        - "Right-click location row"
+        - "Select 'Delete' from menu"
+        - "Confirm deletion in dialog"
+      expected: "Location removed, toast notification shown"
+
+    - name: "Breadcrumb navigation"
+      steps:
+        - "Navigate to deep location (bin level)"
+        - "Click on aisle segment in breadcrumb"
+      expected: "Navigates to aisle level, highlights selected"
+
+    - name: "Capacity indicator display"
+      steps:
+        - "View location with capacity limits"
+      expected: "Indicator shows correct color: green/yellow/red based on %"
+
+    - name: "Filter by location type"
+      steps:
+        - "Open type filter dropdown"
+        - "Select 'pallet'"
+      expected: "Only pallet-type locations shown within 200ms"
+
+    - name: "Search locations"
+      steps:
+        - "Enter 'A01' in search box"
+      expected: "Matching locations displayed with full paths"
+
+# Definition of Done (Testing)
+definition_of_done:
+  - "Full path computation trigger tested with 4-level hierarchy"
+  - "Level hierarchy validation trigger tested for all invalid combinations"
+  - "RLS policies verified: cross-tenant access returns 404"
+  - "Delete validation: children and inventory checks working"
+  - "Tree view expand/collapse persists state"
+  - "Capacity indicators display correct colors"
+  - "Breadcrumb navigation works for all levels"
+  - "Unit test coverage >= 85% for location-service"
+  - "Integration test coverage >= 80% for API endpoints"
+  - "E2E tests pass for critical user flows"
+  - "Performance: tree loads within 300ms for 100 locations"
+  - "Performance: expand node within 200ms"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 85
+    reason: "Complex hierarchy logic requires thorough testing"
+  integration:
+    target: 80
+    reason: "API and database triggers must be validated"
+  e2e:
+    target: "8 critical flows"
+    reason: "Tree view and hierarchy require user interaction testing"
+  files:
+    - "location-service.ts: 85%"
+    - "locations API route: 80%"
+    - "LocationTree component: 75%"
+    - "Database triggers: 100% (critical)"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "Hierarchy validation trigger could have edge cases"
+    mitigation: "Comprehensive unit tests for all level combinations"
+    severity: "medium"
+
+  - id: "RISK-02"
+    description: "Performance degradation with deep/wide trees"
+    mitigation: "Lazy loading, virtualization for >1000 nodes"
+    severity: "low"
+
+  - id: "RISK-03"
+    description: "Full path computation could fail on circular references"
+    mitigation: "Database constraint prevents circular parent_id"
+    severity: "low"
+
+  - id: "RISK-04"
+    description: "Capacity denormalization could become stale"
+    mitigation: "Warehouse module updates current_pallets via triggers"
+    severity: "medium"

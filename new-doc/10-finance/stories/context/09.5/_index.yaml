@@ -1,0 +1,57 @@
+story:
+  id: "09.5"
+  name: "BOM Costing"
+  epic: "09-finance"
+  phase: "1"
+  complexity: "M"
+  estimate_days: 4
+
+dependencies:
+  required:
+    - story: "02.1"
+      provides: ["products"]
+    - story: "02.2"
+      provides: ["boms", "bom_items"]
+    - story: "09.1"
+      provides: ["finance_settings"]
+    - story: "09.2"
+      provides: ["standard_costs"]
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/finance.md"
+  prd_sections: ["FR-9.2.1", "FR-9.2.2"]
+  story: "docs/2-MANAGEMENT/epics/current/09-finance/09.5.bom-costing.md"
+  patterns:
+    - "apps/frontend/lib/services/bom-service.ts"
+
+files_to_create:
+  database:
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_create_cost_rollups.sql"
+  api:
+    - path: "apps/frontend/app/api/finance/bom-costs/[bomId]/route.ts"
+    - path: "apps/frontend/app/api/finance/bom-costs/[bomId]/calculate/route.ts"
+  services:
+    - path: "apps/frontend/lib/services/bom-cost-service.ts"
+
+database:
+  tables:
+    - name: "cost_rollups"
+      columns: ["id", "org_id", "product_id", "bom_id", "material_cost", "labor_cost", "overhead_cost", "total_cost"]
+      rls: true
+
+api_endpoints:
+  - method: "GET"
+    path: "/api/finance/bom-costs/:bomId"
+    roles: ["admin", "finance_manager", "cost_accountant"]
+  - method: "POST"
+    path: "/api/finance/bom-costs/:bomId/calculate"
+    roles: ["admin", "finance_manager", "cost_accountant"]
+
+acceptance_checklist:
+  - "BOM cost calculation from standard costs"
+  - "Ingredient costs summed"
+  - "Packaging costs included"
+  - "Labor and overhead allocated"
+  - "Cost per unit calculated"
+  - "Integration with BOM service"
+  - "API returns cost breakdown"

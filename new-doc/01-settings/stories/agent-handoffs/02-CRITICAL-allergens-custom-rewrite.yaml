@@ -1,0 +1,322 @@
+# AGENT HANDOFF: Allergen Management - Custom Allergens + Multi-Language
+
+agent: frontend-dev
+epic: "01-settings"
+story: "01.12"
+phase: "CRITICAL REWRITE"
+priority: HIGHEST
+task: "Build Allergen Management with Custom allergens + Multi-language support - COMPLETE REWRITE from read-only to CRUD"
+
+# ============================================
+# CRITICAL WARNING
+# ============================================
+
+warning: |
+  V1 code treats allergens as READ-ONLY regulatory data!
+  V1 has AllergenReadOnlyBanner with message "EU 14 regulatory data - cannot edit"
+
+  This is INCORRECT for v2 spec!
+
+  V2 spec requires:
+  - EU14 allergens (A01-A14): Locked, only icon/description editable
+  - CUSTOM allergens (C01-C99): Full CRUD
+  - Multi-language support (EN/PL/DE/FR)
+
+  DO NOT use v1 code - it's completely wrong architecture!
+
+# ============================================
+# CONTEXT
+# ============================================
+
+wireframes:
+  primary:
+    - docs/3-ARCHITECTURE/ux/wireframes/SET-020-allergen-list.md
+
+story_file:
+  - docs/2-MANAGEMENT/epics/current/02-technical/02.3.product-allergens.md
+
+compliance:
+  - FR-SET-071: EU14 allergen codes (A01-A14)
+  - FR-SET-072: Multi-language support (EN/PL/DE/FR)
+
+migration_plan:
+
+reference_code:
+  old_v1: apps/frontend/app/(authenticated)/settings/allergens/page.tsx
+  warning: "DO NOT USE - it's read-only, v2 needs CRUD"
+  why_wrong: |
+    V1: <AllergenReadOnlyBanner /> + read-only table
+    V2: Custom allergen CRUD + Language selector
+    V1 treats all allergens as locked regulatory data - INCORRECT!
+
+# ============================================
+# NEW ARCHITECTURE
+# ============================================
+
+architecture:
+  allergen_types:
+    eu14:
+      codes: A01 to A14
+      locked: true
+      editable_fields: [icon, description_xx]
+      immutable_fields: [code, name_xx, type]
+      pre_populated: true (seeded on org creation)
+      can_delete: false (can disable if products_count = 0)
+
+    custom:
+      codes: C01, C02, C03... C99 (auto-increment)
+      locked: false
+      editable_fields: [code (display only), name_xx, icon, description_xx]
+      immutable_fields: [code (after creation)]
+      pre_populated: false
+      can_delete: true (if products_count = 0)
+
+  multi_language:
+    supported: [en, pl, de, fr]
+    fields:
+      - name_en, name_pl, name_de, name_fr
+      - description_en, description_pl, description_de, description_fr
+    selector:
+      location: Top-right of page
+      type: Dropdown (EN | PL | DE | FR)
+      persistence: User preference (saved in user settings)
+    fallback: English (if translation missing)
+
+  data_model:
+    fields:
+      - id (uuid)
+      - org_id (uuid)
+      - code (string: A01-A14 or C01-C99)
+      - name_en, name_pl, name_de, name_fr (string)
+      - description_en, description_pl, description_de, description_fr (text)
+      - icon (string, single emoji)
+      - type (enum: eu14, custom)
+      - status (enum: active, disabled)
+      - is_locked (boolean, true for EU14)
+      - products_count (integer, computed)
+
+# ============================================
+# OUTPUT FILES
+# ============================================
+
+output:
+  pages:
+    - apps/frontend/app/(authenticated)/settings/allergens/page.tsx
+
+  components:
+    - components/settings/allergens/AllergenManagementView.tsx     # Main view
+    - components/settings/allergens/AllergensDataTable.tsx         # Table with actions
+    - components/settings/allergens/LanguageSelector.tsx           # EN/PL/DE/FR dropdown
+    - components/settings/allergens/CustomAllergenModal.tsx        # Create/edit C01...
+    - components/settings/allergens/EditEU14AllergenModal.tsx      # Edit icon/desc only
+    - components/settings/allergens/AllergenTypeBadge.tsx          # EU14 (blue/locked) vs Custom (green)
+    - components/settings/allergens/AllergenIcon.tsx               # Emoji display
+    - components/settings/allergens/ProductsUsingAllergenModal.tsx # View products list
+
+# ============================================
+# REQUIREMENTS
+# ============================================
+
+requirements:
+
+  page_layout:
+    header:
+      - Title: "Allergens"
+      - Subtitle: "EU-mandated allergens + custom allergen tracking"
+      - Language selector: Dropdown (EN | PL | DE | FR)
+      - [+ Add Custom Allergen] button (primary CTA)
+
+    table_columns:
+      - Code (A01-A14, C01-C99)
+      - Icon (emoji)
+      - Name (localized to selected language)
+      - Products (count, clickable link)
+      - Type (badge: EU14 or Custom)
+      - Status (badge: Active or Disabled)
+      - Actions [⋮]
+
+  language_selector:
+    location: Top-right, next to [+ Add Custom Allergen] button
+    options:
+      - 🇬🇧 English
+      - 🇵🇱 Polski
+      - 🇩🇪 Deutsch
+      - 🇫🇷 Français
+    behavior:
+      - Changes display language for name + description
+      - Persists selection (localStorage or user preference)
+      - Falls back to English if translation missing
+      - Screen reader announces: "Now showing allergens in [language]"
+
+  actions_menu:
+    eu14_allergens:
+      - Edit (icon and description only)
+      - View Products Using This Allergen
+      - View Activity Log
+      - Disable (if products_count = 0, with confirmation)
+
+    custom_allergens:
+      - Edit (all fields)
+      - View Products Using This Allergen
+      - Disable (if products_count = 0)
+      - Enable (if disabled)
+      - Delete (if products_count = 0, with confirmation)
+      - View Activity Log
+
+  custom_allergen_modal:
+    mode: create | edit
+    fields_create:
+      - Code: Auto-generated (C01, C02... display only, read-only)
+      - Icon: Emoji picker (single emoji validation)
+      - Name (EN): Required
+      - Name (PL): Optional
+      - Name (DE): Optional
+      - Name (FR): Optional
+      - Description (EN): Optional
+      - Description (PL): Optional
+      - Description (DE): Optional
+      - Description (FR): Optional
+    fields_edit:
+      - Code: Display only (immutable)
+      - All other fields: Editable
+
+  eu14_allergen_modal:
+    mode: edit_only
+    fields:
+      - Code: Display only (locked, A01-A14)
+      - Name: Display only (locked)
+      - Icon: Editable (emoji picker)
+      - Description (all languages): Editable
+    note: "Names cannot be changed for EU14 allergens (regulatory requirement)"
+
+  eu14_pre_population:
+    codes:
+      - A01: Gluten (🌾)
+      - A02: Crustaceans (🦐)
+      - A03: Eggs (🥚)
+      - A04: Fish (🐟)
+      - A05: Peanuts (🥜)
+      - A06: Soybeans (🫘)
+      - A07: Milk (🥛)
+      - A08: Nuts (🌰)
+      - A09: Celery (🌿)
+      - A10: Mustard (🟡)
+      - A11: Sesame (🌱)
+      - A12: Sulphites (🍇)
+      - A13: Lupin (🫛)
+      - A14: Molluscs (🐚)
+    seeded: On org creation (migration)
+    translations: All 4 languages (EN/PL/DE/FR)
+
+# ============================================
+# REUSABLE ASSETS
+# ============================================
+
+reusable:
+  services:
+    existing:
+      - lib/services/allergen-service.ts
+
+    must_add:
+      - createCustomAllergen(data) → auto-assigns next C code (C01, C02...)
+      - updateAllergen(id, data, type) → type determines editable fields
+      - getNextCustomCode() → returns next available C code
+      - getAllergensByLanguage(lang) → returns localized names/descriptions
+
+  schemas:
+    file: lib/validation/allergen-schemas.ts
+    required_updates:
+      add_fields:
+        - type (z.enum(['eu14', 'custom']))
+        - is_locked (z.boolean())
+        - name_en, name_pl, name_de, name_fr (z.string())
+        - description_en, description_pl, description_de, description_fr (z.string())
+      validation:
+        - Icon must be single emoji (Unicode emoji range validation)
+        - EU14: names immutable
+        - Custom: code auto-generated
+
+  shared_components:
+    - settings/shared/ActionsMenu.tsx
+    - settings/shared/StatusBadge.tsx
+    - settings/shared/EmptyState.tsx
+    - settings/shared/ErrorState.tsx
+
+# ============================================
+# ISOLATION RULES
+# ============================================
+
+isolation:
+  allowed:
+    - Read: SET-020 wireframe
+    - Use: lib/services/allergen-service.ts (update methods)
+    - Use: lib/validation/allergen-schemas.ts (UPDATE for custom + multi-lang)
+    - Create in: settings/allergens/
+
+  forbidden:
+    - Import from: app/(authenticated)/settings/allergens/* (v1 read-only code)
+    - Import from: components/settings/allergens/* (v1 read-only components)
+    - Use: AllergenReadOnlyBanner (DELETE this concept!)
+
+  verification:
+    - grep -r "AllergenReadOnlyBanner" components/settings/allergens/
+    - Expected: ZERO results (should not exist in v2)
+
+# ============================================
+# ACCEPTANCE CRITERIA
+# ============================================
+
+acceptance:
+  visual:
+    - [ ] [+ Add Custom Allergen] button visible (top-right)
+    - [ ] Language selector visible (EN | PL | DE | FR)
+    - [ ] Type badges: EU14 (blue with lock icon 🔒), Custom (green)
+    - [ ] Table shows localized names based on language selection
+    - [ ] Icon column shows emojis correctly
+
+  functionality:
+    - [ ] Can create custom allergen (C01, C02...)
+    - [ ] Code auto-increments (C01 → C02 → C03)
+    - [ ] Can edit EU14 icon/description (but not name)
+    - [ ] Cannot edit EU14 name/code
+    - [ ] Can edit custom allergen all fields (except code after creation)
+    - [ ] Language selector changes displayed names/descriptions
+    - [ ] Search works across all language fields
+    - [ ] Products count shows and links to filtered product list
+    - [ ] Can disable custom allergen (if products_count = 0)
+    - [ ] Cannot delete EU14 allergen
+
+  states:
+    - [ ] Loading: Skeleton rows
+    - [ ] Success: EU14 (14 rows) + Custom allergens
+    - [ ] Empty: Shows EU14 + message "No custom allergens added"
+    - [ ] Error: "Failed to load" + Retry
+
+  compliance:
+    - [ ] FR-SET-071: Codes A01-A14 for EU14
+    - [ ] FR-SET-072: Multi-language support works
+    - [ ] All EU14 allergens seeded with translations
+
+# ============================================
+# TESTING
+# ============================================
+
+testing:
+  manual:
+    - Verify 14 EU14 allergens display (A01-A14)
+    - Create custom allergen "Honey" → should get code C01
+    - Create second custom "Kiwi" → should get code C02
+    - Change language to Polski → names should change
+    - Try editing EU14 allergen A01 → should only allow icon/description
+    - Try editing custom allergen C01 → should allow all fields except code
+    - Search "gluten" → should find A01 (even if language is PL)
+    - Click products count (12) → should navigate to filtered product list
+
+# ============================================
+# EFFORT
+# ============================================
+
+estimated_hours: 10-12
+complexity: HIGH (multi-language + dual edit modes)
+critical_path: true
+validates: "Custom CRUD pattern (EU14 locked, Custom editable)"

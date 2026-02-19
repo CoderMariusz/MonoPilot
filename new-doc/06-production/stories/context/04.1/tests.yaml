@@ -1,0 +1,743 @@
+# Story 04.1 - Production Dashboard
+# Test specifications: acceptance criteria, unit tests, integration tests, e2e tests
+
+acceptance_criteria:
+  # From story document - 25 acceptance criteria
+
+  # Dashboard Load Performance
+  - id: "AC-1"
+    title: "Dashboard Page Load Performance"
+    priority: "P0"
+    given: "user is logged in with production_manager or operator role"
+    when: "user navigates to /production/dashboard"
+    then:
+      - "All 6 KPI cards display within 2 seconds"
+      - "Active WOs table renders with all rows within 2 seconds"
+      - "Alerts panel displays (even if no alerts present)"
+      - "No console errors logged"
+      - "Page is fully interactive within 3 seconds"
+    test_type: ["e2e", "performance"]
+
+  # KPI Cards
+  - id: "AC-2"
+    title: "KPI Card - Active WOs"
+    priority: "P0"
+    given: "5 WOs have status = 'In Progress' and 2 WOs have status = 'Paused'"
+    when: "user views 'Active WOs' KPI card"
+    then:
+      - "Card displays '7' (count of In Progress + Paused)"
+      - "Tooltip shows 'WOs currently on the shop floor (In Progress or Paused)'"
+      - "Card has green accent color"
+      - "Clicking card filters Active WOs table to show only active WOs"
+    test_type: ["unit", "integration", "e2e"]
+
+  - id: "AC-3"
+    title: "KPI Card - WOs Completed Today"
+    priority: "P0"
+    given: "12 WOs were completed today (completed_at between 00:00 and 23:59 today)"
+    when: "user views 'WOs Today' KPI card"
+    then:
+      - "Card displays '12'"
+      - "Tooltip shows 'WOs completed today'"
+      - "Card has blue accent color"
+    test_type: ["unit", "integration"]
+
+  - id: "AC-4"
+    title: "KPI Card - WOs Completed This Week"
+    priority: "P0"
+    given: "47 WOs were completed this week (completed_at >= start of current week)"
+    when: "user views 'WOs This Week' KPI card"
+    then:
+      - "Card displays '47'"
+      - "Tooltip shows 'WOs completed this week (Monday to Sunday)'"
+      - "Card has purple accent color"
+    test_type: ["unit", "integration"]
+
+  - id: "AC-5"
+    title: "KPI Card - Avg Cycle Time"
+    priority: "P0"
+    given: "3 completed WOs today with cycle times: 2.5 hours, 3.0 hours, 4.5 hours"
+    when: "user views 'Avg Cycle Time' KPI card"
+    then:
+      - "Card displays '3.3 hrs' (average rounded to 1 decimal)"
+      - "Cycle time calculated as (completed_at - started_at) in hours"
+      - "Tooltip shows 'Average cycle time for WOs completed today'"
+      - "Card has orange accent color"
+    test_type: ["unit", "integration"]
+
+  - id: "AC-6"
+    title: "KPI Card - On-Time Completion %"
+    priority: "P0"
+    given: "8 WOs completed today, 6 completed before/on scheduled_end_date, 2 completed late"
+    when: "user views 'On-Time %' KPI card"
+    then:
+      - "Card displays '75%' (6/8 * 100)"
+      - "Tooltip shows 'Percentage of WOs completed on or before scheduled date'"
+      - "Card has green accent if >= 90%, yellow if 70-89%, red if < 70%"
+    test_type: ["unit", "integration"]
+
+  # Active WOs Table
+  - id: "AC-7"
+    title: "Active WOs Table - Data Display"
+    priority: "P0"
+    given: "5 WOs are in 'In Progress' status"
+    when: "user views Active WOs table"
+    then:
+      - "All 5 WOs display in table"
+      - "Each row shows: WO Number, Product Name, Status badge, Planned Qty, Actual Qty, Progress % bar, Line Name, Started At timestamp"
+      - "Progress % calculated as (actual_qty / planned_qty * 100), capped at 100%"
+      - "Status badge color: blue for 'In Progress', yellow for 'Paused'"
+      - "Started At formatted as 'MMM DD, HH:mm' (e.g., 'Dec 16, 14:30')"
+    test_type: ["unit", "integration", "e2e"]
+
+  - id: "AC-8"
+    title: "Active WOs Table - No Data State"
+    priority: "P0"
+    given: "no WOs have status 'In Progress' or 'Paused'"
+    when: "user views Active WOs table"
+    then:
+      - "Empty state message displays: 'No active work orders. Start a new WO to begin production.'"
+      - "'Start WO' button displays in empty state"
+      - "Table headers still visible"
+    test_type: ["e2e"]
+
+  - id: "AC-9"
+    title: "Active WOs Table - Filtering by Line"
+    priority: "P0"
+    given: "Active WOs table shows 10 WOs across 3 lines"
+    when: "user selects 'Line A' from Line filter dropdown"
+    then:
+      - "Only WOs assigned to Line A display"
+      - "KPI cards do NOT change (show org-wide metrics)"
+      - "Filter badge shows 'Line: Line A' with X to clear"
+      - "URL updates to /production/dashboard?line=line-a-id"
+    test_type: ["integration", "e2e"]
+
+  - id: "AC-10"
+    title: "Active WOs Table - Filtering by Product"
+    priority: "P1"
+    given: "Active WOs table shows WOs for 5 different products"
+    when: "user selects 'Product X' from Product filter dropdown"
+    then:
+      - "Only WOs for Product X display"
+      - "Filter badge shows 'Product: Product X' with X to clear"
+      - "Multiple filters can be active simultaneously (AND logic)"
+    test_type: ["integration", "e2e"]
+
+  - id: "AC-11"
+    title: "Active WOs Table - Sorting"
+    priority: "P1"
+    given: "Active WOs table displays 10 WOs"
+    when: "user clicks 'Started At' column header"
+    then:
+      - "Table sorts by Started At DESC (newest first) on first click"
+      - "Clicking again toggles to ASC (oldest first)"
+      - "Sort arrow indicator shows current direction"
+      - "Sort state persists during auto-refresh"
+    test_type: ["integration", "e2e"]
+
+  - id: "AC-12"
+    title: "Active WOs Table - Row Actions"
+    priority: "P1"
+    given: "user views Active WOs table"
+    when: "user clicks on a WO row"
+    then:
+      - "Row expands to show WO details: Materials list, Operations status, Notes"
+      - "'View Full Details' button navigates to /production/execution?wo_id={id}"
+      - "'Pause WO' button visible if allow_pause_wo = true (Story 04.2b)"
+      - "'Complete WO' button visible if WO has outputs (Story 04.2c)"
+    test_type: ["e2e"]
+
+  # Alerts Panel
+  - id: "AC-13"
+    title: "Alerts Panel - Material Shortage"
+    priority: "P0"
+    given: "WO-123 has material_availability = 75% (calculated from wo_materials)"
+    when: "user views Alerts panel"
+    then:
+      - "'Material Shortage' alert displays with HIGH priority (red badge)"
+      - "Alert text: 'WO-123: Material availability 75% - Product ABC'"
+      - "Clicking alert navigates to WO detail page"
+      - "Alert includes timestamp of when shortage detected"
+    test_type: ["unit", "integration", "e2e"]
+
+  - id: "AC-14"
+    title: "Alerts Panel - Delayed WO"
+    priority: "P0"
+    given: "WO-456 has scheduled_end_date = 2025-12-10 AND status != 'Completed' AND today = 2025-12-16"
+    when: "user views Alerts panel"
+    then:
+      - "'WO Delayed' alert displays with MEDIUM priority (yellow badge)"
+      - "Alert text: 'WO-456: 6 days overdue - Product XYZ'"
+      - "Days overdue calculated as (today - scheduled_end_date)"
+    test_type: ["unit", "integration", "e2e"]
+
+  - id: "AC-15"
+    title: "Alerts Panel - Placeholder Alerts"
+    priority: "P1"
+    given: "user views Alerts panel"
+    when: "dashboard loads"
+    then:
+      - "'Quality Issues' section shows: 'Quality alerts coming in Quality Module (Epic 06)'"
+      - "'Machine Downtime' section shows: 'Downtime tracking coming in OEE Module (Story 04.9b)'"
+      - "Placeholder sections have gray background and info icon"
+    test_type: ["e2e"]
+
+  - id: "AC-16"
+    title: "Alerts Panel - No Alerts State"
+    priority: "P1"
+    given: "no material shortages, delayed WOs, or other alerts exist"
+    when: "user views Alerts panel"
+    then:
+      - "Green success message displays: 'All systems operational. No alerts at this time.'"
+      - "Timestamp shows last check time"
+    test_type: ["e2e"]
+
+  # Auto-Refresh
+  - id: "AC-17"
+    title: "Auto-Refresh Functionality"
+    priority: "P0"
+    given: "dashboard auto-refresh is set to 30 seconds"
+    when: "30 seconds elapse"
+    then:
+      - "All KPI cards update with latest data"
+      - "Active WOs table refreshes"
+      - "Alerts panel updates"
+      - "Refresh happens without full page reload"
+      - "Loading spinner shows briefly during refresh"
+      - "User's current scroll position is preserved"
+      - "Active filters and sort order are maintained"
+    test_type: ["integration", "e2e"]
+
+  - id: "AC-18"
+    title: "Manual Refresh Button"
+    priority: "P0"
+    given: "user is viewing dashboard"
+    when: "user clicks 'Refresh' button"
+    then:
+      - "All dashboard data refreshes within 500ms"
+      - "Button shows loading spinner during refresh"
+      - "Button is disabled during refresh to prevent double-clicks"
+      - "Success toast message: 'Dashboard refreshed'"
+    test_type: ["e2e"]
+
+  # CSV Export
+  - id: "AC-19"
+    title: "CSV Export"
+    priority: "P0"
+    given: "Active WOs table shows 15 WOs (with filters applied)"
+    when: "user clicks 'Export CSV' button"
+    then:
+      - "CSV file downloads with filename 'active-wos-YYYY-MM-DD-HHmm.csv'"
+      - "CSV includes all columns from table: WO Number, Product, Status, Planned Qty, Actual Qty, Progress %, Line, Started At"
+      - "CSV includes only visible rows (respects current filters)"
+      - "Export completes within 2 seconds for up to 1000 rows"
+    test_type: ["integration", "e2e"]
+
+  # Quick Actions
+  - id: "AC-20"
+    title: "Quick Action - Start WO"
+    priority: "P1"
+    given: "user has permission to start WOs"
+    when: "user clicks 'Start WO' quick action button"
+    then:
+      - "Modal opens showing list of WOs with status = 'Released'"
+      - "User can select a WO and click 'Start' -> triggers Story 04.2a workflow"
+      - "Modal has search/filter by WO number or product"
+      - "Modal shows top 5 highest priority WOs by default"
+    test_type: ["e2e"]
+
+  - id: "AC-21"
+    title: "Quick Action - View Schedule"
+    priority: "P2"
+    given: "user clicks 'View Schedule' quick action button"
+    when: "button clicked"
+    then:
+      - "User navigates to /planning/schedule (Epic 03 Planning module)"
+      - "Current date is pre-selected in schedule view"
+    test_type: ["e2e"]
+
+  # Settings
+  - id: "AC-22"
+    title: "Refresh Interval Configuration"
+    priority: "P2"
+    given: "user has admin role"
+    when: "user opens dashboard settings (gear icon)"
+    then:
+      - "Dropdown allows selecting refresh interval: 15s, 30s (default), 60s, 120s, or Off"
+      - "Selection saved to user preferences in local storage"
+      - "Dashboard immediately adopts new refresh interval"
+    test_type: ["e2e"]
+
+  # API Performance
+  - id: "AC-23"
+    title: "API Performance - KPI Endpoint"
+    priority: "P0"
+    given: "API endpoint /api/production/dashboard/kpis is called"
+    when: "endpoint processes request"
+    then:
+      - "Response time < 500ms for orgs with up to 10,000 WOs"
+      - "Returns JSON with all 6 KPI values"
+      - "Uses database indexes on (org_id, status, completed_at)"
+      - "Response cached for 30 seconds with Redis"
+    test_type: ["integration", "performance"]
+
+  - id: "AC-24"
+    title: "API Performance - Active WOs Endpoint"
+    priority: "P0"
+    given: "API endpoint /api/production/dashboard/active-wos is called with filters"
+    when: "endpoint processes request"
+    then:
+      - "Response time < 1 second for up to 1000 active WOs"
+      - "Supports pagination (default 50 per page, max 100)"
+      - "Returns total count for pagination controls"
+      - "Uses database indexes on (org_id, status, started_at)"
+    test_type: ["integration", "performance"]
+
+  # Security
+  - id: "AC-25"
+    title: "RLS Security"
+    priority: "P0"
+    given: "user belongs to org_id = 'abc-123'"
+    when: "dashboard loads"
+    then:
+      - "All queries filter by org_id = 'abc-123'"
+      - "User cannot see WOs from other orgs"
+      - "API returns 403 Forbidden if org_id mismatch detected"
+      - "RLS policies enforced at database level"
+    test_type: ["integration", "security"]
+
+unit_tests:
+  file: "apps/frontend/lib/services/__tests__/production-dashboard-service.test.ts"
+  framework: "Vitest"
+  coverage_target: ">80%"
+
+  suites:
+    - name: "getDashboardKPIs"
+      tests:
+        - name: "returns correct active WOs count"
+          scenario: "5 In Progress + 2 Paused WOs"
+          expected: "activeWOs = 7"
+
+        - name: "returns correct completed today count"
+          scenario: "12 WOs completed today"
+          expected: "completedToday = 12"
+
+        - name: "returns correct completed this week count"
+          scenario: "47 WOs completed this week"
+          expected: "completedThisWeek = 47"
+
+        - name: "calculates avg cycle time correctly"
+          scenario: "3 WOs with 2.5h, 3.0h, 4.5h cycle times"
+          expected: "avgCycleTimeHrs = 3.3"
+
+        - name: "calculates on-time percentage correctly"
+          scenario: "6 on-time, 2 late out of 8 WOs"
+          expected: "onTimePercent = 75.0"
+
+        - name: "returns 0 for empty data"
+          scenario: "No WOs in system"
+          expected: "all KPIs = 0"
+
+        - name: "handles null cycle times"
+          scenario: "WO completed without started_at"
+          expected: "WO excluded from avg calculation"
+
+    - name: "getActiveWOs"
+      tests:
+        - name: "returns paginated results"
+          scenario: "100 active WOs, page=2, limit=20"
+          expected: "wos.length = 20, total = 100"
+
+        - name: "filters by production line"
+          scenario: "lineId = 'line-1-uuid'"
+          expected: "only WOs from line-1 returned"
+
+        - name: "filters by product"
+          scenario: "productId = 'product-uuid'"
+          expected: "only WOs for product returned"
+
+        - name: "applies AND logic for multiple filters"
+          scenario: "lineId + productId both set"
+          expected: "WOs matching BOTH criteria"
+
+        - name: "calculates progress percent correctly"
+          scenario: "actual_qty = 75, planned_qty = 100"
+          expected: "progress_percent = 75.0"
+
+        - name: "caps progress at 100%"
+          scenario: "actual_qty = 110, planned_qty = 100"
+          expected: "progress_percent = 100.0"
+
+        - name: "handles zero planned_qty"
+          scenario: "planned_qty = 0"
+          expected: "progress_percent = 0"
+
+        - name: "sorts by started_at DESC by default"
+          scenario: "3 WOs with different start times"
+          expected: "newest WO first"
+
+    - name: "getDashboardAlerts"
+      tests:
+        - name: "returns material shortage alerts below threshold"
+          scenario: "WO with 75% material availability, threshold = 80"
+          expected: "WO in materialShortages array"
+
+        - name: "excludes WOs above threshold"
+          scenario: "WO with 85% material availability, threshold = 80"
+          expected: "WO NOT in materialShortages array"
+
+        - name: "returns delayed WO alerts"
+          scenario: "WO scheduled 2025-12-10, today 2025-12-16"
+          expected: "WO in delayedWOs with days_overdue = 6"
+
+        - name: "excludes completed WOs from delayed"
+          scenario: "Completed WO past scheduled date"
+          expected: "WO NOT in delayedWOs"
+
+        - name: "handles empty alerts"
+          scenario: "No shortages or delays"
+          expected: "empty arrays, no errors"
+
+    - name: "exportActiveWOsToCSV"
+      tests:
+        - name: "generates valid CSV with headers"
+          scenario: "3 active WOs"
+          expected: "CSV with 4 rows (header + 3 data)"
+
+        - name: "includes all required columns"
+          scenario: "standard WO data"
+          expected: "8 columns present"
+
+        - name: "respects filters in export"
+          scenario: "filter by line"
+          expected: "only filtered WOs in CSV"
+
+        - name: "handles special characters in data"
+          scenario: "product name with comma"
+          expected: "proper CSV escaping"
+
+  mocks:
+    - "supabase client (from/select/eq/in/order/range)"
+    - "Redis cache (get/setex)"
+
+integration_tests:
+  file: "apps/frontend/app/api/production/dashboard/__tests__/dashboard-api.test.ts"
+  framework: "Vitest + supertest"
+  database: "test database with seeded data"
+
+  suites:
+    - name: "GET /api/production/dashboard/kpis"
+      tests:
+        - name: "returns 200 with KPI data"
+          setup: "seed work_orders with various statuses"
+          request: "GET /api/production/dashboard/kpis"
+          assertions:
+            - "status = 200"
+            - "body has activeWOs, completedToday, etc."
+
+        - name: "returns 401 for unauthenticated request"
+          setup: "no auth token"
+          request: "GET /api/production/dashboard/kpis"
+          assertions:
+            - "status = 401"
+
+        - name: "enforces RLS - only org data returned"
+          setup: "WOs for org-1 and org-2, user is org-1"
+          request: "GET /api/production/dashboard/kpis"
+          assertions:
+            - "only org-1 WOs counted"
+
+        - name: "uses cache on subsequent requests"
+          setup: "first request, then immediate second"
+          assertions:
+            - "DB query called once"
+            - "cache hit on second request"
+
+    - name: "GET /api/production/dashboard/active-wos"
+      tests:
+        - name: "returns paginated active WOs"
+          setup: "seed 100 In Progress WOs"
+          request: "GET /api/production/dashboard/active-wos?limit=50"
+          assertions:
+            - "wos.length = 50"
+            - "total = 100"
+
+        - name: "filters by line parameter"
+          setup: "WOs on 3 different lines"
+          request: "GET /api/production/dashboard/active-wos?line={lineId}"
+          assertions:
+            - "only WOs for specified line returned"
+
+        - name: "validates filter parameters"
+          request: "GET /api/production/dashboard/active-wos?line=invalid"
+          assertions:
+            - "status = 400"
+            - "error message about invalid UUID"
+
+        - name: "returns empty array when no active WOs"
+          setup: "no WOs with In Progress/Paused status"
+          assertions:
+            - "wos = []"
+            - "total = 0"
+
+    - name: "GET /api/production/dashboard/alerts"
+      tests:
+        - name: "returns material shortage alerts"
+          setup: "WO with 70% material availability"
+          assertions:
+            - "materialShortages contains WO"
+            - "availability_percent = 70"
+
+        - name: "returns delayed WO alerts"
+          setup: "WO with past scheduled date"
+          assertions:
+            - "delayedWOs contains WO"
+            - "days_overdue calculated correctly"
+
+    - name: "GET /api/production/dashboard/export"
+      tests:
+        - name: "returns CSV file"
+          setup: "5 active WOs"
+          assertions:
+            - "Content-Type = text/csv"
+            - "Content-Disposition contains filename"
+            - "body is valid CSV"
+
+        - name: "respects filters in export"
+          setup: "WOs on 2 lines"
+          request: "GET /api/production/dashboard/export?line={lineId}"
+          assertions:
+            - "only filtered line in CSV"
+
+        - name: "returns 403 for operator role"
+          setup: "user with operator role"
+          assertions:
+            - "status = 403"
+
+e2e_tests:
+  files:
+    - "apps/frontend/e2e/dashboard-load.spec.ts"
+    - "apps/frontend/e2e/dashboard-filters.spec.ts"
+    - "apps/frontend/e2e/dashboard-refresh.spec.ts"
+    - "apps/frontend/e2e/dashboard-export.spec.ts"
+    - "apps/frontend/e2e/dashboard-alerts.spec.ts"
+  framework: "Playwright"
+
+  suites:
+    - name: "Dashboard Load"
+      file: "dashboard-load.spec.ts"
+      tests:
+        - name: "loads dashboard within 2 seconds"
+          steps:
+            - "Navigate to /production/dashboard"
+            - "Wait for KPI cards to render"
+            - "Verify load time < 2000ms"
+          assertions:
+            - "6 KPI cards visible"
+            - "Active WOs table visible"
+            - "Alerts panel visible"
+            - "No console errors"
+
+        - name: "displays correct KPI values"
+          setup: "seed database with known data"
+          steps:
+            - "Navigate to /production/dashboard"
+            - "Read each KPI card value"
+          assertions:
+            - "Active WOs = expected count"
+            - "WOs Today = expected count"
+
+        - name: "shows loading state"
+          steps:
+            - "Navigate with slow network simulation"
+            - "Verify skeleton loaders appear"
+            - "Verify content replaces skeletons"
+
+        - name: "shows empty state when no active WOs"
+          setup: "no In Progress/Paused WOs"
+          assertions:
+            - "Empty state message visible"
+            - "'Start WO' button visible"
+
+    - name: "Dashboard Filters"
+      file: "dashboard-filters.spec.ts"
+      tests:
+        - name: "filters Active WOs by Line"
+          setup: "WOs across 3 lines"
+          steps:
+            - "Click Line filter dropdown"
+            - "Select 'Line A'"
+            - "Wait for table refresh"
+          assertions:
+            - "Only Line A WOs displayed"
+            - "URL updated with line param"
+            - "Filter badge visible"
+
+        - name: "clears filter when badge X clicked"
+          setup: "Line filter active"
+          steps:
+            - "Click X on filter badge"
+          assertions:
+            - "All WOs displayed"
+            - "URL param removed"
+
+        - name: "combines multiple filters with AND"
+          steps:
+            - "Select Line A"
+            - "Select Product X"
+          assertions:
+            - "Only WOs matching BOTH filters"
+
+        - name: "persists filters on refresh"
+          setup: "Line filter active"
+          steps:
+            - "Manually refresh page (F5)"
+          assertions:
+            - "Same filter still active"
+            - "Same WOs displayed"
+
+    - name: "Dashboard Refresh"
+      file: "dashboard-refresh.spec.ts"
+      tests:
+        - name: "auto-refreshes every 30 seconds"
+          steps:
+            - "Navigate to dashboard"
+            - "Note current data"
+            - "Modify database (add WO)"
+            - "Wait 30 seconds"
+          assertions:
+            - "New WO appears in table"
+            - "KPIs updated"
+            - "No full page reload"
+
+        - name: "manual refresh updates data immediately"
+          steps:
+            - "Navigate to dashboard"
+            - "Modify database"
+            - "Click Refresh button"
+          assertions:
+            - "Data updated within 500ms"
+            - "Success toast displayed"
+
+        - name: "preserves scroll position on refresh"
+          setup: "50+ active WOs"
+          steps:
+            - "Scroll down in table"
+            - "Wait for auto-refresh"
+          assertions:
+            - "Scroll position unchanged"
+
+        - name: "preserves expanded row on refresh"
+          steps:
+            - "Expand a WO row"
+            - "Wait for auto-refresh"
+          assertions:
+            - "Row still expanded"
+            - "Row content updated"
+
+    - name: "Dashboard Export"
+      file: "dashboard-export.spec.ts"
+      tests:
+        - name: "downloads CSV file"
+          steps:
+            - "Navigate to dashboard"
+            - "Click Export CSV button"
+            - "Wait for download"
+          assertions:
+            - "File downloaded"
+            - "Filename matches pattern"
+            - "CSV has correct headers"
+
+        - name: "respects filters in export"
+          setup: "Line filter active"
+          steps:
+            - "Click Export CSV"
+          assertions:
+            - "Only filtered WOs in CSV"
+
+    - name: "Dashboard Alerts"
+      file: "dashboard-alerts.spec.ts"
+      tests:
+        - name: "displays material shortage alerts"
+          setup: "WO with 75% availability"
+          assertions:
+            - "Material Shortage alert visible"
+            - "WO number in alert text"
+            - "75% displayed"
+            - "Red HIGH badge visible"
+
+        - name: "displays delayed WO alerts"
+          setup: "WO 6 days overdue"
+          assertions:
+            - "WO Delayed alert visible"
+            - "'6 days overdue' text"
+            - "Yellow MEDIUM badge"
+
+        - name: "clicking alert navigates to WO"
+          steps:
+            - "Click on alert"
+          assertions:
+            - "Navigated to WO detail page"
+
+        - name: "shows placeholder alerts"
+          assertions:
+            - "Quality Issues placeholder visible"
+            - "Machine Downtime placeholder visible"
+            - "Placeholders have gray background"
+
+performance_tests:
+  tool: "k6 or Artillery"
+  scenarios:
+    - name: "KPI Endpoint Load Test"
+      endpoint: "/api/production/dashboard/kpis"
+      vus: 50
+      duration: "2m"
+      thresholds:
+        p95_response_time: "<500ms"
+        error_rate: "<1%"
+
+    - name: "Active WOs Endpoint Load Test"
+      endpoint: "/api/production/dashboard/active-wos"
+      vus: 50
+      duration: "2m"
+      thresholds:
+        p95_response_time: "<1000ms"
+        error_rate: "<1%"
+
+    - name: "Dashboard Page Load Test"
+      scenario: "full page load"
+      vus: 20
+      duration: "2m"
+      thresholds:
+        p95_load_time: "<3000ms"
+
+security_tests:
+  - name: "RLS Enforcement"
+    test: "Attempt to access other org's data"
+    expected: "403 or empty results"
+
+  - name: "Authentication Required"
+    test: "Call API without token"
+    expected: "401 Unauthorized"
+
+  - name: "Role-Based Access"
+    test: "Operator attempts export"
+    expected: "403 Forbidden"
+
+test_data:
+  seed_script: "supabase/seed/04.1-dashboard-test-data.sql"
+  fixtures:
+    work_orders:
+      - "5 In Progress WOs"
+      - "2 Paused WOs"
+      - "12 Completed today"
+      - "47 Completed this week"
+      - "2 Delayed WOs"
+    wo_materials:
+      - "WO with 75% material availability"
+      - "WO with 100% availability"
+    production_lines:
+      - "Line A, B, C"
+    products:
+      - "Product 1, 2, 3"

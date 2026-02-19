@@ -1,0 +1,103 @@
+# Epic 10 - OEE & Performance Module Implementation Roadmap
+# Last Updated: 2026-01-15
+
+epic:
+  id: "10"
+  name: "OEE & Performance Analytics"
+  module: "oee"
+  type: "premium_addon"
+  status: "planning"
+  completion_pct: 0
+  priority: "P2"
+  pricing: "+$35/user/month"
+
+summary:
+  total_stories: 20
+  completed_stories: 0
+  remaining_stories: 20
+  phases: 4
+  estimated_days_total: 60-78
+  target_completion: "2026-08-15"
+  fr_count: 28
+
+phases:
+  - phase_id: "1A"
+    name: "MVP Core"
+    timeline: "Weeks 1-4"
+    stories: 5
+    estimated_days: 16-20
+    stories_list: ["10.1", "10.2", "10.3", "10.4", "10.5"]
+    deliverables: ["OEE calculation engine", "Downtime tracking", "Real-time dashboard"]
+
+  - phase_id: "1B"
+    name: "MVP Complete"
+    timeline: "Weeks 5-7"
+    stories: 4
+    estimated_days: 12-16
+    stories_list: ["10.6", "10.7", "10.8", "10.9"]
+    deliverables: ["Alerts", "Shift reports", "Energy tracking", "Trends"]
+
+  - phase_id: "2"
+    name: "Growth"
+    timeline: "Weeks 8-11"
+    stories: 6
+    estimated_days: 18-24
+    stories_list: ["10.10", "10.11", "10.12", "10.13", "10.14", "10.15"]
+    deliverables: ["Heatmaps", "Pareto", "Custom reports", "Email alerts"]
+
+  - phase_id: "3"
+    name: "Enterprise"
+    timeline: "Weeks 12-14"
+    stories: 5
+    estimated_days: 14-18
+    stories_list: ["10.16", "10.17", "10.18", "10.19", "10.20"]
+    deliverables: ["MTBF/MTTR", "Bottleneck", "Mobile logging", "BI export"]
+
+stories:
+  # Phase 1A
+  - {id: "10.1", name: "OEE Settings & Targets", phase: "1A", type: "backend", complexity: "M", estimate_days: "2-3", fr_ids: ["OEE-009"], status: "to_create"}
+  - {id: "10.2", name: "Downtime Reason Codes & Categories", phase: "1A", type: "fullstack", complexity: "M", estimate_days: "2-3", fr_ids: ["OEE-004", "OEE-005"], status: "to_create"}
+  - {id: "10.3", name: "Downtime Event Tracking", phase: "1A", type: "fullstack", complexity: "L", estimate_days: "4-5", fr_ids: ["OEE-003"], status: "to_create"}
+  - {id: "10.4", name: "OEE Calculation Engine", phase: "1A", type: "backend", complexity: "L", estimate_days: "5-6", fr_ids: ["OEE-001", "OEE-006", "OEE-007", "OEE-008"], status: "to_create"}
+  - {id: "10.5", name: "Real-Time Machine Dashboard", phase: "1A", type: "frontend", complexity: "L", estimate_days: "4-5", fr_ids: ["OEE-002"], status: "to_create"}
+
+  # Phase 1B
+  - {id: "10.6", name: "OEE Threshold Alerts", phase: "1B", type: "backend", complexity: "M", estimate_days: "3-4", fr_ids: ["OEE-010"], status: "to_create"}
+  - {id: "10.7", name: "Shift Report Generation", phase: "1B", type: "fullstack", complexity: "M", estimate_days: "3-4", fr_ids: ["OEE-011"], status: "to_create"}
+  - {id: "10.8", name: "Energy Consumption Tracking", phase: "1B", type: "fullstack", complexity: "M", estimate_days: "3-4", fr_ids: ["OEE-012", "OEE-013"], status: "to_create"}
+  - {id: "10.9", name: "Historical Trend Analysis", phase: "1B", type: "frontend", complexity: "M", estimate_days: "3-4", fr_ids: ["OEE-014", "OEE-015"], status: "to_create"}
+
+  # Phase 2
+  - {id: "10.10", name: "Machine Utilization Heatmap", phase: "2", type: "frontend", complexity: "M", estimate_days: "2-3", fr_ids: ["OEE-016"], status: "to_create"}
+  - {id: "10.11", name: "Downtime Pareto Analysis", phase: "2", type: "frontend", complexity: "M", estimate_days: "2-3", fr_ids: ["OEE-017"], status: "to_create"}
+  - {id: "10.12", name: "Performance Dashboard", phase: "2", type: "frontend", complexity: "L", estimate_days: "4-5", fr_ids: ["OEE-018"], status: "to_create"}
+  - {id: "10.13", name: "Custom Report Builder", phase: "2", type: "fullstack", complexity: "L", estimate_days: "4-5", fr_ids: ["OEE-019"], status: "to_create"}
+  - {id: "10.14", name: "Email Alerts & Shift Handover", phase: "2", type: "backend", complexity: "M", estimate_days: "3-4", fr_ids: ["OEE-020", "OEE-021"], status: "to_create"}
+  - {id: "10.15", name: "Production Rate Tracking", phase: "2", type: "backend", complexity: "M", estimate_days: "3-4", fr_ids: ["OEE-023"], status: "to_create"}
+
+  # Phase 3
+  - {id: "10.16", name: "MTBF/MTTR Calculation", phase: "3", type: "backend", complexity: "M", estimate_days: "3-4", fr_ids: ["OEE-022"], status: "to_create"}
+  - {id: "10.17", name: "Bottleneck Analysis", phase: "3", type: "fullstack", complexity: "M", estimate_days: "3-4", fr_ids: ["OEE-024"], status: "to_create"}
+  - {id: "10.18", name: "Mobile Downtime Logging", phase: "3", type: "frontend", complexity: "M", estimate_days: "3-4", fr_ids: ["OEE-025"], status: "to_create"}
+  - {id: "10.19", name: "TPM & Benchmarking", phase: "3", type: "fullstack", complexity: "M", estimate_days: "3-4", fr_ids: ["OEE-026", "OEE-027"], status: "to_create"}
+  - {id: "10.20", name: "Export to BI Tools", phase: "3", type: "backend", complexity: "M", estimate_days: "3-4", fr_ids: ["OEE-028"], status: "to_create"}
+
+dependencies:
+  cross_epic:
+    - {epic: "01", stories: ["01.1", "01.10"], provides: "organizations, machines, lines", status: "ready"}
+    - {epic: "02", stories: ["02.1", "02.7", "02.8"], provides: "products, routings, operations", status: "ready"}
+    - {epic: "03", stories: ["03.10"], provides: "work_orders", status: "ready"}
+    - {epic: "04", stories: ["04.2", "04.3", "04.4"], provides: "WO execution, operations, yield", status: "ready"}
+
+  within_epic:
+    - {story: "10.1", blocks: ["10.4", "10.6"]}
+    - {story: "10.2", blocks: ["10.3", "10.11"]}
+    - {story: "10.3", blocks: ["10.6", "10.11", "10.16"]}
+    - {story: "10.4", blocks: ["10.5", "10.6", "10.9", "10.12"]}
+    - {story: "10.6", blocks: ["10.14"]}
+    - {story: "10.7", blocks: ["10.14"]}
+
+metadata:
+  created: "2026-01-15"
+  version: "1.0"
+  author: "ORCHESTRATOR"

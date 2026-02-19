@@ -1,0 +1,393 @@
+# Story 10.1 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/oee-target-service.test.ts"
+    type: "unit"
+    description: "Unit tests for OEETargetService methods"
+  - path: "apps/frontend/lib/validation/__tests__/oee-target-validation.test.ts"
+    type: "unit"
+    description: "Unit tests for Zod validation schemas"
+  - path: "apps/frontend/components/oee/settings/__tests__/TargetFormModal.test.tsx"
+    type: "unit"
+    description: "Unit tests for target form modal component"
+  - path: "supabase/tests/performance_targets_rls.test.sql"
+    type: "integration"
+    description: "Integration tests for RLS policies"
+  - path: "apps/frontend/app/api/oee/targets/__tests__/api.test.ts"
+    type: "integration"
+    description: "Integration tests for all API endpoints"
+  - path: "tests/e2e/oee-targets-crud.spec.ts"
+    type: "e2e"
+    description: "E2E test for target CRUD workflow"
+
+# Acceptance Criteria
+acceptance_criteria:
+  # Database Schema
+  - id: "AC-01"
+    given: "performance_targets table is created"
+    when: "database schema is inspected"
+    then: "table has all columns with correct constraints"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-02"
+    given: "target created with organization scope"
+    when: "reference_id is NOT NULL"
+    then: "validation error: 'Organization targets must have NULL reference_id'"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-03"
+    given: "target created with machine scope"
+    when: "reference_id is NULL"
+    then: "validation error: 'Machine targets require valid reference_id'"
+    test_type: "unit"
+    priority: "P0"
+
+  # Target Hierarchy
+  - id: "AC-04"
+    given: "organization target = 85%, line target = 82%, machine target = 88%"
+    when: "resolving target for machine"
+    then: "returns machine target (88%) with source='machine'"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-05"
+    given: "organization target = 85%, line target = 82%, no machine target"
+    when: "resolving target for machine on line"
+    then: "returns line target (82%) with source='line'"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-06"
+    given: "organization target = 85%, no line/machine target"
+    when: "resolving target for machine"
+    then: "returns org target (85%) with source='organization'"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-07"
+    given: "no targets configured"
+    when: "resolving target for machine"
+    then: "returns default target (85%) with source='default'"
+    test_type: "integration"
+    priority: "P0"
+
+  # Threshold Validation
+  - id: "AC-08"
+    given: "creating target"
+    when: "critical_threshold = 90 and warning_threshold = 80"
+    then: "validation error: 'Critical threshold must be <= warning threshold'"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-09"
+    given: "creating target"
+    when: "warning_threshold = 105"
+    then: "validation error: 'Threshold must be between 0 and 100'"
+    test_type: "unit"
+    priority: "P0"
+
+  # Effective Date Validation
+  - id: "AC-10"
+    given: "creating target"
+    when: "expiry_date = 2025-01-01 and effective_date = 2025-06-01"
+    then: "validation error: 'Expiry date must be >= effective date'"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-11"
+    given: "target with effective_date = 2025-02-01"
+    when: "requesting active target on 2025-01-15"
+    then: "target not returned (not yet effective)"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-12"
+    given: "target with expiry_date = 2025-01-14"
+    when: "requesting active target on 2025-01-15"
+    then: "target not returned (expired)"
+    test_type: "integration"
+    priority: "P0"
+
+  # API Endpoints
+  - id: "AC-13"
+    given: "authenticated user"
+    when: "GET /api/oee/targets"
+    then: "returns all targets for user's org within 500ms"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-14"
+    given: "admin user"
+    when: "POST /api/oee/targets with valid data"
+    then: "target created and returned with 201 status"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-15"
+    given: "viewer role user"
+    when: "POST /api/oee/targets"
+    then: "403 Forbidden 'Insufficient permissions'"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-16"
+    given: "target belongs to Org B"
+    when: "User A (Org A) requests GET /api/oee/targets/:id"
+    then: "404 Not Found (RLS blocks cross-org access)"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-17"
+    given: "valid target ID"
+    when: "PATCH /api/oee/targets/:id with oee_target = 90"
+    then: "target updated and returned with updated_at timestamp changed"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-18"
+    given: "target exists with no dependencies"
+    when: "DELETE /api/oee/targets/:id"
+    then: "target deleted and returns 204 No Content"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-19"
+    given: "target is in use by OEE calculations"
+    when: "DELETE /api/oee/targets/:id"
+    then: "409 Conflict 'Target is in use. Set expiry date instead.'"
+    test_type: "integration"
+    priority: "P0"
+
+  # Frontend Components
+  - id: "AC-20"
+    given: "user navigates to /oee/settings/targets"
+    when: "page loads"
+    then: "DataTable displays with columns: Scope, Reference, OEE Target, Thresholds, Effective Date, Status, Actions"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-21"
+    given: "admin clicks [+ New Target]"
+    when: "modal opens"
+    then: "form displays with all fields (scope, reference, targets, thresholds, dates, notes)"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-22"
+    given: "creating target via modal"
+    when: "user fills valid data and clicks Create"
+    then: "target created, modal closes, success toast displayed, table refreshes"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-23"
+    given: "creating target with invalid data"
+    when: "critical > warning"
+    then: "form validation error displayed, submit disabled"
+    test_type: "e2e"
+    priority: "P0"
+
+  # RLS Policies
+  - id: "AC-24"
+    given: "User A from Org A and User B from Org B"
+    when: "both create targets"
+    then: "each user only sees their own org's targets"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  # Performance
+  - id: "AC-25"
+    given: "100 targets in organization"
+    when: "loading targets list"
+    then: "response time < 500ms"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-26"
+    given: "valid target data"
+    when: "creating target"
+    then: "operation completes < 300ms"
+    test_type: "integration"
+    priority: "P1"
+
+# Unit Test Cases
+unit_tests:
+  oee_target_service:
+    - name: "list() returns paginated targets"
+      expected: "Returns targets array with pagination metadata"
+
+    - name: "list() filters by target_type"
+      setup: "Mock targets with different types"
+      expected: "Returns only targets matching filter"
+
+    - name: "create() validates organization scope"
+      setup: "Input: target_type='organization', reference_id='uuid'"
+      expected: "Throws validation error"
+
+    - name: "create() validates line/machine scope"
+      setup: "Input: target_type='machine', reference_id=null"
+      expected: "Throws validation error"
+
+    - name: "resolveTarget() follows hierarchy (machine override)"
+      setup: "Machine target exists"
+      expected: "Returns machine target with source='machine'"
+
+    - name: "resolveTarget() follows hierarchy (line fallback)"
+      setup: "Line target exists, no machine target"
+      expected: "Returns line target with source='line'"
+
+    - name: "resolveTarget() returns default when no targets"
+      setup: "No targets configured"
+      expected: "Returns default 85% with source='default'"
+
+    - name: "isInUse() returns true when referenced"
+      setup: "Target ID referenced by oee_snapshots"
+      expected: "Returns true"
+
+  oee_target_validation:
+    - name: "createTargetSchema validates percentage range"
+      input: "oee_target: 105"
+      expected: "Validation fails with 'must be <= 100'"
+
+    - name: "createTargetSchema validates threshold order"
+      input: "critical_threshold: 90, warning_threshold: 80"
+      expected: "Validation fails with 'Critical <= warning'"
+
+    - name: "createTargetSchema validates reference_id based on type"
+      input: "target_type: 'organization', reference_id: 'uuid'"
+      expected: "Validation fails"
+
+# Integration Test Cases
+integration_tests:
+  api_endpoints:
+    - name: "GET /api/oee/targets returns org-filtered list"
+      setup: "Org A has 5 targets, Org B has 3 targets"
+      action: "User A requests GET /api/oee/targets"
+      expected: "200 OK with 5 targets (only Org A)"
+
+    - name: "POST /api/oee/targets creates target"
+      setup: "Admin user with valid target data"
+      action: "POST /api/oee/targets"
+      expected: "201 Created with target object"
+
+    - name: "POST /api/oee/targets enforces permissions"
+      setup: "Viewer user"
+      action: "POST /api/oee/targets"
+      expected: "403 Forbidden"
+
+    - name: "GET /api/oee/targets/resolve follows hierarchy"
+      setup: "Machine target = 88%, Line target = 82%, Org target = 85%"
+      action: "GET /api/oee/targets/resolve?type=machine&id={uuid}"
+      expected: "200 OK with effective_target = 88%, source = 'machine'"
+
+    - name: "DELETE /api/oee/targets blocks if in use"
+      setup: "Target referenced by oee_snapshots"
+      action: "DELETE /api/oee/targets/:id"
+      expected: "409 Conflict with usage warning"
+
+  rls_policies:
+    - name: "RLS isolates targets by org"
+      setup: "Org A target, Org B target"
+      action: "User A queries performance_targets"
+      expected: "Only Org A target visible"
+
+    - name: "RLS prevents cross-org update"
+      setup: "Org B target"
+      action: "User A attempts PATCH"
+      expected: "404 Not Found (RLS blocks access)"
+
+# E2E Test Cases
+e2e_tests:
+  - name: "Create organization-wide target"
+    steps:
+      - "Login as admin"
+      - "Navigate to /oee/settings/targets"
+      - "Click [+ New Target]"
+      - "Select scope: Organization"
+      - "Enter OEE target: 85"
+      - "Enter thresholds: warning 85, critical 75"
+      - "Click Create"
+    expected:
+      - "Success toast displayed"
+      - "Target appears in table"
+      - "Scope badge shows 'Organization'"
+
+  - name: "Edit machine-specific target"
+    steps:
+      - "Login as production manager"
+      - "Navigate to /oee/settings/targets"
+      - "Click [Edit] on machine target row"
+      - "Change OEE target from 88 to 90"
+      - "Click Save"
+    expected:
+      - "Success toast displayed"
+      - "Table updates with new value"
+      - "Updated_at timestamp changes"
+
+  - name: "Delete target and handle in-use warning"
+    steps:
+      - "Navigate to targets list"
+      - "Click [Delete] on target in use"
+    expected:
+      - "Error toast: 'Target is in use. Set expiry date instead.'"
+      - "Target not deleted"
+
+# Definition of Done
+definition_of_done:
+  - "performance_targets table created with all constraints"
+  - "OEE settings columns added to settings table"
+  - "All indexes created for performance"
+  - "RLS policies enforce org isolation"
+  - "GET /api/oee/targets returns filtered list within 500ms"
+  - "POST /api/oee/targets creates target with validation"
+  - "PATCH /api/oee/targets updates target"
+  - "DELETE /api/oee/targets handles in-use check"
+  - "GET /api/oee/targets/resolve follows hierarchy correctly"
+  - "Target form modal validates all inputs"
+  - "DataTable displays targets with sorting/filtering"
+  - "Permission enforcement works (admin/production_manager only)"
+  - "Unit tests achieve >80% coverage"
+  - "Integration tests cover all API endpoints"
+  - "E2E test covers full CRUD workflow"
+  - "RLS tests verify multi-org isolation"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    reason: "Core configuration functionality requires solid coverage"
+  integration:
+    target: 80
+    reason: "API endpoints and RLS policies must be thoroughly tested"
+  files:
+    - "lib/services/oee-target-service.ts: 80%"
+    - "lib/validation/oee-target-validation.ts: 90%"
+    - "components/oee/settings/TargetFormModal.tsx: 75%"
+    - "RLS policies: 100% of policy rules tested"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "Target hierarchy resolution complexity could lead to incorrect target selection"
+    mitigation: "Comprehensive hierarchy tests covering all fallback scenarios"
+    severity: "medium"
+    test_coverage: "integration_tests.api_endpoints"
+
+  - id: "RISK-02"
+    description: "RLS policies could leak cross-org target data"
+    mitigation: "Multi-org integration tests verify isolation"
+    severity: "high"
+    test_coverage: "integration_tests.rls_policies"
+
+  - id: "RISK-03"
+    description: "Date range validation could allow invalid targets (expiry < effective)"
+    mitigation: "Database CHECK constraint + validation schema"
+    severity: "low"
+    test_coverage: "unit_tests.oee_target_validation"

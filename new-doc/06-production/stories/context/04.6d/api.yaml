@@ -1,0 +1,384 @@
+# Story 04.6d - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  - method: "POST"
+    path: "/api/production/work-orders/:woId/consume/reverse"
+    description: "Reverse a material consumption - Manager/Admin only"
+    file: "apps/frontend/app/api/production/work-orders/[woId]/consume/reverse/route.ts"
+    auth: "required"
+    roles: ["production_manager", "admin", "owner"]
+    permission: "production.consumption.reverse"
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        woId: "UUID - Work Order ID"
+      body:
+        type: "ReverseConsumptionRequest"
+        schema:
+          consumption_id: "UUID - required - Consumption ID to reverse"
+          reason: "string - required - Reversal reason code"
+          notes: "string - optional - Additional notes"
+        example:
+          consumption_id: "123e4567-e89b-12d3-a456-426614174000"
+          reason: "scanned_wrong_lp"
+          notes: "Operator accidentally scanned LP-08851 instead of LP-08852"
+
+    response:
+      status: 200
+      type: "ConsumptionReversalResult"
+      schema:
+        success: "boolean"
+        consumption_id: "UUID"
+        wo_id: "UUID"
+        wo_number: "string"
+        lp_id: "UUID"
+        lp_number: "string"
+        restored_qty: "number"
+        lp_new_qty: "number"
+        lp_new_status: "string - 'available' or unchanged"
+        reversed_at: "ISO8601 timestamp"
+        reversed_by: "UUID"
+        reversed_by_name: "string"
+        reason: "string"
+        audit_log_id: "UUID"
+        message: "string"
+      example:
+        success: true
+        consumption_id: "123e4567-e89b-12d3-a456-426614174000"
+        wo_id: "456e4567-e89b-12d3-a456-426614174111"
+        wo_number: "WO-2025-0156"
+        lp_id: "789e4567-e89b-12d3-a456-426614174222"
+        lp_number: "LP-2025-08851"
+        restored_qty: 2.5
+        lp_new_qty: 25
+        lp_new_status: "available"
+        reversed_at: "2025-01-14T16:50:45.000Z"
+        reversed_by: "abc12345-e89b-12d3-a456-426614174333"
+        reversed_by_name: "Sarah Lee"
+        reason: "scanned_wrong_lp"
+        audit_log_id: "def67890-e89b-12d3-a456-426614174444"
+        message: "Consumption reversed successfully. LP-2025-08851 quantity restored to 25 kg"
+
+    errors:
+      - status: 400
+        code: "INVALID_CONSUMPTION_ID"
+        message: "Invalid consumption ID format"
+        when: "consumption_id is not a valid UUID"
+      - status: 400
+        code: "ALREADY_REVERSED"
+        message: "This consumption has already been reversed"
+        when: "Consumption.reversed = true"
+      - status: 400
+        code: "REASON_REQUIRED"
+        message: "Reason for reversal is required"
+        when: "reason field is empty or missing"
+      - status: 400
+        code: "INVALID_REASON"
+        message: "Invalid reversal reason. Must be one of: scanned_wrong_lp, wrong_quantity, operator_error, quality_issue, other"
+        when: "reason not in allowed values"
+      - status: 400
+        code: "NOTES_REQUIRED_FOR_OTHER"
+        message: "Notes are required when reason is 'other'"
+        when: "reason = 'other' and notes is empty"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token provided"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Only Managers and Admins can reverse consumptions"
+        when: "User role is not Manager/Admin"
+      - status: 404
+        code: "CONSUMPTION_NOT_FOUND"
+        message: "Consumption not found"
+        when: "Consumption doesn't exist or belongs to different org"
+      - status: 404
+        code: "WO_NOT_FOUND"
+        message: "Work order not found"
+        when: "WO doesn't exist or consumption doesn't belong to this WO"
+      - status: 500
+        code: "REVERSAL_FAILED"
+        message: "Failed to reverse consumption"
+        when: "Database error during reversal transaction"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/consumption-service.ts"
+    description: "Material consumption service - add reversal function"
+    exports:
+      - name: "reverseConsumption"
+        type: "async function"
+        params:
+          - "consumptionId: string"
+          - "reason: ReversalReason"
+          - "notes?: string"
+        returns: "Promise<ConsumptionReversalResult>"
+        description: "Reverse a consumption with full transaction"
+        implementation: |
+          // 1. Validate user role (Manager/Admin only)
+          // 2. Get consumption record
+          // 3. Validate not already reversed
+          // 4. Validate reason (required, valid value)
+          // 5. Start transaction:
+          //    a. Update material_consumptions (reversed = true, reversed_at, reversed_by, reason, notes)
+          //    b. Restore LP quantity (qty += consumed_qty)
+          //    c. Update LP status if was 'consumed' -> 'available'
+          //    d. Update lp_genealogy (is_reversed = true)
+          //    e. Create audit_log entry
+          // 6. Return result
+
+      - name: "canReverseConsumption"
+        type: "async function"
+        params:
+          - "consumptionId: string"
+        returns: "Promise<{ canReverse: boolean; reason?: string }>"
+        description: "Check if user can reverse this consumption"
+
+      - name: "getConsumptionForReversal"
+        type: "async function"
+        params:
+          - "consumptionId: string"
+        returns: "Promise<ConsumptionDetail>"
+        description: "Get consumption details for reversal modal"
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/production.ts"
+    description: "Production TypeScript interfaces - add reversal types"
+    exports:
+      - name: "ReversalReason"
+        type: "type"
+        definition: "'scanned_wrong_lp' | 'wrong_quantity' | 'operator_error' | 'quality_issue' | 'other'"
+
+      - name: "ReverseConsumptionRequest"
+        type: "interface"
+        fields:
+          - "consumption_id: string"
+          - "reason: ReversalReason"
+          - "notes?: string"
+
+      - name: "ConsumptionReversalResult"
+        type: "interface"
+        fields:
+          - "success: boolean"
+          - "consumption_id: string"
+          - "wo_id: string"
+          - "wo_number: string"
+          - "lp_id: string"
+          - "lp_number: string"
+          - "restored_qty: number"
+          - "lp_new_qty: number"
+          - "lp_new_status: LPStatus"
+          - "reversed_at: string"
+          - "reversed_by: string"
+          - "reversed_by_name: string"
+          - "reason: ReversalReason"
+          - "audit_log_id: string"
+          - "message: string"
+
+      - name: "ConsumptionHistoryItem"
+        type: "interface"
+        fields:
+          - "id: string"
+          - "lp_number: string"
+          - "product_code: string"
+          - "product_name: string"
+          - "batch_number: string"
+          - "expiry_date: string | null"
+          - "consumed_qty: number"
+          - "uom: string"
+          - "consumed_at: string"
+          - "consumed_by_name: string"
+          - "consumed_by_role: string"
+          - "reversed: boolean"
+          - "reversed_at: string | null"
+          - "reversed_by_name: string | null"
+          - "reversal_reason: ReversalReason | null"
+
+# Validation
+validation:
+  - path: "apps/frontend/lib/validation/production-schemas.ts"
+    description: "Zod schemas for production validation - add reversal schema"
+    exports:
+      - name: "reverseConsumptionSchema"
+        type: "zod schema"
+        schema: |
+          z.object({
+            consumption_id: z.string().uuid('Invalid consumption ID'),
+            reason: z.enum(
+              ['scanned_wrong_lp', 'wrong_quantity', 'operator_error', 'quality_issue', 'other'],
+              { required_error: 'Reason for reversal is required' }
+            ),
+            notes: z.string().max(500, 'Notes must be 500 characters or less').optional()
+          }).refine(
+            (data) => data.reason !== 'other' || (data.notes && data.notes.trim().length > 0),
+            {
+              message: 'Notes are required when reason is "other"',
+              path: ['notes']
+            }
+          )
+
+      - name: "reversalReasonLabels"
+        type: "const"
+        value: |
+          {
+            scanned_wrong_lp: 'Scanned Wrong LP',
+            wrong_quantity: 'Wrong Quantity Entered',
+            operator_error: 'Operator Error',
+            quality_issue: 'Quality Issue',
+            other: 'Other (specify)'
+          }
+
+# Implementation Pattern
+patterns:
+  api_route: |
+    // apps/frontend/app/api/production/work-orders/[woId]/consume/reverse/route.ts
+    import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+    import { cookies } from 'next/headers';
+    import { NextResponse } from 'next/server';
+    import { reverseConsumption } from '@/lib/services/consumption-service';
+    import { reverseConsumptionSchema } from '@/lib/validation/production-schemas';
+    import { hasRole, getOrgContext } from '@/lib/services/org-context-service';
+
+    export async function POST(
+      request: Request,
+      { params }: { params: { woId: string } }
+    ) {
+      const supabase = createRouteHandlerClient({ cookies });
+
+      // 1. Auth check
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      // 2. Role check - Manager/Admin only
+      const context = await getOrgContext();
+      if (!context || !hasRole(context, ['admin', 'production_manager', 'owner'])) {
+        return NextResponse.json(
+          { error: 'Only Managers and Admins can reverse consumptions' },
+          { status: 403 }
+        );
+      }
+
+      // 3. Parse and validate body
+      const body = await request.json();
+      const validation = reverseConsumptionSchema.safeParse(body);
+      if (!validation.success) {
+        return NextResponse.json(
+          { error: validation.error.errors[0].message },
+          { status: 400 }
+        );
+      }
+
+      // 4. Call service
+      try {
+        const result = await reverseConsumption(
+          validation.data.consumption_id,
+          validation.data.reason,
+          validation.data.notes
+        );
+        return NextResponse.json(result);
+      } catch (error) {
+        const errorMap = {
+          'ALREADY_REVERSED': 400,
+          'CONSUMPTION_NOT_FOUND': 404,
+          'WO_NOT_FOUND': 404,
+        };
+        const status = errorMap[error.code] || 500;
+        return NextResponse.json({ error: error.message }, { status });
+      }
+    }
+
+  service_pattern: |
+    // In apps/frontend/lib/services/consumption-service.ts
+    export async function reverseConsumption(
+      consumptionId: string,
+      reason: ReversalReason,
+      notes?: string
+    ): Promise<ConsumptionReversalResult> {
+      const supabase = createClientComponentClient();
+
+      // 1. Get consumption
+      const { data: consumption, error: fetchError } = await supabase
+        .from('material_consumptions')
+        .select(`
+          *,
+          lp:license_plates(id, lp_number, qty, status),
+          wo:work_orders(id, wo_number)
+        `)
+        .eq('id', consumptionId)
+        .single();
+
+      if (fetchError || !consumption) {
+        throw { code: 'CONSUMPTION_NOT_FOUND', message: 'Consumption not found' };
+      }
+
+      if (consumption.reversed) {
+        throw { code: 'ALREADY_REVERSED', message: 'This consumption has already been reversed' };
+      }
+
+      // 2. Calculate new LP qty
+      const newLpQty = consumption.lp.qty + consumption.quantity;
+      const newLpStatus = consumption.lp.status === 'consumed' ? 'available' : consumption.lp.status;
+
+      // 3. Execute reversal transaction (using RPC for atomicity)
+      const { data: result, error: reversalError } = await supabase.rpc('reverse_consumption', {
+        p_consumption_id: consumptionId,
+        p_reason: reason,
+        p_notes: notes || null,
+        p_new_lp_qty: newLpQty,
+        p_new_lp_status: newLpStatus
+      });
+
+      if (reversalError) {
+        console.error('Reversal failed:', reversalError);
+        throw { code: 'REVERSAL_FAILED', message: 'Failed to reverse consumption' };
+      }
+
+      return {
+        success: true,
+        consumption_id: consumptionId,
+        wo_id: consumption.wo.id,
+        wo_number: consumption.wo.wo_number,
+        lp_id: consumption.lp.id,
+        lp_number: consumption.lp.lp_number,
+        restored_qty: consumption.quantity,
+        lp_new_qty: newLpQty,
+        lp_new_status: newLpStatus,
+        reversed_at: result.reversed_at,
+        reversed_by: result.reversed_by,
+        reversed_by_name: result.reversed_by_name,
+        reason: reason,
+        audit_log_id: result.audit_log_id,
+        message: `Consumption reversed successfully. ${consumption.lp.lp_number} quantity restored to ${newLpQty} ${consumption.uom}`
+      };
+    }
+
+# Error Handling
+error_handling:
+  table:
+    - scenario: "Consumption not found"
+      http_status: 404
+      error_message: "Consumption not found"
+      action: "Return error, do not log stack trace"
+    - scenario: "Already reversed"
+      http_status: 400
+      error_message: "This consumption has already been reversed"
+      action: "Return error"
+    - scenario: "Not Manager/Admin"
+      http_status: 403
+      error_message: "Only Managers and Admins can reverse consumptions"
+      action: "Return error, log access attempt"
+    - scenario: "Reason missing"
+      http_status: 400
+      error_message: "Reason for reversal is required"
+      action: "Return validation error"
+    - scenario: "Database error during transaction"
+      http_status: 500
+      error_message: "Failed to reverse consumption"
+      action: "Log full error, rollback transaction, return generic error"

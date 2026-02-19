@@ -1,0 +1,606 @@
+# Story 02.5a - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+# API Endpoints
+endpoints:
+  # List BOM Items
+  - method: "GET"
+    path: "/api/v1/technical/boms/:id/items"
+    description: "Returns all items for a specific BOM"
+    file: "apps/frontend/app/api/v1/technical/boms/[id]/items/route.ts"
+    auth: "required"
+    roles: ["*"]  # All authenticated users with technical.R permission
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        id: "UUID - BOM ID"
+
+    response:
+      status: 200
+      type: "BOMItemsListResponse"
+      schema:
+        items:
+          - id: "UUID"
+            bom_id: "UUID"
+            product_id: "UUID"
+            product_code: "string"
+            product_name: "string"
+            product_type: "string (RM|ING|PKG|WIP)"
+            product_base_uom: "string"
+            quantity: "number"
+            uom: "string"
+            sequence: "number"
+            operation_seq: "number | null"
+            operation_name: "string | null"
+            scrap_percent: "number"
+            notes: "string | null"
+            created_at: "string (ISO date)"
+            updated_at: "string (ISO date)"
+        total: "number"
+        bom_output_qty: "number"
+        bom_output_uom: "string"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token provided"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Permission denied"
+        when: "User lacks technical.R permission"
+      - status: 404
+        code: "BOM_NOT_FOUND"
+        message: "BOM not found"
+        when: "BOM ID not found or belongs to different org"
+
+  # Create BOM Item
+  - method: "POST"
+    path: "/api/v1/technical/boms/:id/items"
+    description: "Add a new item to a BOM"
+    file: "apps/frontend/app/api/v1/technical/boms/[id]/items/route.ts"
+    auth: "required"
+    roles: ["SUPER_ADMIN", "ADMIN", "PRODUCTION_MANAGER"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        id: "UUID - BOM ID"
+      body:
+        product_id: "UUID (required)"
+        quantity: "number (required, > 0, max 6 decimals)"
+        uom: "string (required)"
+        sequence: "number (optional, default: max+10)"
+        operation_seq: "number | null (optional)"
+        scrap_percent: "number (optional, default: 0, range 0-100)"
+        notes: "string | null (optional, max 500 chars)"
+
+    response:
+      status: 201
+      type: "BOMItemResponse"
+      schema:
+        item:
+          id: "UUID"
+          bom_id: "UUID"
+          product_id: "UUID"
+          product_code: "string"
+          product_name: "string"
+          product_type: "string"
+          quantity: "number"
+          uom: "string"
+          sequence: "number"
+          operation_seq: "number | null"
+          operation_name: "string | null"
+          scrap_percent: "number"
+          notes: "string | null"
+          created_at: "string"
+          updated_at: "string"
+        warnings:
+          - code: "UOM_MISMATCH"
+            message: "UoM does not match component base UoM"
+            details: "Component base UoM is 'kg', you entered 'L'"
+
+    errors:
+      - status: 400
+        code: "VALIDATION_ERROR"
+        message: "Validation failed"
+        when: "Invalid request body (quantity <= 0, invalid UUID, etc.)"
+      - status: 400
+        code: "INVALID_QUANTITY"
+        message: "Quantity must be greater than 0"
+        when: "quantity <= 0"
+      - status: 400
+        code: "DECIMAL_PRECISION"
+        message: "Maximum 6 decimal places allowed"
+        when: "quantity has more than 6 decimal places"
+      - status: 400
+        code: "INVALID_OPERATION"
+        message: "Operation does not exist in assigned routing"
+        when: "operation_seq not found in BOM's routing"
+      - status: 400
+        code: "NO_ROUTING"
+        message: "Cannot assign operation: BOM has no routing assigned"
+        when: "operation_seq provided but BOM has no routing_id"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Permission denied"
+        when: "User lacks technical.C permission"
+      - status: 404
+        code: "BOM_NOT_FOUND"
+        message: "BOM not found"
+        when: "BOM ID not found"
+      - status: 404
+        code: "PRODUCT_NOT_FOUND"
+        message: "Component product not found"
+        when: "product_id not found"
+      - status: 409
+        code: "DUPLICATE_COMPONENT"
+        message: "Component already exists in this BOM"
+        when: "Same product_id already in BOM"
+
+  # Update BOM Item
+  - method: "PUT"
+    path: "/api/v1/technical/boms/:id/items/:itemId"
+    description: "Update an existing BOM item"
+    file: "apps/frontend/app/api/v1/technical/boms/[id]/items/[itemId]/route.ts"
+    auth: "required"
+    roles: ["SUPER_ADMIN", "ADMIN", "PRODUCTION_MANAGER"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        id: "UUID - BOM ID"
+        itemId: "UUID - BOM Item ID"
+      body:
+        quantity: "number (optional, > 0, max 6 decimals)"
+        uom: "string (optional)"
+        sequence: "number (optional)"
+        operation_seq: "number | null (optional)"
+        scrap_percent: "number (optional, range 0-100)"
+        notes: "string | null (optional, max 500 chars)"
+
+    response:
+      status: 200
+      type: "BOMItemResponse"
+      schema:
+        item: "BOMItem (same as create)"
+        warnings: "Warning[] (same as create)"
+
+    errors:
+      - status: 400
+        code: "VALIDATION_ERROR"
+        message: "Validation failed"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Permission denied"
+        when: "User lacks technical.U permission"
+      - status: 404
+        code: "BOM_NOT_FOUND"
+        message: "BOM not found"
+      - status: 404
+        code: "ITEM_NOT_FOUND"
+        message: "BOM item not found"
+
+  # Delete BOM Item
+  - method: "DELETE"
+    path: "/api/v1/technical/boms/:id/items/:itemId"
+    description: "Remove an item from a BOM"
+    file: "apps/frontend/app/api/v1/technical/boms/[id]/items/[itemId]/route.ts"
+    auth: "required"
+    roles: ["SUPER_ADMIN", "ADMIN", "PRODUCTION_MANAGER"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        id: "UUID - BOM ID"
+        itemId: "UUID - BOM Item ID"
+
+    response:
+      status: 200
+      type: "DeleteResponse"
+      schema:
+        success: true
+        message: "BOM item deleted successfully"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Permission denied"
+        when: "User lacks technical.D permission"
+      - status: 404
+        code: "BOM_NOT_FOUND"
+        message: "BOM not found"
+      - status: 404
+        code: "ITEM_NOT_FOUND"
+        message: "BOM item not found"
+
+  # Get Next Sequence
+  - method: "GET"
+    path: "/api/v1/technical/boms/:id/items/next-sequence"
+    description: "Returns next sequence number for auto-increment"
+    file: "apps/frontend/app/api/v1/technical/boms/[id]/items/next-sequence/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    response:
+      status: 200
+      type: "NextSequenceResponse"
+      schema:
+        next_sequence: "number (max_sequence + 10)"
+
+# Supporting Endpoints (for lookups)
+supporting_endpoints:
+  - method: "GET"
+    path: "/api/v1/technical/products"
+    description: "Product list for component selector"
+    filter: "product_type IN ('RM', 'ING', 'PKG', 'WIP'), status = 'active'"
+    fields: ["id", "code", "name", "product_type", "base_uom", "cost_per_unit"]
+
+  - method: "GET"
+    path: "/api/v1/technical/routings/:routingId/operations"
+    description: "Operations list for operation assignment dropdown"
+    fields: ["sequence", "name"]
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/bom-items-service.ts"
+    description: "BOM items CRUD operations"
+    exports:
+      - name: "getBOMItems"
+        type: "async function"
+        params:
+          - "bomId: string"
+        returns: "Promise<BOMItemsListResponse>"
+        description: "Fetch all items for a BOM"
+
+      - name: "createBOMItem"
+        type: "async function"
+        params:
+          - "bomId: string"
+          - "data: CreateBOMItemRequest"
+        returns: "Promise<BOMItemResponse>"
+        description: "Create a new BOM item"
+
+      - name: "updateBOMItem"
+        type: "async function"
+        params:
+          - "bomId: string"
+          - "itemId: string"
+          - "data: UpdateBOMItemRequest"
+        returns: "Promise<BOMItemResponse>"
+        description: "Update an existing BOM item"
+
+      - name: "deleteBOMItem"
+        type: "async function"
+        params:
+          - "bomId: string"
+          - "itemId: string"
+        returns: "Promise<DeleteResponse>"
+        description: "Delete a BOM item"
+
+      - name: "getNextSequence"
+        type: "async function"
+        params:
+          - "bomId: string"
+        returns: "Promise<number>"
+        description: "Get next available sequence (max + 10)"
+
+# TypeScript Types
+types:
+  - path: "apps/frontend/lib/types/bom-items.ts"
+    description: "BOM items TypeScript interfaces"
+    exports:
+      - "BOMItem"
+      - "CreateBOMItemRequest"
+      - "UpdateBOMItemRequest"
+      - "BOMItemsListResponse"
+      - "BOMItemResponse"
+
+# Validation Schemas (Zod)
+validation:
+  - path: "apps/frontend/lib/validation/bom-items.ts"
+    description: "Zod schemas for BOM items"
+    schemas:
+      - name: "bomItemSchema"
+        fields:
+          product_id: "z.string().uuid('Component is required')"
+          quantity: |
+            z.number()
+              .positive('Quantity must be greater than 0')
+              .refine(val => {
+                const decimals = (val.toString().split('.')[1] || '').length;
+                return decimals <= 6;
+              }, 'Maximum 6 decimal places allowed')
+          uom: "z.string().min(1, 'Unit of measure is required')"
+          sequence: "z.number().int().min(0).optional().default(0)"
+          operation_seq: "z.number().int().nullable().optional()"
+          scrap_percent: "z.number().min(0).max(100).optional().default(0)"
+          notes: "z.string().max(500).nullable().optional()"
+
+      - name: "createBOMItemSchema"
+        extends: "bomItemSchema"
+        description: "Schema for creating BOM items"
+
+      - name: "updateBOMItemSchema"
+        description: "Schema for updating BOM items (all fields optional except id)"
+        fields: "bomItemSchema.partial()"
+
+# Implementation Patterns
+patterns:
+  api_route_list: |
+    // apps/frontend/app/api/v1/technical/boms/[id]/items/route.ts
+    import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+    import { cookies } from 'next/headers';
+    import { NextResponse } from 'next/server';
+    import { getOrgContext, hasPermission } from '@/lib/services/org-context-service';
+
+    export async function GET(
+      request: Request,
+      { params }: { params: { id: string } }
+    ) {
+      const context = await getOrgContext();
+      if (!context) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      if (!hasPermission(context, 'technical', 'R')) {
+        return NextResponse.json({ error: 'Permission denied' }, { status: 403 });
+      }
+
+      const supabase = createRouteHandlerClient({ cookies });
+
+      // Verify BOM exists and belongs to org
+      const { data: bom, error: bomError } = await supabase
+        .from('boms')
+        .select('id, output_qty, output_uom, routing_id')
+        .eq('id', params.id)
+        .single();
+
+      if (bomError || !bom) {
+        return NextResponse.json({ error: 'BOM not found' }, { status: 404 });
+      }
+
+      // Fetch items with product join
+      const { data: items, error: itemsError } = await supabase
+        .from('bom_items')
+        .select(`
+          *,
+          product:products(id, code, name, product_type_id, base_uom, cost_per_unit),
+          product_type:products!inner(product_types(code))
+        `)
+        .eq('bom_id', params.id)
+        .order('sequence', { ascending: true });
+
+      if (itemsError) {
+        return NextResponse.json({ error: 'Failed to fetch items' }, { status: 500 });
+      }
+
+      // Get operation names if routing exists
+      let operations: Record<number, string> = {};
+      if (bom.routing_id) {
+        const { data: ops } = await supabase
+          .from('routing_operations')
+          .select('sequence, name')
+          .eq('routing_id', bom.routing_id);
+        operations = Object.fromEntries(ops?.map(o => [o.sequence, o.name]) || []);
+      }
+
+      return NextResponse.json({
+        items: items.map(item => ({
+          ...item,
+          product_code: item.product.code,
+          product_name: item.product.name,
+          product_type: item.product_type?.product_types?.code || 'UNKNOWN',
+          product_base_uom: item.product.base_uom,
+          operation_name: item.operation_seq ? operations[item.operation_seq] || null : null,
+        })),
+        total: items.length,
+        bom_output_qty: bom.output_qty,
+        bom_output_uom: bom.output_uom,
+      });
+    }
+
+  api_route_create: |
+    // apps/frontend/app/api/v1/technical/boms/[id]/items/route.ts (POST)
+    export async function POST(
+      request: Request,
+      { params }: { params: { id: string } }
+    ) {
+      const context = await getOrgContext();
+      if (!context) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      if (!hasPermission(context, 'technical', 'C')) {
+        return NextResponse.json({ error: 'Permission denied' }, { status: 403 });
+      }
+
+      const body = await request.json();
+
+      // Validate with Zod
+      const validation = createBOMItemSchema.safeParse(body);
+      if (!validation.success) {
+        return NextResponse.json({
+          error: 'Validation failed',
+          details: validation.error.errors
+        }, { status: 400 });
+      }
+
+      const supabase = createRouteHandlerClient({ cookies });
+
+      // Verify BOM exists
+      const { data: bom, error: bomError } = await supabase
+        .from('boms')
+        .select('id, routing_id')
+        .eq('id', params.id)
+        .single();
+
+      if (bomError || !bom) {
+        return NextResponse.json({ error: 'BOM not found' }, { status: 404 });
+      }
+
+      // Validate operation_seq if provided
+      if (body.operation_seq) {
+        if (!bom.routing_id) {
+          return NextResponse.json({
+            error: 'Cannot assign operation: BOM has no routing assigned'
+          }, { status: 400 });
+        }
+
+        const { data: op } = await supabase
+          .from('routing_operations')
+          .select('sequence')
+          .eq('routing_id', bom.routing_id)
+          .eq('sequence', body.operation_seq)
+          .single();
+
+        if (!op) {
+          return NextResponse.json({
+            error: 'Operation does not exist in assigned routing'
+          }, { status: 400 });
+        }
+      }
+
+      // Auto-sequence if not provided
+      let sequence = body.sequence;
+      if (sequence === undefined || sequence === null) {
+        const { data: maxSeq } = await supabase
+          .from('bom_items')
+          .select('sequence')
+          .eq('bom_id', params.id)
+          .order('sequence', { ascending: false })
+          .limit(1)
+          .single();
+
+        sequence = (maxSeq?.sequence || 0) + 10;
+      }
+
+      // Insert item
+      const { data: item, error: insertError } = await supabase
+        .from('bom_items')
+        .insert({
+          bom_id: params.id,
+          product_id: body.product_id,
+          quantity: body.quantity,
+          uom: body.uom,
+          sequence,
+          operation_seq: body.operation_seq || null,
+          scrap_percent: body.scrap_percent || 0,
+          notes: body.notes || null,
+        })
+        .select()
+        .single();
+
+      if (insertError) {
+        // Check for constraint violations
+        if (insertError.code === '23514') {  // CHECK constraint
+          return NextResponse.json({
+            error: 'Quantity must be greater than 0'
+          }, { status: 400 });
+        }
+        return NextResponse.json({ error: insertError.message }, { status: 500 });
+      }
+
+      // Check for UoM mismatch warning
+      const warnings = [];
+      const { data: product } = await supabase
+        .from('products')
+        .select('base_uom')
+        .eq('id', body.product_id)
+        .single();
+
+      if (product && product.base_uom !== body.uom) {
+        warnings.push({
+          code: 'UOM_MISMATCH',
+          message: 'UoM does not match component base UoM',
+          details: `Component base UoM is '${product.base_uom}', you entered '${body.uom}'`
+        });
+      }
+
+      return NextResponse.json({ item, warnings }, { status: 201 });
+    }
+
+  service_pattern: |
+    // apps/frontend/lib/services/bom-items-service.ts
+    import { BOMItem, CreateBOMItemRequest, UpdateBOMItemRequest, BOMItemsListResponse, BOMItemResponse } from '@/lib/types/bom-items';
+
+    const API_BASE = '/api/v1/technical/boms';
+
+    export async function getBOMItems(bomId: string): Promise<BOMItemsListResponse> {
+      const response = await fetch(`${API_BASE}/${bomId}/items`);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to fetch BOM items');
+      }
+      return response.json();
+    }
+
+    export async function createBOMItem(
+      bomId: string,
+      data: CreateBOMItemRequest
+    ): Promise<BOMItemResponse> {
+      const response = await fetch(`${API_BASE}/${bomId}/items`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to create BOM item');
+      }
+      return response.json();
+    }
+
+    export async function updateBOMItem(
+      bomId: string,
+      itemId: string,
+      data: UpdateBOMItemRequest
+    ): Promise<BOMItemResponse> {
+      const response = await fetch(`${API_BASE}/${bomId}/items/${itemId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to update BOM item');
+      }
+      return response.json();
+    }
+
+    export async function deleteBOMItem(
+      bomId: string,
+      itemId: string
+    ): Promise<{ success: boolean; message: string }> {
+      const response = await fetch(`${API_BASE}/${bomId}/items/${itemId}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to delete BOM item');
+      }
+      return response.json();
+    }
+
+    export async function getNextSequence(bomId: string): Promise<number> {
+      const response = await fetch(`${API_BASE}/${bomId}/items/next-sequence`);
+      if (!response.ok) return 10;  // Default if fails
+      const data = await response.json();
+      return data.next_sequence;
+    }

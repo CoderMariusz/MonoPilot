@@ -1,0 +1,37 @@
+# Story 10.6 - Frontend Specification
+# OEE Threshold Alerts
+
+types:
+  - path: "apps/frontend/lib/types/oee-alert.ts"
+    exports: ["PerformanceAlert", "AlertType", "AlertSeverity"]
+
+components:
+  - path: "apps/frontend/components/oee/alerts/AlertsDataTable.tsx"
+    description: "DataTable for alerts with severity badges"
+    columns: ["Severity", "Type", "Machine", "Metric", "Actual vs Threshold", "Triggered", "Status", "Actions"]
+
+  - path: "apps/frontend/components/oee/alerts/AlertCard.tsx"
+    description: "Alert card for dashboard sidebar"
+    variants:
+      - { severity: "critical", color: "red", icon: "AlertCircle" }
+      - { severity: "warning", color: "yellow", icon: "AlertTriangle" }
+
+  - path: "apps/frontend/components/oee/alerts/AlertNotification.tsx"
+    description: "Toast notification for new alerts"
+
+pages:
+  - path: "apps/frontend/app/(authenticated)/oee/alerts/page.tsx"
+    route: "/oee/alerts"
+    title: "Performance Alerts"
+    components: ["AlertsDataTable"]
+
+hooks:
+  - name: "useActiveAlerts"
+    type: "query"
+    queryKey: "['oee-alerts', 'active']"
+    refetchInterval: 15000
+
+ux:
+  patterns:
+    notification: "ShadCN Toast with severity color"
+    badge: "Critical=red, Warning=yellow"

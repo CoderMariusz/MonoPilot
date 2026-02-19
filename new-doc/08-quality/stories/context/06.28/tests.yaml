@@ -1,0 +1,127 @@
+# Story 06.28 - CoA Generation Engine Test Specifications
+
+unit_tests:
+  file: lib/services/__tests__/coa-service.test.ts
+  coverage: ">80%"
+
+  test_suites:
+    - suite: "CoAService.generate"
+      tests:
+        - "generates CoA from batch with final inspection"
+        - "generates CoA number correctly"
+        - "populates coa_parameters from test results"
+        - "snapshots template data (header, footer, logo)"
+        - "throws error if final inspection not complete"
+        - "uses active template for product"
+        - "allows template override"
+
+    - suite: "CoAService.populateParameters"
+      tests:
+        - "creates coa_parameters from quality_test_results"
+        - "preserves test result snapshot"
+        - "sets display_order correctly"
+        - "handles missing values gracefully"
+
+    - suite: "CoAService.approve"
+      tests:
+        - "verifies password correctly"
+        - "sets approved_by, approved_at"
+        - "encrypts approval_signature"
+        - "sets is_locked = true (trigger)"
+        - "requires approval_meaning"
+        - "returns error for incorrect password"
+
+    - suite: "CoAService.void"
+      tests:
+        - "sets status = 'void'"
+        - "preserves immutability (is_locked remains true)"
+        - "records void_reason, voided_by, voided_at"
+        - "only works on approved CoAs"
+
+    - suite: "CoAService.regenerate"
+      tests:
+        - "deletes old parameters"
+        - "repopulates from latest test results"
+        - "only works on draft CoAs"
+        - "throws error for approved CoAs"
+
+integration_tests:
+  file: app/api/quality/coas/__tests__/route.test.ts
+
+  test_suites:
+    - endpoint: "POST /api/quality/coas/generate"
+      tests:
+        - "generates CoA with valid batch_id"
+        - "returns 400 if batch not found"
+        - "returns 400 if final inspection not complete"
+        - "populates parameters correctly"
+        - "enforces org_id from auth"
+
+    - endpoint: "POST /api/quality/coas/:id/approve"
+      tests:
+        - "approves CoA with correct password"
+        - "returns 400 for incorrect password"
+        - "returns 400 if approval_meaning missing"
+        - "sets is_locked = true"
+        - "returns 403 for non-QA_MANAGER"
+
+    - endpoint: "POST /api/quality/coas/:id/void"
+      tests:
+        - "voids approved CoA"
+        - "returns 400 if void_reason missing"
+        - "returns 400 for non-approved CoA"
+        - "preserves immutability"
+
+e2e_tests:
+  file: e2e/quality/coas.spec.ts
+
+  scenarios:
+    - name: "Generate and approve CoA workflow"
+      steps:
+        - "Navigate to Quality > Certificates of Analysis"
+        - "Click [Generate CoA]"
+        - "Select batch from dropdown"
+        - "Click [Generate]"
+        - "Verify CoA created with parameters"
+        - "Verify status = 'draft'"
+        - "Click [Submit for Approval]"
+        - "Login as QA_MANAGER"
+        - "Navigate to CoA"
+        - "Click [Approve]"
+        - "Enter password"
+        - "Enter approval meaning"
+        - "Click [Sign and Approve]"
+        - "Verify status = 'approved'"
+        - "Verify is_locked = true"
+        - "Verify all fields read-only"
+
+    - name: "Void approved CoA"
+      steps:
+        - "Navigate to approved CoA"
+        - "Click [Void CoA]"
+        - "Enter void reason"
+        - "Confirm"
+        - "Verify status = 'void'"
+        - "Verify void reason saved"
+        - "Verify CoA still immutable"
+
+acceptance_criteria_mapping:
+  AC-1: "unit_tests.table_creation"
+  AC-2: "unit_tests.CoAService.generateCoANumber"
+  AC-3: "unit_tests.CoAService.generate"
+  AC-4: "unit_tests.CoAService.populateParameters"
+  AC-5: "integration_tests.POST generate"
+  AC-6: "e2e_tests.generate_and_approve_workflow"
+  AC-7: "unit_tests.CoAService.approve (e-signature)"
+  AC-8: "unit_tests.CoAService.regenerate"
+  AC-11: "e2e_tests.void_coa"
+
+performance_tests:
+  - name: "CoA generation with 30 test results"
+    target: "<2s generation time"
+
+  - name: "CoA list with 500 records"
+    target: "<500ms response time"
+
+  - name: "CoA detail with 30 parameters"
+    target: "<500ms load time"

@@ -1,0 +1,178 @@
+# Story 06.37 - Quality Dashboard API Context
+# Endpoints, request/response schemas
+
+endpoints:
+  - method: GET
+    path: /api/quality/dashboard/kpis
+    description: "Get all KPIs for dashboard"
+    auth: true
+    roles: [QA_INSPECTOR, QA_MANAGER, QUALITY_DIRECTOR]
+    query_params:
+      - date_from: string (ISO date, optional)
+      - date_to: string (ISO date, optional)
+    response:
+      kpis:
+        first_pass_yield:
+          current: number
+          target: number
+          trend: 'up' | 'down' | 'stable'
+          previous_period: number
+        ncr_rate:
+          current: number
+          target: number
+          trend: 'up' | 'down' | 'stable'
+          previous_period: number
+        ccp_compliance:
+          current: number
+          target: number
+          trend: 'up' | 'down' | 'stable'
+          previous_period: number
+        inspection_backlog:
+          current: number
+          target: number
+          trend: 'up' | 'down' | 'stable'
+          breakdown: { scheduled: number, in_progress: number }
+        capa_closure_rate:
+          current: number
+          target: number
+          trend: 'up' | 'down' | 'stable'
+          overdue_count: number
+      refreshed_at: string
+
+  - method: GET
+    path: /api/quality/dashboard/ncr-trend
+    description: "Get NCR trend data over time"
+    auth: true
+    roles: [QA_INSPECTOR, QA_MANAGER, QUALITY_DIRECTOR]
+    query_params:
+      - date_from: string
+      - date_to: string
+      - bucket: 'day' | 'week' | 'month' (optional, auto-calculated)
+    response:
+      data:
+        - date: string
+          total: number
+          critical: number
+          major: number
+          minor: number
+
+  - method: GET
+    path: /api/quality/dashboard/defect-pareto
+    description: "Get defect Pareto data (top 10 defect types)"
+    auth: true
+    roles: [QA_MANAGER, QUALITY_DIRECTOR]
+    query_params:
+      - date_from: string
+      - date_to: string
+      - limit: number (default 10)
+    response:
+      data:
+        - defect_type: string
+          count: number
+          severity: 'critical' | 'major' | 'minor'
+          percentage: number
+          cumulative_percentage: number
+
+  - method: GET
+    path: /api/quality/dashboard/inspection-status
+    description: "Get inspection status breakdown"
+    auth: true
+    roles: [QA_INSPECTOR, QA_MANAGER, QUALITY_DIRECTOR]
+    query_params:
+      - date_from: string
+      - date_to: string
+    response:
+      data:
+        scheduled: number
+        in_progress: number
+        completed: number
+        cancelled: number
+      total: number
+
+  - method: GET
+    path: /api/quality/dashboard/supplier-heatmap
+    description: "Get supplier quality heatmap data"
+    auth: true
+    roles: [QA_MANAGER, QUALITY_DIRECTOR]
+    query_params:
+      - limit: number (default 10)
+    response:
+      suppliers:
+        - supplier_id: string
+          supplier_name: string
+          defect_rate: number
+          on_time_rate: number
+          coa_compliance: number
+          overall_score: number
+
+  - method: POST
+    path: /api/quality/dashboard/export-pdf
+    description: "Export dashboard as PDF"
+    auth: true
+    roles: [QA_MANAGER, QUALITY_DIRECTOR]
+    body:
+      - date_from: string
+      - date_to: string
+      - include_charts: boolean (default true)
+    response:
+      pdf_url: string (signed URL, expires in 1 hour)
+      filename: string
+      generated_at: string
+
+service_methods:
+  - name: getKPIs
+    description: "Calculate all KPIs for dashboard"
+    params:
+      - dateFrom: Date (optional)
+      - dateTo: Date (optional)
+    returns: DashboardKPIs
+    logic: |
+      1. Query quality_inspections for First Pass Yield
+      2. Query ncr_reports for NCR Rate (per 1000 batches)
+      3. Query ccp_monitoring_records for CCP Compliance
+      4. Query quality_inspections for Inspection Backlog
+      5. Query capa_records for CAPA Closure Rate
+      6. Calculate trends (compare to previous period)
+      7. Return aggregated KPIs
+
+  - name: getNCRTrend
+    description: "Get NCR trend over time"
+    params:
+      - dateFrom: Date
+      - dateTo: Date
+      - bucket: 'day' | 'week' | 'month'
+    returns: NCRTrendData[]
+    logic: |
+      1. Query ncr_reports grouped by date bucket
+      2. Count NCRs by severity (critical, major, minor)
+      3. Calculate 7-day moving average
+      4. Return time series data
+
+  - name: exportDashboardPDF
+    description: "Export dashboard as PDF"
+    params:
+      - dateFrom: Date
+      - dateTo: Date
+      - includeCharts: boolean
+    returns: { url: string; filename: string }
+    logic: |
+      1. Fetch all dashboard data (KPIs, charts)
+      2. Render HTML template with data
+      3. Use Puppeteer to generate PDF (server-side)
+      4. Upload PDF to Supabase Storage
+      5. Generate signed URL (expires in 1 hour)
+      6. Return URL and filename
+
+performance_targets:
+  - endpoint: GET /api/quality/dashboard/kpis
+    target: <500ms
+  - endpoint: GET /api/quality/dashboard/ncr-trend
+    target: <500ms
+  - endpoint: POST /api/quality/dashboard/export-pdf
+    target: <5s
+
+validation:
+  - date_from: ISO date format (YYYY-MM-DD)
+  - date_to: ISO date format, must be >= date_from
+  - bucket: Must be 'day', 'week', or 'month'
+  - limit: Integer between 1 and 50

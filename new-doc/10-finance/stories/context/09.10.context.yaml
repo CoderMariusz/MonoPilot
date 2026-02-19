@@ -1,0 +1,124 @@
+story:
+  id: "09.10"
+  name: "Cost Center CRUD"
+  epic: "09-finance"
+  phase: "1"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "fullstack"
+
+dependencies:
+  required:
+    - story: "01.1"
+      provides: ["organizations", "users", "roles"]
+  optional:
+    - story: "04.1"
+      provides: ["work_orders"]
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/finance.md"
+  prd_sections: ["FR-9.10.1", "FR-9.10.2", "FR-9.10.3"]
+  story: "docs/2-MANAGEMENT/epics/current/09-finance/09.10.cost-center-crud.md"
+
+files_to_create:
+  database:
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_create_cost_centers.sql"
+      type: "migration"
+  api:
+    - path: "apps/frontend/app/api/finance/cost-centers/route.ts"
+      methods: ["GET", "POST"]
+    - path: "apps/frontend/app/api/finance/cost-centers/[id]/route.ts"
+      methods: ["GET", "PUT", "DELETE"]
+  services:
+    - path: "apps/frontend/lib/services/cost-center-service.ts"
+  validation:
+    - path: "apps/frontend/lib/validation/finance.ts"
+  components:
+    - path: "apps/frontend/components/finance/CostCenterTree.tsx"
+    - path: "apps/frontend/components/finance/CostCenterForm.tsx"
+  pages:
+    - path: "apps/frontend/app/(authenticated)/finance/cost-centers/page.tsx"
+
+database:
+  tables:
+    - name: "cost_centers"
+      columns:
+        - "id"
+        - "org_id"
+        - "code"
+        - "name"
+        - "parent_id"
+        - "type"
+        - "production_line_id"
+        - "is_active"
+      rls: true
+      indexes:
+        - "org_id"
+        - "parent_id"
+        - "production_line_id"
+
+api_endpoints:
+  - method: "GET"
+    path: "/api/finance/cost-centers"
+    auth: true
+    roles: ["viewer", "finance_manager"]
+  - method: "POST"
+    path: "/api/finance/cost-centers"
+    auth: true
+    roles: ["finance_manager"]
+  - method: "GET"
+    path: "/api/finance/cost-centers/:id"
+    auth: true
+    roles: ["viewer", "finance_manager"]
+  - method: "PUT"
+    path: "/api/finance/cost-centers/:id"
+    auth: true
+    roles: ["finance_manager"]
+  - method: "DELETE"
+    path: "/api/finance/cost-centers/:id"
+    auth: true
+    roles: ["finance_manager"]
+
+ux:
+  wireframes:
+    - id: "FIN-005"
+      description: "Cost Center Management Page"
+      components:
+        - "Hierarchical tree view"
+        - "Cost center form"
+        - "Type badges"
+  patterns:
+    tree: "ShadCN Collapsible tree"
+    form: "ShadCN Form"
+
+validation_rules:
+  code: "Unique within org"
+  parent_id: "Cannot be self"
+  hierarchy_depth: "Max 5 levels"
+
+patterns:
+  rls: "ADR-013"
+  api: "REST with org_id filter"
+  service: "class-based with static methods"
+  validation: "zod schemas"
+
+acceptance_checklist:
+  - "cost_centers table created with RLS"
+  - "get_cost_center_hierarchy() function works"
+  - "Cost center CRUD endpoints work"
+  - "Hierarchical tree view renders"
+  - "Parent-child relationships work"
+  - "No circular references allowed"
+  - "Soft delete (is_active) works"
+  - "Production line assignment works"
+  - "All tests pass"
+
+output_artifacts:
+  - "Migration: cost_centers table"
+  - "Function: get_cost_center_hierarchy()"
+  - "API: 5 cost center endpoints"
+  - "Service: CostCenterService"
+  - "Component: CostCenterTree"
+  - "Component: CostCenterForm"
+  - "Page: Cost center management"
+  - "Tests: Unit, integration, E2E"

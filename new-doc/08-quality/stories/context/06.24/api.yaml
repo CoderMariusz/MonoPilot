@@ -1,0 +1,234 @@
+# Story 06.24 - CCP Monitoring Scanner - API Context
+# Generated: 2025-01-15
+
+# Note: Most API endpoints reused from story 06.23
+# This file documents mobile-specific API usage and new endpoints
+
+base_path: "/api/quality/haccp/ccp-monitoring"
+
+# Reused Endpoints from Story 06.23
+reused_endpoints:
+  - method: "POST"
+    path: "/api/quality/haccp/ccp-monitoring"
+    usage: "Mobile sync posts monitoring records (same schema as desktop)"
+    mobile_notes:
+      - "Batch sync: POST array of monitoring records"
+      - "Timestamp from device (monitored_at)"
+      - "monitored_by from auth context at sync time"
+
+  - method: "GET"
+    path: "/api/quality/haccp/ccp-monitoring/:id"
+    usage: "Fetch monitoring record detail (verification after sync)"
+
+  - method: "GET"
+    path: "/api/quality/haccp/ccp-monitoring"
+    usage: "List monitoring records (mobile history view)"
+    mobile_filters:
+      - "monitored_by = current user (show only my records)"
+      - "monitored_at >= today (show today's records)"
+
+# New Mobile-Specific Endpoints
+
+endpoints:
+  - method: "POST"
+    path: "/api/quality/haccp/ccp-monitoring/batch"
+    summary: "Batch sync offline monitoring records"
+    auth: true
+    roles: ["PRODUCTION_OPERATOR", "QA_INSPECTOR"]
+    request_body:
+      schema: "BatchMonitoringRequest"
+      example: |
+        {
+          "records": [
+            {
+              "id": "uuid-generated-offline",
+              "ccp_id": "ccp-uuid",
+              "monitored_value": 2.5,
+              "result": "pass",
+              "monitored_at": "2025-01-15T14:23:00Z",
+              "wo_id": "wo-uuid"
+            }
+          ]
+        }
+    response:
+      status: 200
+      schema: "BatchMonitoringSyncResponse"
+      example: |
+        {
+          "synced": 12,
+          "failed": 0,
+          "errors": []
+        }
+    validation_schema: "batchMonitoringSchema"
+    business_rules:
+      - "Max 50 records per batch"
+      - "Deduplicate by offline ID (idempotent sync)"
+      - "Validate each record independently"
+      - "Return partial success (some succeed, some fail)"
+      - "Trigger deviation alerts for failed records"
+
+  - method: "GET"
+    path: "/api/quality/haccp/ccp-monitoring/mobile/ccps"
+    summary: "Get active CCPs for mobile monitoring (with critical limits)"
+    auth: true
+    roles: ["PRODUCTION_OPERATOR", "QA_INSPECTOR"]
+    query_params:
+      - name: "wo_id"
+        type: "string"
+        format: "uuid"
+        required: false
+        description: "Filter CCPs by work order routing"
+    response:
+      status: 200
+      schema: "MobileCCPListResponse"
+      example: |
+        {
+          "ccps": [
+            {
+              "id": "uuid",
+              "ccp_number": "CCP-1",
+              "ccp_name": "Receiving Temperature",
+              "critical_limit_min": 0,
+              "critical_limit_max": 4,
+              "unit_of_measure": "°C",
+              "target_value": 2,
+              "monitoring_method": "Infrared thermometer",
+              "corrective_action_std": "Reject shipment if >4°C"
+            }
+          ]
+        }
+    business_rules:
+      - "Return only active CCPs (status='active')"
+      - "Include critical limits for offline validation"
+      - "Cache response for offline mode"
+      - "Filter by routing if wo_id provided"
+
+  - method: "POST"
+    path: "/api/quality/haccp/ccp/:id/qr-code"
+    summary: "Generate QR code for CCP quick access"
+    auth: true
+    roles: ["QA_MANAGER"]
+    path_params:
+      - name: "id"
+        type: "string"
+        format: "uuid"
+    response:
+      status: 200
+      schema: "QRCodeResponse"
+      example: |
+        {
+          "qr_code_url": "data:image/png;base64,...",
+          "qr_code_data": "/quality/haccp/ccp-monitoring/mobile?ccp=CCP-1",
+          "ccp_number": "CCP-1"
+        }
+    business_rules:
+      - "QR code contains deep link to mobile monitoring page"
+      - "Auto-selects CCP when scanned"
+      - "QR code cached for 24h"
+
+  - method: "POST"
+    path: "/api/barcode/scan/wo"
+    summary: "Lookup work order by barcode (mobile scanner)"
+    auth: true
+    roles: ["PRODUCTION_OPERATOR"]
+    request_body:
+      schema: "BarcodeScanRequest"
+      example: |
+        {
+          "barcode": "WO-2025-001"
+        }
+    response:
+      status: 200
+      schema: "WOBarcodeResponse"
+      example: |
+        {
+          "wo_id": "uuid",
+          "wo_number": "WO-2025-001",
+          "product_id": "uuid",
+          "product_name": "Bread",
+          "batch_number": "B-2025-001",
+          "routing_id": "uuid",
+          "ccp_ids": ["uuid1", "uuid2"]
+        }
+    validation_schema: "barcodeScanSchema"
+    business_rules:
+      - "Return WO details with linked CCPs"
+      - "Filter CCPs by routing (only CCPs for this WO's routing)"
+      - "Return 404 if WO not found"
+      - "Cache response for offline mode"
+
+# Service Layer (Mobile-Specific)
+service:
+  name: "MobileCCPMonitoringService"
+  file: "lib/services/mobile-ccp-monitoring-service.ts"
+  methods:
+    - name: "batchSync"
+      params: ["records: OfflineMonitoringRecord[]"]
+      returns: "{ synced: number; failed: number; errors: SyncError[] }"
+      description: "Batch sync offline monitoring records"
+
+    - name: "getActiveCCPsForMobile"
+      params: ["woId?: string"]
+      returns: "MobileCCP[]"
+      description: "Get CCPs with critical limits for offline validation"
+
+    - name: "generateCCPQRCode"
+      params: ["ccpId: string"]
+      returns: "{ qrCodeUrl: string; qrCodeData: string }"
+      description: "Generate QR code for CCP quick access"
+
+    - name: "lookupWOByBarcode"
+      params: ["barcode: string"]
+      returns: "WOBarcodeData | null"
+      description: "Lookup WO by barcode for mobile scanner"
+
+    - name: "validateMonitoringOffline"
+      params: ["value: number", "min: number | null", "max: number | null"]
+      returns: "{ result: 'pass' | 'fail' | 'marginal'; deviation: boolean }"
+      description: "Client-side validation for offline mode"
+
+# Validation Schemas
+validation:
+  file: "lib/validation/mobile-ccp-monitoring-validation.ts"
+  schemas:
+    - name: "batchMonitoringSchema"
+      type: "z.object"
+      fields:
+        - name: "records"
+          validation: "z.array(createCCPMonitoringSchema).max(50)"
+
+    - name: "barcodeScanSchema"
+      type: "z.object"
+      fields:
+        - name: "barcode"
+          validation: "z.string().min(1).max(100)"
+
+# Error Handling (Mobile-Specific)
+errors:
+  - code: 400
+    scenario: "Batch sync exceeds 50 records"
+    message: "Batch sync limited to 50 records. Current: {count}"
+  - code: 409
+    scenario: "Duplicate offline ID (already synced)"
+    message: "Monitoring record already synced (idempotent)"
+  - code: 404
+    scenario: "WO barcode not found"
+    message: "Work order not found for barcode: {barcode}"
+  - code: 413
+    scenario: "Offline queue full (50 records)"
+    message: "Offline queue full. Sync pending records before recording new ones."
+
+# Performance Targets (Mobile)
+performance:
+  - endpoint: "POST /batch"
+    target: "<2s for 50 records"
+    notes: "Batch processing, parallel validation"
+  - endpoint: "GET /mobile/ccps"
+    target: "<500ms"
+    notes: "Lightweight response for mobile, cached"
+  - endpoint: "POST /barcode/scan/wo"
+    target: "<300ms"
+    notes: "Fast barcode lookup for production floor"
+  - endpoint: "POST /qr-code"
+    target: "<1s"
+    notes: "QR code generation, cached for 24h"

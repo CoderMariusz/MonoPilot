@@ -1,0 +1,396 @@
+# Story 03.9b - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+# Status: DEFERRED - Requires Epic 05 license_plates table
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/to-lp-service.test.ts"
+    type: "unit"
+    description: "Unit tests for LP assignment service methods"
+    deferred: true
+  - path: "apps/frontend/app/api/planning/transfer-orders/[id]/lines/[lineId]/assign-lps/__tests__/route.test.ts"
+    type: "integration"
+    description: "Integration tests for assign-lps API endpoint"
+    deferred: true
+  - path: "apps/frontend/lib/validation/__tests__/to-lp-validation.test.ts"
+    type: "unit"
+    description: "Unit tests for Zod validation schemas"
+    deferred: true
+  - path: "supabase/tests/to_line_lps_rls.test.sql"
+    type: "integration"
+    description: "Integration tests for RLS policies on to_line_lps"
+    deferred: true
+  - path: "tests/e2e/to-lp-selection.spec.ts"
+    type: "e2e"
+    description: "E2E test for TO with LP assignment full cycle"
+    deferred: true
+
+# Acceptance Criteria (from story)
+acceptance_criteria:
+  - id: "AC-01"
+    title: "Create to_line_lps Junction Table"
+    given: "Epic 05 has created the license_plates table"
+    when: "migration is applied"
+    then: "new table to_line_lps exists with correct schema and RLS"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-02"
+    title: "LP Picker Modal - Open and Display"
+    given: "I am on TO Detail page with status = DRAFT or PLANNED"
+    when: "I click 'Assign LPs' button next to a TO line"
+    then: "LP Picker modal opens showing available LPs filtered by warehouse and product"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-03"
+    title: "Assign Single LP (Full Quantity)"
+    given: "LP Picker modal is open for TO line with qty = 100"
+    when: "I select LP with available_qty = 100 and click Assign"
+    then: "LP assigned, modal closes, success toast shown, TO line shows '1 LP Assigned'"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-04"
+    title: "Assign Multiple LPs (Partial Quantities)"
+    given: "LP Picker modal is open for TO line with qty = 100"
+    when: "I select multiple LPs with partial quantities totaling 100"
+    then: "All LPs assigned, TO line shows '3 LPs Assigned' badge"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-05"
+    title: "Validation - Quantity Mismatch (Exact Match Required)"
+    given: "setting 'Require Exact LP Quantity Match' = true"
+    when: "I select LPs with total < TO line quantity"
+    then: "API returns 400 error with specific message"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-06"
+    title: "Validation - LP Not in Source Warehouse"
+    given: "LP Picker modal open for TO with from_warehouse = WH-001"
+    when: "API receives assignment with LP in WH-002"
+    then: "API returns 400 error: LP not in source warehouse"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-07"
+    title: "Validation - Product Mismatch"
+    given: "TO line requires Product A"
+    when: "API receives assignment with LP containing Product B"
+    then: "API returns 400 error: LP product mismatch"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-08"
+    title: "Validation - Insufficient LP Quantity"
+    given: "LP has available_qty = 50"
+    when: "I assign quantity = 60"
+    then: "API returns 400 error: insufficient quantity"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-09"
+    title: "LP Already Assigned to Another TO"
+    given: "LP-001 is assigned to TO-001"
+    when: "LP Picker loads for TO-002"
+    then: "LP-001 is not shown in available LPs (or shows reduced available qty)"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-10"
+    title: "Remove LP Assignment"
+    given: "TO line has LPs assigned"
+    when: "I click Remove button and confirm"
+    then: "LP removed, TO line badge updates, success toast shown"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-11"
+    title: "Settings Toggle - Require LP Selection"
+    given: "setting 'Require LP Selection' = true"
+    when: "I try to change TO status to PLANNED without assigned LPs"
+    then: "Status transition blocked with error message"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-12"
+    title: "Display LP Assignments on TO Detail"
+    given: "TO line has LPs assigned"
+    when: "I view TO Detail page"
+    then: "LP assignments column shows badge and expandable section"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-13"
+    title: "Integration with Ship TO Action"
+    given: "TO has pre-assigned LPs"
+    when: "Ship TO action executes"
+    then: "Pre-assigned LPs are auto-selected for picking"
+    test_type: "integration"
+    priority: "P1"
+    depends_on: "Epic 05"
+
+# Unit Test Cases
+unit_tests:
+  to_lp_service:
+    - name: "assignLPsToTOLine validates warehouse match"
+      setup: "Mock LP in different warehouse"
+      expected: "Returns { valid: false, error: 'LP not in source warehouse' }"
+
+    - name: "assignLPsToTOLine validates product match"
+      setup: "Mock LP with different product_id"
+      expected: "Returns { valid: false, error: 'LP product mismatch' }"
+
+    - name: "assignLPsToTOLine validates available quantity"
+      setup: "Mock LP with available_qty = 50, request qty = 60"
+      expected: "Returns { valid: false, error: 'Insufficient quantity' }"
+
+    - name: "assignLPsToTOLine validates exact qty match when required"
+      setup: "Mock setting require_exact_match = true, LP total = 80, line qty = 100"
+      expected: "Returns { valid: false, error: 'Quantity mismatch' }"
+
+    - name: "assignLPsToTOLine succeeds with valid assignment"
+      setup: "Mock valid LP in correct warehouse, product, qty"
+      expected: "Returns { success: true, assignments: [...] }"
+
+    - name: "getAvailableLPsForTOLine filters by warehouse"
+      setup: "Mock LPs in multiple warehouses"
+      expected: "Returns only LPs in TO.from_warehouse_id"
+
+    - name: "getAvailableLPsForTOLine filters by product"
+      setup: "Mock LPs with different products"
+      expected: "Returns only LPs matching TO line product_id"
+
+    - name: "getAvailableLPsForTOLine excludes zero-qty LPs"
+      setup: "Mock LP with available_qty = 0"
+      expected: "LP not in results"
+
+    - name: "removeLPFromTOLine deletes assignment"
+      setup: "Mock existing assignment"
+      expected: "Assignment deleted, returns success"
+
+    - name: "removeLPFromTOLine fails for non-existent assignment"
+      setup: "Mock no assignment"
+      expected: "Returns { success: false, error: 'Assignment not found' }"
+
+  validation_schemas:
+    - name: "AssignLPsRequestSchema rejects empty lps array"
+      input: "{ lps: [] }"
+      expected: "Validation fails with 'At least one LP required'"
+
+    - name: "AssignLPsRequestSchema rejects invalid UUID"
+      input: "{ lps: [{ lp_id: 'not-a-uuid', quantity: 10 }] }"
+      expected: "Validation fails with 'Invalid LP ID'"
+
+    - name: "AssignLPsRequestSchema rejects zero quantity"
+      input: "{ lps: [{ lp_id: 'valid-uuid', quantity: 0 }] }"
+      expected: "Validation fails with 'Quantity must be greater than 0'"
+
+    - name: "AssignLPsRequestSchema rejects negative quantity"
+      input: "{ lps: [{ lp_id: 'valid-uuid', quantity: -5 }] }"
+      expected: "Validation fails"
+
+    - name: "AssignLPsRequestSchema accepts valid request"
+      input: "{ lps: [{ lp_id: 'valid-uuid', quantity: 100 }] }"
+      expected: "Validation passes"
+
+    - name: "AvailableLPsQuerySchema validates date format"
+      input: "{ expiry_from: 'invalid' }"
+      expected: "Validation fails with 'Invalid date format'"
+
+    - name: "AvailableLPsQuerySchema accepts valid dates"
+      input: "{ expiry_from: '2025-01-01', expiry_to: '2025-12-31' }"
+      expected: "Validation passes"
+
+# Integration Test Cases
+integration_tests:
+  api_endpoints:
+    - name: "POST /assign-lps returns 401 for unauthenticated request"
+      setup: "No auth token"
+      expected: "401 Unauthorized"
+
+    - name: "POST /assign-lps returns 404 for non-existent TO"
+      setup: "Valid auth, invalid TO ID"
+      expected: "404 TO_NOT_FOUND"
+
+    - name: "POST /assign-lps returns 400 for wrong warehouse LP"
+      setup: "Valid TO, LP in different warehouse"
+      expected: "400 LP_NOT_IN_WAREHOUSE"
+
+    - name: "POST /assign-lps returns 400 for wrong product LP"
+      setup: "Valid TO, LP with different product"
+      expected: "400 LP_PRODUCT_MISMATCH"
+
+    - name: "POST /assign-lps returns 400 for status SHIPPED"
+      setup: "TO with status = shipped"
+      expected: "400 INVALID_STATUS"
+
+    - name: "POST /assign-lps creates assignment successfully"
+      setup: "Valid TO (draft), valid LP"
+      expected: "200 OK with assignments array"
+
+    - name: "GET /lps returns assignments for TO line"
+      setup: "TO line with 2 LP assignments"
+      expected: "200 OK with assignments, total_assigned, is_complete"
+
+    - name: "DELETE /lps/:lpId removes assignment"
+      setup: "Existing assignment"
+      expected: "200 OK, assignment deleted"
+
+    - name: "GET /available-lps filters by warehouse and product"
+      setup: "Multiple LPs, only some match TO criteria"
+      expected: "200 OK with filtered LP list"
+
+  rls_policies:
+    - name: "User can only see LP assignments for own org"
+      setup: |
+        - Create Org A with User A, TO A
+        - Create Org B with User B, TO B
+        - Create LP assignment for each
+      action: "User A queries to_line_lps"
+      expected: "Only TO A assignments visible"
+
+    - name: "User cannot insert LP assignment for other org TO"
+      setup: |
+        - Create Org A with User A
+        - Create Org B with TO B
+      action: "User A attempts to insert assignment for TO B"
+      expected: "RLS blocks insert"
+
+    - name: "User cannot delete LP assignment for other org"
+      setup: |
+        - Create Org A with User A
+        - Create Org B with TO B, LP assignment
+      action: "User A attempts to delete TO B assignment"
+      expected: "RLS blocks delete, 0 rows affected"
+
+    - name: "RLS allows insert only when TO status is draft/planned"
+      setup: "TO with status = shipped"
+      action: "Attempt to insert LP assignment"
+      expected: "RLS WITH CHECK fails"
+
+# E2E Test Cases
+e2e_tests:
+  - name: "Full TO with LP assignment cycle"
+    steps:
+      - "Create TO with 2 lines"
+      - "Open LP Picker for line 1"
+      - "Select 2 LPs with partial quantities"
+      - "Click Assign LPs"
+      - "Verify success toast"
+      - "Verify badges show '2 LPs Assigned'"
+      - "Open LP Picker for line 2"
+      - "Select 1 LP with full quantity"
+      - "Click Assign LPs"
+      - "Remove 1 LP from line 1"
+      - "Verify badge updates to '1 LP Assigned'"
+      - "Change TO status to Planned"
+      - "Verify LPs still assigned"
+    expected: "All operations succeed, UI updates correctly"
+
+  - name: "LP Picker filters work correctly"
+    steps:
+      - "Open LP Picker"
+      - "Enter lot number filter"
+      - "Verify results filtered"
+      - "Set expiry date range"
+      - "Verify results filtered"
+      - "Search by LP number"
+      - "Verify results filtered"
+      - "Clear filters"
+      - "Verify all LPs shown"
+    expected: "Filters apply and clear correctly"
+
+  - name: "Validation errors display correctly"
+    steps:
+      - "Open LP Picker"
+      - "Select LP with qty 50"
+      - "Enter assign qty 60 (exceeds available)"
+      - "Click Assign"
+      - "Verify inline error message"
+      - "Fix quantity to 50"
+      - "Click Assign"
+      - "Verify success"
+    expected: "Validation errors shown inline, operation succeeds after fix"
+
+# Definition of Done
+definition_of_done:
+  - "Migration creates to_line_lps table with correct schema"
+  - "RLS policies enforce org isolation via FK chain"
+  - "LP Picker modal displays available LPs correctly"
+  - "All validation rules enforced (warehouse, product, quantity)"
+  - "Settings toggles (require LP, exact match) functional"
+  - "LP assignments display on TO Detail page"
+  - "Remove LP functionality works with confirmation"
+  - "Unit test coverage >= 80% for service methods"
+  - "Integration tests pass for all API endpoints"
+  - "RLS isolation tests pass with 2+ org fixtures"
+  - "E2E smoke test passes (full cycle)"
+  - "Manual QA completed"
+  - "Performance: LP picker loads < 500ms"
+  - "Accessibility: Modal keyboard-navigable, ARIA labels present"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    reason: "Business logic and validation require thorough testing"
+  integration:
+    target: 70
+    reason: "API and RLS policies must be tested"
+  files:
+    - "lib/services/to-lp-service.ts: 80%"
+    - "lib/validation/to-lp-validation.ts: 90%"
+    - "RLS policies: 100% of policy rules tested"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "Epic 05 table schema may differ from assumptions"
+    mitigation: "Document assumptions, verify schema when Epic 05 complete"
+    severity: "medium"
+
+  - id: "RISK-02"
+    description: "RLS chained lookup may have performance impact"
+    mitigation: "Add indexes on to_line_id, test with realistic data volume"
+    severity: "low"
+
+  - id: "RISK-03"
+    description: "LP allocation conflicts with other TOs"
+    mitigation: "Implement LP reservation table in Phase 3, or exclude assigned LPs from available list"
+    severity: "medium"
+
+  - id: "RISK-04"
+    description: "Ship TO integration may require Epic 05 changes"
+    mitigation: "Coordinate with Warehouse module team on integration points"
+    severity: "medium"
+
+# Test Data Requirements
+test_data:
+  organizations:
+    - { name: "Org A", slug: "org-a" }
+    - { name: "Org B", slug: "org-b" }
+  users:
+    - { org: "Org A", role: "admin", name: "Admin A" }
+    - { org: "Org A", role: "warehouse_manager", name: "WH Manager A" }
+    - { org: "Org B", role: "admin", name: "Admin B" }
+  warehouses:
+    - { org: "Org A", code: "WH-MAIN", name: "Main Warehouse" }
+    - { org: "Org A", code: "WH-BRANCH", name: "Branch Warehouse" }
+  products:
+    - { org: "Org A", code: "PROD-001", name: "Product A" }
+    - { org: "Org A", code: "PROD-002", name: "Product B" }
+  license_plates: # Epic 05 data
+    - { org: "Org A", warehouse: "WH-MAIN", product: "PROD-001", lp_number: "LP-001", available_qty: 100 }
+    - { org: "Org A", warehouse: "WH-MAIN", product: "PROD-001", lp_number: "LP-002", available_qty: 50 }
+    - { org: "Org A", warehouse: "WH-BRANCH", product: "PROD-001", lp_number: "LP-003", available_qty: 100 }
+    - { org: "Org A", warehouse: "WH-MAIN", product: "PROD-002", lp_number: "LP-004", available_qty: 75 }
+  transfer_orders:
+    - { org: "Org A", from: "WH-MAIN", to: "WH-BRANCH", status: "draft", lines: [{ product: "PROD-001", qty: 100 }] }
+    - { org: "Org A", from: "WH-MAIN", to: "WH-BRANCH", status: "planned", lines: [{ product: "PROD-001", qty: 50 }] }
+    - { org: "Org A", from: "WH-MAIN", to: "WH-BRANCH", status: "shipped", lines: [{ product: "PROD-001", qty: 25 }] }

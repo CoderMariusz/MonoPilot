@@ -1,0 +1,27 @@
+# Story 08.12 - Frontend Specification
+# Purpose: BOM preview UI in handoff wizard
+# Agent: FRONTEND-DEV
+# SEE: Integrated into 08.11 handoff wizard (Step 3)
+
+# NOTE: This story is backend-focused.
+# Frontend components are part of 08.11 Handoff Wizard:
+# - HandoffWizard.tsx → Step 3: BOM Preview
+# - BOMPreviewStep.tsx → Formulation → BOM mapping table
+# - BOMPreviewTable.tsx → Preview table showing 1:1 mapping
+
+components_used_from_08_11:
+  - "HandoffWizard.tsx (Step 3)"
+  - "BOMPreviewStep.tsx"
+  - "BOMPreviewTable.tsx"
+
+preview_display:
+  - "Formulation items table (source)"
+  - "Arrow indicator (→)"
+  - "BOM items table (destination)"
+  - "BOM metadata: number, version, effective dates"
+  - "Allergen section (if 08.5 available)"
+
+validation_ui:
+  - "Effective date range validation"
+  - "Product code uniqueness check"
+  - "Formulation locked indicator"

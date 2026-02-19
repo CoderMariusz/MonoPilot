@@ -1,0 +1,320 @@
+# Story 06.31 - Database Schema
+# Purpose: Tables, RLS policies, migrations, triggers, indexes
+# Agent: BACKEND-DEV (database focus)
+
+migrations:
+  - path: "supabase/migrations/095_create_capa_records_table.sql"
+    type: "migration"
+    description: "Create capa_records table with all columns, constraints, RLS"
+  - path: "supabase/migrations/096_create_capa_number_sequences.sql"
+    type: "migration"
+    description: "Create capa_number_sequences table for auto-increment CAPA numbers"
+  - path: "supabase/migrations/097_capa_functions.sql"
+    type: "migration"
+    description: "Create functions for CAPA number generation and target date calculation"
+
+tables:
+  - name: "capa_records"
+    description: "CAPA (Corrective and Preventive Action) records for quality management"
+    columns:
+      # Identity
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id) ON DELETE CASCADE" }
+      - { name: "capa_number", type: "TEXT", constraints: "NOT NULL" }
+
+      # Source Reference (polymorphic)
+      - { name: "source_type", type: "TEXT", constraints: "NOT NULL CHECK (source_type IN ('ncr', 'audit', 'complaint', 'management_review', 'manual'))" }
+      - { name: "source_id", type: "UUID", constraints: "" }
+
+      # CAPA Details
+      - { name: "title", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "description", type: "TEXT", constraints: "NOT NULL" }
+
+      # CAPA Type
+      - { name: "capa_type", type: "TEXT", constraints: "NOT NULL CHECK (capa_type IN ('corrective', 'preventive'))" }
+
+      # Priority
+      - { name: "priority", type: "TEXT", constraints: "NOT NULL DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'critical'))" }
+
+      # Status
+      - { name: "status", type: "TEXT", constraints: "NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'in_progress', 'closed', 'cancelled'))" }
+
+      # Assignment
+      - { name: "owner_id", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "assigned_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "assigned_at", type: "TIMESTAMPTZ", constraints: "" }
+
+      # Dates
+      - { name: "created_date", type: "DATE", constraints: "NOT NULL DEFAULT CURRENT_DATE" }
+      - { name: "target_close_date", type: "DATE", constraints: "NOT NULL" }
+      - { name: "actual_close_date", type: "DATE", constraints: "" }
+
+      # Root Cause
+      - { name: "root_cause", type: "TEXT", constraints: "" }
+      - { name: "root_cause_method", type: "TEXT", constraints: "" }
+
+      # Closure
+      - { name: "closed_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "closed_at", type: "TIMESTAMPTZ", constraints: "" }
+      - { name: "closure_notes", type: "TEXT", constraints: "" }
+
+      # Audit
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT now()" }
+      - { name: "created_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT now()" }
+      - { name: "updated_by", type: "UUID", constraints: "REFERENCES users(id)" }
+
+    constraints:
+      - "CONSTRAINT uq_capa_number UNIQUE(org_id, capa_number)"
+      - "CONSTRAINT capa_closed_check CHECK ((status = 'closed' AND closed_by IS NOT NULL AND closed_at IS NOT NULL AND actual_close_date IS NOT NULL) OR status != 'closed')"
+
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+    indexes:
+      - "idx_capa_org_status ON capa_records(org_id, status)"
+      - "idx_capa_org_priority ON capa_records(org_id, priority)"
+      - "idx_capa_org_type ON capa_records(org_id, capa_type)"
+      - "idx_capa_owner ON capa_records(owner_id) WHERE owner_id IS NOT NULL"
+      - "idx_capa_source ON capa_records(source_type, source_id) WHERE source_id IS NOT NULL"
+      - "idx_capa_created_date ON capa_records(org_id, created_date)"
+      - "idx_capa_target_close ON capa_records(org_id, target_close_date) WHERE status IN ('open', 'in_progress')"
+      - "idx_capa_overdue ON capa_records(org_id, target_close_date, status) WHERE target_close_date < CURRENT_DATE AND status != 'closed'"
+
+  - name: "capa_number_sequences"
+    description: "Sequence counter for auto-generating CAPA numbers per org/year"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id) ON DELETE CASCADE" }
+      - { name: "year", type: "INTEGER", constraints: "NOT NULL" }
+      - { name: "current_value", type: "BIGINT", constraints: "NOT NULL DEFAULT 0" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT now()" }
+    constraints:
+      - "CONSTRAINT uq_capa_seq_org_year UNIQUE(org_id, year)"
+
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+    indexes:
+      - "idx_capa_seq_org ON capa_number_sequences(org_id)"
+
+# RLS Policies (ADR-013)
+rls_policies:
+  pattern: "Users Table Lookup"
+  pattern_sql: "(SELECT org_id FROM users WHERE id = auth.uid())"
+
+  policies:
+    - table: "capa_records"
+      name: "capa_select"
+      operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      description: "All authenticated users can read org CAPAs"
+
+    - table: "capa_records"
+      name: "capa_insert"
+      operation: "INSERT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      description: "Users can create CAPAs in their org"
+
+    - table: "capa_records"
+      name: "capa_update"
+      operation: "UPDATE"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      description: "Users can update CAPAs in their org"
+
+    - table: "capa_records"
+      name: "capa_delete"
+      operation: "DELETE"
+      using: |
+        org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        AND status = 'open'
+      description: "Only open CAPAs can be deleted"
+
+    - table: "capa_number_sequences"
+      name: "capa_seq_select"
+      operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      description: "Read sequence for org"
+
+    - table: "capa_number_sequences"
+      name: "capa_seq_update"
+      operation: "UPDATE"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      description: "Update sequence counter"
+
+# Functions
+functions:
+  - name: "generate_capa_number"
+    description: "SQL function to generate CAPA number with auto-increment"
+    returns: "TEXT"
+    parameters:
+      - name: "p_org_id"
+        type: "UUID"
+    body: |
+      DECLARE
+        v_year INTEGER;
+        v_next_val BIGINT;
+        v_capa_number TEXT;
+      BEGIN
+        v_year := EXTRACT(YEAR FROM CURRENT_DATE);
+
+        INSERT INTO capa_number_sequences (org_id, year, current_value)
+        VALUES (p_org_id, v_year, 1)
+        ON CONFLICT (org_id, year)
+        DO UPDATE SET
+          current_value = capa_number_sequences.current_value + 1,
+          updated_at = NOW()
+        RETURNING current_value INTO v_next_val;
+
+        v_capa_number := 'CAPA-' || v_year::TEXT || '-' || LPAD(v_next_val::TEXT, 5, '0');
+        RETURN v_capa_number;
+      END;
+
+  - name: "calculate_capa_target_date"
+    description: "Calculate target close date based on priority"
+    returns: "DATE"
+    parameters:
+      - name: "p_priority"
+        type: "TEXT"
+      - name: "p_created_date"
+        type: "DATE"
+    body: |
+      DECLARE
+        v_days_to_add INTEGER;
+      BEGIN
+        CASE p_priority
+          WHEN 'critical' THEN v_days_to_add := 7;
+          WHEN 'high' THEN v_days_to_add := 30;
+          WHEN 'medium' THEN v_days_to_add := 60;
+          WHEN 'low' THEN v_days_to_add := 90;
+          ELSE v_days_to_add := 60;
+        END CASE;
+
+        RETURN p_created_date + v_days_to_add;
+      END;
+
+# Triggers
+triggers:
+  - name: "update_capa_records_updated_at"
+    description: "Auto-update updated_at timestamp"
+    table: "capa_records"
+    timing: "BEFORE UPDATE"
+    for_each: "ROW"
+    trigger_sql: |
+      CREATE TRIGGER update_capa_records_updated_at
+      BEFORE UPDATE ON capa_records
+      FOR EACH ROW
+      EXECUTE FUNCTION update_updated_at_column();
+
+# Field Notes
+field_notes:
+  capa_type:
+    description: "Type of CAPA"
+    values:
+      - code: "corrective"
+        label: "Corrective"
+        description: "Fix existing problem (reactive)"
+      - code: "preventive"
+        label: "Preventive"
+        description: "Prevent future occurrence (proactive)"
+
+  source_type:
+    description: "Source of CAPA"
+    values:
+      - code: "ncr"
+        label: "NCR"
+        description: "Created from Non-Conformance Report"
+      - code: "audit"
+        label: "Audit"
+        description: "Created from audit finding"
+      - code: "complaint"
+        label: "Complaint"
+        description: "Created from customer complaint"
+      - code: "management_review"
+        label: "Management Review"
+        description: "Created from management review"
+      - code: "manual"
+        label: "Manual"
+        description: "Manually created CAPA"
+
+  status:
+    description: "CAPA workflow status"
+    values:
+      - code: "open"
+        label: "Open"
+        description: "Created, not yet started"
+      - code: "in_progress"
+        label: "In Progress"
+        description: "Actions being implemented"
+      - code: "closed"
+        label: "Closed"
+        description: "All actions complete, effectiveness verified"
+      - code: "cancelled"
+        label: "Cancelled"
+        description: "Cancelled without completion"
+
+  priority:
+    description: "CAPA priority/urgency"
+    values:
+      - code: "low"
+        label: "Low"
+        description: "90 days to complete"
+      - code: "medium"
+        label: "Medium"
+        description: "60 days to complete"
+      - code: "high"
+        label: "High"
+        description: "30 days to complete"
+      - code: "critical"
+        label: "Critical"
+        description: "7 days to complete"
+
+  capa_number:
+    description: "Unique CAPA identifier per org per year"
+    format: "CAPA-{YYYY}-{NNNNN}"
+    examples:
+      - "CAPA-2025-00001 (first CAPA of 2025)"
+      - "CAPA-2025-00002 (second CAPA of 2025)"
+      - "CAPA-2026-00001 (first CAPA of 2026)"
+    note: "Auto-generated by generate_capa_number() function"
+
+# Related Tables (Future Stories)
+related_tables:
+  - name: "capa_actions"
+    story: "06.32"
+    relationship: "One CAPA has many action items"
+    fk: "capa_actions.capa_id → capa_records.id"
+
+  - name: "capa_effectiveness_checks"
+    story: "06.33"
+    relationship: "One CAPA has many effectiveness checks"
+    fk: "capa_effectiveness_checks.capa_id → capa_records.id"
+
+  - name: "ncr_reports"
+    story: "06.13"
+    relationship: "CAPA can be created from NCR"
+    fk: "capa_records.source_id → ncr_reports.id (when source_type='ncr')"
+
+# Performance Considerations
+performance:
+  expected_volumes:
+    capas_per_month: "20-100"
+    max_capas: "2,000"
+    actions_per_capa: "3-10"
+    max_actions: "5,000"
+
+  query_optimization:
+    - "Paginate CAPA list (default 20 per page)"
+    - "Use indexed columns for filtering (org_id, status, priority)"
+    - "Denormalize owner names in query response"
+    - "Cache summary metrics (5 min TTL)"
+    - "Lazy load action items and effectiveness checks on detail page"
+
+  cache_keys:
+    - "org:{orgId}:quality:capas:list (5 min TTL)"
+    - "org:{orgId}:quality:capa:{id} (5 min TTL)"
+    - "org:{orgId}:quality:capas:summary (5 min TTL)"
+    - "org:{orgId}:quality:capas:overdue (1 min TTL)"

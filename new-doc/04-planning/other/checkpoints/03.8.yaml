@@ -1,0 +1,75 @@
+# Story 03.8 - Transfer Order CRUD & Lines
+# Type: fullstack
+# Epic: 03-planning
+# Audit Date: 2026-01-08
+# Completion Date: 2026-01-09
+
+audit:
+  code_exists: true
+  files_found:
+    - path: "supabase/migrations/063_create_transfer_orders.sql"
+      type: migration
+    - path: "apps/frontend/lib/services/transfer-order-service.ts"
+      type: service
+    - path: "apps/frontend/lib/services/transfer-order/core.ts"
+      type: service
+    - path: "apps/frontend/lib/services/transfer-order/lines.ts"
+      type: service
+    - path: "apps/frontend/lib/services/transfer-order/actions.ts"
+      type: service
+    - path: "apps/frontend/app/api/planning/transfer-orders/"
+      type: api
+      count: 9
+    - path: "apps/frontend/app/(authenticated)/planning/transfer-orders/page.tsx"
+      type: page
+    - path: "apps/frontend/app/(authenticated)/planning/transfer-orders/[id]/page.tsx"
+      type: page
+    - path: "apps/frontend/components/planning/transfer-orders/"
+      type: component
+      count: 15
+    - path: "apps/frontend/lib/validation/transfer-order-schemas.ts"
+      type: validation
+  tests_exist: true
+  test_files:
+    - path: "apps/frontend/app/api/planning/transfer-orders/__tests__/route.test.ts"
+      count: 20
+    - path: "apps/frontend/app/api/planning/transfer-orders/__tests__/integration.test.ts"
+      count: 15
+    - path: "apps/frontend/app/api/planning/transfer-orders/[id]/lines/[lineId]/assign-lps/__tests__/route.test.ts"
+      count: 40
+    - path: "apps/frontend/app/api/planning/transfer-orders/[id]/lines/[lineId]/available-lps/__tests__/route.test.ts"
+      count: 38
+  estimated_completion: 100%
+
+status: COMPLETE
+
+summary: |
+  Story 03.8 "Transfer Orders CRUD + Lines" is COMPLETE.
+
+  Deliverables:
+  - 1 migration: transfer_orders + transfer_order_lines tables
+  - 9 API routes: Full CRUD + status actions
+  - 15 React components: DataTable, modals, badges, dialogs
+  - 2 pages: List page + Detail page
+  - Modular service layer: 8 service modules
+  - Zod validation: 8 schemas
+  - 113 tests passing
+
+  Key Features:
+  - TO CRUD with auto-numbering (TO-YYYY-NNNNN)
+  - Line management (add/edit/delete with renumbering)
+  - Status lifecycle (draft -> planned -> shipped -> received -> closed)
+  - Warehouse validation (from != to)
+  - Date validation (receive >= ship)
+  - Multi-tenancy with RLS
+  - Permission enforcement (ADMIN, WH_MANAGER)
+
+next_phase: NONE
+
+completion_report: "docs/2-MANAGEMENT/epics/current/03-planning/reports/03.8-completion-report.md"
+
+# Phase checkpoints
+P5: ✓ code-reviewer 09:59 issues:0 decision:approved
+P6: ✓ qa-agent 10:06 ac:16/16 bugs:0 decision:pass
+P7: ✓ tech-writer 10:15 report:done docs:updated
+P7: ✓ tech-writer 10:32 report:done docs:updated

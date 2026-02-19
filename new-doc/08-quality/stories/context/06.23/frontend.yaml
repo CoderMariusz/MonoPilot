@@ -1,0 +1,33 @@
+# Story 06.23 - CCP Monitoring Desktop - Frontend Context
+
+pages:
+  - path: "app/(authenticated)/quality/haccp/ccp-monitoring/page.tsx"
+    name: "CCP Monitoring Form"
+  - path: "app/(authenticated)/quality/haccp/ccp-monitoring/queue/page.tsx"
+    name: "Monitoring Queue (Due/Overdue CCPs)"
+  - path: "app/(authenticated)/quality/haccp/ccp-monitoring/history/page.tsx"
+    name: "Monitoring History"
+
+components:
+  - "CCPMonitoringForm.tsx"
+  - "CCPSelector.tsx"
+  - "MonitoringValueInput.tsx"
+  - "RealtimeValidationIndicator.tsx"
+  - "DeviationWarningModal.tsx"
+  - "CorrectiveActionForm.tsx"
+  - "MonitoringHistoryTable.tsx"
+  - "MonitoringResultBadge.tsx (pass/fail/marginal)"
+  - "DueCCPsQueue.tsx"
+  - "VerifyMonitoringDialog.tsx"
+
+hooks:
+  - "useCCPMonitoring()"
+  - "useCreateMonitoring()"
+  - "useDueCCPs()"
+  - "useMonitoringHistory(ccpId)"
+
+ux_patterns:
+  - "Real-time validation (as-you-type)"
+  - "Deviation warning modal (fail result)"
+  - "Corrective action mandatory field (if fail)"
+  - "Auto-lock indicator (5min countdown)"

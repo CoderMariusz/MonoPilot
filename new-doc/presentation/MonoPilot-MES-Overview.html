@@ -1,0 +1,1077 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MonoPilot MES — Przegląd Systemu</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+  :root {
+    --primary: #6C5CE7;
+    --primary-light: #A29BFE;
+    --primary-dark: #5A4BD1;
+    --success: #00D2D3;
+    --success-dark: #00B4B5;
+    --warning: #FECA57;
+    --danger: #FF6B6B;
+    --surface: #FFFFFF;
+    --bg: #F0F2F5;
+    --text: #2D3436;
+    --text-secondary: #636E72;
+    --text-muted: #B2BEC3;
+    --border: #E9ECEF;
+    --shadow: 0 2px 8px rgba(0,0,0,0.08);
+    --shadow-lg: 0 8px 32px rgba(0,0,0,0.12);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .slide {
+    min-height: 100vh;
+    padding: 60px 80px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    position: relative;
+    page-break-after: always;
+  }
+
+  .slide-number {
+    position: absolute;
+    bottom: 30px;
+    right: 40px;
+    font-size: 14px;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+
+  .slide-logo {
+    position: absolute;
+    top: 30px;
+    right: 40px;
+    font-size: 13px;
+    color: var(--text-muted);
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  /* TITLE SLIDE */
+  .slide-title {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    color: #fff;
+    text-align: center;
+    padding: 80px;
+  }
+
+  .slide-title h1 {
+    font-size: 52px;
+    font-weight: 800;
+    margin-bottom: 16px;
+    letter-spacing: -1px;
+    background: linear-gradient(135deg, #A29BFE 0%, #00D2D3 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .slide-title h2 {
+    font-size: 24px;
+    font-weight: 400;
+    color: rgba(255,255,255,0.7);
+    margin-bottom: 40px;
+  }
+
+  .slide-title .meta {
+    font-size: 16px;
+    color: rgba(255,255,255,0.5);
+  }
+
+  .slide-title .badge-row {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    margin-top: 40px;
+    flex-wrap: wrap;
+  }
+
+  .slide-title .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 20px;
+    border-radius: 24px;
+    font-size: 14px;
+    font-weight: 500;
+    background: rgba(255,255,255,0.1);
+    color: rgba(255,255,255,0.8);
+    border: 1px solid rgba(255,255,255,0.15);
+  }
+
+  .slide h2 {
+    font-size: 36px;
+    font-weight: 700;
+    margin-bottom: 32px;
+    color: var(--text);
+  }
+
+  .slide h2 .accent { color: var(--primary); }
+
+  .slide h3 {
+    font-size: 22px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    color: var(--text);
+  }
+
+  .card-grid { display: grid; gap: 24px; }
+  .card-grid-2 { grid-template-columns: 1fr 1fr; }
+  .card-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .card-grid-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+
+  .card {
+    background: var(--surface);
+    border-radius: 16px;
+    padding: 28px;
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border);
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+
+  .card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .card-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    margin-bottom: 16px;
+  }
+
+  .card-icon-purple { background: rgba(108,92,231,0.12); }
+  .card-icon-cyan { background: rgba(0,210,211,0.12); }
+  .card-icon-yellow { background: rgba(254,202,87,0.12); }
+  .card-icon-red { background: rgba(255,107,107,0.12); }
+  .card-icon-green { background: rgba(0,210,100,0.12); }
+  .card-icon-blue { background: rgba(0,123,255,0.12); }
+
+  .card h4 { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
+  .card p { font-size: 14px; color: var(--text-secondary); line-height: 1.6; }
+
+  .card .tag {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-top: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .tag-done { background: rgba(0,210,211,0.12); color: var(--success-dark); }
+  .tag-wip { background: rgba(254,202,87,0.12); color: #D4A005; }
+
+  /* COMPARISON */
+  .comparison-row {
+    display: grid;
+    grid-template-columns: 1fr 60px 1fr;
+    gap: 0;
+    align-items: start;
+  }
+
+  .comparison-col { padding: 32px; border-radius: 16px; }
+
+  .comparison-before {
+    background: rgba(255,107,107,0.06);
+    border: 2px solid rgba(255,107,107,0.2);
+  }
+
+  .comparison-after {
+    background: rgba(0,210,211,0.06);
+    border: 2px solid rgba(0,210,211,0.2);
+  }
+
+  .comparison-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    color: var(--primary);
+    align-self: center;
+  }
+
+  .comparison-col h3 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 20px;
+    margin-bottom: 20px;
+  }
+
+  .comparison-col ul { list-style: none; padding: 0; }
+
+  .comparison-col li {
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+    font-size: 15px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .comparison-col li:last-child { border-bottom: none; }
+  .comparison-col li .icon { flex-shrink: 0; font-size: 18px; }
+
+  /* ARCHITECTURE */
+  .arch-diagram {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  .arch-row { display: grid; gap: 12px; align-items: stretch; }
+  .arch-row-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .arch-row-1 { grid-template-columns: 1fr; }
+  .arch-row-2 { grid-template-columns: 1fr 1fr; }
+
+  .arch-box {
+    padding: 16px 20px;
+    border-radius: 12px;
+    text-align: center;
+    font-weight: 600;
+    font-size: 14px;
+    border: 2px solid;
+  }
+
+  .arch-box small {
+    display: block;
+    font-weight: 400;
+    font-size: 12px;
+    margin-top: 4px;
+    opacity: 0.7;
+  }
+
+  .arch-frontend { background: rgba(108,92,231,0.08); border-color: rgba(108,92,231,0.3); color: var(--primary-dark); }
+  .arch-backend { background: rgba(0,210,211,0.08); border-color: rgba(0,210,211,0.3); color: var(--success-dark); }
+  .arch-device { background: rgba(255,107,107,0.08); border-color: rgba(255,107,107,0.3); color: #CC4444; }
+  .arch-arrow { text-align: center; font-size: 24px; color: var(--text-muted); padding: 4px 0; }
+
+  /* MODULE MAP */
+  .module-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    max-width: 1000px;
+    margin: 0 auto;
+  }
+
+  .module-card {
+    background: var(--surface);
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+    transition: all 0.2s;
+  }
+
+  .module-card-phase1 { border-color: var(--success); background: rgba(0,210,211,0.05); }
+  .module-card-phase2 { border-color: var(--primary); background: rgba(108,92,231,0.05); }
+
+  .module-card .module-num {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+  }
+
+  .module-card .module-name {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+
+  .module-card .module-status {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 8px;
+    display: inline-block;
+  }
+
+  .status-mvp { background: rgba(0,210,211,0.15); color: var(--success-dark); }
+  .status-phase2 { background: rgba(108,92,231,0.15); color: var(--primary); }
+
+  /* FEATURE TABLE */
+  .feature-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+
+  .feature-table th {
+    background: var(--primary);
+    color: #fff;
+    padding: 14px 20px;
+    text-align: left;
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .feature-table td {
+    padding: 14px 20px;
+    font-size: 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+
+  .feature-table tr:last-child td { border-bottom: none; }
+
+  /* UTILITIES */
+  .divider {
+    width: 60px;
+    height: 4px;
+    background: linear-gradient(90deg, var(--primary), var(--success));
+    border-radius: 2px;
+    margin: 20px 0;
+  }
+
+  .text-center { text-align: center; }
+  .mt-20 { margin-top: 20px; }
+  .mt-32 { margin-top: 32px; }
+
+  .highlight-box {
+    background: linear-gradient(135deg, rgba(108,92,231,0.06), rgba(0,210,211,0.06));
+    border: 1px solid rgba(108,92,231,0.15);
+    border-radius: 12px;
+    padding: 24px 32px;
+    margin: 20px 0;
+  }
+
+  .highlight-box p {
+    font-size: 18px;
+    color: var(--text);
+    text-align: center;
+    font-weight: 500;
+  }
+
+  .bullet-list { list-style: none; padding: 0; }
+
+  .bullet-list li {
+    padding: 10px 0;
+    font-size: 16px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .bullet-list li:last-child { border-bottom: none; }
+
+  .bullet-list .icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+
+  /* NAV DOTS */
+  .slide-nav {
+    position: fixed;
+    right: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 100;
+  }
+
+  .slide-nav a {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    opacity: 0.4;
+    transition: opacity 0.2s, transform 0.2s;
+    display: block;
+  }
+
+  .slide-nav a:hover { opacity: 1; transform: scale(1.3); }
+
+  @media print {
+    .slide { page-break-after: always; min-height: auto; padding: 40px; }
+    body { background: #fff; }
+    .slide-nav { display: none; }
+    .card:hover { transform: none; box-shadow: var(--shadow); }
+  }
+</style>
+</head>
+<body>
+
+<!-- SLIDE 1: TITLE -->
+<div class="slide slide-title" id="s1">
+  <h1>MonoPilot MES</h1>
+  <h2>Cloud-native Manufacturing Execution System dla producentów żywności SMB</h2>
+  <div class="meta">IPL Manufacturing • Luty 2026</div>
+  <div class="badge-row">
+    <span class="badge">15 Modułów</span>
+    <span class="badge">Multi-tenant SaaS</span>
+    <span class="badge">Scanner-First</span>
+    <span class="badge">GS1 Compliant</span>
+  </div>
+  <div class="slide-number">1 / 12</div>
+</div>
+
+<!-- SLIDE 2: PROBLEM (Before/After) -->
+<div class="slide" id="s2">
+  <h2><span class="accent">Problem</span> i rozwiązanie</h2>
+  <div class="divider"></div>
+
+  <div class="comparison-row">
+    <div class="comparison-col comparison-before">
+      <h3><span class="icon">&#10060;</span> Aktualny stan (Before)</h3>
+      <ul>
+        <li><span class="icon">&#128221;</span> Excel i papier — brak trasowalności, brak real-time</li>
+        <li><span class="icon">&#128276;</span> Brak kontroli partii i dat ważności</li>
+        <li><span class="icon">&#9201;</span> Audyty trwają godziny/dni — ręczne szukanie dokumentów</li>
+        <li><span class="icon">&#9888;</span> Brak FIFO/FEFO — straty na przeterminowaniu</li>
+        <li><span class="icon">&#128193;</span> Każdy dział ma własne arkusze — brak single source of truth</li>
+        <li><span class="icon">&#128176;</span> Enterprise ERP (SAP, D365) — za drogi, za długie wdrożenie</li>
+      </ul>
+    </div>
+
+    <div class="comparison-arrow">&#10132;</div>
+
+    <div class="comparison-col comparison-after">
+      <h3><span class="icon">&#9989;</span> MonoPilot (After)</h3>
+      <ul>
+        <li><span class="icon">&#9889;</span> License Plate tracking — 100% trasowalność forward/backward &lt;30s</li>
+        <li><span class="icon">&#128308;</span> Automatyczne alerty dat ważności + auto-block expired</li>
+        <li><span class="icon">&#128194;</span> Audit trail na każdej operacji — gotowość na audyt w minuty</li>
+        <li><span class="icon">&#128197;</span> FEFO domyślnie + FIFO fallback — minimalizacja strat</li>
+        <li><span class="icon">&#128202;</span> Jeden system: produkcja, magazyn, jakość, wysyłka</li>
+        <li><span class="icon">&#128176;</span> Wdrożenie w tygodniach, 50 USD/user/mies. — ułamek kosztu ERP</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="slide-number">2 / 12</div>
+  <div class="slide-logo">IPL MANUFACTURING</div>
+</div>
+
+<!-- SLIDE 3: ARCHITECTURE -->
+<div class="slide" id="s3">
+  <h2>Architektura <span class="accent">Techniczna</span></h2>
+  <div class="divider"></div>
+
+  <div class="arch-diagram">
+    <div class="arch-row arch-row-3">
+      <div class="arch-box arch-frontend">&#9881; Next.js 16 + React 19<small>TypeScript + Zod</small></div>
+      <div class="arch-box arch-frontend">&#127912; TailwindCSS + ShadCN<small>Design system</small></div>
+      <div class="arch-box arch-frontend">&#128295; TypeScript + Zod<small>Type safety + validation</small></div>
+    </div>
+    <div class="arch-arrow">&#8595;</div>
+    <div class="arch-row arch-row-2">
+      <div class="arch-box arch-backend">&#128187; Supabase<small>PostgreSQL + Auth + RLS + Storage</small></div>
+      <div class="arch-box arch-backend">&#9889; Redis Cache<small>Performance boost</small></div>
+    </div>
+    <div class="arch-arrow">&#8595;</div>
+    <div class="arch-row arch-row-3">
+      <div class="arch-box arch-device">&#128241; Scanner<small>Zebra / Honeywell</small></div>
+      <div class="arch-box arch-device">&#128438; ZPL Label Printing<small>Zebra printers</small></div>
+      <div class="arch-box arch-device">&#128203; GS1 Barcodes<small>GTIN-14, GS1-128, SSCC-18</small></div>
+    </div>
+  </div>
+
+  <div class="highlight-box mt-20">
+    <p>&#128274; <strong>Multi-tenant SaaS</strong> — RLS na każdej tabeli, org_id isolation, zero cross-org data leaks</p>
+  </div>
+
+  <div class="slide-number">3 / 12</div>
+  <div class="slide-logo">IPL MANUFACTURING</div>
+</div>
+
+<!-- SLIDE 4: MODULE MAP -->
+<div class="slide" id="s4">
+  <h2>Mapa <span class="accent">Modułów</span> (15 modułów)</h2>
+  <div class="divider"></div>
+
+  <div class="module-grid">
+    <div class="module-card module-card-phase1">
+      <div class="module-num">M01</div>
+      <div class="module-name">Settings</div>
+      <div class="module-status status-mvp">Phase 1 MVP</div>
+    </div>
+    <div class="module-card module-card-phase1">
+      <div class="module-num">M02</div>
+      <div class="module-name">Technical</div>
+      <div class="module-status status-mvp">Phase 1 MVP</div>
+    </div>
+    <div class="module-card module-card-phase1">
+      <div class="module-num">M03</div>
+      <div class="module-name">Warehouse</div>
+      <div class="module-status status-mvp">Phase 1 MVP</div>
+    </div>
+    <div class="module-card module-card-phase1">
+      <div class="module-num">M04</div>
+      <div class="module-name">Planning</div>
+      <div class="module-status status-mvp">Phase 1 MVP</div>
+    </div>
+    <div class="module-card module-card-phase1">
+      <div class="module-num">M05</div>
+      <div class="module-name">Scanner</div>
+      <div class="module-status status-mvp">Phase 1 Inkrementalnie</div>
+    </div>
+    <div class="module-card module-card-phase1">
+      <div class="module-num">M06</div>
+      <div class="module-name">Production</div>
+      <div class="module-status status-mvp">Phase 1 MVP</div>
+    </div>
+    <div class="module-card module-card-phase1">
+      <div class="module-num">M07</div>
+      <div class="module-name">Shipping</div>
+      <div class="module-status status-mvp">Phase 1 MVP</div>
+    </div>
+    <div class="module-card module-card-phase1">
+      <div class="module-num">M08</div>
+      <div class="module-name">Quality</div>
+      <div class="module-status status-mvp">Phase 1 Basic + HACCP</div>
+    </div>
+    <div class="module-card module-card-phase2">
+      <div class="module-num">M09</div>
+      <div class="module-name">NPD</div>
+      <div class="module-status status-phase2">Phase 2</div>
+    </div>
+    <div class="module-card module-card-phase2">
+      <div class="module-num">M10</div>
+      <div class="module-name">Finance</div>
+      <div class="module-status status-phase2">Phase 2</div>
+    </div>
+    <div class="module-card module-card-phase2">
+      <div class="module-num">M11</div>
+      <div class="module-name">Multi-Site</div>
+      <div class="module-status status-phase2">Phase 2</div>
+    </div>
+    <div class="module-card module-card-phase2">
+      <div class="module-num">M12</div>
+      <div class="module-name">OEE</div>
+      <div class="module-status status-phase2">Phase 2</div>
+    </div>
+    <div class="module-card module-card-phase2">
+      <div class="module-num">M13</div>
+      <div class="module-name">Integrations</div>
+      <div class="module-status status-phase2">Phase 2</div>
+    </div>
+    <div class="module-card module-card-phase2">
+      <div class="module-num">M14</div>
+      <div class="module-name">Maintenance</div>
+      <div class="module-status status-phase2">Phase 2</div>
+    </div>
+    <div class="module-card module-card-phase1">
+      <div class="module-num">M15</div>
+      <div class="module-name">Reporting</div>
+      <div class="module-status status-mvp">Phase 1 Inkrementalnie</div>
+    </div>
+  </div>
+
+  <div class="highlight-box mt-32">
+    <p><strong>Kolor zielony</strong> = Phase 1 MVP • <strong>Kolor fioletowy</strong> = Phase 2</p>
+  </div>
+
+  <div class="slide-number">4 / 12</div>
+  <div class="slide-logo">IPL MANUFACTURING</div>
+</div>
+
+<!-- SLIDE 5: M01 SETTINGS -->
+<div class="slide" id="s5">
+  <h2>M01 — <span class="accent">Settings</span></h2>
+  <div class="divider"></div>
+
+  <div class="card-grid card-grid-3">
+    <div class="card">
+      <div class="card-icon card-icon-purple">&#9881;</div>
+      <h4>Organizacja CRUD</h4>
+      <p>Multi-tenant, branding, logo, org-level settings</p>
+      <span class="tag tag-done">~80% Done</span>
+    </div>
+    <div class="card">
+      <div class="card-icon card-icon-cyan">&#128101;</div>
+      <h4>10 Ról systemowych</h4>
+      <p>Owner, Admin, Production Manager, Quality Manager, Warehouse Manager, Operator, Planner, Viewer — JSONB permissions (CRUD per moduł)</p>
+    </div>
+    <div class="card">
+      <div class="card-icon card-icon-yellow">&#128230;</div>
+      <h4>Magazyny + lokalizacje</h4>
+      <p>Zone → Row → Bin, capacity tracking, zone management</p>
+    </div>
+    <div class="card">
+      <div class="card-icon card-icon-blue">&#128295;</div>
+      <h4>Maszyny i linie</h4>
+      <p>Production lines, machine CRUD, capacity, status</p>
+    </div>
+    <div class="card">
+      <div class="card-icon card-icon-red">&#9888;</div>
+      <h4>Alergeny EU-14</h4>
+      <p>Globalna tabela (read-only) + org-specific extensions</p>
+    </div>
+    <div class="card">
+      <div class="card-icon card-icon-green">&#128268;</div>
+      <h4>Module toggles</h4>
+      <p>Włącz/wyłącz moduły per org (ADR-011)</p>
+    </div>
+    <div class="card">
+      <div class="card-icon card-icon-purple">&#128176;</div>
+      <h4>Kody VAT</h4>
+      <p>Phase 2: Multi-country VAT codes</p>
+      <span class="tag tag-wip">Phase 2</span>
+    </div>
+  </div>
+
+  <div class="highlight-box mt-20">
+    <p>&#128161; <strong>Onboarding wizard</strong> &lt; 15 min — soft dependencies do M02/M04 (linki, nie cross-module API)</p>
+  </div>
+
+  <div class="slide-number">5 / 12</div>
+  <div class="slide-logo">IPL MANUFACTURING</div>
+</div>
+
+<!-- SLIDE 6: M02 TECHNICAL -->
+<div class="slide" id="s6">
+  <h2>M02 — <span class="accent">Technical / Products</span></h2>
+  <div class="divider"></div>
+
+  <div class="card-grid card-grid-3">
+    <div class="card">
+      <div class="card-icon card-icon-cyan">&#128230;</div>
+      <h4>Produkty CRUD</h4>
+      <p>Name, SKU, GTIN-14, unit, category, item_group (RawMeat, Packaging, Consumables, FinGoods)</p>
+      <span class="tag tag-done">~80% Done</span>
+    </div>
+    <div class="card">
+      <div class="card-icon card-icon-purple">&#9878;</div>
+      <h4>BOM (Bill of Materials)</h4>
+      <p>Drzewo składników z qty, unit, scrap%, priority. Phase 2: versioning, co-products</p>
+    </div>
+    <div class="card">
+      <div class="card-icon card-icon-red">&#9888;</div>
+      <h4>Alergeny EU-14</h4>
+      <p>Auto-propagacja z BOM na produkt (rekursywnie)</p>
+    </div>
+    <div class="card">
+      <div class="card-icon card-icon-yellow">&#9878;</div>
+      <h4>Pola wagowe</h4>
+      <p>net_weight, tare_weight, gross_weight (kg), conversion_factor_kg per unit</p>
+    </div>
+    <div class="card">
+      <div class="card-icon card-icon-green">&#128197;</div>
+      <h4>Shelf life</h4>
+      <p>shelf_life_days, best_before, shelf_advice, auto-calc expiry date</p>
+    </div>
+    <div class="card">
+      <div class="card-icon card-icon-blue">&#9878;</div>
+      <h4>Catch weight</h4>
+      <p>is_catch_weight, nominal_weight, min_weight, max_weight, tolerance %</p>
+    </div>
+    <div class="card">
+      <div class="card-icon card-icon-purple">&#128176;</div>
+      <h4>cost_per_kg</h4>
+      <p>Koszt per kg (GBP) — pole per produkt, używane w Finance (M10)</p>
+    </div>
+    <div class="card">
+      <div class="card-icon card-icon-cyan">&#128203;</div>
+      <h4>Phase 2</h4>
+      <p>BOM versioning, co-products, variable_scrap_pct, flushing_principle, formula audit trail</p>
+      <span class="tag tag-wip">Phase 2</span>
+    </div>
+  </div>
+
+  <div class="slide-number">6 / 12</div>
+  <div class="slide-logo">IPL MANUFACTURING</div>
+</div>
+
+<!-- SLIDE 7: M03 PLANNING -->
+<div class="slide" id="s7">
+  <h2>M04 — <span class="accent">Planning</span></h2>
+  <div class="divider"></div>
+
+  <div class="card-grid card-grid-2">
+    <div class="card">
+      <div class="card-icon card-icon-purple">&#128179;</div>
+      <h4>PO — Purchase Orders</h4>
+      <p>3-krokowe tworzenie: (1) dostawca → (2) produkty+qty → (3) submit. Smart defaults z supplier master. State machine: draft → approved → partial → completed</p>
+      <span class="tag tag-done">~70% Done</span>
+    </div>
+    <div class="card">
+      <div class="card-icon card-icon-cyan">&#128260;</div>
+      <h4>TO — Transfer Orders</h4>
+      <p>Header+lines model, multi-status (draft → planned → shipped → received → closed). Phase 2: CW na TO lines, ship/receipt dates (ADR-019)</p>
+    </div>
+    <div class="card">
+      <div class="card-icon card-icon-blue">&#9881;</div>
+      <h4>WO — Work Orders</h4>
+      <p>State machine: DRAFT → RELEASED → IN_PROGRESS → COMPLETED (+ CANCELLED). BOM Snapshot — niezmienny po tworzeniu (ADR-002)</p>
+    </div>
+    <div class="card">
+      <div class="card-icon card-icon-green">&#128230;</div>
+      <h4>Release to warehouse</h4>
+      <p>Trigger pick list (FIFO/FEFO), LP reservation, material staging</p>
+    </div>
+    <div class="card">
+      <div class="card-icon card-icon-yellow">&#128101;</div>
+      <h4>Supplier management</h4>
+      <p>Supplier CRUD, lead_time_days, moq, preferred_supplier per product</p>
+    </div>
+    <div class="card">
+      <div class="card-icon card-icon-red">&#128202;</div>
+      <h4>Phase 2</h4>
+      <p>planning_priority na WO, MRP basic → advanced, demand forecasting, capacity planning, bulk import CSV</p>
+      <span class="tag tag-wip">Phase 2</span>
+    </div>
+  </div>
+
+  <div class="slide-number">7 / 12</div>
+  <div class="slide-logo">IPL MANUFACTURING</div>
+</div>
+
+<!-- SLIDE 8: M04 PRODUCTION -->
+<div class="slide" id="s8">
+  <h2>M06 — <span class="accent">Production</span></h2>
+  <div class="divider"></div>
+
+  <div class="card-grid card-grid-3">
+    <div class="card">
+      <div class="card-icon card-icon-purple">&#9881;</div>
+      <h4>WO execution</h4>
+      <p>Start/pause/complete workflow. Material consumption LP-level (which LP was consumed). Output registration (LP creation + genealogy)</p>
+      <span class="tag tag-done">~60% Done</span>
+    </div>
+    <div class="card">
+      <div class="card-icon card-icon-red">&#128193;</div>
+      <h4>Waste categories</h4>
+      <p>Fat, floor, giveaway per batch — customizable per org. Tracking waste qty + category + reason</p>
+    </div>
+    <div class="card">
+      <div class="card-icon card-icon-yellow">&#9878;</div>
+      <h4>Weight-based yield</h4>
+      <p>wgt_consumed vs wgt_made, meat_yield_pct, target_yield, variance £</p>
+    </div>
+    <div class="card">
+      <div class="card-icon card-icon-cyan">&#128269;</div>
+      <h4>LP-level consumption</h4>
+      <p>100% trasowalność — dokładnie które LP zostały zużyte na które WO, genealogy forward/backward &lt;30s</p>
+    </div>
+    <div class="card">
+      <div class="card-icon card-icon-blue">&#9201;</div>
+      <h4>Downtime tracking</h4>
+      <p>People / Process / Plant + minuty. Kategorie: maintenance, changeover, shortage, quality, setup</p>
+    </div>
+    <div class="card">
+      <div class="card-icon card-icon-green">&#128197;</div>
+      <h4>Shift AM/PM</h4>
+      <p>Osobne raportowanie per zmiana, shift performance, hourly efficiency (Phase 2)</p>
+    </div>
+    <div class="card">
+      <div class="card-icon card-icon-purple">&#128203;</div>
+      <h4>Phase 2</h4>
+      <p>Co-product output, route per product-line, CW qty na batch order, QC holds z produkcji, rework_batch flag</p>
+      <span class="tag tag-wip">Phase 2</span>
+    </div>
+  </div>
+
+  <div class="slide-number">8 / 12</div>
+  <div class="slide-logo">IPL MANUFACTURING</div>
+</div>
+
+<!-- SLIDE 9: M05 WAREHOUSE (BIG SLIDE) -->
+<div class="slide" id="s9">
+  <h2>M03 — <span class="accent">Warehouse</span> (szczegółowy moduł)</h2>
+  <div class="divider"></div>
+
+  <div class="card-grid card-grid-4" style="margin-bottom: 20px;">
+    <div class="card" style="padding: 20px;">
+      <div class="card-icon card-icon-purple">&#128269;</div>
+      <h4>LP Core</h4>
+      <p>License Plate = atomowa jednostka inwentarza. Status: available → reserved → consumed/shipped. Split/merge/block. Genealogy tree. <strong>Brak luźnych ilości</strong></p>
+      <span class="tag tag-done">Phase 1</span>
+    </div>
+    <div class="card" style="padding: 20px;">
+      <div class="card-icon card-icon-cyan">&#128230;</div>
+      <h4>Receiving (GRN)</h4>
+      <p>GRN z PO/TO. GS1-128 scanning. Validation: qty vs PO, tolerance, over-receipt control. Manual complete (nie auto). Multi-LP per line</p>
+      <span class="tag tag-done">Phase 1</span>
+    </div>
+    <div class="card" style="padding: 20px;">
+      <div class="card-icon card-icon-blue">&#128260;</div>
+      <h4>Stock Moves</h4>
+      <p>Transfer, putaway, adjustment, return, quarantine. Full/partial move. Audit trail. Reason codes. Transit location = fizyczna lokalizacja</p>
+      <span class="tag tag-done">Phase 1</span>
+    </div>
+    <div class="card" style="padding: 20px;">
+      <div class="card-icon card-icon-green">&#128197;</div>
+      <h4>FIFO/FEFO</h4>
+      <p><strong>FEFO domyślnie</strong> (expiry_date ASC NULLS LAST). FIFO fallback (created_at ASC). Override z audit trail. Expired LP auto-block + wykluczenie z pick</p>
+      <span class="tag tag-done">Phase 1</span>
+    </div>
+    <div class="card" style="padding: 20px;">
+      <div class="card-icon card-icon-yellow">&#9888;</div>
+      <h4>QA Status</h4>
+      <p>pending → passed/failed. Failed → quarantine (auto-sugestia, nie auto-move). QA gating: qa_status≠passed → blokada konsumpcji</p>
+      <span class="tag tag-done">Phase 1</span>
+    </div>
+    <div class="card" style="padding: 20px;">
+      <div class="card-icon card-icon-red">&#128438;</div>
+      <h4>Label Printing</h4>
+      <p>ZPL → Zebra, auto-print on receipt. LP label: barcode, product, qty, batch, expiry, QR. Dual UoM: „120 BOX / 184 KG"</p>
+      <span class="tag tag-done">Phase 1</span>
+    </div>
+    <div class="card" style="padding: 20px;">
+      <div class="card-icon card-icon-purple">&#128203;</div>
+      <h4>Phase 2</h4>
+      <p>ASN, Palety & SSCC-18, Catch Weight, Put-away Rules, Load Concept, Cycle Counts</p>
+      <span class="tag tag-wip">Phase 2</span>
+    </div>
+  </div>
+
+  <div class="highlight-box">
+    <p>&#128274; <strong>Kluczowe decyzje</strong>: LP = atomic unit • No loose qty • FEFO default • QA gating • GRN validation • Dual UoM • Scanner auth PIN</p>
+  </div>
+
+  <div class="slide-number">9 / 12</div>
+  <div class="slide-logo">IPL MANUFACTURING</div>
+</div>
+
+<!-- SLIDE 10: M12 SCANNER -->
+<div class="slide" id="s10">
+  <h2>M05 — <span class="accent">Scanner</span> Workflows</h2>
+  <div class="divider"></div>
+
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 28px;">
+    <div>
+      <h3 style="margin-bottom: 16px;">Scanner Workflows (6)</h3>
+      <ul class="bullet-list">
+        <li><span class="icon">&#128230;</span> <strong>Receive</strong>: Scan PO → Scan Product → Enter Qty → Confirm → Print Label</li>
+        <li><span class="icon">&#128260;</span> <strong>Move</strong>: Scan LP → Scan Location → Confirm</li>
+        <li><span class="icon">&#128269;</span> <strong>Putaway</strong>: Scan LP → System Suggests → Scan Location → Confirm</li>
+        <li><span class="icon">&#9881;</span> <strong>Pick</strong>: Scan WO → System Suggests LP (FIFO/FEFO) → Scan LP → Confirm</li>
+        <li><span class="icon">&#9986;</span> <strong>Split</strong>: Scan LP → Enter Qty → Confirm → Print Label</li>
+        <li><span class="icon">&#128259;</span> <strong>Merge</strong>: Scan Primary → Scan Additional → Confirm</li>
+      </ul>
+    </div>
+    <div>
+      <h3 style="margin-bottom: 16px;">Scanner UX Requirements</h3>
+      <ul class="bullet-list">
+        <li><span class="icon">&#128241;</span> Touch targets ≥48px</li>
+        <li><span class="icon">&#128266;</span> Audio/vibration feedback</li>
+        <li><span class="icon">&#128273;</span> Username + PIN login</li>
+        <li><span class="icon">&#128274;</span> LP locking (concurrent access protection)</li>
+        <li><span class="icon">&#9889;</span> Scan-first input (auto-focus barcode field)</li>
+        <li><span class="icon">&#128260;</span> Liniowy flow krok po kroku</li>
+        <li><span class="icon">&#128268;</span> Offline queue Phase 2 (IndexedDB, max 100 transakcji)</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="highlight-box">
+    <p>&#128161; Dedykowane strony <code>/scanner/*</code> — optymalizowane dla skanerów mobilnych (Zebra TC21/TC26, Honeywell CT40/CT60)</p>
+  </div>
+
+  <div class="slide-number">10 / 12</div>
+  <div class="slide-logo">IPL MANUFACTURING</div>
+</div>
+
+<!-- SLIDE 11: KEY DECISIONS (ADR) -->
+<div class="slide" id="s11">
+  <h2>Kluczowe <span class="accent">Decyzje</span> Architektoniczne</h2>
+  <div class="divider"></div>
+
+  <table class="feature-table">
+    <thead>
+      <tr>
+        <th>ADR</th>
+        <th>Decyzja</th>
+        <th>Uzasadnienie</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>ADR-001</strong></td>
+        <td>License Plate Inventory</td>
+        <td>Atomowa jednostka inwentarza, NO loose qty. Pełna trasowalność przez lp_genealogy (split/merge/consume/output)</td>
+      </tr>
+      <tr>
+        <td><strong>ADR-002</strong></td>
+        <td>BOM Snapshot</td>
+        <td>WO kopiuje BOM przy tworzeniu. Niezmienny w trakcie produkcji. Zapobiega błędom zmian BOM mid-production</td>
+      </tr>
+      <tr>
+        <td><strong>ADR-003</strong></td>
+        <td>Multi-Tenancy RLS</td>
+        <td>org_id UUID NOT NULL na WSZYSTKICH tabelach. RLS policy: USING (org_id = auth session). Zero cross-org data leaks</td>
+      </tr>
+      <tr>
+        <td><strong>ADR-004</strong></td>
+        <td>GS1 Compliance</td>
+        <td>GTIN-14 produkty, GS1-128 LP (lot/expiry), SSCC-18 palety. AI(01) GTIN, AI(10) Lot, AI(17) Expiry. Standard branżowy</td>
+      </tr>
+      <tr>
+        <td><strong>ADR-005</strong></td>
+        <td>FIFO/FEFO</td>
+        <td>FEFO domyślnie (expiry_date ASC), FIFO fallback (created_at ASC). Override z audit trail. Minimalizacja strat</td>
+      </tr>
+      <tr>
+        <td><strong>ADR-006</strong></td>
+        <td>Scanner-First</td>
+        <td>Dedykowane /scanner/* routes, 48px touch targets, scan-first input, liniowy flow. Optymalizacja dla operatorów hali</td>
+      </tr>
+      <tr>
+        <td><strong>ADR-007</strong></td>
+        <td>WO State Machine</td>
+        <td>DRAFT → RELEASED → IN_PROGRESS → COMPLETED (+ CANCELLED). Guards: hasBOM, hasMaterials, outputRecorded</td>
+      </tr>
+      <tr>
+        <td><strong>ADR-008</strong></td>
+        <td>Audit Trail</td>
+        <td>Hybrydowy: PG triggers + app context. Tabela audit_log (old_data/new_data, user_id, ip, reason). FDA 21 CFR Part 11, FSMA 204</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="slide-number">11 / 12</div>
+  <div class="slide-logo">IPL MANUFACTURING</div>
+</div>
+
+<!-- SLIDE 12: SUMMARY -->
+<div class="slide" id="s12" style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); color: #fff;">
+  <h2 style="color: #fff; text-align: center;">Podsumowanie &amp; <span style="color: var(--success);">Następne Kroki</span></h2>
+  <div class="divider" style="margin: 20px auto;"></div>
+
+  <div class="card-grid card-grid-3" style="margin-bottom: 40px;">
+    <div class="card" style="background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.1); text-align: center;">
+      <div style="font-size: 48px; margin-bottom: 8px;">&#128202;</div>
+      <h4 style="color: #fff; font-size: 20px;">Co budujemy</h4>
+      <p style="color: rgba(255,255,255,0.6); font-size: 15px;">Cloud-native MES dla SMB food manufacturers. 15 modułów. Pełna trasowalność forward/backward &lt;30s. Scanner-first. GS1 compliant</p>
+    </div>
+    <div class="card" style="background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.1); text-align: center;">
+      <div style="font-size: 48px; margin-bottom: 8px;">&#9881;</div>
+      <h4 style="color: #fff; font-size: 20px;">Jak działamy</h4>
+      <p style="color: rgba(255,255,255,0.6); font-size: 15px;">Multi-tenant SaaS. Supabase + Next.js. License Plate inventory. FEFO domyślnie. BOM snapshot. RLS na każdej tabeli</p>
+    </div>
+    <div class="card" style="background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.1); text-align: center;">
+      <div style="font-size: 48px; margin-bottom: 8px;">&#127758;</div>
+      <h4 style="color: #fff; font-size: 20px;">Dla kogo</h4>
+      <p style="color: rgba(255,255,255,0.6); font-size: 15px;">Producenci żywności 5-100 pracowników. Polska → DACH → EU. Wdrożenie w tygodniach. 50 USD/user/miesiąc</p>
+    </div>
+  </div>
+
+  <div style="max-width: 700px; margin: 0 auto;">
+    <h3 style="color: var(--success); margin-bottom: 20px; text-align: center;">Następne Kroki</h3>
+    <div style="display: grid; gap: 12px;">
+      <div style="display: flex; align-items: center; gap: 16px; padding: 16px 20px; background: rgba(255,255,255,0.06); border-radius: 10px; border: 1px solid rgba(255,255,255,0.1);">
+        <span style="width: 32px; height: 32px; border-radius: 50%; background: var(--primary); display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0;">1</span>
+        <div>
+          <strong style="color: #fff;">Warehouse MVP (M03)</strong>
+          <p style="color: rgba(255,255,255,0.5); font-size: 13px; margin-top: 2px;">LP Core, GRN, stock moves, FIFO/FEFO, scanner workflows, label printing</p>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 16px; padding: 16px 20px; background: rgba(255,255,255,0.06); border-radius: 10px; border: 1px solid rgba(255,255,255,0.1);">
+        <span style="width: 32px; height: 32px; border-radius: 50%; background: var(--primary); display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0;">2</span>
+        <div>
+          <strong style="color: #fff;">Quality Basic (M08)</strong>
+          <p style="color: rgba(255,255,255,0.5); font-size: 13px; margin-top: 2px;">QA holds, NCR, basic HACCP checklisty (CCP monitoring points)</p>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 16px; padding: 16px 20px; background: rgba(255,255,255,0.06); border-radius: 10px; border: 1px solid rgba(255,255,255,0.1);">
+        <span style="width: 32px; height: 32px; border-radius: 50%; background: var(--primary); display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0;">3</span>
+        <div>
+          <strong style="color: #fff;">Shipping Basic (M07)</strong>
+          <p style="color: rgba(255,255,255,0.5); font-size: 13px; margin-top: 2px;">SO CRUD, pick list generation, basic packing, delivery address per order</p>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 16px; padding: 16px 20px; background: rgba(255,255,255,0.06); border-radius: 10px; border: 1px solid rgba(255,255,255,0.1);">
+        <span style="width: 32px; height: 32px; border-radius: 50%; background: var(--primary); display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0;">4</span>
+        <div>
+          <strong style="color: #fff;">Reporting (M15)</strong>
+          <p style="color: rgba(255,255,255,0.5); font-size: 13px; margin-top: 2px;">Factory Overview Dashboard, Yield by Line/SKU, QC Holds dashboard</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="text-align: center; margin-top: 48px;">
+    <p style="font-size: 14px; color: rgba(255,255,255,0.35);">MonoPilot MES • IPL Manufacturing • Luty 2026</p>
+  </div>
+
+  <div class="slide-number" style="color: rgba(255,255,255,0.3);">12 / 12</div>
+</div>
+
+<!-- Navigation dots -->
+<nav class="slide-nav" aria-label="Slide navigation">
+  <a href="#s1" title="Tytuł"></a>
+  <a href="#s2" title="Problem"></a>
+  <a href="#s3" title="Architektura"></a>
+  <a href="#s4" title="Mapa modułów"></a>
+  <a href="#s5" title="Settings"></a>
+  <a href="#s6" title="Technical"></a>
+  <a href="#s7" title="Planning"></a>
+  <a href="#s8" title="Production"></a>
+  <a href="#s9" title="Warehouse"></a>
+  <a href="#s10" title="Scanner"></a>
+  <a href="#s11" title="Decyzje ADR"></a>
+  <a href="#s12" title="Podsumowanie"></a>
+</nav>
+
+<script>
+  document.querySelectorAll('.slide-nav a').forEach(a => {
+    a.addEventListener('click', e => {
+      e.preventDefault();
+      document.querySelector(a.getAttribute('href')).scrollIntoView({ behavior: 'smooth' });
+    });
+  });
+
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const id = entry.target.id;
+        document.querySelectorAll('.slide-nav a').forEach(a => {
+          a.style.opacity = a.getAttribute('href') === '#' + id ? '1' : '0.4';
+          a.style.background = a.getAttribute('href') === '#' + id ? 'var(--primary)' : 'var(--text-muted)';
+        });
+      }
+    });
+  }, { threshold: 0.5 });
+
+  document.querySelectorAll('.slide').forEach(slide => observer.observe(slide));
+</script>
+
+</body>
+</html>

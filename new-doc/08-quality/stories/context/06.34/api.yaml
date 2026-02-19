@@ -1,0 +1,10 @@
+# Story 06.34 - API Schema
+
+endpoints:
+  - GET /api/quality/supplier-ratings
+  - GET /api/quality/supplier-ratings/:supplierId
+  - POST /api/quality/supplier-ratings
+  - POST /api/quality/supplier-ratings/:id/calculate
+  - PUT /api/quality/supplier-ratings/:id/approval-status
+
+service: "supplier-rating-service.ts"

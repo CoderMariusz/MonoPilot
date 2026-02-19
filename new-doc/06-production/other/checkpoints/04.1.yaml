@@ -1,0 +1,99 @@
+story_id: "04.1"
+name: "Production Dashboard"
+epic: "04-production"
+status: complete
+started_at: "2026-01-06T10:00:00Z"
+
+phases:
+  P1:
+    status: skipped
+    reason: "Standard KPI dashboard grid - no custom UX needed"
+    timestamp: "2026-01-06T10:00:00Z"
+  P2:
+    status: pending
+    agent: test-writer
+    model: GLM-4.7
+  P3:
+    status: pending
+  P4:
+    status: pending
+  P5:
+    status: pending
+  P6:
+    status: pending
+  P7:
+    status: pending
+
+context:
+  story_path: "docs/2-MANAGEMENT/epics/current/04-production/04.1.production-dashboard.md"
+  type: "backend + frontend"
+  complexity: "M"
+  estimate_days: 4
+
+deliverables:
+  database:
+    - type: "indexes + RPC function"
+      status: pending
+  api:
+    - path: "apps/frontend/app/api/production/dashboard/kpis/route.ts"
+      methods: ["GET"]
+      status: pending
+    - path: "apps/frontend/app/api/production/dashboard/active-wos/route.ts"
+      methods: ["GET"]
+      status: pending
+    - path: "apps/frontend/app/api/production/dashboard/alerts/route.ts"
+      methods: ["GET"]
+      status: pending
+    - path: "apps/frontend/app/api/production/dashboard/export/route.ts"
+      methods: ["GET"]
+      status: pending
+  services:
+    - path: "apps/frontend/lib/services/production-dashboard-service.ts"
+      status: pending
+  validation:
+    - path: "apps/frontend/lib/validation/production-dashboard-schemas.ts"
+      status: pending
+  pages:
+    - path: "apps/frontend/app/(authenticated)/production/dashboard/page.tsx"
+      status: pending
+  components:
+    - path: "apps/frontend/app/(authenticated)/production/dashboard/components/KPICard.tsx"
+      status: pending
+    - path: "apps/frontend/app/(authenticated)/production/dashboard/components/KPIGrid.tsx"
+      status: pending
+    - path: "apps/frontend/app/(authenticated)/production/dashboard/components/ActiveWOsTable.tsx"
+      status: pending
+    - path: "apps/frontend/app/(authenticated)/production/dashboard/components/AlertsPanel.tsx"
+      status: pending
+    - path: "apps/frontend/app/(authenticated)/production/dashboard/components/QuickActions.tsx"
+      status: pending
+    - path: "apps/frontend/app/(authenticated)/production/dashboard/components/RefreshControls.tsx"
+      status: pending
+    - path: "apps/frontend/app/(authenticated)/production/dashboard/components/DashboardFilters.tsx"
+      status: pending
+    - path: "apps/frontend/app/(authenticated)/production/dashboard/components/ExportButton.tsx"
+      status: pending
+    - path: "apps/frontend/app/(authenticated)/production/dashboard/components/StartWOModal.tsx"
+      status: pending
+  tests:
+    - path: "apps/frontend/lib/services/__tests__/production-dashboard-service.test.ts"
+      status: created
+    - path: "apps/frontend/__tests__/unit/dashboard-kpi-calculations.test.ts"
+      status: created
+    - path: "apps/frontend/__tests__/integration/api/production/dashboard.test.ts"
+      status: created
+    - path: "apps/frontend/__tests__/components/production/dashboard/KPICard.test.tsx"
+      status: created
+    - path: "apps/frontend/__tests__/components/production/dashboard/ActiveWOsTable.test.tsx"
+      status: created
+    - path: "apps/frontend/__tests__/components/production/dashboard/AlertsPanel.test.tsx"
+      status: created
+
+checkpoints:
+  - "P2: test-writer 15:06 files:6 tests:231 status:red"
+P5: x code-reviewer 15:17 issues:8 decision:request_changes
+P5: ✓ code-reviewer 16:06 issues:0 decision:approved
+P6: qa-agent 16:08 ac:1/1 bugs:0 decision:pass
+P7: ✓ tech-writer 16:15 docs:verified jsdoc:verified
+---
+STORY 04.1 COMPLETE

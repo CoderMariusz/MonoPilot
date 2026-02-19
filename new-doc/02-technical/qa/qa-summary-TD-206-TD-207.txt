@@ -1,0 +1,206 @@
+================================================================================
+QA VALIDATION SUMMARY: TD-206, TD-207
+Track C - Locations Types
+================================================================================
+
+DECISION: FAIL
+Date: 2025-12-24
+Component: apps/frontend/lib/types/location.ts
+
+================================================================================
+CRITICAL FAILURES (Blocking)
+================================================================================
+
+1. MISSING: LocationNode.lp_count field
+   - Impact: 24 compilation errors in test fixtures
+   - Error Type: TS2353 "Object literal may only specify known properties"
+   - Blocks: All location type usage, TD-206 implementation
+   - Fix: Add "lp_count: number" to LocationNode interface
+
+2. MISSING: LocationStats interface
+   - AC 1: FAIL
+   - Error: Type referenced in test expectations but not defined
+   - Blocks: Statistics calculations for locations
+   - Fix: Define new interface in location.ts
+
+3. MISSING: MoveLocationRequest interface
+   - AC 2: FAIL
+   - Error: Type referenced in move operations but not defined
+   - Blocks: Location move feature (TD-207)
+   - Fix: Define new interface in location.ts
+
+4. MISSING: MoveValidationResult interface
+   - AC 3: FAIL
+   - Error: Type referenced in validation but not defined
+   - Blocks: Location move validation (TD-207)
+   - Fix: Define new interface in location.ts
+
+5. MISSING: LPCountResponse interface
+   - AC 4: FAIL
+   - Error: Type referenced in API responses but not defined
+   - Blocks: LP count API endpoints
+   - Fix: Define new interface in location.ts
+
+6. MISSING: Type exports
+   - AC 6: FAIL
+   - Error: Cannot export types that don't exist
+   - Blocks: Type imports in components/services
+   - Fix: Add all new types to exports
+
+================================================================================
+TYPESCRIPT COMPILATION RESULT
+================================================================================
+
+Status: FAILED
+Total Errors: 260
+Location-Related Errors: 24+
+
+Breakdown:
+  - __tests__/fixtures/locations.ts: 24 TS2353 errors (lp_count)
+  - lib/services/location-service.ts: 5 TS2339 errors (zone/capacity fields)
+  - Total project errors: 260 (many unrelated to this story)
+
+Command: cd apps/frontend && npm run type-check
+Result: Non-zero exit code (compilation failed)
+
+================================================================================
+ACCEPTANCE CRITERIA RESULTS
+================================================================================
+
+AC 1: LocationStats interface defined
+  Status: FAIL
+  Evidence: No "LocationStats" found in location.ts
+
+AC 2: MoveLocationRequest interface defined
+  Status: FAIL
+  Evidence: No "MoveLocationRequest" found in location.ts
+
+AC 3: MoveValidationResult interface defined
+  Status: FAIL
+  Evidence: No "MoveValidationResult" found in location.ts
+
+AC 4: LPCountResponse interface defined
+  Status: FAIL
+  Evidence: No "LPCountResponse" found in location.ts
+
+AC 5: LocationNode has lp_count field
+  Status: FAIL
+  Evidence: 24 TS2353 compilation errors in test fixtures
+  Example Error:
+    __tests__/fixtures/locations.ts(65,3): error TS2353:
+    Object literal may only specify known properties,
+    and 'lp_count' does not exist in type 'LocationNode'.
+
+AC 6: All types properly exported
+  Status: FAIL
+  Evidence: Types 1-4 are not defined, cannot be exported
+
+Manual: TypeScript compilation passes
+  Status: FAIL
+  Evidence: npm run type-check returns 260+ errors
+
+Manual: Type safety verification
+  Status: FAIL
+  Evidence: Incomplete interface definitions, missing fields
+
+================================================================================
+KEY EVIDENCE
+================================================================================
+
+FILE 1: lib/types/location.ts (lines 76-80)
+Current state (INCOMPLETE):
+  export interface LocationNode extends Location {
+    children: LocationNode[]
+    children_count: number
+    capacity_percent: number | null
+  }
+
+Expected state (NEEDED):
+  export interface LocationNode extends Location {
+    children: LocationNode[]
+    children_count: number
+    capacity_percent: number | null
+    lp_count: number  <-- MISSING
+  }
+
+FILE 2: __tests__/fixtures/locations.ts (line 65+)
+Test expects lp_count field in ALL location nodes:
+  export const zoneRaw: LocationNode = {
+    // ... other properties ...
+    lp_count: 8,  <-- FAILS COMPILATION
+    is_active: true,
+  }
+
+FILE 3: lib/services/__tests__/location-lp-count.test.ts
+Test file demonstrates expected LP count functionality:
+  Line 97: expect(result[0].lp_count).toBe(8) // ZONE-RAW
+  Line 98: expect(result[1].lp_count).toBe(17) // ZONE-FG
+  Line 141: expect(zone.lp_count).toBe(8)
+
+================================================================================
+REQUIRED FIXES (For PASS)
+================================================================================
+
+PRIORITY 1 (Blocking):
+  [ ] Add lp_count field to LocationNode interface
+  [ ] Create LocationStats interface
+  [ ] Create MoveLocationRequest interface
+  [ ] Create MoveValidationResult interface
+  [ ] Create LPCountResponse interface
+  [ ] Export all new types
+
+PRIORITY 2 (Type Safety):
+  [ ] Resolve location-service.ts schema conflicts
+      (zone, zone_enabled, capacity, capacity_enabled fields)
+  [ ] Verify all 24 fixture objects compile
+  [ ] Run TypeScript compilation: npm run type-check
+
+PRIORITY 3 (Verification):
+  [ ] Unit tests executable (currently RED phase)
+  [ ] No new TypeScript errors introduced
+  [ ] All types importable from location.ts
+
+Estimated Fix Time: 30 minutes
+
+================================================================================
+HANDOFF TO DEV
+================================================================================
+
+Story: TD-206, TD-207 (Track C - Locations Types)
+Status: FAIL - Type definitions incomplete
+
+Blocking Issues:
+  - CRITICAL: LocationNode missing lp_count field
+  - CRITICAL: LocationStats not defined
+  - CRITICAL: MoveLocationRequest not defined
+  - CRITICAL: MoveValidationResult not defined
+  - CRITICAL: LPCountResponse not defined
+
+Action Required:
+  1. Update lib/types/location.ts with all 5 missing types/fields
+  2. Run npm run type-check to verify compilation
+  3. Ensure all 24 fixture objects compile without errors
+  4. Resubmit for QA validation
+
+Test Reports:
+  - Full: docs/2-MANAGEMENT/qa/qa-report-story-TD-206-TD-207.md
+  - Summary: docs/2-MANAGEMENT/qa/qa-summary-TD-206-TD-207.txt
+
+Next Steps:
+  1. Developer implements type definitions
+  2. Dev runs: npm run type-check
+  3. Dev resolves any remaining errors
+  4. QA re-runs validation
+  5. On success -> PASS, proceed with implementation
+
+================================================================================
+QA VALIDATION: FAIL
+================================================================================
+
+All Acceptance Criteria: FAIL (0/6 passing)
+TypeScript Compilation: FAIL (260 errors, 24+ location-related)
+Type Safety: FAIL (Incomplete interface definitions)
+Blocking Issues: YES (Type definitions missing)
+
+Cannot proceed with implementation until types are defined.
+

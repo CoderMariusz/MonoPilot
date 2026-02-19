@@ -1,0 +1,384 @@
+# Story 06.1 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/quality-status-service.test.ts"
+    type: "unit"
+    description: "Unit tests for status type service methods"
+  - path: "apps/frontend/lib/validation/__tests__/quality-status-validation.test.ts"
+    type: "unit"
+    description: "Unit tests for Zod validation schemas"
+  - path: "apps/frontend/components/quality/__tests__/StatusBadge.test.tsx"
+    type: "unit"
+    description: "Unit tests for StatusBadge component"
+  - path: "supabase/tests/quality-status-rls.test.sql"
+    type: "integration"
+    description: "Integration tests for RLS policies"
+  - path: "apps/frontend/app/api/quality/status/__tests__/api.test.ts"
+    type: "integration"
+    description: "Integration tests for API endpoints"
+  - path: "tests/e2e/quality-status-transition.spec.ts"
+    type: "e2e"
+    description: "E2E test for status change workflow"
+
+# Acceptance Criteria (from story)
+acceptance_criteria:
+  # Status Type Definition
+  - id: "AC-01"
+    given: "quality_status_type enum is created"
+    when: "database schema is queried"
+    then: "7 status types (PENDING, PASSED, FAILED, HOLD, RELEASED, QUARANTINED, COND_APPROVED) exist"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-02"
+    given: "status transitions table is seeded"
+    when: "querying transitions"
+    then: "all valid transitions have business rules defined (20+ transitions)"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-03"
+    given: "license_plates table is updated"
+    when: "qa_status column is inspected"
+    then: "it uses quality_status_type enum with default 'PENDING'"
+    test_type: "integration"
+    priority: "P0"
+
+  # Status Transition Validation
+  - id: "AC-04"
+    given: "LP with status PENDING"
+    when: "user attempts transition to PASSED"
+    then: "validation checks requires_inspection=true and blocks if no inspection exists"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-05"
+    given: "LP with status PASSED"
+    when: "user attempts transition to HOLD"
+    then: "validation allows transition (requires_reason=true)"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-06"
+    given: "LP with status FAILED"
+    when: "user attempts invalid transition to RELEASED"
+    then: "validation returns error 'Invalid status transition: FAILED -> RELEASED'"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-07"
+    given: "LP with status HOLD"
+    when: "user attempts transition to RELEASED with approval=true"
+    then: "transition succeeds and history record created"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-08"
+    given: "LP with status QUARANTINED"
+    when: "user without QA Manager role attempts transition"
+    then: "API returns 403 Forbidden 'Requires QA Manager approval'"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  # Status History Tracking
+  - id: "AC-09"
+    given: "LP status changes from PENDING to PASSED"
+    when: "transition completes"
+    then: "quality_status_history record created with from_status, to_status, reason, changed_by, changed_at"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-10"
+    given: "10 status changes on single LP"
+    when: "history is queried"
+    then: "all 10 transitions returned in chronological order (changed_at DESC)"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-11"
+    given: "status change without reason"
+    when: "requires_reason=true"
+    then: "validation error 'Reason is required for this status transition' displayed"
+    test_type: "unit"
+    priority: "P0"
+
+  # API Endpoint Functionality
+  - id: "AC-12"
+    given: "authenticated user"
+    when: "GET /api/quality/status/types called"
+    then: "7 status types returned with display names and descriptions within 200ms"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-13"
+    given: "LP with status HOLD"
+    when: "GET /api/quality/status/transitions?current=HOLD called"
+    then: "valid transitions (PASSED, FAILED, RELEASED, COND_APPROVED, QUARANTINED) returned with business rules"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-14"
+    given: "valid transition request"
+    when: "POST /api/quality/status/validate-transition called"
+    then: "validation result returned indicating success/failure with reason"
+    test_type: "integration"
+    priority: "P0"
+
+  # Status Badge Display
+  - id: "AC-15"
+    given: "LP with status PASSED"
+    when: "status badge renders in UI"
+    then: "green badge with 'Passed' text and checkmark icon displays"
+    test_type: "unit"
+    priority: "P1"
+
+  - id: "AC-16"
+    given: "LP with status FAILED"
+    when: "status badge renders"
+    then: "red badge with 'Failed' text and X icon displays"
+    test_type: "unit"
+    priority: "P1"
+
+  - id: "AC-17"
+    given: "LP with status HOLD"
+    when: "status badge renders"
+    then: "orange badge with 'Hold' text and pause icon displays"
+    test_type: "unit"
+    priority: "P1"
+
+  - id: "AC-18"
+    given: "LP with status QUARANTINED"
+    when: "status badge renders"
+    then: "dark red badge with 'Quarantined' text and alert icon displays"
+    test_type: "unit"
+    priority: "P1"
+
+  # Permission Enforcement
+  - id: "AC-19"
+    given: "user with VIEWER role"
+    when: "attempting to view status types"
+    then: "GET /api/quality/status/types succeeds (read access for all)"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-20"
+    given: "user without QA Manager role"
+    when: "attempting transition requiring approval"
+    then: "API returns 403 'QA Manager approval required'"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-21"
+    given: "user with QA Inspector role"
+    when: "attempting PENDING -> PASSED transition with inspection"
+    then: "transition succeeds"
+    test_type: "integration"
+    priority: "P0"
+
+  # Phase 1B+ Features Handling
+  - id: "AC-22"
+    given: "user viewing status management UI"
+    when: "MVP is active (Phase 1A)"
+    then: "'Add Custom Status' button hidden"
+    test_type: "e2e"
+    priority: "P2"
+
+  - id: "AC-23"
+    given: "user attempting to create custom status via API"
+    when: "POST /api/quality/status/types called"
+    then: "501 Not Implemented returned with message 'Custom status types available in Phase 1B'"
+    test_type: "integration"
+    priority: "P1"
+
+# Unit Test Cases
+unit_tests:
+  quality_status_service:
+    - name: "getStatusTypes returns all 7 status types"
+      expected: "Returns array with 7 QualityStatusType objects"
+
+    - name: "getValidTransitions returns transitions for PENDING status"
+      setup: "Mock Supabase query for PENDING status"
+      expected: "Returns 4 transitions: PASSED, FAILED, HOLD, QUARANTINED"
+
+    - name: "getValidTransitions returns transitions for HOLD status"
+      setup: "Mock Supabase query for HOLD status"
+      expected: "Returns 5 transitions: PASSED, FAILED, RELEASED, COND_APPROVED, QUARANTINED"
+
+    - name: "validateTransition returns error for invalid transition"
+      setup: "Request: FAILED -> RELEASED"
+      expected: "is_valid: false, errors: ['Invalid status transition: FAILED -> RELEASED']"
+
+    - name: "validateTransition returns error when reason required but missing"
+      setup: "Request: PASSED -> HOLD without reason, transition requires_reason=true"
+      expected: "is_valid: false, errors: ['Reason is required for this status transition']"
+
+  quality_status_validation:
+    - name: "qualityStatusEnum validates valid status codes"
+      input: "PENDING"
+      expected: "Validation passes"
+
+    - name: "qualityStatusEnum rejects invalid status codes"
+      input: "INVALID"
+      expected: "Validation fails"
+
+    - name: "validateTransitionSchema requires different from/to status"
+      input: "{ entity_type: 'lp', entity_id: 'uuid', from_status: 'HOLD', to_status: 'HOLD' }"
+      expected: "Validation fails with 'From and to status cannot be the same'"
+
+    - name: "changeStatusSchema requires reason with min 10 chars"
+      input: "{ ..., reason: 'short' }"
+      expected: "Validation fails with 'Reason must be at least 10 characters'"
+
+  status_badge_component:
+    - name: "renders PASSED status with green color"
+      props: "{ status: 'PASSED' }"
+      expected: "Badge has green background, 'Passed' text, CheckCircle icon"
+
+    - name: "renders FAILED status with red color"
+      props: "{ status: 'FAILED' }"
+      expected: "Badge has red background, 'Failed' text, XCircle icon"
+
+    - name: "renders QUARANTINED status with dark red color"
+      props: "{ status: 'QUARANTINED' }"
+      expected: "Badge has dark red background, 'Quarantined' text, AlertTriangle icon"
+
+    - name: "renders without icon when showIcon=false"
+      props: "{ status: 'PASSED', showIcon: false }"
+      expected: "Badge has no icon, only 'Passed' text"
+
+# Integration Test Cases
+integration_tests:
+  api_endpoints:
+    - name: "GET /api/quality/status/types returns 7 statuses"
+      setup: "Authenticated user"
+      expected: "200 OK with 7 status types"
+      performance: "<200ms"
+
+    - name: "GET /api/quality/status/transitions returns correct transitions for HOLD"
+      setup: "Authenticated user, query: current=HOLD"
+      expected: "200 OK with 5 valid transitions"
+
+    - name: "GET /api/quality/status/transitions returns 400 for invalid status"
+      setup: "Authenticated user, query: current=INVALID"
+      expected: "400 Bad Request with 'Invalid status code'"
+
+    - name: "POST /api/quality/status/validate-transition validates correctly"
+      setup: "Authenticated user, body: { entity_type: 'lp', entity_id: 'uuid', from_status: 'PENDING', to_status: 'PASSED' }"
+      expected: "200 OK with validation result"
+
+    - name: "POST /api/quality/status/change updates LP status"
+      setup: "QA Inspector user, valid LP, body: { entity_type: 'lp', to_status: 'PASSED', reason: 'Inspection complete' }"
+      expected: "200 OK, LP qa_status updated, history record created"
+
+    - name: "POST /api/quality/status/change returns 403 for approval-required transition"
+      setup: "Viewer user (not QA Manager), QUARANTINED -> RELEASED"
+      expected: "403 Forbidden with 'QA Manager approval required'"
+
+  rls_policies:
+    - name: "Status history isolated by org_id"
+      setup: |
+        - Create Org A with User A, LP A
+        - Create Org B with User B, LP B
+        - Create status history for both LPs
+      action: "User A queries quality_status_history"
+      expected: "Only LP A history returned, LP B history not visible"
+
+    - name: "Status transitions readable by all authenticated users"
+      setup: "Any authenticated user"
+      action: "Query quality_status_transitions"
+      expected: "All 20+ transition rules returned"
+
+# E2E Test Cases
+e2e_tests:
+  - name: "User changes LP status from PENDING to PASSED"
+    steps:
+      - "Login as QA Inspector"
+      - "Navigate to LP detail page"
+      - "Click 'Change Status' button"
+      - "Select 'Passed' from dropdown"
+      - "Enter reason 'Inspection complete, all tests passed'"
+      - "Click 'Update Status'"
+    expected:
+      - "Success toast displayed"
+      - "Status badge updates to green 'Passed'"
+      - "History shows new transition record"
+
+  - name: "User attempts invalid transition and sees error"
+    steps:
+      - "Login as QA Inspector"
+      - "Navigate to LP with status FAILED"
+      - "Attempt to change to RELEASED"
+    expected:
+      - "RELEASED not in dropdown (filtered by valid transitions)"
+      - "Or error message if attempted via direct API"
+
+  - name: "QA Manager approves transition requiring approval"
+    steps:
+      - "Login as QA Manager"
+      - "Navigate to LP with status QUARANTINED"
+      - "Click 'Change Status'"
+      - "Select 'Released'"
+      - "Enter reason"
+      - "Click 'Update Status'"
+    expected:
+      - "Success toast displayed"
+      - "Status badge updates to blue 'Released'"
+
+# Definition of Done
+definition_of_done:
+  - "quality_status_type enum created with 7 statuses"
+  - "quality_status_transitions table seeded with 20+ valid transitions"
+  - "quality_status_history table tracks all status changes"
+  - "license_plates.qa_status uses enum type with PENDING default"
+  - "GET /api/quality/status/types returns all statuses within 200ms"
+  - "GET /api/quality/status/transitions filters by current status correctly"
+  - "POST /api/quality/status/validate-transition enforces all business rules"
+  - "Status change creates history record with user, timestamp, reason"
+  - "Transitions requiring inspection are blocked without inspection"
+  - "Transitions requiring approval are blocked for non-QA Manager users"
+  - "StatusBadge component displays correct colors and icons"
+  - "Status transition modal shows only valid transitions"
+  - "RLS policies enforce org isolation on status history"
+  - "Phase 1B+ features (custom statuses) return 501 Not Implemented"
+  - "Unit tests achieve >85% coverage on status service"
+  - "Integration tests cover all API endpoints"
+  - "E2E test covers full status change workflow"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 85
+    reason: "Core quality functionality requires solid coverage"
+  integration:
+    target: 80
+    reason: "API endpoints and RLS policies must be thoroughly tested"
+  files:
+    - "lib/services/quality-status-service.ts: 85%"
+    - "lib/validation/quality-status-validation.ts: 90%"
+    - "components/quality/StatusBadge.tsx: 85%"
+    - "RLS policies: 100% of policy rules tested"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "Status transition rules misconfigured could allow invalid state changes"
+    mitigation: "Comprehensive seed data validation, transition matrix tests"
+    severity: "medium"
+    test_coverage: "integration_tests.api_endpoints"
+
+  - id: "RISK-02"
+    description: "RLS policy on history table could leak cross-org data"
+    mitigation: "Multi-org integration tests verify isolation"
+    severity: "high"
+    test_coverage: "integration_tests.rls_policies"
+
+  - id: "RISK-03"
+    description: "LP qa_status migration could fail on existing TEXT data"
+    mitigation: "Migration handles both TEXT->ENUM conversion and new column creation"
+    severity: "low"
+    test_coverage: "Manual migration testing"

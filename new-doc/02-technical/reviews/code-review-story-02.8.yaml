@@ -1,0 +1,302 @@
+story: "02.8"
+name: "Routing Operations Management"
+epic: "02-technical"
+review_date: "2025-12-28"
+reviewer: "CODE-REVIEWER"
+
+decision: "REQUEST_CHANGES"
+
+ratings:
+  security: 4
+  code_quality: 7
+  overall: "BLOCKING"
+
+test_status:
+  total_tests: 60
+  passing: 60
+  failing: 0
+  coverage_percent: 100
+  verdict: "PASSING"
+
+issues_found:
+  critical: 3
+  major: 2
+  minor: 3
+  total: 8
+
+critical_issues:
+  - id: "SEC-001"
+    severity: "CRITICAL"
+    category: "security"
+    title: "Missing RLS policies on routing_operations table"
+    description: "No Row Level Security policies found. Violates ADR-013 and allows cross-tenant data access."
+    file: "supabase/migrations/*"
+    line: null
+    impact: "CROSS-TENANT DATA EXPOSURE"
+    required_fix: "Create migration with standard RLS policy per ADR-013"
+    estimated_hours: 2
+    blocks_merge: true
+
+  - id: "SEC-002"
+    severity: "CRITICAL"
+    category: "security"
+    title: "Service layer using admin client bypasses RLS"
+    description: "createServerSupabaseAdmin() in createOperation function bypasses all RLS policies"
+    file: "apps/frontend/lib/services/routing-operations-service.ts"
+    line: 296
+    impact: "RLS BYPASS IN CREATE OPERATION"
+    required_fix: "Replace createServerSupabaseAdmin() with createServerSupabase()"
+    estimated_hours: 1
+    blocks_merge: true
+
+  - id: "DB-001"
+    severity: "CRITICAL"
+    category: "database"
+    title: "Missing base table migration"
+    description: "No CREATE TABLE migration found for routing_operations"
+    file: "supabase/migrations/*"
+    line: null
+    impact: "CODE CANNOT RUN"
+    required_fix: "Create migration 046_create_routing_operations.sql with complete schema"
+    estimated_hours: 2
+    blocks_merge: true
+
+major_issues:
+  - id: "CODE-001"
+    severity: "MAJOR"
+    category: "code_quality"
+    title: "Database schema mismatch in field mapping"
+    description: "cleanup_time and instructions fields hardcoded to 0/null despite existing in DB schema"
+    file: "apps/frontend/lib/services/routing-operations-service.ts"
+    line: 247-249
+    impact: "DATA MAPPING ERRORS"
+    required_fix: "Add cleanup_time_minutes and instructions to SELECT query and map actual DB fields"
+    estimated_hours: 1
+    blocks_merge: false
+
+  - id: "SEC-003"
+    severity: "MAJOR"
+    category: "security"
+    title: "Manual permission parsing in API routes"
+    description: "Permission checks parse permissions.technical string manually instead of using centralized service"
+    file: "apps/frontend/app/api/v1/technical/routings/[id]/operations/route.ts"
+    line: 92-96
+    impact: "INCONSISTENT PERMISSION ENFORCEMENT"
+    required_fix: "Create lib/services/permission-service.ts and use centralized permission checks"
+    estimated_hours: 3
+    blocks_merge: false
+
+minor_issues:
+  - id: "UX-001"
+    severity: "MINOR"
+    category: "ux"
+    title: "UI component missing parallel operations indicator"
+    description: "Operations table doesn't append '(Parallel)' suffix when sequence numbers are duplicated (AC-03)"
+    file: "apps/frontend/components/technical/routings/operations-table.tsx"
+    line: 130
+    impact: "UX NOT MATCHING AC-03"
+    required_fix: "Import isParallelOperation helper and add '(Parallel)' suffix conditionally"
+    estimated_hours: 0.5
+    blocks_merge: false
+
+  - id: "CODE-002"
+    severity: "MINOR"
+    category: "code_quality"
+    title: "Hardcoded placeholder for average_yield"
+    description: "average_yield hardcoded to 100 instead of calculating or returning null"
+    file: "apps/frontend/lib/services/routing-operations-service.ts"
+    line: 163
+    impact: "MISLEADING SUMMARY DATA"
+    required_fix: "Calculate weighted average or return null"
+    estimated_hours: 0.5
+    blocks_merge: false
+
+  - id: "A11Y-001"
+    severity: "MINOR"
+    category: "accessibility"
+    title: "Missing accessibility attributes"
+    description: "Missing aria-label, role, aria-live attributes per TEC-008a wireframe"
+    file: "apps/frontend/components/technical/routings/operations-table.tsx"
+    line: null
+    impact: "ACCESSIBILITY INCOMPLETE"
+    required_fix: "Add ARIA attributes and keyboard navigation handlers"
+    estimated_hours: 2
+    blocks_merge: false
+
+positive_highlights:
+  - category: "business_logic"
+    title: "Parallel Operations Logic"
+    rating: 10
+    description: "Perfect implementation of FR-2.48 with MAX duration and SUM cost logic"
+
+  - category: "validation"
+    title: "Validation Schemas"
+    rating: 9
+    description: "Comprehensive Zod schemas with clear error messages and helper functions"
+
+  - category: "types"
+    title: "TypeScript Types"
+    rating: 9
+    description: "Complete type coverage with clear interfaces and nullable fields"
+
+  - category: "testing"
+    title: "Test Coverage"
+    rating: 10
+    description: "60/60 tests passing with all ACs covered (unit + integration + E2E)"
+
+  - category: "service"
+    title: "Service Layer Structure"
+    rating: 8
+    description: "Clean separation of concerns with reusable helper functions"
+
+acceptance_criteria:
+  - id: "AC-01"
+    status: "PASSED"
+    description: "Operations load within 500ms for 50 operations"
+
+  - id: "AC-02"
+    status: "PASSED"
+    description: "8 columns displayed in operations table"
+
+  - id: "AC-03"
+    status: "FAILED"
+    description: "Parallel indicator shown - Missing in UI component"
+    issue_ref: "UX-001"
+
+  - id: "AC-04-07"
+    status: "PASSED"
+    description: "Parallel operations logic (MAX duration, SUM cost)"
+
+  - id: "AC-08-10"
+    status: "PASSED"
+    description: "Time tracking validation"
+
+  - id: "AC-11-14"
+    status: "PASSED"
+    description: "Machine assignment optional"
+
+  - id: "AC-15-17"
+    status: "PASSED"
+    description: "Instructions field validation"
+
+  - id: "AC-18-21"
+    status: "PASSED"
+    description: "Attachments support"
+
+  - id: "AC-22-24"
+    status: "PASSED"
+    description: "Add/Edit operations CRUD"
+
+  - id: "AC-25-27"
+    status: "PASSED"
+    description: "Reorder operations"
+
+  - id: "AC-28-29"
+    status: "PASSED"
+    description: "Delete operations"
+
+  - id: "AC-30-31"
+    status: "PASSED"
+    description: "Summary panel calculations"
+
+  - id: "AC-32"
+    status: "FAILED"
+    description: "Permission enforcement - Missing RLS policies"
+    issue_ref: "SEC-001"
+
+adr_compliance:
+  - adr: "ADR-013"
+    title: "RLS Org Isolation Pattern"
+    status: "VIOLATED"
+    severity: "CRITICAL"
+    description: "No RLS policies found on routing_operations table"
+    issue_ref: "SEC-001"
+
+  - adr: "ADR-009"
+    title: "Routing Level Costs"
+    status: "COMPLIANT"
+    description: "Cost calculation correctly sums all operations including parallel ops"
+
+files_reviewed:
+  - path: "apps/frontend/lib/services/routing-operations-service.ts"
+    lines: 999
+    rating: 7
+    issues: ["SEC-002", "CODE-001"]
+
+  - path: "apps/frontend/lib/validation/operation-schemas.ts"
+    lines: 179
+    rating: 9
+    issues: []
+
+  - path: "apps/frontend/lib/types/routing-operation.ts"
+    lines: 109
+    rating: 9
+    issues: []
+
+  - path: "apps/frontend/app/api/v1/technical/routings/[id]/operations/route.ts"
+    lines: 136
+    rating: 6
+    issues: ["SEC-003"]
+
+  - path: "apps/frontend/app/api/v1/technical/routings/[id]/operations/[opId]/route.ts"
+    lines: 174
+    rating: 6
+    issues: ["SEC-003"]
+
+  - path: "apps/frontend/app/api/v1/technical/routings/[id]/operations/[opId]/reorder/route.ts"
+    lines: 97
+    rating: 7
+    issues: []
+
+  - path: "apps/frontend/components/technical/routings/operations-table.tsx"
+    lines: 196
+    rating: 7
+    issues: ["UX-001", "A11Y-001"]
+
+  - path: "supabase/migrations/*"
+    lines: null
+    rating: 0
+    issues: ["DB-001", "SEC-001"]
+
+required_fixes_summary:
+  critical_count: 3
+  major_count: 2
+  minor_count: 3
+  total_estimated_hours: 12
+  blocks_qa: true
+  blocks_merge: true
+
+estimated_fix_time:
+  critical_only: "4-6 hours"
+  all_issues: "12 hours"
+
+next_steps:
+  - step: "DEV team addresses 3 CRITICAL issues"
+    priority: "P0"
+    estimated_hours: 5
+
+  - step: "Request re-review after CRITICAL fixes"
+    priority: "P0"
+    estimated_hours: 1
+
+  - step: "Address 2 MAJOR issues (can be follow-up story if needed)"
+    priority: "P1"
+    estimated_hours: 4
+
+  - step: "Address 3 MINOR issues (optional)"
+    priority: "P2"
+    estimated_hours: 3
+
+approval_criteria_status:
+  all_ac_implemented: true
+  no_critical_security_issues: false  # FAILED: Missing RLS
+  no_major_security_issues: false     # FAILED: Admin client bypass
+  tests_pass_with_coverage: true
+  positive_feedback_included: true
+  all_issues_have_references: true
+  total_met: 4
+  total_required: 6
+  verdict: "REQUEST_CHANGES"
+
+handoff_to: "DEV"
+handoff_context: "Fix 3 CRITICAL security issues (RLS policies, table migration, admin client bypass) before merge. Business logic is excellent but security gaps are unacceptable for production."

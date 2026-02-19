@@ -1,0 +1,382 @@
+# Story 06.22 - CCP Definition - API Context
+# Generated: 2025-01-15
+
+base_path: "/api/quality/haccp/ccp"
+
+endpoints:
+  - method: "GET"
+    path: "/api/quality/haccp/ccp"
+    summary: "List CCPs with filters"
+    auth: true
+    roles: ["QA_INSPECTOR", "QA_MANAGER", "VIEWER"]
+    query_params:
+      - name: "haccp_plan_id"
+        type: "string"
+        format: "uuid"
+        required: false
+      - name: "status"
+        type: "string"
+        enum: ["draft", "active", "inactive", "superseded"]
+        required: false
+      - name: "hazard_type"
+        type: "string"
+        enum: ["biological", "chemical", "physical"]
+        required: false
+      - name: "routing_id"
+        type: "string"
+        format: "uuid"
+        required: false
+      - name: "search"
+        type: "string"
+        required: false
+      - name: "sort_by"
+        type: "string"
+        enum: ["ccp_number", "ccp_name", "effective_date", "created_at"]
+        default: "ccp_number"
+      - name: "sort_order"
+        type: "string"
+        enum: ["asc", "desc"]
+        default: "asc"
+      - name: "page"
+        type: "integer"
+        default: 1
+      - name: "limit"
+        type: "integer"
+        default: 20
+        max: 100
+    response:
+      status: 200
+      schema: "CCPListResponse"
+    validation_schema: "ccpListQuerySchema"
+
+  - method: "GET"
+    path: "/api/quality/haccp/ccp/:id"
+    summary: "Get CCP detail with version history"
+    auth: true
+    roles: ["QA_INSPECTOR", "QA_MANAGER", "VIEWER"]
+    path_params:
+      - name: "id"
+        type: "string"
+        format: "uuid"
+    response:
+      status: 200
+      schema: "CCPDetailResponse"
+
+  - method: "POST"
+    path: "/api/quality/haccp/ccp"
+    summary: "Create new CCP"
+    auth: true
+    roles: ["QA_INSPECTOR", "QA_MANAGER"]
+    request_body:
+      schema: "CreateCCPRequest"
+    response:
+      status: 201
+      schema: "CreateCCPResponse"
+    validation_schema: "createCCPSchema"
+
+  - method: "PUT"
+    path: "/api/quality/haccp/ccp/:id"
+    summary: "Update CCP (draft only)"
+    auth: true
+    roles: ["QA_INSPECTOR", "QA_MANAGER"]
+    path_params:
+      - name: "id"
+        type: "string"
+        format: "uuid"
+    request_body:
+      schema: "UpdateCCPRequest"
+    response:
+      status: 200
+      schema: "UpdateCCPResponse"
+    validation_schema: "updateCCPSchema"
+    business_rules:
+      - "Can only update draft CCPs"
+      - "Returns 400 if CCP is active/inactive/superseded"
+
+  - method: "DELETE"
+    path: "/api/quality/haccp/ccp/:id"
+    summary: "Delete CCP (draft only)"
+    auth: true
+    roles: ["QA_MANAGER"]
+    path_params:
+      - name: "id"
+        type: "string"
+        format: "uuid"
+    response:
+      status: 204
+    business_rules:
+      - "Can only delete draft CCPs"
+      - "Returns 400 if CCP is active/inactive/superseded"
+
+  - method: "POST"
+    path: "/api/quality/haccp/ccp/:id/activate"
+    summary: "Activate CCP (draft -> active)"
+    auth: true
+    roles: ["QA_MANAGER"]
+    path_params:
+      - name: "id"
+        type: "string"
+        format: "uuid"
+    request_body:
+      schema: "ActivateCCPRequest"
+    response:
+      status: 200
+      schema: "ActivateCCPResponse"
+    validation_schema: "activateCCPSchema"
+    business_rules:
+      - "Requires critical limits"
+      - "Requires routing link"
+      - "Requires QA Manager approval"
+      - "Sets effective_date if not provided"
+
+  - method: "POST"
+    path: "/api/quality/haccp/ccp/:id/deactivate"
+    summary: "Deactivate CCP (active -> inactive)"
+    auth: true
+    roles: ["QA_MANAGER"]
+    path_params:
+      - name: "id"
+        type: "string"
+        format: "uuid"
+    request_body:
+      schema: "DeactivateCCPRequest"
+    response:
+      status: 200
+      schema: "DeactivateCCPResponse"
+    validation_schema: "deactivateCCPSchema"
+    business_rules:
+      - "Can only deactivate active CCPs"
+      - "Sets expiry_date to today if not provided"
+      - "Requires deactivation reason"
+
+  - method: "POST"
+    path: "/api/quality/haccp/ccp/:id/version"
+    summary: "Create new version from active CCP"
+    auth: true
+    roles: ["QA_MANAGER"]
+    path_params:
+      - name: "id"
+        type: "string"
+        format: "uuid"
+    response:
+      status: 201
+      schema: "CreateCCPVersionResponse"
+    business_rules:
+      - "Can only version active CCPs"
+      - "Increments version number"
+      - "New version starts as draft"
+      - "Copies all fields from current version"
+
+# Service Layer
+service:
+  name: "HACCPCCPService"
+  file: "lib/services/haccp-ccp-service.ts"
+  methods:
+    - name: "list"
+      params: ["CCPListParams"]
+      returns: "PaginatedResult<HACCPCCP>"
+      description: "List CCPs with filters and pagination"
+
+    - name: "getById"
+      params: ["id: string"]
+      returns: "CCPDetail | null"
+      description: "Get CCP by ID with version history"
+
+    - name: "getByNumber"
+      params: ["ccpNumber: string", "haccpPlanId: string"]
+      returns: "HACCPCCP | null"
+      description: "Get CCP by number within HACCP plan"
+
+    - name: "create"
+      params: ["input: CreateCCPInput"]
+      returns: "HACCPCCP"
+      description: "Create new CCP"
+
+    - name: "update"
+      params: ["id: string", "input: UpdateCCPInput"]
+      returns: "HACCPCCP"
+      description: "Update CCP (draft only)"
+
+    - name: "delete"
+      params: ["id: string"]
+      returns: "void"
+      description: "Delete CCP (draft only)"
+
+    - name: "activate"
+      params: ["id: string", "effectiveDate?: string"]
+      returns: "HACCPCCP"
+      description: "Activate CCP with validation"
+
+    - name: "deactivate"
+      params: ["id: string", "reason: string", "expiryDate?: string"]
+      returns: "HACCPCCP"
+      description: "Deactivate CCP with reason"
+
+    - name: "createVersion"
+      params: ["id: string"]
+      returns: "HACCPCCP"
+      description: "Create new draft version from active CCP"
+
+    - name: "getVersionHistory"
+      params: ["ccpNumber: string", "haccpPlanId: string"]
+      returns: "HACCPCCP[]"
+      description: "Get all versions of CCP"
+
+    - name: "evaluateDecisionTree"
+      params: ["answers: Record<string, boolean>"]
+      returns: "{ isCCP: boolean; reason: string; recommendation: string }"
+      description: "Evaluate HACCP decision tree (7 questions)"
+
+    - name: "getCCPsForOperation"
+      params: ["routingOperationId: string"]
+      returns: "HACCPCCP[]"
+      description: "Get CCPs for routing operation"
+
+    - name: "linkToOperation"
+      params: ["ccpId: string", "routingId: string", "routingOperationId: string"]
+      returns: "HACCPCCP"
+      description: "Link CCP to routing operation"
+
+    - name: "canActivate"
+      params: ["id: string"]
+      returns: "{ canActivate: boolean; missingFields: string[]; warnings: string[] }"
+      description: "Validate if CCP can be activated"
+
+    - name: "isCCPNumberUnique"
+      params: ["ccpNumber: string", "haccpPlanId: string", "excludeId?: string"]
+      returns: "boolean"
+      description: "Check if CCP number is unique within HACCP plan"
+
+# Validation Schemas
+validation:
+  file: "lib/validation/haccp-ccp-validation.ts"
+  schemas:
+    - name: "createCCPSchema"
+      type: "z.object"
+      fields:
+        - name: "haccp_plan_id"
+          validation: "z.string().uuid()"
+        - name: "ccp_number"
+          validation: "z.string().regex(/^CCP-\\d+$/)"
+        - name: "ccp_name"
+          validation: "z.string().min(3).max(200)"
+        - name: "hazard_type"
+          validation: "hazardTypeEnum"
+        - name: "hazard_description"
+          validation: "z.string().min(10).max(1000)"
+        - name: "control_measure"
+          validation: "z.string().min(10).max(1000)"
+        - name: "critical_limit_min"
+          validation: "z.number().optional()"
+        - name: "critical_limit_max"
+          validation: "z.number().optional()"
+        - name: "unit_of_measure"
+          validation: "z.string().min(1).max(50)"
+        - name: "target_value"
+          validation: "z.number().optional()"
+        - name: "monitoring_frequency"
+          validation: "z.string().min(3).max(200)"
+        - name: "monitoring_method"
+          validation: "z.string().min(3).max(500)"
+        - name: "routing_id"
+          validation: "z.string().uuid().optional()"
+        - name: "routing_operation_id"
+          validation: "z.string().uuid().optional()"
+        - name: "corrective_action_std"
+          validation: "z.string().min(10).max(2000)"
+        - name: "verification_method"
+          validation: "z.string().max(500).optional()"
+        - name: "verification_frequency"
+          validation: "z.string().max(200).optional()"
+        - name: "responsible_role"
+          validation: "z.string().min(3).max(100)"
+        - name: "responsible_user_id"
+          validation: "z.string().uuid().optional()"
+        - name: "decision_tree_answers"
+          validation: "z.record(z.string()).optional()"
+      refinements:
+        - condition: "critical_limit_min < critical_limit_max (if both set)"
+          message: "Critical limit min must be less than max"
+
+    - name: "updateCCPSchema"
+      type: "createCCPSchema.partial()"
+
+    - name: "activateCCPSchema"
+      type: "z.object"
+      fields:
+        - name: "effective_date"
+          validation: "z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/).optional()"
+
+    - name: "deactivateCCPSchema"
+      type: "z.object"
+      fields:
+        - name: "reason"
+          validation: "z.string().min(10).max(500)"
+        - name: "expiry_date"
+          validation: "z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/).optional()"
+
+    - name: "ccpListQuerySchema"
+      type: "z.object"
+      fields:
+        - name: "haccp_plan_id"
+          validation: "z.string().uuid().optional()"
+        - name: "status"
+          validation: "ccpStatusEnum.optional()"
+        - name: "hazard_type"
+          validation: "hazardTypeEnum.optional()"
+        - name: "routing_id"
+          validation: "z.string().uuid().optional()"
+        - name: "search"
+          validation: "z.string().min(1).optional()"
+        - name: "sort_by"
+          validation: "z.enum(['ccp_number', 'ccp_name', 'effective_date', 'created_at']).default('ccp_number')"
+        - name: "sort_order"
+          validation: "z.enum(['asc', 'desc']).default('asc')"
+        - name: "page"
+          validation: "z.coerce.number().int().positive().default(1)"
+        - name: "limit"
+          validation: "z.coerce.number().int().min(1).max(100).default(20)"
+
+# Error Handling
+errors:
+  - code: 400
+    scenario: "Invalid CCP number format"
+    message: "CCP number must be format CCP-N (e.g., CCP-1)"
+  - code: 400
+    scenario: "Critical limits validation failed"
+    message: "Critical limit min must be less than max"
+  - code: 400
+    scenario: "Cannot activate without critical limits"
+    message: "CCP activation requires at least one critical limit (min or max)"
+  - code: 400
+    scenario: "Cannot activate without routing link"
+    message: "CCP activation requires routing link"
+  - code: 400
+    scenario: "Cannot edit active CCP"
+    message: "Active CCP cannot be edited. Create new version instead."
+  - code: 400
+    scenario: "Cannot delete active CCP"
+    message: "Cannot delete active CCP. Deactivate first."
+  - code: 403
+    scenario: "Non-QA Manager attempting to activate"
+    message: "CCP activation requires QA Manager role"
+  - code: 404
+    scenario: "CCP not found"
+    message: "CCP not found"
+  - code: 409
+    scenario: "Duplicate CCP number in same HACCP plan"
+    message: "CCP number already exists for this HACCP plan"
+
+# Performance Targets
+performance:
+  - endpoint: "GET /api/quality/haccp/ccp"
+    target: "<500ms"
+    notes: "With pagination and proper indexes"
+  - endpoint: "GET /api/quality/haccp/ccp/:id"
+    target: "<500ms"
+    notes: "With version history join"
+  - endpoint: "POST /api/quality/haccp/ccp"
+    target: "<300ms"
+  - endpoint: "POST /api/quality/haccp/ccp/:id/activate"
+    target: "<500ms"
+    notes: "Includes validation checks"

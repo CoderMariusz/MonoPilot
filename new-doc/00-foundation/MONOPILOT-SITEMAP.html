@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MonoPilot — Complete Site Map & UI Prototype</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--blue:#1976D2;--green:#22c55e;--amber:#f59e0b;--red:#ef4444;--info:#3b82f6;--bg:#f8fafc;--sidebar:#1e293b;--card:#fff;--text:#1e293b;--muted:#64748b;--border:#e2e8f0;--radius:6px}
+body{font-family:Inter,system-ui,-apple-system,sans-serif;font-size:14px;color:var(--text);background:var(--bg);line-height:1.4}
+#sidebar{position:fixed;left:0;top:0;bottom:0;width:220px;background:var(--sidebar);color:#cbd5e1;overflow-y:auto;z-index:100}
+#sidebar::-webkit-scrollbar{width:4px}#sidebar::-webkit-scrollbar-thumb{background:#475569;border-radius:4px}
+.sidebar-logo{padding:14px 16px;font-size:18px;font-weight:700;color:#fff;border-bottom:1px solid #334155;display:flex;align-items:center;gap:8px}
+.sidebar-logo span{font-size:11px;color:#94a3b8;font-weight:400}
+.sidebar-group{padding:8px 14px 2px;font-size:10px;color:#475569;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.sidebar-item{padding:7px 14px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:8px;border-left:3px solid transparent;transition:all .15s}
+.sidebar-item:hover{background:#334155;color:#f1f5f9}
+.sidebar-item.active{background:#1e3a5f;color:#fff;border-left-color:var(--blue)}
+.sidebar-sub{display:none;padding-left:28px}.sidebar-sub.open{display:block}
+.sidebar-subitem{padding:4px 14px;font-size:12px;cursor:pointer;color:#94a3b8;border-left:2px solid transparent}
+.sidebar-subitem:hover{color:#f1f5f9;background:#334155}
+.sidebar-subitem.active{color:var(--blue);border-left-color:var(--blue)}
+#main{margin-left:220px;padding:40px 20px 20px}
+.page-title{font-size:20px;font-weight:700;margin-bottom:2px}
+.breadcrumb{font-size:12px;color:var(--muted);margin-bottom:14px}
+.breadcrumb a{color:var(--blue);text-decoration:none}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px}
+.card-title{font-size:14px;font-weight:600;margin-bottom:10px}
+.kpi-row{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:14px}
+.kpi{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;border-bottom:3px solid var(--blue)}
+.kpi.green{border-bottom-color:var(--green)}.kpi.amber{border-bottom-color:var(--amber)}.kpi.red{border-bottom-color:var(--red)}
+.kpi-label{font-size:11px;color:var(--muted);font-weight:500}.kpi-value{font-size:26px;font-weight:700;line-height:1.2}
+.kpi-change{font-size:11px;margin-top:2px}
+.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:500}
+.badge-green{background:#dcfce7;color:#166534}.badge-amber{background:#fef3c7;color:#92400e}
+.badge-red{background:#fee2e2;color:#991b1b}.badge-blue{background:#dbeafe;color:#1e40af}.badge-gray{background:#f1f5f9;color:#475569}
+.badge-modal{background:#dbeafe;color:#1976D2;cursor:pointer;font-size:10px;padding:1px 6px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:8px 10px;background:#f8fafc;border-bottom:2px solid var(--border);font-weight:600;font-size:12px;color:var(--muted);white-space:nowrap}
+td{padding:7px 10px;border-bottom:1px solid var(--border)}
+tr:hover td{background:#f8fafc}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.form-field{margin-bottom:10px}
+.form-label{display:block;font-size:12px;font-weight:500;margin-bottom:3px;color:#374151}
+.form-label .req{color:var(--red)}
+.form-input{width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:4px;font-size:13px;font-family:inherit}
+.form-input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 2px rgba(25,118,210,.15)}
+select.form-input{appearance:auto}
+.btn{padding:6px 14px;border-radius:4px;font-size:12px;font-weight:500;cursor:pointer;border:1px solid transparent;font-family:inherit}
+.btn-primary{background:var(--blue);color:#fff}.btn-primary:hover{background:#1565C0}
+.btn-secondary{background:#fff;color:var(--text);border-color:var(--border)}.btn-secondary:hover{background:#f1f5f9}
+.btn-danger{background:var(--red);color:#fff}.btn-success{background:var(--green);color:#fff}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.alert{padding:10px 14px;border-radius:var(--radius);margin-bottom:8px;font-size:12px;border-left:4px solid}
+.alert-red{background:#fef2f2;border-color:var(--red)}.alert-amber{background:#fffbeb;border-color:var(--amber)}
+.alert-blue{background:#eff6ff;border-color:var(--info)}.alert-green{background:#f0fdf4;border-color:var(--green)}
+.tl-item{display:flex;gap:10px;align-items:flex-start;padding:6px 0;border-bottom:1px solid #f1f5f9;font-size:12px}
+.tl-dot{width:8px;height:8px;border-radius:50%;margin-top:4px;flex-shrink:0}
+.tl-time{margin-left:auto;color:var(--muted);white-space:nowrap;font-size:11px}
+#modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;justify-content:center;align-items:center}
+#modal-overlay.open{display:flex}
+#modal-box{background:#fff;border-radius:8px;width:560px;max-height:80vh;overflow-y:auto;padding:20px}
+#modal-box .modal-title{font-size:16px;font-weight:700;margin-bottom:14px;display:flex;justify-content:space-between}
+#modal-box .modal-close{cursor:pointer;font-size:18px;color:var(--muted)}
+.page-block{border:1px dashed #cbd5e1;border-radius:6px;padding:14px;margin-bottom:12px;background:#fff}
+.page-block-title{font-size:13px;font-weight:600;color:var(--blue);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.page-block-route{font-size:11px;color:var(--muted);font-family:monospace;background:#f1f5f9;padding:1px 6px;border-radius:3px}
+.scanner-card{background:#fff;border:2px solid var(--border);border-radius:8px;padding:20px;text-align:center;cursor:pointer}
+.scanner-card:hover{border-color:var(--blue);box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.scanner-card .icon{font-size:32px;margin-bottom:6px}.scanner-card .label{font-size:14px;font-weight:600}
+.scanner-step{display:flex;gap:8px;align-items:center;padding:10px;background:#f8fafc;border-radius:6px;margin-bottom:6px;font-size:13px}
+.scanner-step .num{width:28px;height:28px;background:var(--blue);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0}
+.tabs{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:14px}
+.tab{padding:8px 16px;font-size:13px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;color:var(--muted)}
+.tab.active{color:var(--blue);border-bottom-color:var(--blue);font-weight:600}
+.kanban{display:flex;gap:12px;overflow-x:auto}
+.kanban-col{min-width:180px;background:#f8fafc;border-radius:6px;padding:10px}
+.kanban-col-title{font-size:12px;font-weight:700;margin-bottom:8px;color:var(--muted)}
+.kanban-card{background:#fff;border:1px solid var(--border);border-radius:4px;padding:8px;margin-bottom:6px;font-size:12px}
+.tree-item{padding:3px 0;font-size:12px;padding-left:16px;border-left:1px solid var(--border)}
+.tree-item.l0{padding-left:0;border:none;font-weight:600}.tree-item.l1{padding-left:16px}.tree-item.l2{padding-left:32px}.tree-item.l3{padding-left:48px}
+.flex{display:flex}.gap-2{gap:8px}.items-center{align-items:center}.justify-between{justify-content:space-between}
+.mt-2{margin-top:8px}.mt-3{margin-top:12px}.mb-2{margin-bottom:8px}.text-sm{font-size:12px}.text-xs{font-size:11px}.text-muted{color:var(--muted)}.font-bold{font-weight:700}
+</style>
+</head>
+<body>
+<div id="sidebar"></div>
+<div id="main"></div>
+<div id="modal-overlay" onclick="if(event.target===this)closeModal()">
+<div id="modal-box"><div class="modal-title"><span id="modal-title-text"></span><span class="modal-close" onclick="closeModal()">&times;</span></div><div id="modal-body"></div></div>
+</div>
+<script>
+const MODULES=[
+{id:'public',icon:'🔐',label:'Public Pages',group:'AUTH'},
+{id:'dashboard',icon:'🏠',label:'Dashboard',group:'CORE'},
+{id:'settings',icon:'⚙️',label:'Settings',group:'CORE'},
+{id:'technical',icon:'🔧',label:'Technical',group:'CORE'},
+{id:'planning',icon:'📅',label:'Planning',group:'OPERATIONS'},
+{id:'production',icon:'🏭',label:'Production',group:'OPERATIONS'},
+{id:'warehouse',icon:'📦',label:'Warehouse',group:'OPERATIONS'},
+{id:'scanner',icon:'📱',label:'Scanner',group:'OPERATIONS'},
+{id:'quality',icon:'✅',label:'Quality',group:'QA & SHIPPING'},
+{id:'shipping',icon:'🚚',label:'Shipping',group:'QA & SHIPPING'},
+{id:'npd',icon:'💡',label:'NPD',group:'PREMIUM'},
+{id:'finance',icon:'💰',label:'Finance',group:'PREMIUM'},
+{id:'oee',icon:'📊',label:'OEE',group:'PREMIUM'},
+{id:'integrations',icon:'🔗',label:'Integrations',group:'PREMIUM'},
+{id:'reporting',icon:'📈',label:'Reporting',group:'NEW'},
+{id:'multisite',icon:'🏢',label:'Multi-Site',group:'NEW'},
+{id:'maintenance',icon:'🔩',label:'Maintenance',group:'NEW'},
+];
+const P={
+public:[
+{title:'Login',route:'/',fields:['Email Address *|email|you@company.com','Password *|password|••••••••'],buttons:['Sign In|primary','Forgot password?|link','Sign up|link'],notes:'Remember me checkbox. SSO: Google, Microsoft.'},
+{title:'Sign Up',route:'/signup',fields:['Full Name *|text|John Smith','Work Email *|email|john@company.com','Organization Name *|text|ACME Foods Ltd','Password *|password|Min 8 characters','Confirm Password *|password|Repeat'],buttons:['Create Account|primary']},
+{title:'Forgot Password',route:'/forgot-password',fields:['Email Address *|email|you@company.com'],buttons:['Send Reset Link|primary']},
+{title:'Reset Password',route:'/reset-password',fields:['New Password *|password|Min 8 chars','Confirm Password *|password|Repeat'],buttons:['Set New Password|primary']},
+{title:'Accept Invitation',route:'/auth/accept-invitation',fields:['Full Name *|text|Your name','Set Password *|password|Min 8 chars'],buttons:['Accept & Join|primary'],notes:'Shows org name + role from invitation link.'},
+],
+dashboard:[
+{title:'Main Dashboard',route:'/dashboard',kpis:[{l:'Active Work Orders',v:'12',c:'↑ 3 today',color:'blue'},{l:'Pending POs',v:'7',c:'2 overdue',color:'amber'},{l:'Low Stock Alerts',v:'4',c:'Critical: 1',color:'red'},{l:'Quality Holds',v:'2',c:'↓ 1',color:'amber'},{l:'Today\'s Shipments',v:'8',c:'On time 100%',color:'green'}],buttons:['+ Create Work Order|primary|modal:create-wo','+ Create Purchase Order|primary|modal:create-po','📦 Receive Goods|secondary','✅ Quality Check|secondary','🚚 Create Shipment|secondary','📊 Run MRP|secondary'],notes:'Quick Actions bar + Recent Activity timeline (5 items) + System Alerts panel (critical/warning/info). Auto-refresh 30s.'},
+],
+settings:[
+{title:'Settings Home',route:'/settings',type:'cards',cards:['Organization|Edit company profile, logo, timezone','Users & Roles|Manage team members and permissions','Warehouses|Configure warehouse locations','Machines|Register production equipment','Production Lines|Set up manufacturing lines','Modules|Enable/disable application modules']},
+{title:'Onboarding Wizard',route:'/settings/onboarding',type:'wizard',steps:['Organization Profile','Invite Users','Create Warehouses','Register Machines','Setup Production Lines','Enable Modules']},
+{title:'Organization',route:'/settings/organization',fields:['Company Name *|text|ACME Foods Ltd','Legal Name|text|ACME Foods Limited','Address *|text|123 Industrial Park','City *|text|Manchester','Country *|select|United Kingdom','Phone|tel|+44 161 000 0000','Logo|file|Upload','Timezone *|select|Europe/London','Currency *|select|GBP','Fiscal Calendar|select|4-4-5','Tax Reg #|text|GB123456789'],buttons:['Save Changes|primary']},
+{title:'Users',route:'/settings/users',table:{cols:['Name','Email','Role','Status','Last Login','Actions ↕'],rows:[['John Smith','john@acme.com','Admin','●Active','2h ago','✏️ ⋮'],['Anna K.','anna@acme.com','Operator','●Active','1d ago','✏️ ⋮'],['Bob W.','bob@acme.com','Viewer','○Invited','Never','✏️ ⋮']]},buttons:['+ Invite User|primary|modal:invite-user','Export CSV|secondary'],modals:['Create/Edit User: first_name, last_name, email, role (select), send_invite (checkbox)','Invite User: email, role, custom_message']},
+{title:'Roles & Permissions',route:'/settings/roles',table:{cols:['Role Name','Users','Permissions','Actions'],rows:[['Admin','3','Full access','✏️'],['Production Manager','2','Production + Planning','✏️'],['Operator','5','Scanner + Production (read)','✏️'],['Viewer','2','Read-only all','✏️']]},modals:['Edit Role: role_name, permission matrix (module × CRUD checkboxes)']},
+{title:'Warehouses',route:'/settings/warehouses',table:{cols:['Code','Name','Address','Locations','Status','Actions'],rows:[['WH-01','Main Warehouse','123 Industrial Park','42','●Active','✏️ ⋮'],['WH-02','Cold Storage','124 Industrial Park','18','●Active','✏️ ⋮']]},buttons:['+ Add Warehouse|primary|modal:create-warehouse'],modals:['Create/Edit Warehouse: code, name, address, type (Ambient/Cold/Frozen), is_active']},
+{title:'Locations',route:'/settings/locations',type:'tree',tree:['WH-01 Main Warehouse|l0','Zone A — Receiving|l1','Section A1 — Ambient|l2','Shelf A1-01 (Cap: 100)|l3','Shelf A1-02 (Cap: 80)|l3','Section A2 — Cold +4°C|l2','Zone B — Production|l1','Zone C — Shipping|l1'],buttons:['+ Add Location|primary|modal:create-location'],modals:['Create Location: warehouse, parent, code, name, type (Zone/Section/Shelf/Bin), capacity, temp_zone']},
+{title:'Machines',route:'/settings/machines',table:{cols:['Code','Name','Line','Type','Status','Actions'],rows:[['MCH-001','Mixer A','Line 1','Mixer','●Active','✏️ ⋮'],['MCH-002','Oven B','Line 1','Oven','●Active','✏️ ⋮'],['MCH-003','Packer C','Line 2','Packaging','○Maintenance','✏️ ⋮']]},buttons:['+ Add Machine|primary|modal:create-machine'],modals:['Create/Edit Machine: code, name, line, type, manufacturer, model, serial_no, purchase_date, is_active']},
+{title:'Production Lines',route:'/settings/production-lines',table:{cols:['Code','Name','Machines','Default Recipe','Status','Actions'],rows:[['LINE-01','Nugget Line','Mixer, Oven, Packer','Chicken Nuggets 1kg','●Active','✏️ ⋮'],['LINE-02','Sausage Line','Grinder, Mixer, Stuffer','Pork Sausages 500g','●Active','✏️ ⋮']]},buttons:['+ Add Line|primary|modal:create-line'],modals:['Create/Edit Line: code, name, machines (multi-select), default_product, speed_per_hour, is_active']},
+{title:'Allergens',route:'/settings/allergens',type:'grid',notes:'14 EU allergens: Celery, Cereals, Crustaceans, Eggs, Fish, Lupin, Milk, Molluscs, Mustard, Nuts, Peanuts, Sesame, Soy, Sulphites — each ON/OFF toggle + custom allergen add.'},
+{title:'Tax Codes',route:'/settings/tax-codes',table:{cols:['Code','Description','Rate %','Effective Date','Actions'],rows:[['VAT-STD','Standard Rate','20%','2024-01-01','✏️'],['VAT-RED','Reduced Rate','5%','2024-01-01','✏️'],['VAT-ZERO','Zero Rate','0%','2024-01-01','✏️']]},buttons:['+ Add Tax Code|primary|modal:create-tax'],modals:['Create Tax Code: code, description, rate_percent, effective_from, effective_to']},
+{title:'Modules',route:'/settings/modules',type:'toggles',toggles:['Technical|Products, BOMs, routings|ON','Planning|Suppliers, POs, work orders|ON','Production|Batch execution, yields|ON','Warehouse|LP inventory, movements|ON','Scanner|Mobile barcode scanning|ON','Quality|QC, holds, HACCP|OFF','Shipping|Sales orders, picking, packing|OFF','NPD|New product development|OFF','Finance|Costing, variance|OFF','OEE|Machine monitoring|OFF','Integrations|API, webhooks, EDI|OFF','Reporting|Analytics dashboards|OFF']},
+{title:'API Keys',route:'/settings/api-keys',table:{cols:['Name','Prefix','Created','Last Used','Status','Actions'],rows:[['Production API','mp_prod_a1b2...','Dec 1','2h ago','●Active','⋮'],['Test Key','mp_test_x9y8...','Nov 15','3d ago','●Active','⋮']]},buttons:['+ Create API Key|primary|modal:create-apikey'],modals:['Create API Key: name, permissions, expires_at']},
+{title:'Webhooks',route:'/settings/webhooks',table:{cols:['URL','Events','Status','Last Triggered','Actions'],rows:[['https://erp.acme.com/hook','PO.created, WO.completed','●Active','1h ago','✏️ ⋮'],['https://slack.com/hook','QA.hold_created','●Active','2d ago','✏️ ⋮']]},buttons:['+ Add Webhook|primary|modal:create-webhook'],modals:['Create Webhook: url, events (multi-select), secret, retry_policy, is_active']},
+{title:'Audit Logs',route:'/settings/audit-logs',table:{cols:['Timestamp ↕','User','Action','Resource','Details'],rows:[['Dec 15 14:32','John S.','UPDATE','Product PRD-001','Changed yield 95%→92%'],['Dec 15 14:28','Anna K.','CREATE','WO-0143','Chicken Nuggets × 500'],['Dec 15 14:15','System','APPROVE','PO-1089','Auto-approved (< £5k)']]},buttons:['Export|secondary','Filter: Date|secondary','Filter: User|secondary']},
+{title:'Security',route:'/settings/security',fields:['Min Password Length|number|8','Require Uppercase|toggle|ON','Require Number|toggle|ON','Two-Factor Auth|toggle|OFF','Session Timeout|select|30 min / 1h / 4h','Max Login Attempts|number|5'],buttons:['Save Settings|primary']},
+{title:'Notifications',route:'/settings/notifications',notes:'Channel × Event matrix: Email/In-App/Slack toggles for: PO approved, WO started, WO completed, QA hold, Low stock, Shipment dispatched, User invited.'},
+{title:'Billing',route:'/settings/billing',notes:'Plan card (Free/Pro/Enterprise), usage (users, storage), payment method, invoice history table.'},
+{title:'Import/Export',route:'/settings/import-export',notes:'Import: Upload CSV → Map Columns → Preview → Confirm. Export: Entity select → Format (CSV/JSON/Excel) → Download.'},
+{title:'Waste Categories',route:'/settings/waste-categories',table:{cols:['Category','Type','Active','Actions'],rows:[['Trim Fat','Fat Waste','●Yes','✏️'],['Floor Sweep','Floor Waste','●Yes','✏️'],['Overweight','Giveaway','●Yes','✏️']]},buttons:['+ Add Category|primary|modal:create-waste-cat'],modals:['Create Category: name, type (Fat/Floor/Giveaway/Process), description, is_active']},
+{title:'Grade Thresholds',route:'/settings/grade-thresholds',fields:['Grade A (Excellent)|number|≥ 95%','Grade B (Good)|number|≥ 85%','Grade C (Acceptable)|number|≥ 75%','Grade D (Poor)|number|< 75%'],buttons:['Save|primary']},
+{title:'Fiscal Calendar',route:'/settings/fiscal-calendar',fields:['Calendar Type|select|4-4-5 / 4-5-4 / Standard','Fiscal Year Start|select|January / April'],buttons:['Save|primary']},
+{title:'KPI Targets',route:'/settings/kpi-targets',table:{cols:['Line','Product','Target Yield %','Target OEE %','Actions'],rows:[['Line 1','Chicken Nuggets','92%','85%','✏️'],['Line 2','Pork Sausages','88%','80%','✏️']]},buttons:['+ Set Target|primary|modal:set-kpi-target'],modals:['Set Target: line, product, target_yield, target_oee, target_waste, effective_from']},
+{title:'Planning Settings',route:'/settings/planning',fields:['Default Lead Time (days)|number|7','PO Auto-Approve Below £|number|5000','MRP Horizon (weeks)|number|4','PO Number Prefix|text|PO-','WO Number Prefix|text|WO-'],buttons:['Save|primary']},
+{title:'Production Execution',route:'/settings/production-execution',fields:['Require Lot Tracking|toggle|ON','Allow Over-Consumption|toggle|OFF','Over-Consumption Tolerance %|number|5','Default Shift Pattern|select|AM/PM / 3-Shift','Backflush by Default|toggle|ON'],buttons:['Save|primary']},
+],
+technical:[
+{title:'Technical Dashboard',route:'/technical',kpis:[{l:'Products',v:'148',c:'↑ 5 this week',color:'blue'},{l:'Active BOMs',v:'92',c:'3 drafts',color:'green'},{l:'Routings',v:'45',c:'2 pending',color:'blue'},{l:'Avg Yield',v:'91.2%',c:'↑ 0.8%',color:'green'},{l:'Cost Changes',v:'7',c:'This month',color:'amber'}],buttons:['+ Create Product|primary|modal:create-product','+ Create BOM|primary|modal:create-bom'],notes:'Recent changes timeline. Quick actions. Product type breakdown chart.'},
+{title:'Products List',route:'/technical/products',table:{cols:['Code ↕','Name ↕','Type','UoM','Status','Allergens','BOMs','Actions'],rows:[['FG-NUGGET-1K','Chicken Nuggets 1kg','FG','kg','●Active','🥚🌾🥛','2','✏️ ⋮'],['FG-FISH-500','Fish Fingers 500g','FG','kg','●Active','🐟🌾','1','✏️ ⋮'],['RM-FLOUR-001','Wheat Flour','RM','kg','●Active','🌾','—','✏️ ⋮'],['PKG-BOX-1K','1kg Carton Box','PKG','pcs','●Active','—','—','✏️ ⋮']]},buttons:['+ Create Product|primary|modal:create-product','Import|secondary','Export CSV|secondary'],modals:['Create/Edit Product: code*, name*, type*(FG/WIP/RM/PKG), uom*(kg/L/pcs), description, net_weight, tare_weight, gross_weight, shelf_life_days, best_before_rule, is_catch_weight, cw_unit, nominal_qty, min_qty, max_qty, expected_yield_pct, preferred_supplier, gtin14, item_group(RawMeat/Packaging/Consumables/FinGoods), status']},
+{title:'Product Detail',route:'/technical/products/[id]',type:'tabs',tabsList:['General','Nutrition','Allergens','BOMs','Costing','Shelf Life','History'],notes:'General: all fields. Nutrition: per 100g (kcal, fat, carbs, protein, salt). Allergens: 14 EU matrix. BOMs: linked list. Costing: breakdown. Shelf Life: config. History: audit.'},
+{title:'BOM List',route:'/technical/boms',table:{cols:['BOM Code ↕','Product','Version','Status','Items','Yield %','Actions'],rows:[['BOM-NUGGET-01','Chicken Nuggets','v3','●Active','8','92%','✏️ ⋮'],['BOM-NUGGET-01','Chicken Nuggets','v2','○Archived','7','90%','👁'],['BOM-FISH-01','Fish Fingers','v1','●Active','6','89%','✏️ ⋮']]},buttons:['+ Create BOM|primary|modal:create-bom','Clone|secondary|modal:clone-bom','Compare|secondary|modal:compare-bom'],modals:['Create BOM: product*, version, yield_pct, valid_from/to, items:[material, qty, uom, scrap_pct, flushing(Backflush/Manual), priority]','Clone BOM: source, new_version, scale_factor','Compare BOMs: bom_a vs bom_b → side-by-side diff']},
+{title:'BOM Explosion',route:'/technical/boms/[id]',type:'bom-tree',notes:'Multi-level tree: Component|Level(L1/L2/L3)|Type(RM/WIP/FG/PKG)|Qty|Cumulative|Scrap%|Cost. Version tabs. Actions: Scale, Clone, Compare, Edit. Raw Materials Summary. Co-products section.'},
+{title:'Routings',route:'/technical/routings',table:{cols:['Code ↕','Product','Ops','Total Time','Status','Actions'],rows:[['RTG-NUGGET-01','Chicken Nuggets','4','2h 15m','●Active','✏️ ⋮'],['RTG-FISH-01','Fish Fingers','3','1h 45m','●Active','✏️ ⋮']]},buttons:['+ Create Routing|primary|modal:create-routing','Clone|secondary'],modals:['Create Routing: code*, product*, operations:[seq, name, work_center, setup_min, run_min, queue_min, overlap_pct]']},
+{title:'Routing Detail',route:'/technical/routings/[id]',table:{cols:['Seq','Operation','Work Center','Setup','Run','Queue','Overlap','Actions'],rows:[['10','Mixing','Mixer A','15m','30m','5m','0%','✏️'],['20','Forming','Former B','10m','45m','10m','50%','✏️'],['30','Cooking','Oven C','5m','60m','15m','0%','✏️'],['40','Packing','Packer D','5m','20m','0m','80%','✏️']]},buttons:['+ Add Operation|primary','Edit|secondary']},
+{title:'Nutrition',route:'/technical/nutrition',fields:['Energy (kcal)|number|per 100g','Fat (g)|number|','Sat Fat (g)|number|','Carbs (g)|number|','Sugars (g)|number|','Fibre (g)|number|','Protein (g)|number|','Salt (g)|number|'],buttons:['Save|primary','Calculate from BOM|secondary']},
+{title:'Allergen Matrix',route:'/technical/allergens',type:'matrix',notes:'Products × 14 EU Allergens. Values: ● Contains / ◐ May Contain / ○ Free. Bulk edit, export.'},
+{title:'Shelf Life',route:'/technical/shelf-life',fields:['Shelf Life Days *|number|180','Best Before Rule|select|From production / From receipt','Min Remaining for Sale|number|30 days','Min Remaining for Ship|number|60 days'],buttons:['Save|primary']},
+{title:'Recipe Costing',route:'/technical/costing',table:{cols:['Component','Qty','UoM','Unit Cost','Total'],rows:[['Chicken Breast','0.45','kg','£5.20','£2.34'],['Wheat Flour','0.15','kg','£0.80','£0.12'],['Breadcrumbs','0.10','kg','£1.50','£0.15'],['Seasoning','0.02','kg','£8.00','£0.16'],['1kg Carton','1','pcs','£0.25','£0.25']]},notes:'Material £3.02 + Labor £0.45 + Overhead £0.18 = Total £3.65/unit'},
+{title:'Cost History',route:'/technical/costing/history',notes:'Line chart: cost/unit over 12 months. Breakdown by category. Export.'},
+{title:'Traceability',route:'/technical/traceability',fields:['Search|text|Enter Lot #, LP #, or Batch #','Direction|select|Forward / Backward'],notes:'Genealogy tree: raw material → production → output → shipment.'},
+{title:'Formulas (Versioned)',route:'/technical/formulas',table:{cols:['Code','Product','Version','Status','Approved','Valid From','Actions'],rows:[['FML-NUGGET','Chicken Nuggets','v3','●Active','✓','2024-01-01','✏️ ⋮'],['FML-NUGGET','Chicken Nuggets','v2','○Archived','✓','2023-06-01','👁']]},notes:'Formula = BOM + Routing + QC bundled. Approval workflow.'},
+{title:'Co-Products',route:'/technical/co-products',table:{cols:['Main Product','Co-Product','Ratio %','Type','Actions'],rows:[['Chicken Nuggets','Chicken Trim','8%','By-product','✏️'],['Pork Sausages','Meat Trimmings','5%','By-product','✏️']]},buttons:['+ Define Co-Product|primary|modal:create-coproduct'],modals:['Create: main_product, co_product, ratio_pct, type(By-product/Co-product)']},
+],
+planning:[
+{title:'Planning Dashboard',route:'/planning',kpis:[{l:'Active POs',v:'23',c:'7 this week',color:'blue'},{l:'Overdue POs',v:'3',c:'↑ 1',color:'red'},{l:'Active WOs',v:'12',c:'5 today',color:'green'},{l:'Pending TOs',v:'4',c:'2 in transit',color:'amber'},{l:'MRP Suggestions',v:'18',c:'Last run: yesterday',color:'blue'}],buttons:['+ Create PO|primary|modal:create-po','+ Create WO|primary|modal:create-wo','+ Create TO|primary','Run MRP|secondary']},
+{title:'Suppliers',route:'/planning/suppliers',kpis:[{l:'Total',v:'24',c:'',color:'blue'},{l:'Active',v:'21',c:'',color:'green'},{l:'Pending POs',v:'7',c:'',color:'amber'},{l:'Overdue',v:'2',c:'',color:'red'}],table:{cols:['Code ↕','Name ↕','Products','Rating','Terms','Status','Actions'],rows:[['SUP-001','FoodCo','12','⭐4.5','Net 30','●Approved','✏️ ⋮'],['SUP-002','PackRight','8','⭐4.0','Net 60','●Approved','✏️ ⋮']]},buttons:['+ Add Supplier|primary|modal:create-supplier','Import|secondary'],modals:['Create Supplier: code*, name*, contact, email, phone, address, payment_terms, currency, rating']},
+{title:'Supplier Detail',route:'/planning/suppliers/[id]',type:'tabs',tabsList:['General','Products','Purchase Orders','Performance','Notes']},
+{title:'Purchase Orders',route:'/planning/purchase-orders',kpis:[{l:'Total',v:'89',c:'This month',color:'blue'},{l:'Pending',v:'7',c:'',color:'amber'},{l:'Overdue',v:'3',c:'',color:'red'},{l:'Received',v:'79',c:'',color:'green'}],table:{cols:['PO # ↕','Supplier ↕','Date','Delivery','Lines','Status','Total','Actions'],rows:[['PO-1089','FoodCo','Dec 14','Dec 18','5','●Confirmed','£3,250','✏️ ⋮'],['PO-1088','PackRight','Dec 13','Dec 16','3','⚠️Overdue','£1,100','✏️ ⋮'],['PO-1090','SpiceMaster','Dec 15','Dec 22','2','○Draft','£450','✏️ ⋮']]},buttons:['+ Create PO|primary|modal:create-po','Bulk Approve|secondary','Import|secondary'],modals:['Create PO (3-step): 1.Supplier→auto-fill, 2.Items(product,qty,price,date), 3.Review+Submit','Approve PO: approve/reject + comment','Add PO Line: product, qty, unit_price, delivery_date']},
+{title:'PO Detail',route:'/planning/purchase-orders/[id]',notes:'Header + status timeline (Draft→Confirmed→Partially Received→Received→Invoiced). Lines: item, qty ordered/received, price. Actions: Approve, Add Line, Receive→GRN, Cancel, Print.'},
+{title:'PO Import',route:'/planning/purchase-orders/import',type:'wizard',steps:['Upload CSV/Excel','Map Columns','Preview & Validate','Import']},
+{title:'Transfer Orders',route:'/planning/transfer-orders',table:{cols:['TO # ↕','From','To','Items','Status','Ship Date','Actions'],rows:[['TO-0045','WH-01','WH-02','3','●In Transit','Dec 14','✏️ ⋮'],['TO-0044','WH-02','WH-01','1','✓Received','Dec 13','👁']]},buttons:['+ Create TO|primary|modal:create-to'],modals:['Create TO: from_wh*, to_wh*, lines(product, qty, locations), ship_date','Ship/Receive TO: confirm + qty per line']},
+{title:'TO Detail',route:'/planning/transfer-orders/[id]',notes:'Header + lines with LP assignments. Status: Draft→Confirmed→Shipped→Received. LP picker modal.'},
+{title:'Work Orders',route:'/planning/work-orders',kpis:[{l:'Active',v:'12',c:'',color:'blue'},{l:'Today',v:'5',c:'',color:'green'},{l:'Behind',v:'1',c:'',color:'red'},{l:'Week Done',v:'28',c:'↑ 4',color:'green'}],table:{cols:['WO # ↕','Product ↕','BOM','Qty','Line','Date','Status','Priority','Actions'],rows:[['WO-0143','Chicken Nuggets','v3','500 kg','Line 1','Dec 16','●In Progress','High','✏️ ⋮'],['WO-0144','Fish Fingers','v1','300 kg','Line 2','Dec 16','○Planned','Medium','✏️ ⋮'],['WO-0142','Pork Sausages','v2','200 kg','Line 2','Dec 15','✓Completed','Normal','👁']]},buttons:['+ Create WO|primary|modal:create-wo','Gantt View|secondary'],modals:['Create WO: product*→auto BOM, qty*, line*, date*, priority, notes','Reserve Materials: requirements → available LPs → reserve']},
+{title:'WO Detail',route:'/planning/work-orders/[id]',notes:'Header, BOM snapshot (immutable), material requirements table, reservations, status timeline (Planned→Released→In Progress→ON_HOLD→Completed). Actions: Release, Start, Pause, Resume, Complete.'},
+{title:'Gantt Chart',route:'/planning/work-orders/gantt',notes:'Horizontal timeline. Rows=lines. Bars=WOs color by status. Drag to reschedule. Zoom: day/week/month. Today indicator. Quick view on hover.'},
+{title:'MRP',route:'/planning/mrp',notes:'Set horizon→run calc. Results: Suggested POs, Suggested WOs, Stock projections. Accept/reject. Demand: SOs + Safety Stock.'},
+],
+production:[
+{title:'Production Dashboard',route:'/production/dashboard',kpis:[{l:'Active WOs',v:'5',c:'3 lines',color:'blue'},{l:'Yield',v:'91.2%',c:'↑ 0.5%',color:'green'},{l:'OEE',v:'84%',c:'Target: 85%',color:'amber'},{l:'Downtime',v:'45 min',c:'↓ 15m',color:'green'},{l:'Output',v:'2,340 kg',c:'↑ 12%',color:'green'}],notes:'Auto-refresh 30s. Active WOs table with progress bars. Alert panel.'},
+{title:'WO Execution',route:'/production/work-orders/[id]',notes:'Full execution: header + progress bar. Operations: start/complete each. Material consumption: scan LP→qty→confirm. Output: qty, LP, batch, expiry. Modals: Start WO, Pause (reason: Break/Material/Machine/QC/Other), Resume, Complete (yield, waste summary).'},
+{title:'Operations',route:'/production/work-orders/[id]/operations',table:{cols:['Seq','Operation','Center','Status','Start','End','Duration','Actions'],rows:[['10','Mixing','Mixer A','✓Done','14:00','14:32','32m','👁'],['20','Forming','Former B','●Running','14:35','—','22m+','⏸ ✓'],['30','Cooking','Oven C','○Pending','—','—','—','▶'],['40','Packing','Packer D','○Pending','—','—','—','—']]},buttons:['Start Next|primary','Complete Current|success'],modals:['Start Operation: confirm, operator','Complete Operation: actual_time, notes, issues']},
+{title:'Material Consumption',route:'/production/material-consumption',table:{cols:['WO','Material','Planned','Consumed','Variance','LP Used','Actions'],rows:[['WO-0143','Chicken Breast','225 kg','220 kg','-5 kg ✓','LP-8801,8802','⋮'],['WO-0143','Wheat Flour','75 kg','78 kg','+3 kg ⚠️','LP-9012','⋮']]},buttons:['+ Add Consumption|primary|modal:add-consumption'],modals:['Add: wo, material, qty, lp(scan), notes','Reverse: record, reason, qty','Over-Consumption Approval: variance, reason, approve/reject']},
+{title:'Output Registration',route:'/production/output-registration',fields:['Work Order *|select|WO-0143','Product|text|Chicken Nuggets 1kg (auto)','Qty Produced *|number|490 kg','Batch # *|text|BATCH-2024-1215-A','Expiry *|date|2025-06-15','Create LP|toggle|ON'],buttons:['Register Output|primary','Register By-Product|secondary'],modals:['Register Output: WO, product, qty, batch, expiry, location, quality_status','Register By-Product: WO, co_product, qty, LP']},
+{title:'Yield Dashboard',route:'/production/yield-dashboard',kpis:[{l:'Today',v:'91.2%',c:'Target: 92%',color:'amber'},{l:'Week',v:'90.8%',c:'↑ 0.3%',color:'green'},{l:'MTD',v:'91.5%',c:'↑ 0.7%',color:'green'},{l:'Best Line',v:'93%',c:'Line 1',color:'green'},{l:'Worst',v:'87%',c:'Line 3',color:'red'}],notes:'4-week trend. By product × line with grade (A/B/C/D). Drill to WOs.'},
+{title:'Waste Tracking',route:'/production/waste-tracking',table:{cols:['WO','Product','Fat','Floor','Giveaway','Total','%'],rows:[['WO-0143','Chicken Nuggets','2.1 kg','0.5 kg','1.2 kg','3.8 kg','0.8%'],['WO-0141','Pork Sausages','3.5 kg','1.0 kg','2.0 kg','6.5 kg','3.3%']]},notes:'Pie chart by category. Trend over time.'},
+{title:'Shift Management',route:'/production/shift-management',notes:'Grid: Line × Shift (AM/PM). Each cell: operators, target, actual, yield. Color: green/amber/red.'},
+{title:'Downtime',route:'/production/downtime',table:{cols:['Line','Start','End','Duration','Category','Reason','Actions'],rows:[['Line 1','14:22','14:45','23 min','Plant','Mixer jam','✏️'],['Line 2','10:00','10:15','15 min','People','Break','✏️']]},buttons:['+ Log Downtime|primary|modal:log-downtime'],modals:['Log: line*, start*, end, category*(People/Process/Plant), reason*, notes'],notes:'Pareto chart. Category breakdown.'},
+{title:'Analytics',route:'/production/analytics',notes:'Charts: Yield trend (12w), OEE trend, Downtime by category, Top products, Shift comparison. Export.'},
+],
+warehouse:[
+{title:'Warehouse Dashboard',route:'/warehouse',kpis:[{l:'Total LPs',v:'1,247',c:'',color:'blue'},{l:'Available',v:'1,089',c:'87%',color:'green'},{l:'Reserved',v:'98',c:'8%',color:'amber'},{l:'Blocked/QA',v:'34',c:'3%',color:'red'},{l:'Expiring 7d',v:'12',c:'',color:'red'}],notes:'Alert panels: Expiring, QA Pending, Failed QA, Low Stock. Inventory aging.'},
+{title:'License Plates',route:'/warehouse/license-plates',table:{cols:['LP # ↕','Product ↕','Qty','Batch','Expiry ↕','Location','Status','Actions'],rows:[['LP-8801','Chicken Breast','50 kg','B-1210','2025-03-10','WH-01/A1-01','●Available','✏️ ⋮'],['LP-9012','Wheat Flour','200 kg','B-1201','2025-09-01','WH-01/A2-03','◉Reserved','✏️ ⋮'],['LP-9100','Cream Cheese','25 kg','B-1205','2025-01-05','WH-02/B1-02','⚠️Expiring','✏️ ⋮']]},buttons:['+ Create LP|primary|modal:create-lp','Split|secondary|modal:split-lp','Merge|secondary|modal:merge-lp','Print Labels|secondary','Export|secondary'],modals:['Create LP: product*, qty*, batch*, expiry*, location*, status','Split LP: source, split_qty, new_location','Merge LPs: lp_list (same product+batch)','Block/Unblock: reason, notes','Change QA: status(Pending/Passed/Failed), notes','Print: LP, copies, format']},
+{title:'LP Detail',route:'/warehouse/license-plates/[id]',notes:'Info card + QR. Tabs: Movements, Genealogy (parent/child), QA Results, Reservations. Actions: Move, Split, Block, QA, Print.'},
+{title:'Stock Movements',route:'/warehouse/stock-movements',table:{cols:['Date ↕','Type','LP','Product','Qty','From','To','User'],rows:[['Dec 15','Receipt','LP-8801','Chicken Breast','50 kg','—','WH-01/A1-01','John'],['Dec 15','Move','LP-9012','Wheat Flour','200 kg','A1-03','A2-03','Anna'],['Dec 15','Consume','LP-8750','Seasoning','5 kg','B2-01','Production','System']]},buttons:['+ Manual Move|primary|modal:create-movement','Export|secondary']},
+{title:'Inventory Browser',route:'/warehouse/inventory-browser',fields:['Search|text|Product, LP #, batch, location...'],notes:'Advanced filters + results grid. Summary: total qty, value, LP count.'},
+{title:'Genealogy',route:'/warehouse/genealogy',notes:'Tree: Parent LP → Children (splits/merges). Click for detail. Traceability.'},
+{title:'GRN',route:'/warehouse/grn',notes:'From PO: select→verify→create LPs→locate→print. From TO: select→confirm→create. Validation: qty vs tolerance.'},
+{title:'Layout',route:'/warehouse/layout',notes:'Visual zones, sections, utilization heatmap. Click for LP list.'},
+],
+scanner:[
+{title:'Scanner Home',route:'/scanner',type:'scanner-home',scannerCards:['📥|Receive|Receive from PO','🔄|Move|Move LP','📍|Putaway|Suggested putaway','⚡|Consume|Material for WO','📤|Output|WO output','📋|Pick|Sales order','📦|Pack|Pack shipment','🔀|Transfer|Between warehouses']},
+{title:'Receive',route:'/scanner/receive',type:'scanner-flow',steps:['Scan PO barcode','Scan product → verify','Enter qty (numpad)','Quality: Accept/Hold','Auto-create LP + Print','Next item or Complete']},
+{title:'Move',route:'/scanner/move',type:'scanner-flow',steps:['Scan LP barcode','Verify details','Scan destination','Confirm move','Done']},
+{title:'Putaway',route:'/scanner/putaway',type:'scanner-flow',steps:['System suggests LP (FIFO)','Scan LP to confirm','System suggests location','Scan location','Done → next']},
+{title:'Consume',route:'/scanner/consume',type:'scanner-flow',steps:['Select Work Order','See materials needed','Scan material LP','Enter qty','Confirm','Next or Done']},
+{title:'Output',route:'/scanner/output',type:'scanner-flow',steps:['Select WO','Enter output qty','Enter batch #','Set expiry','Create LP + Print','Optional: by-product']},
+{title:'Pick',route:'/scanner/pick',type:'scanner-flow',steps:['Select Pick List','Go to location','Scan location','Scan LP','Confirm qty','Next line or Complete']},
+{title:'Pack',route:'/scanner/pack',type:'scanner-flow',steps:['Scan SO','Scan items into box','Weight entry','Close box → SSCC','Print label','Next box or Done']},
+{title:'Transfer',route:'/scanner/transfer',type:'scanner-flow',steps:['Select TO','Scan items to ship','Confirm ship','At dest: scan items','Confirm receipt','Complete']},
+],
+quality:[
+{title:'Quality Dashboard',route:'/quality',kpis:[{l:'Holds',v:'2',c:'',color:'red'},{l:'Specs',v:'34',c:'3 drafts',color:'blue'},{l:'Open NCRs',v:'5',c:'2 critical',color:'amber'},{l:'Releases Today',v:'4',c:'All passed',color:'green'},{l:'CCP Alerts',v:'0',c:'Normal',color:'green'}]},
+{title:'Specifications',route:'/quality/specifications',table:{cols:['Code ↕','Product','Type','Tests','Status','Actions'],rows:[['QS-NUGGET-01','Chicken Nuggets','FG','8','●Active','✏️ ⋮'],['QS-FLOUR-01','Wheat Flour','RM','5','●Active','✏️ ⋮']]},buttons:['+ Create Spec|primary|modal:create-spec'],modals:['Create: code*, product*, type, tests:[{param, method, target, min, max, uom, is_critical}]']},
+{title:'Spec Detail',route:'/quality/specifications/[id]',table:{cols:['Parameter','Method','Target','Min','Max','UoM','Critical'],rows:[['Temperature','Probe','≤5°C','—','5°C','°C','Yes'],['pH','Meter','6.0','5.5','6.5','pH','No'],['Weight','Scale','1000g','990g','1010g','g','Yes']]},buttons:['Edit|primary','Approve|success','Clone|secondary']},
+{title:'Test Templates',route:'/quality/test-templates',table:{cols:['Template','Tests','Used By','Actions'],rows:[['Incoming Raw Meat','5','3 specs','✏️'],['FG Physical','4','8 specs','✏️']]},buttons:['+ Create|primary']},
+{title:'Incoming Inspection',route:'/quality/incoming-inspection',notes:'GRN items queue → select spec → record results → Pass/Fail → update LP status.'},
+{title:'In-Process',route:'/quality/in-process-inspection',notes:'WO operation checkpoints. Record measurements during production.'},
+{title:'Final Inspection',route:'/quality/final-inspection',notes:'Batch-level final QC. All tests pass → release. Summary view.'},
+{title:'Holds',route:'/quality/holds',table:{cols:['Hold #','Product','LPs','Reason','Qty','Status','Actions'],rows:[['QH-23','Chicken Breast','LP-8810,8811','Supplier dev.','98 kg','●Active','✏️ ⋮'],['QH-22','Fish Fillet','LP-8790','Temp excursion','25 kg','✓Released','👁']]},buttons:['+ Create Hold|primary|modal:create-hold'],modals:['Create: product, lps, reason*, qty, type(QC/Regulatory)','Release: disposition(Release/Reject/Rework), notes, approved_by']},
+{title:'NCR',route:'/quality/ncr',table:{cols:['NCR #','Type','Severity','Product','Status','Assigned','Actions'],rows:[['NCR-89','Process','Major','Nuggets','●Open','John','✏️ ⋮'],['NCR-88','Supplier','Minor','Flour','◉In Progress','Anna','✏️ ⋮']]},buttons:['+ Create NCR|primary|modal:create-ncr'],modals:['Create: type, severity, product, description*, root_cause, corrective_action, due_date, assigned_to']},
+{title:'Batch Release',route:'/quality/batch-release',table:{cols:['Batch','Product','QC','Tests','Docs','Actions'],rows:[['B-1215-A','Chicken Nuggets','✓Pass','8/8','✓','Release|Reject'],['B-1215-B','Fish Fingers','⚠️Dev','6/7','✓','Review']]},buttons:['Release Selected|success','Reject|danger']},
+{title:'COA',route:'/quality/coa',notes:'Auto-generated Certificate of Analysis per batch. Test results, specs, conclusion. PDF. Template config.'},
+{title:'HACCP',route:'/quality/haccp',table:{cols:['Plan','Product Line','CCPs','Status','Last Review','Actions'],rows:[['HACCP-01','Chicken','3','●Active','Nov 1','✏️'],['HACCP-02','Fish','2','●Active','Oct 15','✏️']]},notes:'CCP: name, hazard, limits, monitoring, corrective action.'},
+{title:'CCP Monitoring',route:'/quality/ccp-monitoring',notes:'Real-time CCP values vs limits. Green/Red. Auto-alert on breach.'},
+{title:'Audit Trail',route:'/quality/audit-trail',table:{cols:['Time','User','Action','Resource','Details'],rows:[['14:32','John','RELEASE','Batch B-1215-A','All passed'],['13:45','Anna','HOLD','LP-8810','Supplier dev'],['12:00','System','CCP_LOG','CCP-01','74.2°C ✓']]},buttons:['Export|secondary']},
+],
+shipping:[
+{title:'Shipping Dashboard',route:'/shipping',kpis:[{l:'Orders Today',v:'12',c:'',color:'blue'},{l:'Picking',v:'3',c:'',color:'amber'},{l:'Packed Ready',v:'5',c:'',color:'green'},{l:'Shipped',v:'8',c:'100% on time',color:'green'},{l:'Backorders',v:'2',c:'',color:'red'}]},
+{title:'Customers',route:'/shipping/customers',table:{cols:['Code ↕','Name ↕','Contact','City','Orders','Status','Actions'],rows:[['CUST-001','Tesco','buyer@tesco.com','London','45','●Active','✏️ ⋮'],['CUST-002','Aldi','orders@aldi.com','Manchester','32','●Active','✏️ ⋮']]},buttons:['+ Add Customer|primary|modal:create-customer'],modals:['Create: code*, name*, contact, email, phone, billing_addr, ship_addrs[], allergen_restrictions[], payment_terms, credit_limit']},
+{title:'Customer Detail',route:'/shipping/customers/[id]',type:'tabs',tabsList:['General','Addresses','Allergen Rules','Order History','Notes']},
+{title:'Sales Orders',route:'/shipping/sales-orders',kpis:[{l:'Total',v:'156',c:'Month',color:'blue'},{l:'Confirmed',v:'12',c:'',color:'amber'},{l:'In Progress',v:'8',c:'',color:'blue'},{l:'Shipped',v:'136',c:'',color:'green'}],table:{cols:['SO # ↕','Customer ↕','Date','Delivery','Lines','Status','Total','Actions'],rows:[['SO-2451','Tesco','Dec 14','Dec 17','5','●Confirmed','£12,500','✏️ ⋮'],['SO-2450','Aldi','Dec 13','Dec 16','8','◉Picking','£8,750','✏️ ⋮'],['SO-2449','Green Valley','Dec 13','Dec 18','3','⬤Packing','£4,100','✏️ ⋮']]},buttons:['+ Create SO|primary|modal:create-so','Bulk Allocate|secondary','Export|secondary'],modals:['Create SO: customer*→auto addr, delivery_date*, lines:[product,qty,price], ship_addr, customer_po, notes','Confirm/Hold/Cancel/Clone SO: reason required for hold/cancel']},
+{title:'SO Detail',route:'/shipping/sales-orders/[id]',notes:'Header + lines (ordered/allocated/picked/shipped/price). Status timeline: Draft→Confirmed→Allocated→Picking→Packed→Shipped→Delivered. Actions: Confirm, Allocate, Pick, Pack, Ship.'},
+{title:'Allocation',route:'/shipping/allocation',notes:'SO lines → Available LPs (FIFO/FEFO) → Allocate. Manual override. Allergen check.'},
+{title:'Pick Lists',route:'/shipping/pick-lists',table:{cols:['Pick #','SO(s)','Lines','Status','Picker','Actions'],rows:[['PL-89','SO-2450','8','●In Progress','Anna','👁'],['PL-90','SO-2451','5','○Pending','—','▶']]},buttons:['+ Create Pick|primary|modal:create-pick','Wave|secondary'],modals:['Create Pick List: select SOs → optimize route']},
+{title:'Wave Picking',route:'/shipping/wave-picking',notes:'Batch SOs into waves. Optimize routes. Status tracking.'},
+{title:'Pick Desktop',route:'/shipping/pick-desktop',notes:'Desktop picking: location→LP→qty→confirm each line. Short pick modal.'},
+{title:'Packing Station',route:'/shipping/packing-station',notes:'Scan SO → scan items → box → weigh → SSCC → label → close → next. Packing slip + BOL.'},
+{title:'Shipments',route:'/shipping/shipments',table:{cols:['Ship #','Customer','Carrier','Boxes','Status','Tracking','Actions'],rows:[['SHP-412','Tesco','DHL','4','✓Shipped','DHL-1234567','👁'],['SHP-413','Aldi','Own Fleet','2','●Ready','—','🚚']]},buttons:['Ship Selected|primary','Print BOL|secondary']},
+{title:'Shipment Detail',route:'/shipping/shipments/[id]',notes:'Boxes, items, SSCC labels, packing slip, BOL, tracking, POD.'},
+],
+npd:[
+{title:'Projects Board',route:'/npd/projects',type:'kanban',columns:['Ideation|2','Feasibility|1','Development|3','Validation|1','Launch|0']},
+{title:'Project Detail',route:'/npd/projects/[id]',notes:'Stage-gate timeline. Gate checklists. Team. Documents. Tasks. Budget. Actions: Advance Gate, Add Task, Upload.'},
+{title:'Formulations',route:'/npd/formulations',table:{cols:['Code','Product','Version','Status','Actions'],rows:[['FML-NEW-01','Spicy Nuggets','v2','○Draft','✏️ ⋮'],['FML-NEW-02','Veggie Burger','v1','●Active','✏️ ⋮']]},buttons:['+ Create|primary']},
+{title:'Editor',route:'/npd/formulations/editor',notes:'Ingredients: add/remove/reorder. Qty, %, cost. Auto-calc: nutrition, allergens. Preview label.'},
+{title:'Versions',route:'/npd/formulations/[id]/versions',notes:'Vertical timeline v1→v2→v3. Changes, who, date, approval. Click to compare.'},
+{title:'Costing',route:'/npd/formulations/[id]/costing',notes:'Breakdown: ingredients + labor + overhead + packaging = total. Margin calc.'},
+{title:'Compare',route:'/npd/formulations/[id]/compare',notes:'Side-by-side v1 vs v2. Highlight: added(green), removed(red), changed(amber).'},
+{title:'Risk Register',route:'/npd/risk-register',notes:'Probability×Impact matrix. Items plotted. Colors. Actions: mitigate/accept.'},
+{title:'Handoff Wizard',route:'/npd/handoff',type:'wizard',steps:['Select Formulation','Generate BOM','Create Routing','Define QC Spec','Set Pricing','Assign Line','Get Approval','Launch']},
+],
+finance:[
+{title:'Finance Dashboard',route:'/finance',kpis:[{l:'Cost MTD',v:'£145K',c:'↑ 5%',color:'blue'},{l:'Cost/kg',v:'£3.42',c:'↓ 2%',color:'green'},{l:'Material Var.',v:'-£2.1K',c:'Favorable',color:'green'},{l:'Labor Var.',v:'+£800',c:'Unfavorable',color:'red'},{l:'Margin',v:'32%',c:'Target: 35%',color:'amber'}]},
+{title:'Standard Costs',route:'/finance/standard-costs',table:{cols:['Product','Material','Labor','Overhead','Total','Actions'],rows:[['Chicken Nuggets','£3.02','£0.45','£0.18','£3.65','✏️'],['Fish Fingers','£2.15','£0.35','£0.15','£2.65','✏️']]},buttons:['Update Costs|primary|modal:update-costs'],modals:['Update: product, material, labor, overhead, effective_from']},
+{title:'BOM Costing',route:'/finance/bom-costing',notes:'BOM tree with costs. Cost simulation: what-if analysis.'},
+{title:'Inventory Valuation',route:'/finance/inventory-valuation',notes:'By warehouse/product. Method: FIFO/Weighted Avg. Aged buckets.'},
+{title:'Currency',route:'/finance/currency',table:{cols:['Currency','Rate','Date','Actions'],rows:[['EUR','0.86','Dec 15','✏️'],['USD','0.79','Dec 15','✏️']]},buttons:['+ Update|primary']},
+{title:'Material Variance',route:'/finance/material-variance',table:{cols:['WO','Product','Planned','Actual','Variance','%'],rows:[['WO-143','Nuggets','£1,510','£1,485','-£25','-1.7% ✓'],['WO-141','Sausages','£890','£920','+£30','+3.4% ⚠️']]},notes:'Drill by material within WO.'},
+{title:'Labor Variance',route:'/finance/labor-variance',table:{cols:['WO','Plan Hrs','Actual','Plan Cost','Actual','Var.'],rows:[['WO-143','4.0','4.5','£80','£90','+£10'],['WO-141','3.0','2.8','£60','£56','-£4']]}},
+{title:'Variance Dashboard',route:'/finance/variance-dashboard',notes:'Real-time total variance. Trend. Alerts. Drill-down.'},
+{title:'Drill-Down',route:'/finance/variance-drill-down',notes:'Multi-dim: material→WO→operation→period. Pivot table.'},
+{title:'Reports',route:'/finance/reports',notes:'P&L by line, Cost/kg, Waste cost, Month-end, YoY. PDF/Excel.'},
+{title:'Margin Analysis',route:'/finance/margin-analysis',notes:'Price - COGS - overhead = margin per product. Sort by margin %.'},
+{title:'Cost Centers',route:'/finance/cost-centers',notes:'Department budget vs actual. Monthly breakdown.'},
+{title:'Budget',route:'/finance/budget',notes:'Set by dept × month. Track. Forecast.'},
+{title:'Comarch',route:'/finance/comarch',notes:'Field mapping, sync direction, schedule, test, logs.'},
+],
+oee:[
+{title:'OEE Dashboard',route:'/oee',kpis:[{l:'OEE',v:'84%',c:'Target: 85%',color:'amber'},{l:'Availability',v:'92%',c:'',color:'green'},{l:'Performance',v:'88%',c:'',color:'green'},{l:'Quality',v:'96%',c:'',color:'green'},{l:'Downtime',v:'45 min',c:'3 events',color:'amber'}],notes:'Machine cards with gauges. Green>85%, Amber 60-85%, Red<60%. Auto-refresh 10s.'},
+{title:'Downtime Events',route:'/oee/downtime',table:{cols:['Machine','Start','End','Duration','Category','Reason','Actions'],rows:[['Mixer A','14:22','14:45','23 min','Plant','Jam','✏️'],['Former B','10:00','10:15','15 min','People','Break','✏️']]},buttons:['+ Log|primary|modal:log-dt'],modals:['Log: machine*, start*, end, category*(People/Process/Plant), reason*, notes']},
+{title:'Settings',route:'/oee/settings',notes:'Targets per machine. Reason codes config. Shift times. Alerts.'},
+{title:'Shift Reports',route:'/oee/shift-reports',notes:'Line+shift+date → report: OEE, output, downtime, quality. PDF.'},
+{title:'Energy',route:'/oee/energy',notes:'kWh per machine/product/shift. Trends. Cost. Carbon.'},
+{title:'Trends',route:'/oee/trends',notes:'12-month rolling OEE. Compare machines/lines/products.'},
+{title:'Heatmap',route:'/oee/heatmap',notes:'Hours×Days utilization heatmap. Peak/off-peak.'},
+{title:'Pareto',route:'/oee/pareto',notes:'Top reasons by minutes. 80/20 line. Filter.'},
+{title:'Performance',route:'/oee/performance',notes:'Speed losses, micro-stops, idle time. Bottleneck ID.'},
+],
+integrations:[
+{title:'Dashboard',route:'/integrations',kpis:[{l:'Connected',v:'3',c:'',color:'green'},{l:'Errors 24h',v:'2',c:'',color:'red'},{l:'Webhooks',v:'5',c:'',color:'blue'},{l:'API Calls',v:'1,245',c:'Today',color:'blue'}]},
+{title:'API Keys',route:'/integrations/api-keys',table:{cols:['Name','Prefix','Permissions','Last Used','Actions'],rows:[['Production','mp_prod_...','Full','2h ago','⋮'],['Read-Only','mp_read_...','Read','1d ago','⋮']]},buttons:['+ Create|primary']},
+{title:'Logs',route:'/integrations/logs',table:{cols:['Time','System','Direction','Status','Size','Actions'],rows:[['14:32','Comarch','Out','✓','2.1 KB','👁'],['14:28','Webhook','Out','✗Failed','1.5 KB','🔄']]},buttons:['Export|secondary']},
+{title:'Webhooks',route:'/integrations/webhooks',notes:'URL, events, retry policy, headers, test.'},
+{title:'Export',route:'/integrations/export',notes:'Entity → Format (CSV/JSON/Excel) → Filters → Download.'},
+{title:'Supplier Portal',route:'/integrations/supplier-portal',notes:'What suppliers see. Access management.'},
+{title:'Customer Portal',route:'/integrations/customer-portal',notes:'Order tracking, COA access. Branding.'},
+{title:'EDI',route:'/integrations/edi',table:{cols:['#','Type','Direction','Partner','Status','Date'],rows:[['EDI-001','PO','Out','FoodCo','✓Sent','Dec 15'],['EDI-002','ASN','In','FoodCo','✓Rcvd','Dec 14']]},buttons:['Send|primary','Import|secondary']},
+{title:'Import Templates',route:'/integrations/import-templates',notes:'Column defs, validation, transformations. Reusable.'},
+{title:'Retry / DLQ',route:'/integrations/retry-dlq',table:{cols:['Message','System','Error','Attempts','Actions'],rows:[['Webhook #45','Comarch','Timeout','3/5','🔄 | 🗑']]},notes:'Dead letter queue.'},
+{title:'Comarch',route:'/integrations/comarch',notes:'Field mapping, sync, schedule, test, logs.'},
+{title:'Builder',route:'/integrations/builder',notes:'Drag-and-drop: Trigger→Transform→Send. No-code.'},
+],
+reporting:[
+{title:'Factory Overview',route:'/reporting/factory-overview',kpis:[{l:'Volume',v:'12,450 kg',c:'↑ 8%',color:'green'},{l:'Yield',v:'91.2%',c:'↑ 0.5%',color:'green'},{l:'OEE',v:'84%',c:'↓ 1%',color:'amber'},{l:'Waste',v:'2.8%',c:'↓ 0.3%',color:'green'},{l:'Orders',v:'42',c:'↑ 5',color:'green'}],notes:'Time: Day|Week|Period|Year. 13-week trend + line breakdown + gains/losses.'},
+{title:'Yield by Line',route:'/reporting/yield-by-line',table:{cols:['Line','Yield %','vs Target','Trend','Grade','Volume'],rows:[['Line 1','93.2%','↑ +1.2%','📈','A','4,200 kg'],['Line 2','89.5%','↓ -0.5%','📉','B','3,800 kg'],['Line 3','87.1%','↑ +0.8%','📈','C','2,100 kg']]},notes:'Sparklines per row. Click to drill.'},
+{title:'Yield by SKU',route:'/reporting/yield-by-sku',notes:'Product × Period matrix. Expected vs actual.'},
+{title:'Giveaway',route:'/reporting/giveaway',notes:'Overweight analysis by product/line/shift. Cost. Trends.'},
+{title:'Leader Scorecard',route:'/reporting/leader-scorecard',notes:'KPI radar: yield, waste, downtime, output, quality. A/B/C/D. League table.'},
+{title:'Team Comparison',route:'/reporting/team-comparison',notes:'Shift/team comparison. Savings calculator. Gap analysis.'},
+{title:'Period Reports',route:'/reporting/period-reports',notes:'4-4-5 fiscal. YoY comparison. Auto-generated. PDF/Excel.'},
+{title:'Daily Issues',route:'/reporting/daily-issues',notes:'Top 3: downtime, quality, material. Resolution tracking.'},
+{title:'Shift Performance',route:'/reporting/shift-performance',notes:'AM vs PM. By line. Output, yield, waste, downtime.'},
+{title:'Hourly Grids',route:'/reporting/hourly-grids',notes:'Dense grid (Explitia-style): Lines×Hours×Shifts. Color: green/amber/red/white.'},
+],
+multisite:[
+{title:'Sites',route:'/multi-site/sites',table:{cols:['Code','Name','Address','Modules','Users','Status'],rows:[['FORZ','Forza Plant','Manchester','All','28','●Active'],['KOBE','Kobe Site','Birmingham','Prod+WH','12','●Active']]},buttons:['+ Add Site|primary']},
+{title:'Site Selector',route:'/multi-site/selector',notes:'Global dropdown: select site. All data filtered. "(All Sites)" option.'},
+{title:'Cross-Site Reports',route:'/multi-site/cross-reports',notes:'Compare sites: volume, yield, OEE, costs. Side-by-side.'},
+{title:'Inter-Site Transfers',route:'/multi-site/transfers',notes:'Transfer orders between sites. In-transit tracking.'},
+],
+maintenance:[
+{title:'Dashboard',route:'/maintenance',kpis:[{l:'Open Requests',v:'8',c:'3 urgent',color:'amber'},{l:'PM Due 7d',v:'5',c:'',color:'blue'},{l:'Health',v:'94%',c:'',color:'green'},{l:'MTBF',v:'120 hrs',c:'↑ 5%',color:'green'},{l:'MTTR',v:'45 min',c:'↓ 10%',color:'green'}]},
+{title:'Work Requests',route:'/maintenance/work-requests',table:{cols:['#','Equipment','Priority','Reporter','Status','Actions'],rows:[['MR-45','Mixer A','Urgent','John','●Open','✏️ ⋮'],['MR-44','Oven C','Normal','Anna','◉In Progress','✏️ ⋮']]},buttons:['+ Create|primary|modal:create-mr'],modals:['Create: equipment*, priority, description*, photo']},
+{title:'Preventive PM',route:'/maintenance/preventive',notes:'Equipment × interval matrix. Calendar. Auto-generate. History.'},
+{title:'Spare Parts',route:'/maintenance/spare-parts',table:{cols:['Part #','Description','Equipment','Stock','Min','Actions'],rows:[['SP-001','Mixer Blade','Mixer A','3','2','✏️'],['SP-002','Belt','Former B','1','1','⚠️']]},buttons:['+ Add|primary']},
+{title:'Equipment',route:'/maintenance/equipment',table:{cols:['Code','Name','Type','Line','Last PM','Next PM','Status'],rows:[['EQ-001','Mixer A','Mixer','Line 1','Dec 1','Dec 15','●OK'],['EQ-002','Oven C','Oven','Line 1','Nov 28','Dec 28','●OK']]},buttons:['+ Add|primary'],notes:'Detail: specs, history, parts, downtime, docs.'},
+],
+};
+
+// === RENDER ===
+function renderSidebar(){let h='<div class="sidebar-logo">🏭 MonoPilot <span>v1.0</span></div>';let g='';MODULES.forEach(m=>{if(m.group!==g){h+=`<div class="sidebar-group">${m.group}</div>`;g=m.group}h+=`<div class="sidebar-item" id="nav-${m.id}" onclick="showModule('${m.id}')">${m.icon} <span>${m.label}</span></div>`;if(P[m.id]&&P[m.id].length>1){h+=`<div class="sidebar-sub" id="sub-${m.id}">`;P[m.id].forEach((p,i)=>h+=`<div class="sidebar-subitem" onclick="event.stopPropagation();showPage('${m.id}',${i})">${p.title}</div>`);h+='</div>'}});document.getElementById('sidebar').innerHTML=h}
+
+function rKpis(k){if(!k||!k.length)return '';return `<div class="kpi-row">${k.map(x=>`<div class="kpi ${x.color}"><div class="kpi-label">${x.l}</div><div class="kpi-value">${x.v}</div><div class="kpi-change"><span class="badge badge-${x.color}">${x.c}</span></div></div>`).join('')}</div>`}
+
+function rTable(t){if(!t)return '';return `<div style="overflow-x:auto"><table><thead><tr>${t.cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead><tbody>${t.rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div><div class="text-xs text-muted" style="padding:6px 0">Showing ${t.rows.length} of ${t.rows.length+Math.floor(Math.random()*80)} · Page 1 of ${1+Math.floor(Math.random()*5)}</div>`}
+
+function rFields(f){if(!f||!f.length)return '';return `<div class="form-grid">${f.map(x=>{let[l,t,p]=x.split('|');let req=l.includes('*');if(t==='toggle')return `<div class="form-field"><label class="form-label">${l.replace('*','')}${req?' <span class="req">*</span>':''}</label><div style="display:flex;gap:8px;align-items:center"><div style="width:36px;height:20px;background:${p==='ON'?'var(--green)':'#cbd5e1'};border-radius:10px;position:relative"><div style="width:16px;height:16px;background:#fff;border-radius:50%;position:absolute;top:2px;${p==='ON'?'right:2px':'left:2px'}"></div></div><span class="text-xs text-muted">${p}</span></div></div>`;if(t==='select')return `<div class="form-field"><label class="form-label">${l.replace('*','')}${req?' <span class="req">*</span>':''}</label><select class="form-input"><option>${p}</option></select></div>`;return `<div class="form-field"><label class="form-label">${l.replace('*','')}${req?' <span class="req">*</span>':''}</label><input class="form-input" type="${t||'text'}" placeholder="${p||''}"></div>`}).join('')}</div>`}
+
+function rBtns(b){if(!b||!b.length)return '';return `<div class="flex gap-2" style="flex-wrap:wrap;margin:8px 0">${b.map(x=>{let[l,t,m]=x.split('|');if(t==='link')return `<a href="#" style="font-size:12px;color:var(--blue)">${l}</a>`;let c=t==='primary'?'btn-primary':t==='danger'?'btn-danger':t==='success'?'btn-success':'btn-secondary';let oc=m?` onclick="openModal('${m}')"`:'';let badge=m?' <span class="badge-modal">📋</span>':'';return `<button class="btn ${c}"${oc}>${l}</button>${badge}`}).join('')}</div>`}
+
+function rModals(m){if(!m||!m.length)return '';return `<div class="mt-2"><div class="text-xs font-bold mb-2" style="color:var(--blue)">📋 Modals:</div>${m.map(x=>`<div class="alert alert-blue" style="font-size:11px;padding:5px 10px">${x}</div>`).join('')}</div>`}
+
+function rPage(p){let h=`<div class="page-block"><div class="page-block-title">${p.title} <span class="page-block-route">${p.route}</span></div>`;
+h+=rKpis(p.kpis);h+=rBtns(p.buttons);
+if(p.type==='cards'&&p.cards)h+=`<div class="grid-3">${p.cards.map(c=>{let[t,d]=c.split('|');return `<div class="card" style="cursor:pointer"><div class="card-title">${t}</div><div class="text-sm text-muted">${d}</div></div>`}).join('')}</div>`;
+if(p.type==='wizard'&&p.steps)h+=`<div class="card">${p.steps.map((s,i)=>`<div class="scanner-step"><div class="num">${i+1}</div>${s}</div>`).join('')}</div>`;
+if(p.type==='toggles'&&p.toggles)h+=`<div class="card">${p.toggles.map(t=>{let[n,d,s]=t.split('|');return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)"><div><div style="font-weight:500">${n}</div><div class="text-xs text-muted">${d}</div></div><div style="width:36px;height:20px;background:${s==='ON'?'var(--green)':'#cbd5e1'};border-radius:10px;cursor:pointer;position:relative"><div style="width:16px;height:16px;background:#fff;border-radius:50%;position:absolute;top:2px;${s==='ON'?'right:2px':'left:2px'}"></div></div></div>`}).join('')}</div>`;
+if(p.type==='tree'&&p.tree)h+=`<div class="card">${p.tree.map(t=>{let[x,l]=t.split('|');return `<div class="tree-item ${l||'l0'}">${x.trim()}</div>`}).join('')}</div>`;
+if(p.type==='tabs'&&p.tabsList)h+=`<div class="tabs">${p.tabsList.map((t,i)=>`<div class="tab ${i===0?'active':''}">${t}</div>`).join('')}</div>`;
+if(p.type==='scanner-home'&&p.scannerCards)h+=`<div class="grid-4">${p.scannerCards.map(c=>{let[i,l,d]=c.split('|');return `<div class="scanner-card"><div class="icon">${i}</div><div class="label">${l}</div><div class="text-xs text-muted mt-2">${d}</div></div>`}).join('')}</div>`;
+if(p.type==='scanner-flow'&&p.steps)h+=`<div class="card" style="max-width:400px">${p.steps.map((s,i)=>`<div class="scanner-step"><div class="num">${i+1}</div>${s}</div>`).join('')}<div class="mt-3"><button class="btn btn-primary" style="width:100%;padding:12px;font-size:16px">Confirm</button></div></div>`;
+if(p.type==='kanban'&&p.columns)h+=`<div class="kanban">${p.columns.map(c=>{let[t,n]=c.split('|');return `<div class="kanban-col"><div class="kanban-col-title">${t} <span class="badge badge-gray">${n}</span></div><div class="kanban-card">Sample Item<br><span class="text-xs text-muted">Due: Dec 20</span></div></div>`}).join('')}</div>`;
+if(p.type==='bom-tree')h+=`<div class="card"><div class="card-title">BOM Explosion</div><div class="tabs"><div class="tab active">v3 Active</div><div class="tab">v2 Archived</div></div><table><thead><tr><th>Component</th><th>Lvl</th><th>Type</th><th>Qty</th><th>Cumul.</th><th>Scrap%</th><th>Cost</th><th>Total</th></tr></thead><tbody><tr><td><b>Chicken Breast</b></td><td><span class="badge badge-blue">L1</span></td><td><span class="badge badge-amber">RM</span></td><td>0.45kg</td><td>0.45</td><td>2%</td><td>£5.20</td><td>£2.34</td></tr><tr><td><b>Wheat Flour</b></td><td><span class="badge badge-blue">L1</span></td><td><span class="badge badge-amber">RM</span></td><td>0.15kg</td><td>0.15</td><td>1%</td><td>£0.80</td><td>£0.12</td></tr><tr><td style="padding-left:24px">Wheat Grain</td><td><span class="badge badge-gray">L2</span></td><td><span class="badge badge-amber">RM</span></td><td>0.18kg</td><td>0.18</td><td>15%</td><td>£0.45</td><td>£0.08</td></tr><tr><td><b>1kg Carton</b></td><td><span class="badge badge-blue">L1</span></td><td><span class="badge badge-green">PKG</span></td><td>1 pcs</td><td>1</td><td>0%</td><td>£0.25</td><td>£0.25</td></tr></tbody></table><div class="card mt-2" style="background:#f8fafc"><b>Summary:</b> Material £3.02 + Labor £0.45 + Overhead £0.18 = <b>Total £3.65</b></div></div>`;
+if(p.type==='matrix')h+=`<div class="card"><table><thead><tr><th>Product</th><th>🌾</th><th>🥚</th><th>🐟</th><th>🥛</th><th>🥜</th></tr></thead><tbody><tr><td>Chicken Nuggets</td><td>●</td><td>●</td><td>○</td><td>●</td><td>○</td></tr><tr><td>Fish Fingers</td><td>●</td><td>○</td><td>●</td><td>○</td><td>○</td></tr></tbody></table><div class="text-xs text-muted mt-2">● Contains | ◐ May Contain | ○ Free</div></div>`;
+if(p.type==='grid')h+=`<div class="card"><div class="text-sm">${p.notes||''}</div></div>`;
+h+=rTable(p.table);h+=rFields(p.fields);h+=rModals(p.modals);
+if(p.notes&&p.type!=='grid')h+=`<div class="alert alert-blue mt-2"><b>Details:</b> ${p.notes}</div>`;
+h+='</div>';return h}
+
+function renderModule(id){let pages=P[id];if(!pages)return '<div class="card">Module not defined.</div>';let m=MODULES.find(x=>x.id===id);let h=`<div class="page-title">${m.icon} ${m.label}</div><div class="breadcrumb"><a href="#" onclick="showModule('dashboard')">Home</a> / ${m.label} <span class="badge badge-gray">${pages.length} pages</span></div>`;h+=pages.map(p=>rPage(p)).join('');return h}
+
+let cur='dashboard';
+function showModule(id){cur=id;document.querySelectorAll('.sidebar-item').forEach(e=>e.classList.remove('active'));document.querySelectorAll('.sidebar-sub').forEach(e=>e.classList.remove('open'));let n=document.getElementById('nav-'+id);if(n)n.classList.add('active');let s=document.getElementById('sub-'+id);if(s)s.classList.add('open');document.getElementById('main').innerHTML=renderModule(id);window.scrollTo(0,0)}
+function showPage(mid,i){cur=mid;document.querySelectorAll('.sidebar-item').forEach(e=>e.classList.remove('active'));let n=document.getElementById('nav-'+mid);if(n)n.classList.add('active');let s=document.getElementById('sub-'+mid);if(s)s.classList.add('open');let m=MODULES.find(x=>x.id===mid);let p=P[mid][i];let h=`<div class="page-title">${m.icon} ${p.title}</div><div class="breadcrumb"><a href="#" onclick="showModule('dashboard')">Home</a> / <a href="#" onclick="showModule('${mid}')">${m.label}</a> / ${p.title}</div>`;h+=rPage(p);document.getElementById('main').innerHTML=h;window.scrollTo(0,0)}
+function openModal(id){let o=document.getElementById('modal-overlay');document.getElementById('modal-title-text').textContent=id.replace('modal:','').replace(/-/g,' ').replace(/\b\w/g,l=>l.toUpperCase());document.getElementById('modal-body').innerHTML=`<div class="form-grid"><div class="form-field"><label class="form-label">Field 1 <span class="req">*</span></label><input class="form-input" placeholder="Required"></div><div class="form-field"><label class="form-label">Field 2</label><input class="form-input" placeholder="Optional"></div><div class="form-field"><label class="form-label">Select</label><select class="form-input"><option>Option 1</option></select></div><div class="form-field"><label class="form-label">Notes</label><textarea class="form-input" rows="2" placeholder="Notes..."></textarea></div></div><div class="flex gap-2 justify-between mt-3"><button class="btn btn-secondary" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="closeModal()">Save</button></div><div class="text-xs text-muted mt-2">Generic modal preview. See page details for exact fields.</div>`;o.classList.add('open')}
+function closeModal(){document.getElementById('modal-overlay').classList.remove('open')}
+
+renderSidebar();showModule('dashboard');
+
+// Stats bar
+let tp=0,tm=0,tf=0,tb=0;Object.values(P).forEach(pp=>{tp+=pp.length;pp.forEach(p=>{if(p.modals)tm+=p.modals.length;if(p.fields)tf+=p.fields.length;if(p.buttons)tb+=p.buttons.length})});
+let sb=document.createElement('div');sb.style.cssText='position:fixed;top:0;left:220px;right:0;z-index:50;background:#1e293b;color:#fff;padding:6px 20px;font-size:12px;display:flex;gap:16px;align-items:center';
+sb.innerHTML=`<b>MonoPilot Site Map</b> | 📄 ${tp} Pages | 📋 ${tm} Modals | 📝 ${tf} Fields | 🔘 ${tb} Buttons | 📦 ${MODULES.length} Modules <span style="margin-left:auto;color:#94a3b8">Complete UI Map v1.0 — 2026-02-18</span>`;
+document.body.appendChild(sb);
+</script>
+</body>
+</html>

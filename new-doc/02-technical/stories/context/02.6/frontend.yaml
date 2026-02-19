@@ -1,0 +1,430 @@
+# Story 02.6 - Frontend Specification
+# Purpose: Components, pages, services, hooks
+# Agent: FRONTEND-DEV
+
+# TypeScript Types
+types:
+  - path: "apps/frontend/lib/types/bom-clone.ts"
+    description: "BOM clone types"
+    exports:
+      - "CloneBOMRequest"
+      - "CloneBOMResponse"
+
+  - path: "apps/frontend/lib/types/bom-alternative.ts"
+    description: "BOM alternative types"
+    exports:
+      - "BOMAlternative"
+      - "AlternativesListResponse"
+      - "CreateAlternativeRequest"
+      - "UpdateAlternativeRequest"
+      - "AlternativeResponse"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/bom-clone-service.ts"
+    description: "BOM clone service"
+    functions:
+      - name: "cloneBOM"
+        description: "Clone BOM to target product"
+        params: "sourceBomId: string, options: CloneBOMRequest"
+        returns: "Promise<CloneBOMResponse>"
+
+      - name: "getNextVersion"
+        description: "Get next available version for product"
+        params: "productId: string"
+        returns: "Promise<number>"
+
+      - name: "validateCloneTarget"
+        description: "Validate no date overlap for target"
+        params: "productId: string, effectiveFrom: string, effectiveTo: string | null"
+        returns: "Promise<{ valid: boolean; error?: string }>"
+
+  - path: "apps/frontend/lib/services/bom-alternatives-service.ts"
+    description: "BOM alternatives service"
+    functions:
+      - name: "getAlternatives"
+        description: "Get alternatives for BOM item"
+        params: "bomId: string, itemId: string"
+        returns: "Promise<AlternativesListResponse>"
+
+      - name: "createAlternative"
+        description: "Add alternative to item"
+        params: "bomId: string, itemId: string, data: CreateAlternativeRequest"
+        returns: "Promise<AlternativeResponse>"
+
+      - name: "updateAlternative"
+        description: "Update alternative"
+        params: "bomId: string, itemId: string, altId: string, data: UpdateAlternativeRequest"
+        returns: "Promise<AlternativeResponse>"
+
+      - name: "deleteAlternative"
+        description: "Delete alternative"
+        params: "bomId: string, itemId: string, altId: string"
+        returns: "Promise<void>"
+
+      - name: "validateAlternativeRules"
+        description: "Validate alternative business rules"
+        params: "primaryItem: BOMItem, alternativeProductId: string, excludeAltId?: string"
+        returns: "Promise<{ valid: boolean; error?: string; warning?: string }>"
+
+# Components
+components:
+  - path: "apps/frontend/components/technical/bom/BOMCloneModal.tsx"
+    description: "Modal for cloning BOM to same or different product"
+    props:
+      - "sourceBom: BOM - Source BOM to clone"
+      - "open: boolean - Modal open state"
+      - "onOpenChange: (open: boolean) => void"
+      - "onSuccess: (newBom: BOM) => void"
+    features:
+      - "Target product selector (Combobox)"
+      - "Mode toggle: Same Product vs Different Product"
+      - "Version preview (auto-calculated)"
+      - "Effective date pickers"
+      - "Notes textarea"
+      - "Clone summary (items count, routing name)"
+      - "Loading state during clone"
+      - "Error display for validation failures"
+    states:
+      - "default - Form with target product selector"
+      - "loading - Spinner while cloning"
+      - "error - Error message with retry"
+      - "success - Toast notification, modal closes"
+    wireframe_ref: "TEC-005 (Clone action), TEC-006 (BOM Modal pattern)"
+
+  - path: "apps/frontend/components/technical/bom/BOMAlternativeModal.tsx"
+    description: "Modal for adding/editing alternative ingredient"
+    props:
+      - "bomId: string - BOM ID"
+      - "primaryItem: BOMItem - Primary BOM item"
+      - "bomProductId: string - BOM output product ID (for circular ref check)"
+      - "existingAlternatives: BOMAlternative[] - Current alternatives"
+      - "alternative?: BOMAlternative - For edit mode"
+      - "open: boolean"
+      - "onOpenChange: (open: boolean) => void"
+      - "onSuccess: (alternative: BOMAlternative) => void"
+    features:
+      - "Primary item info display (read-only)"
+      - "Alternative product selector (Combobox, filtered by same type)"
+      - "Quantity input with decimal support"
+      - "UoM display (from selected product)"
+      - "Preference order input (min 2)"
+      - "Notes textarea"
+      - "Validation error display"
+      - "UoM mismatch warning"
+    states:
+      - "create - Empty form"
+      - "edit - Pre-populated form"
+      - "loading - Saving"
+      - "error - Validation errors"
+    wireframe_ref: "TEC-006a (Add Alternative Modal)"
+
+  - path: "apps/frontend/components/technical/bom/BOMAlternativesManager.tsx"
+    description: "Component to manage all alternatives for an item"
+    props:
+      - "bomId: string"
+      - "item: BOMItem"
+      - "bomProductId: string"
+      - "onUpdate: () => void - Callback to refresh parent"
+    features:
+      - "List of alternatives with preference order"
+      - "Add alternative button"
+      - "Edit/delete actions per alternative"
+      - "Preference reordering"
+      - "Empty state message"
+    wireframe_ref: "TEC-006a (Alternatives sub-row display)"
+
+  - path: "apps/frontend/components/technical/bom/AlternativeRow.tsx"
+    description: "Single alternative sub-row display"
+    props:
+      - "alternative: BOMAlternative"
+      - "onEdit: (alt: BOMAlternative) => void"
+      - "onDelete: (altId: string) => void"
+      - "canEdit: boolean"
+    features:
+      - "Display format: ALT: {code} {name} ({qty} {uom}) - Priority {N}"
+      - "Edit button"
+      - "Delete button with confirmation"
+      - "Notes tooltip if present"
+    wireframe_ref: "TEC-006a (Alternative sub-row)"
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-bom-clone.ts"
+    description: "React Query hook for BOM clone operations"
+    exports:
+      - name: "useBOMClone"
+        returns: "UseMutationResult<CloneBOMResponse, Error, CloneBOMRequest>"
+        description: "Mutation hook for cloning BOM"
+      - name: "useNextVersion"
+        returns: "UseQueryResult<number>"
+        params: "productId: string"
+        description: "Query hook for next available version"
+
+  - path: "apps/frontend/lib/hooks/use-bom-alternatives.ts"
+    description: "React Query hooks for BOM alternatives"
+    exports:
+      - name: "useBOMAlternatives"
+        returns: "UseQueryResult<AlternativesListResponse>"
+        params: "bomId: string, itemId: string"
+        description: "Query hook for alternatives list"
+      - name: "useCreateAlternative"
+        returns: "UseMutationResult<AlternativeResponse, Error, CreateAlternativeRequest>"
+        description: "Mutation hook for creating alternative"
+      - name: "useUpdateAlternative"
+        returns: "UseMutationResult<AlternativeResponse, Error, UpdateAlternativeRequest>"
+        description: "Mutation hook for updating alternative"
+      - name: "useDeleteAlternative"
+        returns: "UseMutationResult<void, Error, string>"
+        description: "Mutation hook for deleting alternative"
+
+# Page Updates
+page_updates:
+  - path: "apps/frontend/app/(authenticated)/technical/boms/page.tsx"
+    description: "BOMs list page - add clone action"
+    changes:
+      - "Add Clone button to row actions menu"
+      - "Integrate BOMCloneModal component"
+      - "Handle clone success (refresh list, show toast)"
+      - "Add keyboard shortcut Ctrl+D for clone"
+
+  - path: "apps/frontend/app/(authenticated)/technical/boms/[id]/page.tsx"
+    description: "BOM detail page - add clone action to header"
+    changes:
+      - "Add Clone button to page header actions"
+      - "Integrate BOMCloneModal component"
+      - "Handle clone success (navigate to new BOM)"
+
+  - path: "apps/frontend/app/(authenticated)/technical/boms/[id]/items/page.tsx"
+    description: "BOM items page - add alternatives display and management"
+    changes:
+      - "Show alternatives as sub-rows below each item"
+      - "Add '+ Add Alternative' link per item row"
+      - "Integrate BOMAlternativeModal for CRUD"
+      - "Show alternatives count badge on items"
+
+# Validation Schemas
+validation:
+  - path: "apps/frontend/lib/validation/bom-clone.ts"
+    schema: |
+      import { z } from 'zod';
+
+      export const cloneBOMSchema = z.object({
+        target_product_id: z.string().uuid("Select target product"),
+        effective_from: z.string()
+          .refine((val) => !val || !isNaN(Date.parse(val)), "Invalid date")
+          .refine((val) => {
+            if (!val) return true;
+            const date = new Date(val);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            return date >= today;
+          }, "Effective date cannot be in the past")
+          .optional(),
+        effective_to: z.string()
+          .refine((val) => !val || !isNaN(Date.parse(val)), "Invalid date")
+          .nullable()
+          .optional(),
+        status: z.enum(['draft', 'active']).default('draft'),
+        notes: z.string().max(2000).optional(),
+      }).refine((data) => {
+        if (data.effective_to && data.effective_from) {
+          return new Date(data.effective_to) >= new Date(data.effective_from);
+        }
+        return true;
+      }, {
+        message: "Effective To must be after Effective From",
+        path: ["effective_to"],
+      });
+
+  - path: "apps/frontend/lib/validation/bom-alternative.ts"
+    schema: |
+      import { z } from 'zod';
+
+      export const createAlternativeSchema = z.object({
+        alternative_product_id: z.string().uuid("Alternative component is required"),
+        quantity: z.number()
+          .positive("Quantity must be greater than 0")
+          .refine(val => {
+            const decimals = (val.toString().split('.')[1] || '').length;
+            return decimals <= 6;
+          }, "Maximum 6 decimal places allowed"),
+        uom: z.string().min(1, "Unit of measure is required"),
+        preference_order: z.number()
+          .int("Preference must be a whole number")
+          .min(2, "Preference must be 2 or higher (1 is reserved for primary)")
+          .optional(),
+        notes: z.string().max(500).nullable().optional(),
+      });
+
+      export const updateAlternativeSchema = z.object({
+        quantity: z.number()
+          .positive("Quantity must be greater than 0")
+          .refine(val => {
+            const decimals = (val.toString().split('.')[1] || '').length;
+            return decimals <= 6;
+          }, "Maximum 6 decimal places allowed")
+          .optional(),
+        uom: z.string().min(1).optional(),
+        preference_order: z.number().int().min(2).optional(),
+        notes: z.string().max(500).nullable().optional(),
+      });
+
+# UX Notes
+ux:
+  wireframes:
+    - id: "TEC-005"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-005-boms-list.md"
+      relevance: "Clone action in row actions (clipboard icon)"
+      components: ["BOMTable", "BOMCloneModal"]
+    - id: "TEC-006a"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-006a-bom-items-detail.md"
+      relevance: "Alternatives section, Add Alternative modal"
+      components: ["BOMItemsTable", "AlternativeRow", "BOMAlternativeModal"]
+
+  patterns:
+    table: "ShadCN DataTable with expandable sub-rows for alternatives"
+    modal: "ShadCN Dialog with form validation"
+    combobox: "ShadCN Combobox with product search and type filtering"
+    toast: "ShadCN Toast for success/error notifications"
+
+  states:
+    clone_modal:
+      - "default - Form with product selector"
+      - "same_product - Version auto-increment shown"
+      - "different_product - Version resets to 1"
+      - "validating - Checking date overlap"
+      - "loading - Clone in progress"
+      - "error - Validation or server error"
+      - "success - Toast, redirect to new BOM"
+
+    alternative_modal:
+      - "create - Empty form, primary item info shown"
+      - "edit - Pre-filled form"
+      - "validating - Type check in progress"
+      - "warning - UoM mismatch warning (not blocking)"
+      - "error - Validation error"
+      - "loading - Saving"
+      - "success - Toast, modal closes"
+
+    alternatives_display:
+      - "empty - No alternatives, show 'Add Alternative' only"
+      - "has_alternatives - Sub-rows below item row"
+      - "expanded - All alternatives visible"
+      - "edit_mode - Alternative modal open"
+
+  accessibility:
+    - "All modals: aria-labelledby for title, aria-describedby for description"
+    - "Clone button: aria-label='Clone BOM'"
+    - "Add Alternative link: aria-label='Add alternative for {item_name}'"
+    - "Alternative rows: aria-label='Alternative: {product_name}, Priority {N}'"
+    - "Keyboard: Escape closes modal, Tab navigates form fields"
+    - "Focus: Returns to trigger element on modal close"
+
+# Component Patterns
+component_patterns:
+  clone_modal_pattern: |
+    // BOMCloneModal.tsx - Key implementation pattern
+    import { useState } from 'react';
+    import { useForm } from 'react-hook-form';
+    import { zodResolver } from '@hookform/resolvers/zod';
+    import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+    import { ProductCombobox } from '@/components/technical/product/ProductCombobox';
+    import { cloneBOMSchema } from '@/lib/validation/bom-clone';
+    import { cloneBOM, getNextVersion } from '@/lib/services/bom-clone-service';
+
+    export function BOMCloneModal({ sourceBom, open, onOpenChange, onSuccess }) {
+      const [mode, setMode] = useState<'same' | 'different'>('same');
+      const [nextVersion, setNextVersion] = useState<number>(sourceBom.version + 1);
+
+      const form = useForm({
+        resolver: zodResolver(cloneBOMSchema),
+        defaultValues: {
+          target_product_id: sourceBom.product_id,
+          effective_from: new Date().toISOString().split('T')[0],
+          effective_to: null,
+          status: 'draft',
+          notes: '',
+        },
+      });
+
+      // When target product changes, fetch next version
+      const handleProductChange = async (productId: string) => {
+        form.setValue('target_product_id', productId);
+        const version = await getNextVersion(productId);
+        setNextVersion(version);
+        setMode(productId === sourceBom.product_id ? 'same' : 'different');
+      };
+
+      const onSubmit = async (data) => {
+        try {
+          const result = await cloneBOM(sourceBom.id, data);
+          onSuccess(result.bom);
+          onOpenChange(false);
+        } catch (error) {
+          form.setError('root', { message: error.message });
+        }
+      };
+
+      return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Clone BOM</DialogTitle>
+            </DialogHeader>
+            {/* Form implementation */}
+          </DialogContent>
+        </Dialog>
+      );
+    }
+
+  alternative_row_pattern: |
+    // AlternativeRow.tsx - Sub-row display pattern
+    import { TableCell, TableRow } from '@/components/ui/table';
+    import { Button } from '@/components/ui/button';
+    import { Badge } from '@/components/ui/badge';
+    import { Pencil, Trash2 } from 'lucide-react';
+
+    export function AlternativeRow({ alternative, onEdit, onDelete, canEdit }) {
+      return (
+        <TableRow className="bg-muted/50 border-l-4 border-l-primary/20">
+          <TableCell colSpan={2} className="pl-12">
+            <span className="text-sm text-muted-foreground">ALT:</span>
+            <span className="ml-2 font-mono text-sm">
+              {alternative.alternative_product_code}
+            </span>
+            <span className="ml-2 text-sm">
+              {alternative.alternative_product_name}
+            </span>
+          </TableCell>
+          <TableCell>
+            {alternative.quantity} {alternative.uom}
+          </TableCell>
+          <TableCell>
+            <Badge variant="outline">Priority {alternative.preference_order}</Badge>
+          </TableCell>
+          <TableCell>
+            {canEdit && (
+              <div className="flex gap-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => onEdit(alternative)}
+                  aria-label="Edit alternative"
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => onDelete(alternative.id)}
+                  aria-label="Delete alternative"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+          </TableCell>
+        </TableRow>
+      );
+    }

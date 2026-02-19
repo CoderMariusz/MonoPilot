@@ -1,0 +1,329 @@
+# Story 06.2 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/quality-hold-service.test.ts"
+    type: "unit"
+    description: "Unit tests for quality-hold-service"
+  - path: "apps/frontend/lib/validation/__tests__/quality-hold.test.ts"
+    type: "unit"
+    description: "Unit tests for Zod schemas"
+  - path: "apps/frontend/app/api/v1/quality/holds/__tests__/route.test.ts"
+    type: "integration"
+    description: "Integration tests for API endpoints"
+  - path: "supabase/tests/quality-holds-rls.test.sql"
+    type: "integration"
+    description: "RLS policy tests for multi-tenant isolation"
+  - path: "apps/frontend/e2e/quality-holds.spec.ts"
+    type: "e2e"
+    description: "E2E tests for hold lifecycle with Playwright"
+
+# Acceptance Criteria (from story)
+acceptance_criteria:
+  # Hold Creation
+  - id: "AC-2.1"
+    given: "user is on Quality Holds list page"
+    when: "user clicks [+ Create Hold] button"
+    then: "Create Hold modal opens within 200ms"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-2.2"
+    given: "user is creating a hold"
+    when: "user enters reason 'Failed metal detection test' and selects hold_type 'investigation' and priority 'high'"
+    then: "form validates successfully"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-2.3"
+    given: "user has selected hold parameters"
+    when: "user clicks [Add Items] and selects 3 license plates"
+    then: "items table shows 3 rows with LP numbers, current location, and quantity"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-2.4"
+    given: "user has completed hold form"
+    when: "user clicks [Create Hold]"
+    then: "hold saved with auto-generated hold_number format 'QH-YYYYMMDD-NNNN' (e.g., 'QH-20251216-0001'), status 'active', held_by current user ID, held_at current timestamp"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-2.5"
+    given: "hold creation succeeds"
+    when: "response received"
+    then: "toast notification shows 'Hold QH-20251216-0001 created successfully' and user redirected to Hold Detail page"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-2.6"
+    given: "user tries to create hold without reason"
+    when: "[Create Hold] clicked"
+    then: "validation error 'Reason is required' displays under reason field"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-2.7"
+    given: "user tries to create hold without selecting items"
+    when: "[Create Hold] clicked"
+    then: "validation error 'At least one item must be added to the hold' displays"
+    test_type: "unit"
+    priority: "P0"
+
+  # Hold Detail View
+  - id: "AC-2.8"
+    given: "user navigates to Hold Detail page"
+    when: "page loads"
+    then: "hold details display within 500ms showing: hold_number, status badge, priority badge, reason, hold_type, held_by user name, held_at timestamp, and items table"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-2.9"
+    given: "hold has 5 items (3 LPs, 2 WOs)"
+    when: "items table renders"
+    then: "each row shows: reference_type icon, reference_id (clickable link), quantity_held, uom, location_id (if LP), and notes"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-2.10"
+    given: "hold status is 'active'"
+    when: "detail page loads"
+    then: "[Release Hold] button visible in header, [Edit] and [Delete] buttons visible (if user has permission)"
+    test_type: "e2e"
+    priority: "P0"
+
+  # Hold Release Workflow
+  - id: "AC-2.14"
+    given: "user confirms release"
+    when: "[Confirm Release] clicked"
+    then: "hold status updated to 'released', released_by set to current user, released_at set to current timestamp, disposition and release_notes saved"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-2.16"
+    given: "user tries to release hold without selecting disposition"
+    when: "[Confirm Release] clicked"
+    then: "validation error 'Disposition decision is required' displays"
+    test_type: "unit"
+    priority: "P0"
+
+  # LP Blocking Logic - CRITICAL
+  - id: "AC-2.18"
+    given: "license plate LP-001 is added to active hold"
+    when: "hold saved"
+    then: "LP-001 qa_status updated to 'hold' in license_plates table"
+    test_type: "integration"
+    priority: "P0"
+    critical: true
+
+  - id: "AC-2.19"
+    given: "LP-001 has qa_status 'hold'"
+    when: "user attempts to consume LP-001 in production (picking operation)"
+    then: "system blocks transaction and displays error 'License plate LP-001 is on quality hold QH-20251216-0001. Cannot consume.'"
+    test_type: "integration"
+    priority: "P0"
+    critical: true
+
+  - id: "AC-2.20"
+    given: "LP-001 is on hold and hold is released with disposition 'release'"
+    when: "release confirmed"
+    then: "LP-001 qa_status updated to 'passed' in license_plates table"
+    test_type: "integration"
+    priority: "P0"
+    critical: true
+
+  - id: "AC-2.21"
+    given: "LP-001 is on hold and hold is released with disposition 'scrap'"
+    when: "release confirmed"
+    then: "LP-001 qa_status updated to 'scrap' and quantity_available set to 0"
+    test_type: "integration"
+    priority: "P0"
+    critical: true
+
+  - id: "AC-2.22"
+    given: "multiple LPs are on same hold"
+    when: "hold released with disposition 'rework'"
+    then: "all LP qa_status values updated to 'pending' for re-inspection"
+    test_type: "integration"
+    priority: "P0"
+    critical: true
+
+  # Hold Aging
+  - id: "AC-2.23"
+    given: "hold with priority 'high' is active for >48 hours"
+    when: "Hold List page loads"
+    then: "hold row displays yellow warning icon with tooltip 'Hold aging: 52 hours'"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-2.24"
+    given: "hold with priority 'critical' is active for >24 hours"
+    when: "Hold List page loads"
+    then: "hold row displays red critical icon with tooltip 'Hold aging: 30 hours (CRITICAL)'"
+    test_type: "e2e"
+    priority: "P1"
+
+  # Hold List and Filters
+  - id: "AC-2.27"
+    given: "user navigates to Quality Holds list page"
+    when: "page loads"
+    then: "holds table displays within 1 second showing columns: hold_number, status, priority, reason (truncated), items_count, held_at, held_by, aging indicator"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-2.28"
+    given: "holds list has 50 active holds"
+    when: "user applies filter status 'active' and priority 'high'"
+    then: "table shows only holds matching both criteria within 500ms"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-2.29"
+    given: "user searches for hold_number 'QH-20251216-0001'"
+    when: "search input changes"
+    then: "table filters to show only matching hold within 300ms (debounced)"
+    test_type: "e2e"
+    priority: "P0"
+
+  # Permission Enforcement
+  - id: "AC-2.33"
+    given: "user with VIEWER role"
+    when: "Quality Holds page loads"
+    then: "[+ Create Hold] button hidden, [Edit] and [Delete] buttons hidden in Hold Detail"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-2.34"
+    given: "user without Quality write permission"
+    when: "attempting to create hold via API"
+    then: "API returns 403 Forbidden with message 'Insufficient permissions to create quality holds'"
+    test_type: "integration"
+    priority: "P0"
+
+# Unit Tests
+unit_tests:
+  - name: "Hold Service Tests"
+    file: "apps/frontend/lib/services/__tests__/quality-hold-service.test.ts"
+    tests:
+      - "Create hold with valid data returns hold with auto-generated number"
+      - "Create hold without items returns validation error"
+      - "Create hold with reason < 10 chars returns validation error"
+      - "Release hold updates status, released_by, released_at, disposition"
+      - "Release hold with disposition 'release' updates LP qa_status to 'passed'"
+      - "Release hold with disposition 'scrap' updates LP qa_status to 'scrap' and quantity to 0"
+      - "Release hold with disposition 'rework' updates LP qa_status to 'pending'"
+      - "Release hold with disposition 'return' updates LP qa_status to 'rejected'"
+      - "Calculate aging status returns 'critical' for critical priority hold >24h old"
+      - "Calculate aging status returns 'warning' for high priority hold >24h but <48h old"
+      - "Block LP consumption returns true if LP is on active hold"
+      - "Block LP consumption returns false if LP is not on hold"
+      - "Get active holds returns only holds with status 'active'"
+      - "Get hold stats returns correct counts and percentages"
+
+  - name: "Validation Tests"
+    file: "apps/frontend/lib/validation/__tests__/quality-hold.test.ts"
+    tests:
+      - "createHoldSchema accepts valid hold data"
+      - "createHoldSchema rejects reason < 10 chars"
+      - "createHoldSchema rejects reason > 500 chars"
+      - "createHoldSchema rejects empty items array"
+      - "createHoldSchema accepts optional priority (defaults to 'medium')"
+      - "releaseHoldSchema accepts valid disposition"
+      - "releaseHoldSchema rejects release_notes < 10 chars"
+      - "releaseHoldSchema rejects release_notes > 1000 chars"
+      - "releaseHoldSchema rejects invalid disposition"
+
+# Integration Tests
+integration_tests:
+  - name: "API Endpoint Tests"
+    file: "apps/frontend/app/api/v1/quality/holds/__tests__/route.test.ts"
+    tests:
+      - "GET /api/v1/quality/holds returns paginated list with 200"
+      - "GET /api/v1/quality/holds filters by status correctly"
+      - "GET /api/v1/quality/holds filters by priority correctly"
+      - "GET /api/v1/quality/holds paginates correctly (limit 20)"
+      - "GET /api/v1/quality/holds/:id returns hold detail with items and NCR"
+      - "GET /api/v1/quality/holds/:id returns 404 for non-existent hold"
+      - "POST /api/v1/quality/holds creates hold and returns 201"
+      - "POST /api/v1/quality/holds without reason returns 400 validation error"
+      - "POST /api/v1/quality/holds without items returns 400 validation error"
+      - "POST /api/v1/quality/holds updates LP qa_status to 'hold'"
+      - "POST /api/v1/quality/holds auto-generates hold_number"
+      - "PATCH /api/v1/quality/holds/:id/release updates hold and returns 200"
+      - "PATCH /api/v1/quality/holds/:id/release without disposition returns 400"
+      - "PATCH /api/v1/quality/holds/:id/release updates LP qa_status based on disposition"
+      - "DELETE /api/v1/quality/holds/:id returns 204 for active hold"
+      - "DELETE /api/v1/quality/holds/:id returns 400 for released hold"
+      - "GET /api/v1/quality/holds/active returns only active holds"
+      - "GET /api/v1/quality/holds/stats returns correct statistics"
+      - "POST /api/v1/quality/holds/bulk-release releases multiple holds"
+
+  - name: "RLS Policy Tests"
+    file: "supabase/tests/quality-holds-rls.test.sql"
+    tests:
+      - "User from org A cannot read holds from org B"
+      - "User from org A cannot update holds from org B"
+      - "User from org A cannot delete holds from org B"
+      - "Unauthenticated request returns 401"
+      - "User can create hold in their org"
+      - "User cannot create hold in different org"
+      - "User can access hold items via parent hold org isolation"
+
+# E2E Tests
+e2e_tests:
+  - name: "Hold Workflow E2E"
+    file: "apps/frontend/e2e/quality-holds.spec.ts"
+    tests:
+      - "Navigate to holds list page and load data"
+      - "Open create hold modal and fill form"
+      - "Create hold and verify redirect to detail page"
+      - "Verify hold appears in list with correct status"
+      - "View hold detail and verify all fields"
+      - "Release hold and verify status updated"
+      - "Verify LP status updated after hold release"
+      - "Filter holds by status"
+      - "Filter holds by priority"
+      - "Search holds by hold_number"
+      - "View hold aging indicator for old holds"
+      - "Bulk release multiple holds"
+      - "Export holds to Excel"
+      - "Verify permission checks (VIEWER role)"
+      - "Test responsive design (mobile, tablet, desktop)"
+
+# Performance Requirements
+performance_requirements:
+  - metric: "Page load time (holds list)"
+    target: "<500ms (P95)"
+    test_type: "performance"
+  - metric: "Filter/search response"
+    target: "<300ms"
+    test_type: "performance"
+  - metric: "Hold creation"
+    target: "<800ms"
+    test_type: "performance"
+  - metric: "Hold release"
+    target: "<600ms"
+    test_type: "performance"
+  - metric: "Table render (100 holds)"
+    target: "<1s"
+    test_type: "performance"
+
+# Test Coverage Requirements
+coverage_requirements:
+  quality_hold_service: ">80%"
+  api_endpoints: ">80%"
+  validation_schemas: ">90%"
+  components: ">75%"
+  overall: ">80%"
+
+# Critical Test Cases (Must Pass Before Release)
+critical_tests:
+  - "AC-2.18: LP qa_status updated to 'hold' on hold creation"
+  - "AC-2.19: LP consumption blocked when qa_status = 'hold'"
+  - "AC-2.20: LP qa_status updated to 'passed' on release with disposition 'release'"
+  - "AC-2.21: LP qa_status updated to 'scrap' and quantity = 0 on release with disposition 'scrap'"
+  - "AC-2.4: Hold auto-numbering works correctly (QH-YYYYMMDD-NNNN)"
+  - "RLS: Users cannot access holds from other orgs"
+  - "AC-2.34: Permission checks enforce role-based access"

@@ -1,0 +1,373 @@
+# Story 06.3 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/specification-service.test.ts"
+    type: "unit"
+    description: "Unit tests for specification service"
+  - path: "apps/frontend/app/api/quality/specifications/__tests__/route.test.ts"
+    type: "integration"
+    description: "Integration tests for API endpoints"
+  - path: "tests/e2e/quality/specification-workflow.spec.ts"
+    type: "e2e"
+    description: "E2E test for create -> approve -> supersede flow"
+
+# Acceptance Criteria
+acceptance_criteria:
+  - id: "AC-01"
+    given: "user navigates to Quality > Specifications page"
+    when: "page loads"
+    then: "specifications list displays within 500ms showing spec_number, name, product, version, status, effective_date, next_review_date"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-02"
+    given: "user applies filter for status = 'active'"
+    when: "filter applied"
+    then: "only active specifications display and URL reflects filter state"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-03"
+    given: "user fills required fields (Product, Name, Effective Date)"
+    when: "[Save Draft] clicked"
+    then: "specification created with status='draft', version=1, user redirected to detail page"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-04"
+    given: "duplicate spec_number + version combination"
+    when: "attempting to save"
+    then: "validation error 'Specification number and version already exists'"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-05"
+    given: "user opens active/expired/superseded specification"
+    when: "detail page loads"
+    then: "all fields are read-only and only [Clone as New Version] button visible"
+    test_type: "e2e"
+    priority: "P0"
+    security: false
+
+  - id: "AC-06"
+    given: "user with QA_MANAGER role views draft specification"
+    when: "[Approve] button clicked and confirmed"
+    then: "status changes to 'active', approved_by/approved_at set, next_review_date calculated, previous active specs superseded"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-07"
+    given: "user without QA_MANAGER role"
+    when: "attempting to approve via API"
+    then: "API returns 403 Forbidden"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-08"
+    given: "user views active specification"
+    when: "[Clone as New Version] clicked"
+    then: "new draft created with version = previous_version + 1, same spec_number, cleared approval fields"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-09"
+    given: "product has multiple specification versions (v1 superseded, v2 active, v3 draft)"
+    when: "GET /api/quality/specifications/product/:productId/active called"
+    then: "returns v2 (the active spec)"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-10"
+    given: "product has no active specification"
+    when: "GET /api/quality/specifications/product/:productId/active called"
+    then: "returns 404 with message 'No active specification found for this product'"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-11"
+    given: "active specification with next_review_date approaching (within 30 days)"
+    when: "specifications list loads"
+    then: "row displays warning indicator (yellow badge)"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-12"
+    given: "user from Org B"
+    when: "requesting specification from Org A"
+    then: "response is 404 Not Found (RLS isolation)"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-13"
+    given: "specification has status='active'"
+    when: "DELETE /api/quality/specifications/:id called"
+    then: "returns 400 'Only draft specifications can be deleted'"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-14"
+    given: "any specification state change (create, update, approve, supersede)"
+    when: "action completes"
+    then: "audit log entry created with entity_type='specification', action, user_id, old/new values"
+    test_type: "integration"
+    priority: "P1"
+
+# Unit Test Cases
+unit_tests:
+  specification_service:
+    - name: "getActiveForProduct returns active spec when one exists"
+      setup: "Mock database with active spec for product"
+      expected: "Returns QualitySpecification object"
+
+    - name: "getActiveForProduct returns null when no active spec"
+      setup: "Mock database with only draft specs"
+      expected: "Returns null"
+
+    - name: "getActiveForProduct ignores expired specs"
+      setup: "Mock database with expired spec"
+      expected: "Returns null"
+
+    - name: "getActiveForProduct ignores superseded specs"
+      setup: "Mock database with superseded spec"
+      expected: "Returns null"
+
+    - name: "approve changes status to active"
+      setup: "Draft specification exists"
+      expected: "Status changes to 'active', approved_by set"
+
+    - name: "approve sets approved_by and approved_at"
+      setup: "Draft specification exists"
+      expected: "approved_by = current user, approved_at = now"
+
+    - name: "approve supersedes previous active spec"
+      setup: "Draft and active spec for same product"
+      expected: "Previous active spec status = 'superseded', superseded_by = new spec id"
+
+    - name: "approve calculates next_review_date"
+      setup: "Draft spec with review_frequency_days = 90"
+      expected: "next_review_date = effective_date + 90 days"
+
+    - name: "approve rejects if not draft status"
+      setup: "Active specification"
+      expected: "Throws ValidationError"
+
+    - name: "approve creates audit log entry"
+      setup: "Draft specification"
+      expected: "Audit entry with action='approve'"
+
+    - name: "cloneAsNewVersion creates new draft with incremented version"
+      setup: "Active specification v1"
+      expected: "New spec with version=2, status='draft'"
+
+    - name: "cloneAsNewVersion copies name, description, review_frequency"
+      setup: "Specification with all fields"
+      expected: "New spec has same values"
+
+    - name: "cloneAsNewVersion clears approval fields"
+      setup: "Approved specification"
+      expected: "approved_by=null, approved_at=null"
+
+    - name: "cloneAsNewVersion sets effective_date to today"
+      setup: "Specification with past effective_date"
+      expected: "New spec effective_date = today"
+
+    - name: "generateSpecNumber generates QS-YYYYMM-001 format"
+      setup: "No existing specs this month"
+      expected: "Returns 'QS-{current_month}-001'"
+
+    - name: "generateSpecNumber increments sequence within month"
+      setup: "Existing spec QS-202512-001"
+      expected: "Returns 'QS-202512-002'"
+
+    - name: "generateSpecNumber resets sequence for new month"
+      setup: "Existing specs from previous month"
+      expected: "Returns 'QS-{current_month}-001'"
+
+    - name: "completeReview updates last_review_date and next_review_date"
+      setup: "Active specification"
+      expected: "last_review_date = today, next_review_date = today + review_frequency_days"
+
+    - name: "completeReview rejects if not active status"
+      setup: "Draft specification"
+      expected: "Throws ValidationError"
+
+# Integration Test Cases
+integration_tests:
+  api_endpoints:
+    - name: "GET /api/quality/specifications returns paginated list"
+      setup: "Create 25 specifications"
+      expected: "First page returns 20, pagination metadata correct"
+
+    - name: "GET /api/quality/specifications filters by status"
+      setup: "Create specs with different statuses"
+      expected: "Only matching status returned"
+
+    - name: "GET /api/quality/specifications/:id returns detail with version history"
+      setup: "Create spec with 3 versions"
+      expected: "Returns spec and version_history array"
+
+    - name: "POST /api/quality/specifications creates draft specification"
+      setup: "Valid request body"
+      expected: "Returns 201 with new spec, status='draft'"
+
+    - name: "POST /api/quality/specifications validates required fields"
+      setup: "Missing product_id"
+      expected: "Returns 400 with validation error"
+
+    - name: "POST /api/quality/specifications enforces org_id from auth"
+      setup: "Valid request"
+      expected: "org_id set from authenticated user"
+
+    - name: "PUT /api/quality/specifications/:id updates draft"
+      setup: "Draft specification"
+      expected: "Returns 200 with updated spec"
+
+    - name: "PUT /api/quality/specifications/:id rejects non-draft"
+      setup: "Active specification"
+      expected: "Returns 400 'Only draft specifications can be updated'"
+
+    - name: "DELETE /api/quality/specifications/:id deletes draft"
+      setup: "Draft specification"
+      expected: "Returns 200, spec deleted"
+
+    - name: "DELETE /api/quality/specifications/:id rejects non-draft"
+      setup: "Active specification"
+      expected: "Returns 400"
+
+    - name: "POST /api/quality/specifications/:id/approve requires QA_MANAGER role"
+      setup: "Draft spec, user with viewer role"
+      expected: "Returns 403"
+
+    - name: "POST /api/quality/specifications/:id/approve supersedes existing active specs"
+      setup: "Draft and active spec for same product"
+      expected: "Original active becomes superseded"
+
+    - name: "POST /api/quality/specifications/:id/clone creates new version"
+      setup: "Active specification v2"
+      expected: "Returns 201 with new draft v3"
+
+    - name: "GET /api/quality/specifications/product/:id returns all specs for product"
+      setup: "Create 3 specs for product"
+      expected: "Returns array of 3 specs"
+
+    - name: "GET /api/quality/specifications/product/:id/active returns active spec"
+      setup: "Active spec exists"
+      expected: "Returns active specification"
+
+    - name: "GET /api/quality/specifications/product/:id/active returns 404 when none"
+      setup: "Only draft specs exist"
+      expected: "Returns 404"
+
+  rls_isolation:
+    - name: "User can only see specifications from own org"
+      setup: "Create specs in Org A and Org B"
+      action: "User A lists specifications"
+      expected: "Only Org A specs returned"
+
+    - name: "Cross-tenant specification access returns 404"
+      setup: "Spec in Org A"
+      action: "User B requests spec by ID"
+      expected: "Returns 404 (not 403)"
+
+# E2E Test Cases
+e2e_tests:
+  - name: "Complete lifecycle: create draft -> approve -> supersede"
+    steps:
+      - "Navigate to Quality > Specifications"
+      - "Click [+ New Specification]"
+      - "Fill form: select product, enter name, set effective date"
+      - "Click [Save Draft]"
+      - "Verify status = 'draft', redirected to detail page"
+      - "Click [Approve]"
+      - "Confirm approval in modal"
+      - "Verify status = 'active', approved_by shown"
+      - "Click [Clone as New Version]"
+      - "Verify new spec created with version+1, status='draft'"
+      - "Approve new version"
+      - "Verify original spec status = 'superseded'"
+
+  - name: "Search and filter specifications"
+    steps:
+      - "Navigate to specifications list"
+      - "Enter search term"
+      - "Verify results filter in real-time"
+      - "Select status filter"
+      - "Verify combined filters work"
+      - "Verify URL contains filter params"
+
+  - name: "Review date warning display"
+    steps:
+      - "Create active spec with review due in 15 days"
+      - "Navigate to specifications list"
+      - "Verify yellow warning badge displayed"
+      - "Hover to see tooltip"
+
+# Definition of Done
+definition_of_done:
+  - "Migration creates quality_specifications table with all columns"
+  - "Migration creates quality_spec_parameters table with FK to specs"
+  - "RLS policies enforce org isolation"
+  - "RLS prevents delete of non-draft specs"
+  - "Database functions for active resolution and superseding work correctly"
+  - "All API endpoints implemented and tested"
+  - "Zod validation schemas complete and tested"
+  - "SpecificationService with all methods implemented"
+  - "Specifications list page loads <500ms"
+  - "Create specification form with validation"
+  - "Edit draft specification works"
+  - "Approve workflow with confirmation modal"
+  - "Clone as new version creates correct data"
+  - "Active spec resolution returns correct spec"
+  - "Superseding updates previous active spec"
+  - "Review date tracking and badges display"
+  - "Complete review action updates dates"
+  - "Audit trail for all state changes"
+  - "Permission checks: VIEWER can read, QA_INSPECTOR can create/edit, QA_MANAGER can approve"
+  - "Delete restricted to draft status only"
+  - "Unit tests >90% coverage for service"
+  - "Integration tests for all API endpoints"
+  - "E2E test for full workflow"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 90
+    reason: "Core business logic requires high coverage"
+  integration:
+    target: 80
+    reason: "API endpoints and RLS policies must be thoroughly tested"
+  files:
+    - "lib/services/specification-service.ts: 90%"
+    - "lib/validation/specification-schemas.ts: 100%"
+    - "RLS policies: 100% of policy rules tested"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "Supersede logic could leave orphan active specs"
+    mitigation: "Database trigger ensures atomic supersede operation"
+    severity: "high"
+    test_coverage: "unit_tests: approve supersedes previous active spec"
+
+  - id: "RISK-02"
+    description: "Version number could have gaps if drafts deleted"
+    mitigation: "Version increments from max(version) not count"
+    severity: "low"
+    test_coverage: "unit_tests: cloneAsNewVersion increments from max"
+
+  - id: "RISK-03"
+    description: "Spec immutability after approval could be bypassed"
+    mitigation: "RLS + API validation both enforce draft-only updates"
+    severity: "high"
+    test_coverage: "integration_tests: PUT rejects non-draft"
+
+  - id: "RISK-04"
+    description: "Review date calculations could be incorrect"
+    mitigation: "Unit tests cover date calculation edge cases"
+    severity: "medium"
+    test_coverage: "unit_tests: approve calculates next_review_date"

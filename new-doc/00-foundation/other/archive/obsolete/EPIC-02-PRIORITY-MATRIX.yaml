@@ -1,0 +1,412 @@
+---
+analysis_date: 2026-01-24
+total_failures: 114
+total_tests: 160
+
+# Priority Matrix: Order of Fix Implementation
+priority_order:
+  - priority: P0-CRITICAL
+    description: Fix immediately - blocks all module testing
+    total_affected_failures: 89
+    total_affected_tests: 89
+    estimated_time_hours: 10
+    tasks:
+      - task_id: TASK-001
+        name: Fix BOMsPage Heading Selector
+        failures_fixed: 6
+        module: boms
+        complexity: MEDIUM
+        file: e2e/pages/BOMsPage.ts
+        line: 92
+        time_hours: 2
+        tests:
+          - TC-BOM-001
+          - TC-BOM-003
+          - TC-BOM-004
+          - TC-BOM-024
+          - TC-BOM-025
+          - TC-BOM-032
+        blocking_tests: 6
+        critical_path: true
+
+      - task_id: TASK-002
+        name: Fix BOMsPage Create Form Selector
+        failures_fixed: 12
+        module: boms
+        complexity: MEDIUM
+        file: e2e/pages/BOMsPage.ts
+        line: 187
+        time_hours: 2
+        tests:
+          - TC-BOM-006
+          - TC-BOM-007
+          - TC-BOM-008
+          - TC-BOM-009
+          - TC-BOM-010
+          - TC-BOM-011
+          - TC-BOM-012
+          - TC-BOM-015
+          - TC-BOM-016
+          - TC-BOM-017
+          - TC-BOM-018
+          - TC-BOM-020
+        blocking_tests: 12
+        critical_path: true
+
+      - task_id: TASK-003
+        name: Fix DataTablePage Filter Button Selector
+        failures_fixed: 7
+        module: shared
+        complexity: EASY
+        file: e2e/pages/DataTablePage.ts
+        line: 56
+        time_hours: 1
+        tests:
+          - TC-BOM-003
+          - TC-BOM-004
+          - TC-PROD-005
+          - TC-PROD-006
+          - TC-TYPE-002
+          - TC-RTG-003
+          - TC-RTG-004
+        blocking_tests: 7
+        critical_path: true
+        notes: Affects all modules with filter capability
+
+      - task_id: TASK-004
+        name: Fix ProductsPage Header and List Selectors
+        failures_fixed: 5
+        module: products
+        complexity: MEDIUM
+        file: e2e/pages/ProductsPage.ts
+        time_hours: 2
+        tests:
+          - TC-PROD-001
+          - TC-PROD-002
+          - TC-PROD-005
+          - TC-PROD-006
+          - TC-PROD-007
+        blocking_tests: 5
+        critical_path: true
+
+      - task_id: TASK-005
+        name: Fix ProductsPage Modal and Drawer Selectors
+        failures_fixed: 19
+        module: products
+        complexity: HARD
+        file: e2e/pages/ProductsPage.ts
+        time_hours: 3
+        tests:
+          - TC-PROD-008
+          - TC-PROD-009
+          - TC-PROD-010
+          - TC-PROD-011
+          - TC-PROD-012
+          - TC-PROD-013
+          - TC-PROD-014
+          - TC-PROD-015
+          - TC-PROD-016
+          - TC-PROD-017
+          - TC-PROD-018
+          - TC-PROD-019
+          - TC-PROD-020
+          - TC-PROD-021
+          - TC-PROD-022
+          - TC-PROD-023
+          - TC-PROD-024
+          - TC-PROD-025
+          - TC-PROD-026
+          - TC-PROD-027
+          - TC-PROD-028
+          - TC-PROD-029
+          - TC-PROD-030
+        blocking_tests: 19
+        critical_path: true
+        notes: Largest single task
+
+      - task_id: TASK-006
+        name: Fix RoutingsPage All Selectors
+        failures_fixed: 27
+        module: routings
+        complexity: HARD
+        file: e2e/pages/RoutingsPage.ts
+        time_hours: 3
+        tests:
+          - TC-RTG-001
+          - TC-RTG-003
+          - TC-RTG-004
+          - TC-RTG-006
+          - TC-RTG-007
+          - TC-RTG-008
+          - TC-RTG-009
+          - TC-RTG-010
+          - TC-RTG-011
+          - TC-RTG-012
+          - TC-RTG-013
+          - TC-RTG-014
+          - TC-RTG-015
+          - TC-RTG-016
+          - TC-RTG-017
+          - TC-RTG-018
+          - TC-RTG-019
+          - TC-RTG-020
+          - TC-RTG-021
+          - TC-RTG-022
+          - TC-RTG-023
+          - TC-RTG-024
+          - TC-RTG-025
+          - TC-RTG-026
+          - TC-RTG-027
+        blocking_tests: 27
+        critical_path: true
+        notes: Second largest task
+
+      - task_id: TASK-007
+        name: Create TraceabilityPage Object
+        failures_fixed: 17
+        module: traceability
+        complexity: HARD
+        file: e2e/pages/TraceabilityPage.ts
+        time_hours: 3
+        tests:
+          - TC-TRC-001
+          - TC-TRC-002
+          - TC-TRC-003
+          - TC-TRC-004
+          - TC-TRC-005
+          - TC-TRC-006
+          - TC-TRC-007
+          - TC-TRC-008
+          - TC-TRC-009
+          - TC-TRC-010
+          - TC-TRC-011
+          - TC-TRC-012
+          - TC-TRC-013
+          - TC-TRC-014
+          - TC-TRC-015
+          - TC-TRC-016
+          - TC-TRC-017
+        blocking_tests: 17
+        critical_path: false
+        notes: New file creation
+
+  - priority: P1-HIGH
+    description: Fix after P0 - enables advanced features
+    total_affected_failures: 20
+    total_affected_tests: 20
+    estimated_time_hours: 2
+    tasks:
+      - task_id: TASK-008
+        name: Fix ProductTypesPage Selectors
+        failures_fixed: 8
+        module: product_types
+        complexity: MEDIUM
+        file: e2e/pages/ProductTypesPage.ts
+        time_hours: 1.5
+        tests:
+          - TC-TYPE-001
+          - TC-TYPE-002
+          - TC-TYPE-003
+          - TC-TYPE-004
+          - TC-TYPE-005
+          - TC-TYPE-006
+          - TC-TYPE-008
+        blocking_tests: 8
+        critical_path: true
+
+      - task_id: TASK-010
+        name: Fix Integration Tests (depends on P0 tasks)
+        failures_fixed: 12
+        module: integration
+        complexity: MEDIUM
+        file: e2e/tests/technical/integration.spec.ts
+        time_hours: 1
+        tests:
+          - TC-INT-001
+          - TC-INT-002
+          - TC-INT-003
+          - TC-INT-004
+          - TC-INT-005
+          - TC-INT-006
+          - TC-INT-007
+          - TC-INT-008
+          - TC-INT-009
+          - TC-INT-010
+          - TC-INT-011
+          - TC-INT-012
+        blocking_tests: 12
+        critical_path: true
+        depends_on:
+          - TASK-001
+          - TASK-002
+          - TASK-004
+          - TASK-005
+          - TASK-006
+        notes: Automatically fixed by P0 task completion
+
+  - priority: P2-NICE_TO_HAVE
+    description: Fix last - performance tuning
+    total_affected_failures: 1
+    total_affected_tests: 1
+    estimated_time_hours: 1
+    tasks:
+      - task_id: TASK-009
+        name: Fix Dashboard Performance
+        failures_fixed: 1
+        module: dashboard
+        complexity: LOW
+        file: e2e/tests/technical/dashboard.spec.ts
+        time_hours: 1
+        tests:
+          - TC-DASH-002
+        blocking_tests: 1
+        critical_path: false
+        notes: Performance tuning only
+
+# Execution Plan
+execution_phases:
+  phase_1:
+    name: Critical Infrastructure Fixes
+    duration_hours: 1
+    tasks:
+      - TASK-003  # Filter button (shared)
+    rationale: Fixes 7 tests quickly, unblocks other modules
+
+  phase_2:
+    name: Core Module Fixes (can parallelize)
+    duration_hours: 8
+    parallel_tasks:
+      track_1:
+        - TASK-001  # BOMs heading (2h)
+        - TASK-002  # BOMs form (2h)
+      track_2:
+        - TASK-004  # Products header (2h)
+        - TASK-005  # Products modal (3h)
+      track_3:
+        - TASK-006  # Routings (3h)
+        - TASK-008  # ProductTypes (1.5h)
+    rationale: Largest impact, can run in parallel
+
+  phase_3:
+    name: Advanced Features
+    duration_hours: 3
+    tasks:
+      - TASK-007  # TraceabilityPage (3h)
+    rationale: Lower priority, depends on core pages
+
+  phase_4:
+    name: Integration & Performance
+    duration_hours: 1
+    tasks:
+      - TASK-010  # Integration tests (auto-fix)
+      - TASK-009  # Dashboard perf (1h)
+    rationale: Depends on earlier tasks
+
+# Quick Wins (fix 15+ tests in 3 hours)
+quick_wins:
+  - name: DataTablePage Filter Fix
+    task_id: TASK-003
+    time_minutes: 30
+    tests_fixed: 7
+    complexity: EASY
+    priority: P0
+
+  - name: BOMsPage Heading
+    task_id: TASK-001
+    time_minutes: 60
+    tests_fixed: 6
+    complexity: MEDIUM
+    priority: P0
+
+  - name: Products Header & List
+    task_id: TASK-004
+    time_minutes: 90
+    tests_fixed: 5
+    complexity: MEDIUM
+    priority: P0
+
+# Risk Assessment
+risks:
+  - risk_id: R-001
+    name: Selector Not Found
+    probability: MEDIUM
+    impact: HIGH
+    mitigation: Use browser inspector to verify each selector
+    fallback: Try multiple selector patterns
+
+  - risk_id: R-002
+    name: Form Structure Changed
+    probability: MEDIUM
+    impact: MEDIUM
+    mitigation: Check ShadCN Dialog/Drawer documentation
+    fallback: Use role selectors instead of specific elements
+
+  - risk_id: R-003
+    name: Parallel Task Conflicts
+    probability: LOW
+    impact: LOW
+    mitigation: Use feature branches for each task
+    fallback: Sequential execution if conflicts arise
+
+  - risk_id: R-004
+    name: Page Load Timing Issues
+    probability: LOW
+    impact: MEDIUM
+    mitigation: Add wait conditions to page objects
+    fallback: Increase timeout thresholds
+
+# Success Metrics
+success_criteria:
+  all_tests_passing: 160
+  zero_failures: true
+  zero_timeout_errors: true
+  no_element_not_found_errors: true
+  test_duration_minutes: 30  # Current: 25.3, target: <30
+
+# Estimated Timeline
+timeline:
+  phase_1_completion: "~30 minutes"
+  phase_2_completion: "~4-5 hours (with parallelization)"
+  phase_3_completion: "~3 hours"
+  phase_4_completion: "~1 hour"
+  total_estimated: "12-16 hours"
+
+# Resource Requirements
+resources:
+  frontend_dev_hours: 12
+  qa_review_hours: 1
+  total_team_hours: 13
+
+# Validation Checklist
+validation:
+  - run_full_test_suite: true
+    target: 160/160 passing
+  - run_by_module:
+      boms: 38/38 passing
+      products: 32/32 passing
+      routings: 47/47 passing
+      traceability: 17/17 passing
+      product_types: 12/12 passing
+      integration: 12/12 passing
+      dashboard: 8/8 passing
+  - check_performance:
+      total_duration: "<30 minutes"
+      timeout_errors: 0
+      flaky_tests: 0
+  - code_review: true
+    reviewer: code-reviewer
+  - documentation: true
+    update_readme: true
+
+# Blockers
+blockers: []
+dependencies:
+  - TASK-010 depends on TASK-001,002,004,005,006
+
+# Notes
+notes:
+  - All failures are selector/DOM related, not logic errors
+  - Fixes are isolated to page object layer
+  - No changes needed to core application code
+  - Should result in 100% test pass rate
+  - Consider adding data-testid attributes to components after fixes

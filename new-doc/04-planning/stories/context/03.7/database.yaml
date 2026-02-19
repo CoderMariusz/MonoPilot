@@ -1,0 +1,199 @@
+# Story 03.7 - Database Schema
+# Purpose: Tables, RLS policies, indexes, seed data
+# Agent: BACKEND-DEV (database focus)
+
+migrations:
+  - path: "supabase/migrations/XXX_create_po_statuses.sql"
+    type: "migration"
+    description: "PO status configuration table per organization"
+  - path: "supabase/migrations/XXX_create_po_status_transitions.sql"
+    type: "migration"
+    description: "Status transition rules table"
+  - path: "supabase/migrations/XXX_seed_default_po_statuses.sql"
+    type: "seed"
+    description: "Function to seed default statuses on org creation"
+
+tables:
+  - name: "po_statuses"
+    description: "PO status configuration per organization"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id) ON DELETE CASCADE" }
+      - { name: "code", type: "VARCHAR(50)", constraints: "NOT NULL" }
+      - { name: "name", type: "VARCHAR(100)", constraints: "NOT NULL" }
+      - { name: "color", type: "VARCHAR(20)", constraints: "NOT NULL DEFAULT 'gray'" }
+      - { name: "display_order", type: "INTEGER", constraints: "NOT NULL" }
+      - { name: "is_system", type: "BOOLEAN", constraints: "DEFAULT false" }
+      - { name: "is_active", type: "BOOLEAN", constraints: "DEFAULT true" }
+      - { name: "description", type: "TEXT", constraints: "" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_po_statuses_org ON po_statuses(org_id, display_order)"
+      - "idx_po_statuses_code ON po_statuses(org_id, code)"
+    constraints:
+      - "UNIQUE(org_id, code)"
+      - "CHECK (color IN ('gray', 'blue', 'yellow', 'green', 'purple', 'emerald', 'red', 'orange', 'amber', 'teal', 'indigo'))"
+
+  - name: "po_status_transitions"
+    description: "Valid status transitions (state machine rules)"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id) ON DELETE CASCADE" }
+      - { name: "from_status_id", type: "UUID", constraints: "NOT NULL REFERENCES po_statuses(id) ON DELETE CASCADE" }
+      - { name: "to_status_id", type: "UUID", constraints: "NOT NULL REFERENCES po_statuses(id) ON DELETE CASCADE" }
+      - { name: "is_system", type: "BOOLEAN", constraints: "DEFAULT false" }
+      - { name: "requires_approval", type: "BOOLEAN", constraints: "DEFAULT false" }
+      - { name: "requires_reason", type: "BOOLEAN", constraints: "DEFAULT false" }
+      - { name: "condition_function", type: "TEXT", constraints: "" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_po_transitions_from ON po_status_transitions(from_status_id)"
+      - "idx_po_transitions_to ON po_status_transitions(to_status_id)"
+    constraints:
+      - "UNIQUE(org_id, from_status_id, to_status_id)"
+      - "CHECK (from_status_id != to_status_id)"
+
+  - name: "po_status_history"
+    description: "Status change audit trail (extends existing from 03.3)"
+    note: "Table created in story 03.3 - documenting here for reference"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "po_id", type: "UUID", constraints: "NOT NULL REFERENCES purchase_orders(id) ON DELETE CASCADE" }
+      - { name: "from_status", type: "VARCHAR(50)", constraints: "" }
+      - { name: "to_status", type: "VARCHAR(50)", constraints: "NOT NULL" }
+      - { name: "changed_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "changed_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+      - { name: "notes", type: "TEXT", constraints: "" }
+      - { name: "transition_metadata", type: "JSONB", constraints: "" }
+    indexes:
+      - "idx_po_history_po ON po_status_history(po_id, changed_at DESC)"
+
+# RLS Policies
+rls_policies:
+  pattern: "Users Table Lookup (ADR-013)"
+  pattern_sql: "(SELECT org_id FROM users WHERE id = auth.uid())"
+
+  policies:
+    # po_statuses
+    - table: "po_statuses"
+      name: "po_statuses_select"
+      operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+    - table: "po_statuses"
+      name: "po_statuses_insert"
+      operation: "INSERT"
+      with_check: |
+        org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        AND (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid()) IN ('owner', 'admin')
+
+    - table: "po_statuses"
+      name: "po_statuses_update"
+      operation: "UPDATE"
+      using: |
+        org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        AND (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid()) IN ('owner', 'admin')
+
+    - table: "po_statuses"
+      name: "po_statuses_delete"
+      operation: "DELETE"
+      using: |
+        org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        AND is_system = false
+        AND NOT EXISTS (SELECT 1 FROM purchase_orders po WHERE po.status = po_statuses.code AND po.org_id = po_statuses.org_id)
+        AND (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid()) IN ('owner', 'admin')
+
+    # po_status_transitions
+    - table: "po_status_transitions"
+      name: "po_transitions_select"
+      operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+    - table: "po_status_transitions"
+      name: "po_transitions_insert"
+      operation: "INSERT"
+      with_check: |
+        org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        AND (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid()) IN ('owner', 'admin')
+
+    - table: "po_status_transitions"
+      name: "po_transitions_update"
+      operation: "UPDATE"
+      using: |
+        org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        AND (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid()) IN ('owner', 'admin')
+
+    - table: "po_status_transitions"
+      name: "po_transitions_delete"
+      operation: "DELETE"
+      using: |
+        org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        AND is_system = false
+        AND (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid()) IN ('owner', 'admin')
+
+# Seed Data - Default PO Statuses
+seed_data:
+  default_statuses:
+    description: "7 default PO statuses created via function for new organizations"
+    data:
+      - { code: "draft", name: "Draft", color: "gray", display_order: 1, is_system: true }
+      - { code: "submitted", name: "Submitted", color: "blue", display_order: 2, is_system: true }
+      - { code: "pending_approval", name: "Pending Approval", color: "yellow", display_order: 3, is_system: false }
+      - { code: "confirmed", name: "Confirmed", color: "green", display_order: 4, is_system: true }
+      - { code: "receiving", name: "Receiving", color: "purple", display_order: 5, is_system: true }
+      - { code: "closed", name: "Closed", color: "emerald", display_order: 6, is_system: true }
+      - { code: "cancelled", name: "Cancelled", color: "red", display_order: 7, is_system: true }
+
+  default_transitions:
+    description: "Default transition rules between statuses"
+    data:
+      # From draft
+      - { from: "draft", to: "submitted", is_system: false }
+      - { from: "draft", to: "cancelled", is_system: false }
+      # From submitted
+      - { from: "submitted", to: "pending_approval", is_system: false }
+      - { from: "submitted", to: "confirmed", is_system: false }
+      - { from: "submitted", to: "cancelled", is_system: false }
+      # From pending_approval
+      - { from: "pending_approval", to: "confirmed", is_system: false }
+      - { from: "pending_approval", to: "cancelled", is_system: false }
+      # From confirmed
+      - { from: "confirmed", to: "receiving", is_system: true, note: "Auto-triggered on first receipt" }
+      - { from: "confirmed", to: "cancelled", is_system: false }
+      # From receiving
+      - { from: "receiving", to: "closed", is_system: true, note: "Auto-triggered when fully received" }
+      - { from: "receiving", to: "cancelled", is_system: false }
+
+# Database Function
+functions:
+  - name: "create_default_po_statuses"
+    description: "Creates default PO statuses and transition rules for new organization"
+    params:
+      - "p_org_id UUID"
+    returns: "VOID"
+    language: "plpgsql"
+    trigger: "Called on organization creation"
+    notes:
+      - "Creates 7 default statuses"
+      - "Creates default transition rules"
+      - "Should be idempotent (check if already exists)"
+
+# Status Colors (TailwindCSS)
+status_colors:
+  allowed:
+    - { name: "gray", hex: "#6B7280", usage: "Draft, inactive" }
+    - { name: "blue", hex: "#3B82F6", usage: "Submitted, in progress" }
+    - { name: "yellow", hex: "#EAB308", usage: "Pending, waiting" }
+    - { name: "green", hex: "#22C55E", usage: "Confirmed, approved" }
+    - { name: "purple", hex: "#A855F7", usage: "Receiving, processing" }
+    - { name: "emerald", hex: "#10B981", usage: "Closed, complete" }
+    - { name: "red", hex: "#EF4444", usage: "Cancelled, rejected" }
+    - { name: "orange", hex: "#F97316", usage: "Custom status" }
+    - { name: "amber", hex: "#F59E0B", usage: "Custom status" }
+    - { name: "teal", hex: "#14B8A6", usage: "Custom status" }
+    - { name: "indigo", hex: "#6366F1", usage: "Custom status" }

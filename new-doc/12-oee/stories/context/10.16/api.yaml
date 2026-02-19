@@ -1,0 +1,49 @@
+# Story 10.16 - API Specification
+# Purpose: MTBF/MTTR reliability endpoints
+# Agent: BACKEND-DEV
+
+endpoints:
+  - method: "GET"
+    path: "/api/oee/analytics/mtbf"
+    description: "Get MTBF/MTTR metrics"
+    auth: "required"
+    query_params:
+      machine_id: "string (optional)"
+      date_from: "string (optional)"
+      date_to: "string (optional)"
+    response:
+      machines:
+        - machine_id: "string"
+          machine_name: "string"
+          running_hours: "number"
+          failure_count: "number"
+          mtbf_hours: "number | null"
+          mttr_minutes: "number | null"
+          reliability_rank: "number"
+      summary:
+        avg_mtbf: "number"
+        avg_mttr: "number"
+        total_failures: "number"
+        least_reliable: "string (machine name)"
+
+  - method: "GET"
+    path: "/api/oee/analytics/mtbf/:machineId/trend"
+    description: "Get MTBF/MTTR trend for specific machine"
+    auth: "required"
+
+services:
+  - path: "apps/frontend/lib/services/reliability-service.ts"
+    exports:
+      - name: "ReliabilityService"
+        methods:
+          - "getMTBFMetrics"
+          - "calculateMTBF"
+          - "calculateMTTR"
+          - "getReliabilityRanking"
+
+types:
+  - path: "apps/frontend/lib/types/reliability.ts"
+    exports:
+      - "ReliabilityMetrics"
+      - "MTBFData"
+      - "ReliabilityRanking"

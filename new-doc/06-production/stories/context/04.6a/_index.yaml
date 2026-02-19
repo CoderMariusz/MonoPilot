@@ -1,0 +1,127 @@
+# Story 04.6a - Material Consumption Desktop
+# Generated: 2026-01-14
+# Format: Multi-file context (5 files)
+
+story:
+  id: "04.6a"
+  name: "Material Consumption Desktop"
+  slug: "material-consumption-desktop"
+  epic: "04-production"
+  phase: "1"
+  complexity: "L"
+  estimate_days: 4
+  type: "full-stack"
+  state: "ready"
+  priority: "P0"
+
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides:
+        - "org_id context"
+        - "RLS patterns"
+        - "permission-service"
+    - story: "04.5"
+      name: "Production Settings"
+      provides:
+        - "production_settings table"
+        - "allow_over_consumption setting"
+        - "allow_partial_lp_consumption setting"
+    - story: "03.11a"
+      name: "WO Materials"
+      provides:
+        - "wo_materials table"
+        - "consume_whole_lp flag"
+    - story: "05.1"
+      name: "License Plates Table"
+      provides:
+        - "license_plates table"
+        - "LP status management"
+  soft:
+    - story: "05.6"
+      name: "LP Transactions"
+      provides:
+        - "lp_transactions table"
+        - "audit trail"
+  blocked_by: []
+  blocks:
+    - story: "04.6b"
+      reason: "Scanner uses same service layer and API"
+    - story: "04.6c"
+      reason: "Full LP consumption builds on base consumption"
+
+references:
+  prd:
+    path: "docs/1-BASELINE/product/modules/production.md"
+    sections:
+      - "FR-PROD-006"
+      - "FR-PROD-008"
+      - "FR-PROD-009"
+      - "FR-PROD-010"
+  wireframe:
+    path: "docs/3-ARCHITECTURE/ux/wireframes/PROD-003-material-consumption.md"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+
+functional_requirements:
+  - id: "FR-04.6a-001"
+    name: "LP Validation on Selection"
+    description: "Validate LP exists, is available, product matches, UoM matches before consumption"
+
+  - id: "FR-04.6a-002"
+    name: "Quantity Validation"
+    description: "Validate consume quantity against LP available quantity, block over-LP consumption"
+
+  - id: "FR-04.6a-003"
+    name: "Consumption Recording"
+    description: "Record consumption in wo_material_consumptions, update LP qty, update material consumed qty"
+
+  - id: "FR-04.6a-004"
+    name: "Materials Progress Display"
+    description: "Display materials table with consumption progress bars and variance indicators"
+
+  - id: "FR-04.6a-005"
+    name: "Consumption History with Reversal"
+    description: "Display consumption history with Manager-only reversal capability"
+
+acceptance_criteria:
+  - id: "AC-04.6a-001"
+    given: "LP does not exist in system"
+    when: "user enters LP barcode in search"
+    then: "error 'LP not found' displays within 500ms"
+
+  - id: "AC-04.6a-002"
+    given: "LP status is 'consumed'"
+    when: "user selects LP for consumption"
+    then: "error 'LP is not available' displays with LP details"
+
+  - id: "AC-04.6a-003"
+    given: "LP.product_id does not match material.product_id"
+    when: "user selects LP"
+    then: "error 'Product mismatch: LP contains X, material requires Y' displays"
+
+  - id: "AC-04.6a-004"
+    given: "LP.uom does not match material.uom"
+    when: "user attempts consumption"
+    then: "error 'UoM mismatch: LP is X, material requires Y' displays"
+
+  - id: "AC-04.6a-005"
+    given: "LP.qty is 30 and user enters 50"
+    when: "user submits consumption"
+    then: "error 'Insufficient quantity: LP has 30 kg, requested 50 kg' displays"
+
+  - id: "AC-04.6a-006"
+    given: "valid consumption with qty 40 from LP with 100"
+    when: "user confirms consumption"
+    then: "LP.qty becomes 60, wo_material_consumptions record created, wo_materials.consumed_qty increased by 40"
+
+  - id: "AC-04.6a-007"
+    given: "consumption fully depletes LP (consume_qty equals LP.qty)"
+    when: "user confirms consumption"
+    then: "LP.status becomes 'consumed', LP.qty becomes 0"
+
+  - id: "AC-04.6a-008"
+    given: "material with consume_whole_lp is true"
+    when: "material displays in table"
+    then: "'Full LP Required' badge with lock icon displays next to material name"

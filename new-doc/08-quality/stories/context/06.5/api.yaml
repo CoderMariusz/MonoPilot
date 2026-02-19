@@ -1,0 +1,474 @@
+# Story 06.5 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling, services
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  # ==================== LIST INSPECTIONS ====================
+  - method: "GET"
+    path: "/api/quality/inspections"
+    description: "List inspections with filtering, sorting, and pagination"
+    file: "apps/frontend/app/api/quality/inspections/route.ts"
+    auth: "required"
+    roles: ["*"]  # All authenticated users can read
+
+    query_parameters:
+      - { name: "inspection_type", type: "string", required: false, enum: ["incoming", "in_process", "final"], description: "Filter by inspection type" }
+      - { name: "status", type: "string", required: false, enum: ["scheduled", "in_progress", "completed", "cancelled"], description: "Filter by status" }
+      - { name: "priority", type: "string", required: false, enum: ["low", "normal", "high", "urgent"], description: "Filter by priority" }
+      - { name: "inspector_id", type: "UUID", required: false, description: "Filter by assigned inspector" }
+      - { name: "product_id", type: "UUID", required: false, description: "Filter by product" }
+      - { name: "lp_id", type: "UUID", required: false, description: "Filter by license plate" }
+      - { name: "grn_id", type: "UUID", required: false, description: "Filter by GRN" }
+      - { name: "po_id", type: "UUID", required: false, description: "Filter by PO" }
+      - { name: "date_from", type: "date", required: false, description: "Filter from date" }
+      - { name: "date_to", type: "date", required: false, description: "Filter to date" }
+      - { name: "search", type: "string", required: false, description: "Search by inspection#, PO#, material name" }
+      - { name: "sort_by", type: "string", required: false, default: "inspection_number", enum: ["inspection_number", "scheduled_date", "created_at", "priority"] }
+      - { name: "sort_order", type: "string", required: false, default: "desc", enum: ["asc", "desc"] }
+      - { name: "page", type: "integer", required: false, default: 1 }
+      - { name: "limit", type: "integer", required: false, default: 20, max: 100 }
+
+    response:
+      status: 200
+      schema:
+        inspections:
+          - id: "UUID"
+            org_id: "UUID"
+            inspection_number: "string"
+            inspection_type: "string"
+            product_id: "UUID"
+            product_code: "string"
+            product_name: "string"
+            lp_id: "UUID | null"
+            lp_number: "string | null"
+            grn_id: "UUID | null"
+            grn_number: "string | null"
+            po_id: "UUID | null"
+            po_number: "string | null"
+            supplier_name: "string | null"
+            batch_number: "string | null"
+            inspector_id: "UUID | null"
+            inspector_name: "string | null"
+            status: "string"
+            priority: "string"
+            result: "string | null"
+            scheduled_date: "date | null"
+            started_at: "timestamp | null"
+            completed_at: "timestamp | null"
+            defects_found: "number"
+            created_at: "timestamp"
+
+        pagination:
+          total: "number"
+          page: "number"
+          limit: "number"
+          pages: "number"
+
+    errors:
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+      - { status: 400, code: "INVALID_QUERY_PARAMS", message: "Invalid query parameters" }
+
+  # ==================== GET INSPECTION DETAIL ====================
+  - method: "GET"
+    path: "/api/quality/inspections/:id"
+    description: "Get inspection details with test results"
+    file: "apps/frontend/app/api/quality/inspections/[id]/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    response:
+      status: 200
+      schema:
+        inspection:
+          id: "UUID"
+          org_id: "UUID"
+          inspection_number: "string"
+          inspection_type: "string"
+          status: "string"
+          result: "string | null"
+          priority: "string"
+          inspector_id: "UUID | null"
+          inspector_name: "string | null"
+          assigned_at: "timestamp | null"
+          product_id: "UUID"
+          product_code: "string"
+          product_name: "string"
+          spec_id: "UUID | null"
+          spec_number: "string | null"
+          lp_id: "UUID | null"
+          lp_number: "string | null"
+          grn_id: "UUID | null"
+          batch_number: "string | null"
+          scheduled_date: "date | null"
+          started_at: "timestamp | null"
+          completed_at: "timestamp | null"
+          completed_by: "UUID | null"
+          result_notes: "string | null"
+          defects_found: "number"
+          major_defects: "number"
+          minor_defects: "number"
+          critical_defects: "number"
+          created_at: "timestamp"
+          created_by: "string"
+
+        test_results:
+          - id: "UUID"
+            parameter_id: "UUID"
+            parameter_name: "string"
+            measured_value: "string"
+            numeric_value: "number | null"
+            result_status: "string"
+            specification: "string"
+            tested_by: "string"
+            tested_at: "timestamp"
+
+        test_result_summary:
+          total_parameters: "number"
+          tested_count: "number"
+          passed_count: "number"
+          failed_count: "number"
+          untested_count: "number"
+
+        can_complete: "boolean"
+        suggested_result: "string | null"
+
+    errors:
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+      - { status: 404, code: "NOT_FOUND", message: "Inspection not found" }
+
+  # ==================== CREATE INSPECTION ====================
+  - method: "POST"
+    path: "/api/quality/inspections"
+    description: "Create new inspection"
+    file: "apps/frontend/app/api/quality/inspections/route.ts"
+    auth: "required"
+    roles: ["QA_INSPECTOR", "QA_MANAGER"]
+
+    request_body:
+      type: "CreateInspectionRequest"
+      schema:
+        product_id: "UUID (required)"
+        lp_id: "UUID | null (optional)"
+        grn_id: "UUID | null (optional)"
+        po_id: "UUID | null (optional)"
+        spec_id: "UUID | null (optional)"
+        batch_number: "string | null (optional, max 100)"
+        lot_size: "integer | null (optional)"
+        priority: "string (default: normal)"
+        scheduled_date: "date (optional)"
+        inspector_id: "UUID | null (optional)"
+        notes: "string | null (optional, max 2000)"
+
+      validation:
+        - "At least one of: lp_id, grn_id, po_id must be provided"
+        - "product_id must exist and be accessible to org"
+        - "scheduled_date must be today or future date"
+
+      example:
+        product_id: "550e8400-e29b-41d4-a716-446655440000"
+        lp_id: "660e8400-e29b-41d4-a716-446655440000"
+        grn_id: null
+        po_id: "770e8400-e29b-41d4-a716-446655440000"
+        spec_id: null
+        batch_number: "LOT-20251215-001"
+        priority: "high"
+        scheduled_date: "2025-12-16"
+        inspector_id: null
+        notes: "First batch from new supplier ABC Mills"
+
+    response:
+      status: 201
+      schema:
+        inspection:
+          id: "UUID"
+          org_id: "UUID"
+          inspection_number: "string"
+          status: "scheduled"
+          created_at: "timestamp"
+
+    errors:
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+      - { status: 403, code: "FORBIDDEN", message: "Insufficient permissions" }
+      - { status: 400, code: "VALIDATION_ERROR", message: "Validation failed" }
+      - { status: 400, code: "PRODUCT_NOT_FOUND", message: "Product not found" }
+      - { status: 400, code: "LP_NOT_FOUND", message: "License Plate not found" }
+      - { status: 409, code: "DUPLICATE_INSPECTION", message: "LP already has active inspection" }
+
+  # ==================== ASSIGN INSPECTOR ====================
+  - method: "POST"
+    path: "/api/quality/inspections/:id/assign"
+    description: "Assign inspector to inspection"
+    file: "apps/frontend/app/api/quality/inspections/[id]/assign/route.ts"
+    auth: "required"
+    roles: ["QA_MANAGER"]
+
+    request_body:
+      schema:
+        inspector_id: "UUID (required)"
+
+    response:
+      status: 200
+      schema:
+        inspection:
+          id: "UUID"
+          inspector_id: "UUID"
+          assigned_by: "UUID"
+          assigned_at: "timestamp"
+
+    errors:
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+      - { status: 403, code: "FORBIDDEN", message: "Insufficient permissions" }
+      - { status: 404, code: "NOT_FOUND", message: "Inspection or inspector not found" }
+      - { status: 400, code: "CANNOT_ASSIGN_COMPLETED", message: "Cannot assign completed inspection" }
+
+  # ==================== START INSPECTION ====================
+  - method: "POST"
+    path: "/api/quality/inspections/:id/start"
+    description: "Start inspection (scheduled → in_progress)"
+    file: "apps/frontend/app/api/quality/inspections/[id]/start/route.ts"
+    auth: "required"
+    roles: ["QA_INSPECTOR", "QA_MANAGER"]
+
+    request_body:
+      schema:
+        take_over: "boolean (optional, default false)"
+
+    response:
+      status: 200
+      schema:
+        inspection:
+          id: "UUID"
+          status: "in_progress"
+          inspector_id: "UUID"
+          started_at: "timestamp"
+
+    errors:
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+      - { status: 404, code: "NOT_FOUND", message: "Inspection not found" }
+      - { status: 400, code: "INVALID_STATUS", message: "Inspection is not scheduled" }
+      - { status: 400, code: "NO_INSPECTOR", message: "Inspector must be assigned before starting" }
+
+  # ==================== COMPLETE INSPECTION ====================
+  - method: "POST"
+    path: "/api/quality/inspections/:id/complete"
+    description: "Complete inspection with result determination"
+    file: "apps/frontend/app/api/quality/inspections/[id]/complete/route.ts"
+    auth: "required"
+    roles: ["QA_INSPECTOR", "QA_MANAGER"]
+
+    request_body:
+      schema:
+        result: "string (required: pass|fail|conditional)"
+        result_notes: "string | null (optional, max 2000)"
+        defects_found: "integer (default 0)"
+        major_defects: "integer (default 0)"
+        minor_defects: "integer (default 0)"
+        critical_defects: "integer (default 0)"
+        conditional_reason: "string | null (required if result=conditional, max 500)"
+        conditional_restrictions: "string | null (required if result=conditional, max 1000)"
+        conditional_expires_at: "timestamp | null (optional for conditional)"
+        create_ncr: "boolean (default false)"
+
+      validation:
+        - "result is required"
+        - "If result='conditional': conditional_reason and conditional_restrictions required"
+        - "If result='fail': optional disposition selection"
+        - "All test results must be recorded before completion"
+
+    response:
+      status: 200
+      schema:
+        inspection:
+          id: "UUID"
+          status: "completed"
+          result: "string"
+          completed_at: "timestamp"
+          completed_by: "UUID"
+
+        lp_status_updated: "boolean"
+        ncr_id: "UUID | null"
+
+    errors:
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+      - { status: 404, code: "NOT_FOUND", message: "Inspection not found" }
+      - { status: 400, code: "INVALID_STATUS", message: "Inspection is not in_progress" }
+      - { status: 400, code: "INCOMPLETE_TESTS", message: "All test results must be recorded" }
+      - { status: 400, code: "CONDITIONAL_MISSING_FIELDS", message: "Conditional result requires reason and restrictions" }
+
+  # ==================== CANCEL INSPECTION ====================
+  - method: "POST"
+    path: "/api/quality/inspections/:id/cancel"
+    description: "Cancel scheduled inspection"
+    file: "apps/frontend/app/api/quality/inspections/[id]/cancel/route.ts"
+    auth: "required"
+    roles: ["QA_INSPECTOR", "QA_MANAGER"]
+
+    request_body:
+      schema:
+        cancellation_reason: "string (required, min 10 chars, max 500)"
+
+    response:
+      status: 200
+      schema:
+        inspection:
+          id: "UUID"
+          status: "cancelled"
+
+    errors:
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+      - { status: 404, code: "NOT_FOUND", message: "Inspection not found" }
+      - { status: 400, code: "INVALID_STATUS", message: "Only scheduled inspections can be cancelled" }
+
+  # ==================== GET PENDING INSPECTIONS ====================
+  - method: "GET"
+    path: "/api/quality/inspections/pending"
+    description: "Get pending inspections (scheduled + in_progress)"
+    file: "apps/frontend/app/api/quality/inspections/pending/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    query_parameters:
+      - { name: "inspection_type", type: "string", required: false, description: "Filter by type" }
+      - { name: "page", type: "integer", required: false, default: 1 }
+      - { name: "limit", type: "integer", required: false, default: 20 }
+
+    response:
+      status: 200
+      schema:
+        inspections: "QualityInspection[]"
+        counts:
+          scheduled: "number"
+          in_progress: "number"
+          total: "number"
+
+    errors:
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+
+  # ==================== GET INCOMING INSPECTIONS ====================
+  - method: "GET"
+    path: "/api/quality/inspections/incoming"
+    description: "Get incoming inspections (type='incoming')"
+    file: "apps/frontend/app/api/quality/inspections/incoming/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    query_parameters:
+      - { name: "status", type: "string", required: false, enum: ["scheduled", "in_progress", "completed"] }
+      - { name: "result", type: "string", required: false, enum: ["pass", "fail", "conditional"] }
+      - { name: "page", type: "integer", required: false, default: 1 }
+      - { name: "limit", type: "integer", required: false, default: 20 }
+
+    response:
+      status: 200
+      schema:
+        inspections: "QualityInspection[]"
+        pagination: "{ total, page, limit, pages }"
+
+    errors:
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/inspection-service.ts"
+    description: "Inspection business logic, queries, mutations"
+    exports:
+      - name: "InspectionService"
+        type: "class"
+        methods:
+          - { name: "list", params: ["params: InspectionListParams"], returns: "Promise<PaginatedResult<QualityInspection>>" }
+          - { name: "getById", params: ["id: string"], returns: "Promise<InspectionDetail | null>" }
+          - { name: "getByNumber", params: ["inspectionNumber: string"], returns: "Promise<QualityInspection | null>" }
+          - { name: "create", params: ["input: CreateInspectionInput"], returns: "Promise<QualityInspection>" }
+          - { name: "assign", params: ["id: string", "inspectorId: string", "assignedBy: string"], returns: "Promise<QualityInspection>" }
+          - { name: "start", params: ["id: string", "userId: string", "takeOver?: boolean"], returns: "Promise<QualityInspection>" }
+          - { name: "complete", params: ["id: string", "input: CompleteInspectionInput", "userId: string"], returns: "Promise<{ inspection: QualityInspection; ncrId?: string }>" }
+          - { name: "cancel", params: ["id: string", "reason: string", "userId: string"], returns: "Promise<QualityInspection>" }
+          - { name: "getSuggestedResult", params: ["inspectionId: string"], returns: "Promise<{ suggested: string; reason: string; testSummary: any }>" }
+          - { name: "canComplete", params: ["inspectionId: string"], returns: "Promise<{ canComplete: boolean; missingTests: string[] }>" }
+          - { name: "updateLPStatus", params: ["lpId: string", "result: string"], returns: "Promise<void>" }
+          - { name: "getPendingInspections", params: ["type?: string"], returns: "Promise<{ inspections: QualityInspection[]; counts: any }>" }
+          - { name: "getMyInspections", params: ["userId: string"], returns: "Promise<QualityInspection[]>" }
+          - { name: "hasActiveInspection", params: ["lpId: string"], returns: "Promise<{ has: boolean; inspectionId?: string }>" }
+
+# Validation Schemas
+validation:
+  - path: "apps/frontend/lib/validation/inspection.ts"
+    description: "Zod schemas for inspection validation"
+    exports:
+      - name: "inspectionTypeEnum"
+        values: ["incoming", "in_process", "final"]
+
+      - name: "inspectionStatusEnum"
+        values: ["scheduled", "in_progress", "completed", "cancelled"]
+
+      - name: "inspectionPriorityEnum"
+        values: ["low", "normal", "high", "urgent"]
+
+      - name: "inspectionResultEnum"
+        values: ["pass", "fail", "conditional"]
+
+      - name: "createInspectionSchema"
+        fields:
+          product_id: "z.string().uuid()"
+          lp_id: "z.string().uuid().optional()"
+          grn_id: "z.string().uuid().optional()"
+          po_id: "z.string().uuid().optional()"
+          spec_id: "z.string().uuid().optional()"
+          batch_number: "z.string().max(100).optional()"
+          lot_size: "z.number().int().positive().optional()"
+          priority: "inspectionPriorityEnum.default('normal')"
+          scheduled_date: "z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/).optional()"
+          inspector_id: "z.string().uuid().optional()"
+          notes: "z.string().max(2000).optional()"
+
+      - name: "assignInspectionSchema"
+        fields:
+          inspector_id: "z.string().uuid()"
+
+      - name: "completeInspectionSchema"
+        fields:
+          result: "inspectionResultEnum"
+          result_notes: "z.string().max(2000).optional()"
+          defects_found: "z.number().int().min(0).default(0)"
+          major_defects: "z.number().int().min(0).default(0)"
+          minor_defects: "z.number().int().min(0).default(0)"
+          critical_defects: "z.number().int().min(0).default(0)"
+          conditional_reason: "z.string().max(500).optional()"
+          conditional_restrictions: "z.string().max(1000).optional()"
+          conditional_expires_at: "z.string().datetime().optional()"
+          create_ncr: "z.boolean().default(false)"
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/inspection.ts"
+    description: "TypeScript interfaces for inspection module"
+    exports:
+      - name: "QualityInspection"
+        fields:
+          id: "string"
+          org_id: "string"
+          inspection_number: "string"
+          inspection_type: "InspectionType"
+          status: "InspectionStatus"
+          result?: "InspectionResult"
+          priority: "InspectionPriority"
+          product_id: "string"
+          product_code: "string"
+          product_name: "string"
+          lp_id?: "string"
+          lp_number?: "string"
+          inspector_id?: "string"
+          inspector_name?: "string"
+          scheduled_date?: "string"
+          started_at?: "string"
+          completed_at?: "string"
+          defects_found: "number"
+          created_at: "string"
+
+      - name: "InspectionDetail"
+        extends: "QualityInspection"
+        fields:
+          test_results: "TestResult[]"
+          test_result_summary: "TestResultSummary"
+          can_complete: "boolean"
+          suggested_result?: "InspectionResult"

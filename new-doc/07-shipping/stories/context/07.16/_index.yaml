@@ -1,0 +1,182 @@
+# Story 07.16 - Index File (Entry Point)
+# Generated: 2025-12-18
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "07.16"
+  name: "RMA Core CRUD + Approval Workflow"
+  slug: "rma-core-crud"
+  epic: "07-shipping"
+  phase: "2A"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "fullstack"
+  state: "ready"
+  priority: "P1 (Phase 2)"
+  food_safety_critical: true
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, RLS, seed data, migrations
+  - api.yaml         # Endpoints, auth, request/response schemas
+  - frontend.yaml    # Components, pages, services, types
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["org_id context", "RLS patterns", "users table lookup"]
+    - story: "01.6"
+      name: "Role-Based Permissions"
+      provides: ["MANAGER role enforcement", "permission checks"]
+    - story: "02.1"
+      name: "Products CRUD"
+      provides: ["products table", "product references"]
+    - story: "07.1"
+      name: "Customers CRUD"
+      provides: ["customers table", "customer_id FK"]
+    - story: "07.2"
+      name: "Sales Orders CRUD"
+      provides: ["sales_orders table", "sales_order_id optional FK"]
+  soft_dependencies:
+    - story: "05"
+      name: "Warehouse (License Plates)"
+      provides: ["LP integration for 07.17"]
+  blocked_by: []
+  blocks:
+    - story: "07.17"
+      name: "RMA Receiving"
+      reason: "Requires rma_requests & rma_lines tables from this story"
+    - story: "07.18"
+      name: "RMA Disposition Processing"
+      reason: "Extends approval workflow and disposition logic"
+    - story: "09"
+      name: "Finance (Credit Memo)"
+      reason: "Generate credit memo from RMA"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/shipping.md"
+    sections: ["FR-7.59", "FR-7.60 to FR-7.65", "Returns & RMA section"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/shipping.md"
+    sections: ["rma_requests table", "rma_lines table", "RMA Endpoints"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/07-shipping/07.16.rma-core-crud.md"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/SHIP-011-so-cancellation.md"
+      name: "Cancellation Modal (reuse pattern)"
+      usage: "Form patterns, impact summary layout, modal structure"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for rma_requests & rma_lines tables"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "rma_requests & rma_lines tables with RLS, auto-number generation"
+  - type: "service"
+    count: 1
+    description: "rma-service.ts with CRUD + approval workflow + auto-numbering"
+  - type: "api"
+    count: 7
+    description: "List, Get, Create, Update, Delete, Approve, Close endpoints"
+  - type: "validation"
+    count: 1
+    description: "Zod schemas for RMA CRUD operations"
+  - type: "pages"
+    count: 2
+    description: "/shipping/rma list page, /shipping/rma/:id detail page"
+  - type: "components"
+    count: 10
+    description: "DataTable, forms, badges, filters, approval dialogs, RMA lines"
+  - type: "test"
+    count: 3
+    description: "Unit tests (service), Integration tests (API), E2E tests (workflow)"
+
+# Technical notes
+technical_notes:
+  - "RMA number auto-generation: RMA-YYYY-NNNNN format with annual sequence per org"
+  - "Status workflow: pending → approved → receiving → received → processed → closed"
+  - "Phase 1 scope: CRUD + approval only (07.17 adds receiving, 07.18 adds disposition)"
+  - "Edit/delete allowed only for pending status RMAs"
+  - "Approval requires MANAGER or ADMIN role"
+  - "RMA lines CRUD: Add/edit/delete lines (pending RMA only)"
+  - "Reason codes: damaged, expired, wrong_product, quality_issue, customer_change, other"
+  - "Disposition options: restock, scrap, quality_hold, rework"
+  - "Auto-suggest disposition based on reason code"
+  - "RLS: org_id isolation enforced at database and API level"
+  - "Audit trail: All create/update/approve/close actions logged"
+
+# Acceptance Criteria Summary (high-level)
+acceptance_summary:
+  - "rma_requests & rma_lines tables with all required columns"
+  - "Auto-generated RMA numbers in RMA-YYYY-NNNNN format"
+  - "Create RMA with customer (required), SO link (optional), reason code, disposition"
+  - "Add/edit/delete RMA lines (product, qty_expected, lot_number, reason_notes)"
+  - "RMA list with DataTable (status, customer, date filters, search)"
+  - "RMA detail page with header, lines table, approval info"
+  - "Edit RMA (pending only) with all fields editable except RMA number"
+  - "Delete RMA (pending only) with cascade delete to lines"
+  - "Submit RMA: draft → pending (status transition)"
+  - "Approve RMA (MANAGER+ only): pending → approved + record timestamp/user"
+  - "Close RMA (MANAGER+ only): final status transition"
+  - "Status badges with correct colors (pending, approved, receiving, received, processed, closed)"
+  - "Reason code & disposition badges with correct colors"
+  - "Permission enforcement (create: SHIPPER+, approve: MANAGER+)"
+  - "RLS policy enforcement for multi-tenancy"
+  - "Audit trail for all CRUD and approval actions"
+
+# UI Components Summary
+ui_components:
+  - "RMADataTable: List with pagination, sorting, filtering"
+  - "RMAFilters: Status, customer, reason code, date range"
+  - "RMAStatusBadge: pending, approved, receiving, received, processed, closed"
+  - "RMAReasonBadge: damaged, expired, wrong_product, quality_issue, customer_change, other"
+  - "RMADispositionBadge: restock, scrap, quality_hold, rework"
+  - "RMADetail: Header + customer info + lines + approval info + actions"
+  - "RMALinesTable: Product, qty_expected, qty_received, lot, reason, disposition, actions"
+  - "RMALineForm: Add/edit line modal with validation"
+  - "CreateRMAForm: Customer selection, SO link, reason code, disposition"
+  - "EditRMAForm: Edit pending RMA fields"
+  - "ApproveRMADialog: Confirmation before approval"
+  - "CloseRMADialog: Close RMA (final action)"
+  - "DeleteRMADialog: Delete pending RMA confirmation"
+
+# Database Tables
+database_summary:
+  rma_requests:
+    - "id, org_id, rma_number (unique per org)"
+    - "customer_id, sales_order_id (optional), status"
+    - "reason_code, disposition, notes"
+    - "total_value, approved_at, approved_by"
+    - "created_at, created_by, updated_at"
+  rma_lines:
+    - "id, org_id, rma_request_id, product_id"
+    - "quantity_expected, quantity_received, lot_number"
+    - "reason_notes, disposition (optional override)"
+    - "created_at"
+
+# API Endpoints
+api_summary:
+  - "GET /api/shipping/rma - List with filters"
+  - "GET /api/shipping/rma/:id - Get detail"
+  - "POST /api/shipping/rma - Create RMA"
+  - "PUT /api/shipping/rma/:id - Update pending only"
+  - "DELETE /api/shipping/rma/:id - Delete pending only"
+  - "POST /api/shipping/rma/:id/lines - Add line"
+  - "PUT /api/shipping/rma/:id/lines/:lineId - Update line"
+  - "DELETE /api/shipping/rma/:id/lines/:lineId - Delete line"
+  - "POST /api/shipping/rma/:id/approve - Approve RMA (MANAGER+)"
+  - "POST /api/shipping/rma/:id/close - Close RMA (MANAGER+)"
+
+# Related Stories
+related_stories:
+  phase_2a: ["07.15 (SO Cancellation)", "07.16 (RMA Core - this story)"]
+  phase_2b: ["07.17 (RMA Receiving)", "07.18 (RMA Disposition)"]
+  phase_3: ["06 (Quality Hold Integration)", "09 (Credit Memo)"]

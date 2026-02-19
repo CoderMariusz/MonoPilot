@@ -1,0 +1,46 @@
+# Story 08.14 - Test Specifications
+# Purpose: Export functionality tests
+# Agent: TEST-WRITER, QA-AGENT
+# SEE: markdown lines 582-627
+
+test_files:
+  unit:
+    - "lib/services/npd-export-service.test.ts"
+  integration:
+    - "app/api/npd/formulations/[id]/export/pdf/route.test.ts"
+    - "app/api/npd/formulations/[id]/export/excel/route.test.ts"
+  e2e:
+    - "e2e/npd-export.spec.ts"
+
+key_tests:
+  pdf_export:
+    - "Export locked formulation to PDF"
+    - "PDF includes all sections (project, items, allergens, costing)"
+    - "PDF without allergens (graceful degradation)"
+    - "PDF without costing (graceful degradation)"
+    - "Content-Type and Content-Disposition headers correct"
+    - "Filename format: {PROJECT}_{VERSION}.pdf"
+
+  excel_export:
+    - "Export locked formulation to Excel"
+    - "Excel has 4 sheets (Info, Ingredients, Allergens, Costing)"
+    - "Excel formatting (bold headers, freeze panes, formulas)"
+    - "Percentage column formatted as %"
+    - "Cost columns formatted as currency"
+
+  validation:
+    - "Cannot export draft formulation"
+    - "Cannot export approved (not locked) formulation"
+
+  audit:
+    - "Export logged to audit_log with action, user, timestamp"
+
+  permissions:
+    - "NPD_LEAD/R&D can export"
+    - "VIEWER cannot export (403)"
+
+  performance:
+    - "PDF export < 2 seconds for 50 items"
+    - "Excel export < 3 seconds for 100 items"
+
+coverage_target: ">= 80%"

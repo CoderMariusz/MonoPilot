@@ -1,0 +1,464 @@
+# Story 03.5b - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  - method: "POST"
+    path: "/api/planning/purchase-orders/:id/submit"
+    description: "Submit PO for approval or direct submission based on settings"
+    file: "apps/frontend/app/api/planning/purchase-orders/[id]/submit/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "planner", "purchaser"]
+
+    request:
+      params:
+        id: "UUID - Purchase Order ID"
+      body: {}  # No body needed
+
+    response:
+      status: 200
+      schema:
+        success: "boolean"
+        data:
+          id: "UUID"
+          po_number: "string"
+          status: "'pending_approval' | 'submitted'"
+          approval_required: "boolean"
+          approval_status: "'pending' | null"
+          notification_sent: "boolean"
+          notification_count: "number"
+
+    errors:
+      - status: 400
+        code: "PO_NOT_DRAFT"
+        message: "Cannot submit: PO must be in draft status"
+        when: "PO status is not 'draft'"
+      - status: 400
+        code: "PO_NO_LINES"
+        message: "Cannot submit PO: Purchase order must have at least one line item"
+        when: "PO has zero lines"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "You do not have permission to submit purchase orders"
+        when: "User lacks submit permission"
+      - status: 404
+        code: "PO_NOT_FOUND"
+        message: "Purchase order not found"
+        when: "PO doesn't exist or belongs to different org"
+
+  - method: "POST"
+    path: "/api/planning/purchase-orders/:id/approve"
+    description: "Approve a pending PO (restricted to approval roles)"
+    file: "apps/frontend/app/api/planning/purchase-orders/[id]/approve/route.ts"
+    auth: "required"
+    roles: ["dynamic - from planning_settings.po_approval_roles"]
+
+    request:
+      params:
+        id: "UUID - Purchase Order ID"
+      body:
+        notes:
+          type: "string"
+          required: false
+          maxLength: 1000
+          description: "Optional approval notes"
+
+    response:
+      status: 200
+      schema:
+        success: "boolean"
+        data:
+          id: "UUID"
+          po_number: "string"
+          status: "'approved'"
+          approval_status: "'approved'"
+          approved_by:
+            id: "UUID"
+            name: "string"
+          approved_at: "ISO timestamp"
+          approval_notes: "string | null"
+          notification_sent: "boolean"
+          notification_recipient:
+            id: "UUID"
+            name: "string"
+            email: "string"
+
+    errors:
+      - status: 400
+        code: "PO_NOT_PENDING_APPROVAL"
+        message: "Cannot approve: PO must be in pending approval status"
+        when: "PO status is not 'pending_approval'"
+      - status: 403
+        code: "NOT_APPROVER"
+        message: "Access denied: You do not have permission to approve purchase orders"
+        when: "User role not in po_approval_roles"
+      - status: 404
+        code: "PO_NOT_FOUND"
+        message: "Purchase order not found"
+        when: "PO doesn't exist or belongs to different org"
+      - status: 409
+        code: "PO_ALREADY_PROCESSED"
+        message: "This PO has already been approved by {user_name}"
+        when: "Concurrent approval attempt"
+
+  - method: "POST"
+    path: "/api/planning/purchase-orders/:id/reject"
+    description: "Reject a pending PO (restricted to approval roles)"
+    file: "apps/frontend/app/api/planning/purchase-orders/[id]/reject/route.ts"
+    auth: "required"
+    roles: ["dynamic - from planning_settings.po_approval_roles"]
+
+    request:
+      params:
+        id: "UUID - Purchase Order ID"
+      body:
+        rejection_reason:
+          type: "string"
+          required: true
+          minLength: 10
+          maxLength: 1000
+          description: "Required reason for rejection"
+
+    response:
+      status: 200
+      schema:
+        success: "boolean"
+        data:
+          id: "UUID"
+          po_number: "string"
+          status: "'rejected'"
+          approval_status: "'rejected'"
+          rejected_by:
+            id: "UUID"
+            name: "string"
+          rejected_at: "ISO timestamp"
+          rejection_reason: "string"
+          notification_sent: "boolean"
+          notification_recipient:
+            id: "UUID"
+            name: "string"
+            email: "string"
+
+    errors:
+      - status: 400
+        code: "REJECTION_REASON_REQUIRED"
+        message: "Rejection reason is required"
+        when: "rejection_reason is missing"
+      - status: 400
+        code: "REJECTION_REASON_TOO_SHORT"
+        message: "Rejection reason must be at least 10 characters"
+        when: "rejection_reason < 10 chars"
+      - status: 400
+        code: "PO_NOT_PENDING_APPROVAL"
+        message: "Cannot reject: PO must be in pending approval status"
+        when: "PO status is not 'pending_approval'"
+      - status: 403
+        code: "NOT_APPROVER"
+        message: "Access denied: You do not have permission to reject purchase orders"
+        when: "User role not in po_approval_roles"
+      - status: 404
+        code: "PO_NOT_FOUND"
+        message: "Purchase order not found"
+        when: "PO doesn't exist or belongs to different org"
+
+  - method: "GET"
+    path: "/api/planning/purchase-orders/:id/approval-history"
+    description: "Get approval history for a PO"
+    file: "apps/frontend/app/api/planning/purchase-orders/[id]/approval-history/route.ts"
+    auth: "required"
+    roles: ["*"]  # All authenticated users with PO read access
+
+    request:
+      params:
+        id: "UUID - Purchase Order ID"
+      query:
+        page: "number (default: 1)"
+        limit: "number (default: 10, max: 50)"
+
+    response:
+      status: 200
+      schema:
+        success: "boolean"
+        data:
+          history:
+            type: "array"
+            items:
+              id: "UUID"
+              po_id: "UUID"
+              action: "'submitted' | 'approved' | 'rejected'"
+              user_id: "UUID"
+              user_name: "string"
+              user_role: "string"
+              notes: "string | null"
+              created_at: "ISO timestamp"
+          pagination:
+            page: "number"
+            limit: "number"
+            total: "number"
+            total_pages: "number"
+
+    errors:
+      - status: 404
+        code: "PO_NOT_FOUND"
+        message: "Purchase order not found"
+        when: "PO doesn't exist or belongs to different org"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/purchase-order-service.ts"
+    description: "EXTEND - Add approval workflow methods"
+    exports:
+      - name: "submitPO"
+        type: "async function"
+        params:
+          - "poId: string"
+          - "orgId: string"
+          - "userId: string"
+        returns: "Promise<{ status: 'pending_approval' | 'submitted'; approvalRequired: boolean; notificationSent: boolean; }>"
+        description: "Submit PO for approval or direct submission based on settings"
+
+      - name: "approvePO"
+        type: "async function"
+        params:
+          - "poId: string"
+          - "orgId: string"
+          - "userId: string"
+          - "userRole: string"
+          - "notes?: string"
+        returns: "Promise<void>"
+        description: "Approve a pending PO"
+
+      - name: "rejectPO"
+        type: "async function"
+        params:
+          - "poId: string"
+          - "orgId: string"
+          - "userId: string"
+          - "userRole: string"
+          - "rejectionReason: string"
+        returns: "Promise<void>"
+        description: "Reject a pending PO"
+
+      - name: "getPOApprovalHistory"
+        type: "async function"
+        params:
+          - "poId: string"
+          - "orgId: string"
+          - "options?: { page?: number; limit?: number }"
+        returns: "Promise<{ history: POApprovalHistory[]; pagination: Pagination }>"
+        description: "Get approval history for a PO"
+
+      - name: "canUserApprove"
+        type: "async function"
+        params:
+          - "userId: string"
+          - "orgId: string"
+        returns: "Promise<boolean>"
+        description: "Check if user has approval permission"
+
+      - name: "validateStatusTransition"
+        type: "function"
+        params:
+          - "currentStatus: POStatus"
+          - "nextStatus: POStatus"
+          - "approvalEnabled: boolean"
+        returns: "void"
+        throws: "Error if transition is invalid"
+        description: "Validate PO status transition (state machine)"
+
+  - path: "apps/frontend/lib/services/notification-service.ts"
+    description: "NEW or EXTEND - Email notifications for approval workflow"
+    exports:
+      - name: "notifyApprovers"
+        type: "async function"
+        params:
+          - "poId: string"
+          - "poNumber: string"
+          - "poTotal: number"
+          - "supplierName: string"
+          - "submittedBy: string"
+          - "orgId: string"
+        returns: "Promise<{ sent: boolean; count: number }>"
+        description: "Send approval request notification to all approvers"
+
+      - name: "notifyPOCreator"
+        type: "async function"
+        params:
+          - "poId: string"
+          - "poNumber: string"
+          - "action: 'approved' | 'rejected'"
+          - "approverName: string"
+          - "notes: string"
+          - "creatorUserId: string"
+        returns: "Promise<{ sent: boolean }>"
+        description: "Send approval decision notification to PO creator"
+
+# Validation Schemas
+validation:
+  - path: "apps/frontend/lib/validation/purchase-order-validation.ts"
+    description: "EXTEND - Add approval workflow schemas"
+    schemas:
+      - name: "submitPoSchema"
+        content: |
+          export const submitPoSchema = z.object({
+            // No body needed - action is idempotent
+          });
+
+      - name: "approvePoSchema"
+        content: |
+          export const approvePoSchema = z.object({
+            notes: z.string().max(1000, 'Notes cannot exceed 1000 characters').optional(),
+          });
+
+      - name: "rejectPoSchema"
+        content: |
+          export const rejectPoSchema = z.object({
+            rejection_reason: z.string()
+              .min(10, 'Rejection reason must be at least 10 characters')
+              .max(1000, 'Rejection reason must not exceed 1000 characters'),
+          });
+
+    types:
+      - name: "ApprovePoInput"
+        export: "export type ApprovePoInput = z.infer<typeof approvePoSchema>;"
+      - name: "RejectPoInput"
+        export: "export type RejectPoInput = z.infer<typeof rejectPoSchema>;"
+
+# Implementation Patterns
+patterns:
+  api_route_approve: |
+    // apps/frontend/app/api/planning/purchase-orders/[id]/approve/route.ts
+    import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+    import { cookies } from 'next/headers';
+    import { NextRequest, NextResponse } from 'next/server';
+    import { approvePoSchema } from '@/lib/validation/purchase-order-validation';
+    import { approvePO, canUserApprove } from '@/lib/services/purchase-order-service';
+    import { getOrgContext } from '@/lib/services/org-context-service';
+
+    export async function POST(
+      request: NextRequest,
+      { params }: { params: { id: string } }
+    ) {
+      const supabase = createRouteHandlerClient({ cookies });
+      const context = await getOrgContext();
+
+      if (!context) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      // Check if user can approve
+      const canApprove = await canUserApprove(context.user_id, context.org_id);
+      if (!canApprove) {
+        return NextResponse.json(
+          { error: 'Access denied: You do not have permission to approve purchase orders' },
+          { status: 403 }
+        );
+      }
+
+      // Validate request body
+      const body = await request.json();
+      const validation = approvePoSchema.safeParse(body);
+      if (!validation.success) {
+        return NextResponse.json(
+          { error: validation.error.errors[0].message },
+          { status: 400 }
+        );
+      }
+
+      try {
+        await approvePO(
+          params.id,
+          context.org_id,
+          context.user_id,
+          context.role_code,
+          validation.data.notes
+        );
+
+        // Fetch updated PO for response
+        const { data: po } = await supabase
+          .from('purchase_orders')
+          .select('*')
+          .eq('id', params.id)
+          .single();
+
+        return NextResponse.json({ success: true, data: po });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Approval failed';
+        return NextResponse.json({ error: message }, { status: 400 });
+      }
+    }
+
+  state_machine: |
+    // State machine for PO status transitions
+    const validTransitions: Record<string, string[]> = {
+      'draft': ['pending_approval', 'submitted'],
+      'pending_approval': ['approved', 'rejected'],
+      'approved': ['confirmed'],
+      'rejected': ['draft'],  // Return to draft for editing
+      'submitted': ['confirmed'],
+      'confirmed': ['receiving', 'cancelled'],
+      'receiving': ['closed'],
+      'closed': [],
+      'cancelled': [],
+    };
+
+    export function validateStatusTransition(
+      currentStatus: POStatus,
+      nextStatus: POStatus,
+      approvalEnabled: boolean
+    ): void {
+      const allowed = validTransitions[currentStatus] || [];
+
+      // Special handling for approval flow
+      if (currentStatus === 'draft' && approvalEnabled) {
+        if (nextStatus === 'submitted') {
+          throw new Error('Approval is enabled. PO must go through pending_approval.');
+        }
+      }
+
+      if (!allowed.includes(nextStatus)) {
+        throw new Error(`Invalid status transition: ${currentStatus} -> ${nextStatus}`);
+      }
+    }
+
+# Error Codes Summary
+error_codes:
+  - code: "PO_NOT_FOUND"
+    http: 404
+    description: "PO doesn't exist or belongs to different org"
+  - code: "PO_NOT_DRAFT"
+    http: 400
+    description: "Cannot submit: PO must be in draft status"
+  - code: "PO_NO_LINES"
+    http: 400
+    description: "Cannot submit PO without line items"
+  - code: "PO_NOT_PENDING_APPROVAL"
+    http: 400
+    description: "Cannot approve/reject: PO must be in pending approval status"
+  - code: "NOT_APPROVER"
+    http: 403
+    description: "User role not in po_approval_roles"
+  - code: "REJECTION_REASON_REQUIRED"
+    http: 400
+    description: "Rejection reason is required"
+  - code: "REJECTION_REASON_TOO_SHORT"
+    http: 400
+    description: "Rejection reason must be at least 10 characters"
+  - code: "PO_ALREADY_PROCESSED"
+    http: 409
+    description: "Concurrent approval - PO already approved/rejected"
+
+# Performance Targets
+performance:
+  - endpoint: "POST /purchase-orders/:id/submit"
+    target: "< 300ms (P95)"
+    notes: "Notification queued async"
+  - endpoint: "POST /purchase-orders/:id/approve"
+    target: "< 500ms (P95)"
+    notes: "Includes history write"
+  - endpoint: "POST /purchase-orders/:id/reject"
+    target: "< 500ms (P95)"
+    notes: "Includes history write"
+  - endpoint: "GET /purchase-orders/:id/approval-history"
+    target: "< 200ms"
+    notes: "Paginated, max 50 per page"

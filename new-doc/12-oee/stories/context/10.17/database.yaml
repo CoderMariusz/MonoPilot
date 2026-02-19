@@ -1,0 +1,44 @@
+# Story 10.17 - Database Schema
+# Purpose: Bottleneck analysis views
+# Agent: BACKEND-DEV
+
+# Uses existing tables (routings, oee_snapshots), creates analysis views
+views:
+  - name: "line_bottleneck_analysis"
+    description: "Identify bottleneck operations per line"
+    sql: |
+      CREATE OR REPLACE VIEW line_bottleneck_analysis AS
+      WITH operation_metrics AS (
+        SELECT
+            r.org_id,
+            r.line_id,
+            ro.operation_id,
+            o.name as operation_name,
+            ro.sequence,
+            ro.cycle_time_seconds,
+            3600.0 / NULLIF(ro.cycle_time_seconds, 0) as capacity_per_hour
+        FROM routings r
+        JOIN routing_operations ro ON r.id = ro.routing_id
+        JOIN operations o ON ro.operation_id = o.id
+        WHERE r.is_active = true
+      ),
+      ranked AS (
+        SELECT
+            *,
+            MIN(capacity_per_hour) OVER (PARTITION BY org_id, line_id) as line_capacity,
+            CASE WHEN capacity_per_hour = MIN(capacity_per_hour) OVER (PARTITION BY org_id, line_id)
+              THEN true ELSE false
+            END as is_bottleneck
+        FROM operation_metrics
+      )
+      SELECT * FROM ranked;
+
+existing_tables:
+  - name: "routings"
+    columns_used: ["id", "line_id", "is_active"]
+  - name: "routing_operations"
+    columns_used: ["operation_id", "cycle_time_seconds", "sequence"]
+  - name: "operations"
+    columns_used: ["name"]
+
+migrations: []

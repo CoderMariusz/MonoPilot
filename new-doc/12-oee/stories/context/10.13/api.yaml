@@ -1,0 +1,68 @@
+# Story 10.13 - API Specification
+# Purpose: Report templates CRUD and report generation
+# Agent: BACKEND-DEV
+
+endpoints:
+  - method: "GET"
+    path: "/api/oee/reports/templates"
+    description: "List report templates"
+    auth: "required"
+    roles: ["*"]
+
+  - method: "POST"
+    path: "/api/oee/reports/templates"
+    description: "Create report template"
+    auth: "required"
+    request:
+      body:
+        name: "string (required)"
+        description: "string (optional)"
+        metrics: "string[] (required)"
+        dimensions: "string[] (required)"
+        filters: "object (optional)"
+        chart_type: "string (required)"
+        is_public: "boolean (optional)"
+
+  - method: "GET"
+    path: "/api/oee/reports/templates/:id"
+    description: "Get template by ID"
+    auth: "required"
+
+  - method: "DELETE"
+    path: "/api/oee/reports/templates/:id"
+    description: "Delete template"
+    auth: "required"
+
+  - method: "POST"
+    path: "/api/oee/reports/generate"
+    description: "Generate report from configuration"
+    auth: "required"
+    request:
+      body:
+        metrics: "string[]"
+        dimensions: "string[]"
+        filters: "object"
+        chart_type: "string"
+    response:
+      data: "aggregated report data"
+      chart_data: "formatted for chart rendering"
+
+services:
+  - path: "apps/frontend/lib/services/report-builder-service.ts"
+    exports:
+      - name: "ReportBuilderService"
+        methods:
+          - "listTemplates"
+          - "createTemplate"
+          - "getTemplate"
+          - "deleteTemplate"
+          - "generateReport"
+
+types:
+  - path: "apps/frontend/lib/types/report-builder.ts"
+    exports:
+      - "ReportTemplate"
+      - "ReportConfig"
+      - "ReportData"
+      - "Metric"
+      - "Dimension"

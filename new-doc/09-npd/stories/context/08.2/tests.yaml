@@ -1,0 +1,431 @@
+# Story 08.2 - Test Strategy
+# NPD Projects CRUD & Kanban
+
+unit_tests:
+  service_layer:
+    file: apps/frontend/lib/services/__tests__/npd-project-service.test.ts
+    framework: Vitest
+    coverage_target: ">80%"
+    test_suites:
+      - suite: NPDProjectService.create
+        tests:
+          - name: "creates project with correct fields"
+            description: "Verify all fields saved correctly"
+          - name: "generates project number in NPD-YYYY-NNNNN format"
+            description: "Check number generation"
+          - name: "defaults to current user as owner if not provided"
+            description: "Verify owner_id default"
+          - name: "defaults current_gate to G0 and status to idea"
+            description: "Verify workflow defaults"
+          - name: "returns 400 for missing project_name"
+            description: "Validation error handling"
+
+      - suite: NPDProjectService.update
+        tests:
+          - name: "updates project fields successfully"
+            description: "Verify field updates"
+          - name: "blocks update if status = 'launched'"
+            description: "Enforce edit restrictions"
+          - name: "returns 404 for non-existent project"
+            description: "Error handling"
+
+      - suite: NPDProjectService.delete
+        tests:
+          - name: "deletes project with status = 'idea'"
+            description: "Verify RLS allows deletion"
+          - name: "blocks deletion if status != 'idea'"
+            description: "RLS policy enforcement"
+
+      - suite: NPDProjectService.advanceGate
+        tests:
+          - name: "advances G0 to G1 and updates status to feasibility"
+            description: "Verify gate-status mapping"
+          - name: "advances through all gates sequentially"
+            description: "Full workflow test"
+          - name: "blocks advancement from Launched gate"
+            description: "Terminal gate check"
+          - name: "creates audit log entry on advancement"
+            description: "Audit trail"
+
+      - suite: NPDProjectService.generateProjectNumber
+        tests:
+          - name: "generates NPD-YYYY-NNNNN format"
+            description: "Format validation"
+          - name: "increments sequence correctly"
+            description: "Sequential numbering"
+          - name: "resets sequence per year"
+            description: "Year-based reset"
+          - name: "prevents duplicate numbers in same org"
+            description: "Uniqueness constraint"
+
+      - suite: NPDProjectService.gateToStatus
+        tests:
+          - name: "maps G0 to 'idea'"
+            description: "Gate-status mapping"
+          - name: "maps G1 to 'feasibility'"
+            description: "Gate-status mapping"
+          - name: "maps G4 to 'testing'"
+            description: "Gate-status mapping"
+          - name: "maps Launched to 'launched'"
+            description: "Gate-status mapping"
+
+      - suite: NPDProjectService.getKanbanData
+        tests:
+          - name: "groups projects by current_gate"
+            description: "Verify grouping logic"
+          - name: "sorts by priority DESC then created_at DESC"
+            description: "Verify sort order"
+          - name: "excludes cancelled projects"
+            description: "Filter logic"
+          - name: "returns summary counts"
+            description: "Aggregation logic"
+
+  validation_layer:
+    file: apps/frontend/lib/validation/__tests__/npd-project.test.ts
+    framework: Vitest
+    test_suites:
+      - suite: createProjectSchema
+        tests:
+          - name: "validates required project_name"
+            description: "Required field check"
+          - name: "validates project_name min length (3 chars)"
+            description: "Min length validation"
+          - name: "validates project_name max length (200 chars)"
+            description: "Max length validation"
+          - name: "validates target_launch_date format (YYYY-MM-DD)"
+            description: "Date format validation"
+          - name: "defaults priority to 'medium'"
+            description: "Default value"
+
+      - suite: updateProjectSchema
+        tests:
+          - name: "allows partial updates (all fields optional)"
+            description: "Partial update validation"
+          - name: "validates priority enum"
+            description: "Enum validation"
+          - name: "validates status enum"
+            description: "Enum validation"
+
+integration_tests:
+  api_endpoints:
+    file: apps/frontend/app/api/npd/projects/__tests__/route.test.ts
+    framework: Vitest
+    test_suites:
+      - suite: POST /api/npd/projects
+        tests:
+          - name: "creates project with valid data and returns 201"
+            description: "Success path"
+          - name: "returns 400 for missing project_name"
+            description: "Validation error"
+          - name: "returns 403 if NPD module not enabled"
+            description: "Feature flag check"
+          - name: "enforces org_id from auth token"
+            description: "RLS enforcement"
+          - name: "auto-generates project_number"
+            description: "Number generation"
+
+      - suite: GET /api/npd/projects
+        tests:
+          - name: "returns paginated project list"
+            description: "Pagination works"
+          - name: "filters by current_gate"
+            description: "Filter logic"
+          - name: "filters by priority"
+            description: "Filter logic"
+          - name: "filters by portfolio_category"
+            description: "Filter logic"
+          - name: "searches by project_name"
+            description: "Search logic"
+          - name: "respects RLS (org isolation)"
+            description: "Multi-tenancy"
+          - name: "sorts by sort_by param"
+            description: "Sort logic"
+
+      - suite: GET /api/npd/projects/:id
+        tests:
+          - name: "returns project detail with related counts"
+            description: "Success path"
+          - name: "returns 404 for non-existent project"
+            description: "Error handling"
+          - name: "returns 404 for project in different org"
+            description: "RLS enforcement"
+
+      - suite: PUT /api/npd/projects/:id
+        tests:
+          - name: "updates project fields and returns 200"
+            description: "Success path"
+          - name: "returns 400 if status = 'launched'"
+            description: "Edit restriction"
+          - name: "returns 404 for non-existent project"
+            description: "Error handling"
+
+      - suite: DELETE /api/npd/projects/:id
+        tests:
+          - name: "deletes idea project and returns 204"
+            description: "Success path"
+          - name: "returns 403 for non-idea project"
+            description: "RLS delete policy"
+
+      - suite: POST /api/npd/projects/:id/advance-gate
+        tests:
+          - name: "advances gate from G0 to G1"
+            description: "Success path"
+          - name: "updates status with gate change"
+            description: "Status mapping"
+          - name: "returns 400 if already at Launched"
+            description: "Terminal gate check"
+          - name: "returns 403 for unauthorized user"
+            description: "Permission check"
+
+      - suite: GET /api/npd/dashboard
+        tests:
+          - name: "returns projects grouped by gate"
+            description: "Kanban data structure"
+          - name: "includes summary counts"
+            description: "Aggregation"
+          - name: "respects RLS"
+            description: "Multi-tenancy"
+
+  rls_policies:
+    file: supabase/tests/npd_projects_rls.test.sql
+    framework: pgTAP
+    test_suites:
+      - suite: npd_projects RLS
+        tests:
+          - name: "User A from Org A can SELECT own projects"
+            description: "SELECT policy"
+          - name: "User A cannot SELECT projects from Org B"
+            description: "Org isolation"
+          - name: "User A can INSERT project with org_id = Org A"
+            description: "INSERT policy"
+          - name: "User A cannot INSERT project with org_id = Org B"
+            description: "Org isolation"
+          - name: "User A can UPDATE own project"
+            description: "UPDATE policy"
+          - name: "User A cannot UPDATE project from Org B"
+            description: "Org isolation"
+          - name: "User A can DELETE project if status IN ('idea', 'cancelled')"
+            description: "DELETE policy with status check"
+          - name: "User A cannot DELETE project if status = 'launched'"
+            description: "DELETE policy restriction"
+
+e2e_tests:
+  workflow_tests:
+    file: tests/e2e/npd/projects.spec.ts
+    framework: Playwright
+    test_suites:
+      - suite: NPD Projects - Full Workflow
+        tests:
+          - name: "Create project → Advance gates → Launch"
+            steps:
+              - Navigate to /npd/dashboard
+              - Click [+ New Project]
+              - Fill form (name, category, priority, target date)
+              - Submit
+              - Verify project appears in G0 column
+              - Drag to G1 column
+              - Confirm advancement modal
+              - Verify project in G1 column with status = 'feasibility'
+              - Continue through G2, G3, G4
+              - Advance to Launched
+              - Verify status = 'launched'
+              - Verify [Edit] button disabled
+
+          - name: "Filter projects by category and priority"
+            steps:
+              - Navigate to /npd/dashboard
+              - Create 3 projects with different categories/priorities
+              - Apply filter: category = 'Vegan Line'
+              - Verify only matching projects display
+              - Apply filter: priority = 'high'
+              - Verify only high priority projects display
+              - Clear filters
+              - Verify all projects display
+
+          - name: "Switch between Kanban and List view"
+            steps:
+              - Navigate to /npd/dashboard (Kanban view)
+              - Click [List View] toggle
+              - Verify DataTable displays
+              - Sort by target_launch_date
+              - Click project row
+              - Verify navigates to detail page
+              - Back to list
+              - Click [Kanban View] toggle
+              - Verify Kanban displays
+
+          - name: "Edit project and verify updates"
+            steps:
+              - Navigate to project detail page
+              - Click [Edit]
+              - Change project_name and priority
+              - Submit
+              - Verify updates reflected
+              - Verify success toast
+
+          - name: "Cancel project workflow"
+            steps:
+              - Navigate to project detail page
+              - Click [Cancel Project]
+              - Enter cancellation reason
+              - Confirm
+              - Verify status = 'cancelled'
+              - Verify project no longer in Kanban active columns
+
+      - suite: NPD Projects - Permissions
+        tests:
+          - name: "NPD_LEAD can create/edit/delete projects"
+            steps:
+              - Login as NPD_LEAD user
+              - Navigate to /npd/dashboard
+              - Verify [+ New Project] button visible
+              - Create project
+              - Edit project
+              - Delete idea project
+              - Verify all actions succeed
+
+          - name: "R&D can view but not create"
+            steps:
+              - Login as R&D user
+              - Navigate to /npd/dashboard
+              - Verify [+ New Project] button hidden
+              - View project detail
+              - Verify [Edit] button hidden
+              - Verify read-only access
+
+          - name: "Viewer cannot access NPD module"
+            steps:
+              - Login as VIEWER user
+              - Navigate to /npd/dashboard
+              - Verify 403 Forbidden or redirect
+
+      - suite: NPD Projects - Error Handling
+        tests:
+          - name: "Validation errors display inline"
+            steps:
+              - Open Create Project modal
+              - Submit without project_name
+              - Verify error message "Project name is required"
+              - Enter invalid date format
+              - Verify error message
+
+          - name: "Network error shows retry option"
+            steps:
+              - Disconnect network
+              - Try to create project
+              - Verify error toast with retry button
+              - Reconnect network
+              - Click retry
+              - Verify success
+
+performance_tests:
+  load_tests:
+    - name: "Kanban dashboard with 50 projects loads < 500ms"
+      tool: Lighthouse
+      threshold: "500ms p95"
+
+    - name: "Project list with 200 projects loads < 500ms"
+      tool: Lighthouse
+      threshold: "500ms p95"
+
+    - name: "Drag-drop responds < 100ms"
+      tool: Custom performance timing
+      threshold: "100ms"
+
+    - name: "Search input debounce works (300ms)"
+      tool: Jest + fake timers
+      threshold: "300ms delay"
+
+accessibility_tests:
+  - name: "Kanban board keyboard navigable"
+    tool: axe-core
+    criteria:
+      - Tab through columns
+      - Arrow keys move focus
+      - Enter activates drag
+      - Escape cancels drag
+
+  - name: "Modals have focus trap"
+    tool: axe-core
+    criteria:
+      - Tab cycles within modal
+      - Escape closes modal
+      - Focus returns to trigger element
+
+  - name: "Badges have accessible text"
+    tool: axe-core
+    criteria:
+      - aria-label for icon-only badges
+      - Color + text (not color alone)
+
+test_data:
+  fixtures:
+    - name: npd_projects_seed.sql
+      description: "Seed data for testing"
+      records:
+        - project_number: NPD-2025-00001
+          project_name: Premium Vegan Burger
+          current_gate: G2
+          status: business_case
+          priority: high
+        - project_number: NPD-2025-00002
+          project_name: Gluten-Free Buns
+          current_gate: G0
+          status: idea
+          priority: medium
+        - project_number: NPD-2025-00003
+          project_name: Organic Cheese
+          current_gate: G4
+          status: testing
+          priority: high
+
+coverage_targets:
+  - service_layer: ">80%"
+  - validation: ">90%"
+  - api_routes: ">75%"
+  - components: ">70%"
+  - overall: ">75%"
+
+ci_pipeline:
+  stages:
+    - stage: lint
+      command: "pnpm lint"
+    - stage: unit_tests
+      command: "pnpm test:unit"
+    - stage: integration_tests
+      command: "pnpm test:integration"
+    - stage: e2e_tests
+      command: "pnpm test:e2e"
+      browsers: [chromium, firefox, webkit]
+    - stage: coverage_report
+      command: "pnpm test:coverage"
+      fail_threshold: "<75%"
+
+acceptance_criteria_mapping:
+  - ac_id: AC-01
+    tests:
+      - "NPDProjectService.generateProjectNumber - generates NPD-YYYY-NNNNN format"
+      - "NPDProjectService.generateProjectNumber - increments sequence"
+      - "POST /api/npd/projects - auto-generates project_number"
+
+  - ac_id: AC-02
+    tests:
+      - "E2E: Drag project to next gate"
+      - "POST /api/npd/projects/:id/advance-gate - advances gate from G0 to G1"
+      - "AdvanceGateModal - shows confirmation"
+
+  - ac_id: AC-03
+    tests:
+      - "GET /api/npd/projects - filters by portfolio_category"
+      - "E2E: Filter projects by category and priority"
+
+  - ac_id: AC-04
+    tests:
+      - "NPDProjectService.create - defaults current_gate to G0"
+      - "NPDProjectService.create - defaults status to idea"
+      - "NPDProjectService.create - defaults priority to medium"
+
+  - ac_id: AC-05
+    tests:
+      - "NPDProjectService.update - blocks update if status = 'launched'"
+      - "E2E: Edit button disabled for launched project"

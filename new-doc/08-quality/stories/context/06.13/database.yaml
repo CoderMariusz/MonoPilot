@@ -1,0 +1,238 @@
+# Story 06.13 - Database Schema
+# Purpose: Tables, RLS policies, indexes, migrations
+# Agent: BACKEND-DEV (database focus)
+
+migrations:
+  - path: "supabase/migrations/xxx_extend_ncr_reports_workflow.sql"
+    type: "migration"
+    description: "Extend ncr_reports with full workflow states and tracking columns"
+  - path: "supabase/migrations/xxx_create_ncr_state_transitions.sql"
+    type: "migration"
+    description: "NCR State Transitions configuration table per org"
+  - path: "supabase/migrations/xxx_create_ncr_state_history.sql"
+    type: "migration"
+    description: "NCR State History immutable audit trail"
+
+tables:
+  ncr_reports_extended_columns:
+    description: "Additional columns added to ncr_reports for workflow tracking"
+    columns:
+      - { name: "current_state_owner", type: "UUID", constraints: "REFERENCES users(id)", note: "User responsible for current state" }
+      - { name: "state_entered_at", type: "TIMESTAMPTZ", constraints: "DEFAULT now()", note: "When entered current state" }
+      - { name: "state_due_at", type: "TIMESTAMPTZ", constraints: "", note: "SLA deadline for current state" }
+      - { name: "escalation_level", type: "INTEGER", constraints: "DEFAULT 0", note: "0=none, 1=supervisor, 2=manager, 3=director" }
+      - { name: "escalated_at", type: "TIMESTAMPTZ", constraints: "", note: "When last escalated" }
+      - { name: "reopen_count", type: "INTEGER", constraints: "DEFAULT 0", note: "Number of times NCR has been reopened" }
+      - { name: "last_reopened_at", type: "TIMESTAMPTZ", constraints: "", note: "Timestamp of last reopen" }
+      - { name: "last_reopened_by", type: "UUID", constraints: "REFERENCES users(id)", note: "Who last reopened" }
+      - { name: "reopen_reason", type: "TEXT", constraints: "", note: "Justification for reopening" }
+
+    status_constraint_update: |
+      ALTER TABLE ncr_reports
+      DROP CONSTRAINT IF EXISTS ncr_reports_status_check;
+
+      ALTER TABLE ncr_reports
+      ADD CONSTRAINT ncr_reports_status_check
+      CHECK (status IN ('draft', 'open', 'investigation', 'root_cause',
+                        'corrective_action', 'verification', 'closed', 'reopened'));
+
+    new_indexes:
+      - "idx_ncr_state_owner ON ncr_reports(current_state_owner) WHERE current_state_owner IS NOT NULL"
+      - "idx_ncr_state_due ON ncr_reports(org_id, state_due_at) WHERE state_due_at IS NOT NULL AND status NOT IN ('draft', 'closed')"
+      - "idx_ncr_escalation ON ncr_reports(org_id, escalation_level) WHERE escalation_level > 0"
+
+  ncr_state_transitions:
+    description: "Valid NCR workflow transitions configuration per org"
+    columns:
+      # Identity
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id) ON DELETE CASCADE" }
+
+      # Transition definition
+      - { name: "transition_code", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "from_state", type: "TEXT", constraints: "NOT NULL CHECK (from_state IN ('draft', 'open', 'investigation', 'root_cause', 'corrective_action', 'verification', 'closed', 'reopened'))" }
+      - { name: "to_state", type: "TEXT", constraints: "NOT NULL CHECK (to_state IN ('draft', 'open', 'investigation', 'root_cause', 'corrective_action', 'verification', 'closed', 'reopened'))" }
+
+      # Authorization
+      - { name: "allowed_roles", type: "TEXT[]", constraints: "NOT NULL", note: "Array of role codes" }
+      - { name: "requires_notes", type: "BOOLEAN", constraints: "DEFAULT false" }
+      - { name: "min_notes_length", type: "INTEGER", constraints: "DEFAULT 0" }
+
+      # SLA
+      - { name: "sla_hours", type: "INTEGER", constraints: "", note: "NULL = no SLA" }
+
+      # Auto-assignment
+      - { name: "auto_assign_role", type: "TEXT", constraints: "", note: "Role code to auto-assign" }
+      - { name: "auto_assign_user_id", type: "UUID", constraints: "REFERENCES users(id)", note: "Specific user to auto-assign" }
+
+      # Notification
+      - { name: "notify_roles", type: "TEXT[]", constraints: "", note: "Roles to notify on transition" }
+      - { name: "notify_users", type: "UUID[]", constraints: "", note: "Specific users to notify" }
+
+      # Display
+      - { name: "button_label", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "button_variant", type: "TEXT", constraints: "DEFAULT 'default'", note: "default, primary, destructive, outline" }
+      - { name: "confirmation_required", type: "BOOLEAN", constraints: "DEFAULT false" }
+      - { name: "confirmation_message", type: "TEXT", constraints: "" }
+
+      # Status
+      - { name: "is_active", type: "BOOLEAN", constraints: "DEFAULT true" }
+      - { name: "sequence", type: "INTEGER", constraints: "DEFAULT 0", note: "Display order" }
+
+      # Audit
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT now()" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "DEFAULT now()" }
+
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+    indexes:
+      - "UNIQUE(org_id, transition_code)"
+      - "UNIQUE(org_id, from_state, to_state)"
+      - "idx_ncr_transitions_lookup ON ncr_state_transitions(org_id, from_state, is_active)"
+
+    constraints:
+      - "UNIQUE(org_id, transition_code)"
+      - "UNIQUE(org_id, from_state, to_state)"
+
+  ncr_state_history:
+    description: "Immutable audit trail for NCR state transitions (FDA 21 CFR Part 11)"
+    columns:
+      # Identity
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id) ON DELETE CASCADE" }
+      - { name: "ncr_id", type: "UUID", constraints: "NOT NULL REFERENCES ncr_reports(id) ON DELETE CASCADE" }
+
+      # Transition
+      - { name: "transition_code", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "from_state", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "to_state", type: "TEXT", constraints: "NOT NULL" }
+
+      # Actor
+      - { name: "transitioned_by", type: "UUID", constraints: "NOT NULL REFERENCES users(id)" }
+      - { name: "transitioned_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT now()" }
+
+      # Notes
+      - { name: "transition_notes", type: "TEXT", constraints: "" }
+
+      # State metadata at time of transition
+      - { name: "previous_owner", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "new_owner", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "previous_due_at", type: "TIMESTAMPTZ", constraints: "" }
+      - { name: "new_due_at", type: "TIMESTAMPTZ", constraints: "" }
+      - { name: "was_overdue", type: "BOOLEAN", constraints: "DEFAULT false" }
+
+      # Immutable (no updated_at)
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT now()" }
+
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    immutable: true
+    note: "No UPDATE or DELETE allowed - immutable audit trail"
+
+    indexes:
+      - "idx_ncr_history_ncr ON ncr_state_history(ncr_id, transitioned_at DESC)"
+      - "idx_ncr_history_org ON ncr_state_history(org_id, transitioned_at DESC)"
+      - "idx_ncr_history_user ON ncr_state_history(transitioned_by, transitioned_at DESC)"
+
+# Function: Seed default transitions for org
+function:
+  name: "seed_ncr_transitions"
+  signature: "(p_org_id UUID) RETURNS void"
+  description: "Seed default NCR workflow transitions for an organization"
+  logic: |
+    INSERT INTO ncr_state_transitions (
+      org_id, transition_code, from_state, to_state, allowed_roles,
+      requires_notes, min_notes_length, sla_hours, auto_assign_role,
+      button_label, button_variant, confirmation_required, confirmation_message, sequence
+    ) VALUES
+      (p_org_id, 'submit', 'draft', 'open',
+        ARRAY['QA_INSPECTOR', 'QA_MANAGER', 'ADMIN'], false, 0, 24, 'QA_MANAGER',
+        'Submit NCR', 'primary', true, 'Submit this NCR for investigation?', 1),
+      (p_org_id, 'start_investigation', 'open', 'investigation',
+        ARRAY['QA_INSPECTOR', 'QA_MANAGER'], true, 20, 48, NULL,
+        'Start Investigation', 'default', false, NULL, 2),
+      (p_org_id, 'start_investigation_reopen', 'reopened', 'investigation',
+        ARRAY['QA_INSPECTOR', 'QA_MANAGER'], true, 20, 48, NULL,
+        'Start Investigation', 'default', false, NULL, 3),
+      (p_org_id, 'complete_investigation', 'investigation', 'root_cause',
+        ARRAY['QA_INSPECTOR', 'QA_MANAGER'], true, 50, 72, NULL,
+        'Complete Investigation', 'default', false, NULL, 4),
+      (p_org_id, 'identify_cause', 'root_cause', 'corrective_action',
+        ARRAY['QA_INSPECTOR', 'QA_MANAGER'], true, 50, 168, 'PROCESS_OWNER',
+        'Identify Root Cause', 'default', false, NULL, 5),
+      (p_org_id, 'implement_action', 'corrective_action', 'verification',
+        ARRAY['PROCESS_OWNER', 'QA_MANAGER', 'ADMIN'], true, 50, 336, 'QA_MANAGER',
+        'Implement Corrective Action', 'default', false, NULL, 6),
+      (p_org_id, 'verify_effective', 'verification', 'closed',
+        ARRAY['QA_MANAGER'], true, 50, NULL, NULL,
+        'Verify Effective & Close', 'primary', true, 'Confirm corrective action is effective and close this NCR?', 7),
+      (p_org_id, 'verify_ineffective', 'verification', 'corrective_action',
+        ARRAY['QA_MANAGER'], true, 50, 168, 'PROCESS_OWNER',
+        'Mark Ineffective', 'destructive', true, 'Corrective action is not effective. Return to corrective action phase?', 8),
+      (p_org_id, 'reopen', 'closed', 'reopened',
+        ARRAY['QA_MANAGER'], true, 50, 48, 'QA_MANAGER',
+        'Reopen NCR', 'destructive', true, 'Reopen this closed NCR for further investigation?', 9)
+    ON CONFLICT (org_id, transition_code) DO NOTHING;
+
+# RLS Policies (ADR-013)
+rls_policies:
+  ncr_state_transitions:
+    select:
+      name: "ncr_transitions_select"
+      operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+    admin:
+      name: "ncr_transitions_admin"
+      operation: "ALL"
+      using: |
+        org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        AND (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid()) IN ('SUPER_ADMIN', 'ADMIN')
+
+  ncr_state_history:
+    select:
+      name: "ncr_history_select"
+      operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+    insert:
+      name: "ncr_history_insert"
+      operation: "INSERT"
+      with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+    no_update:
+      name: "ncr_history_no_update"
+      operation: "UPDATE"
+      using: "false"
+      note: "IMMUTABLE - no updates allowed"
+
+    no_delete:
+      name: "ncr_history_no_delete"
+      operation: "DELETE"
+      using: "false"
+      note: "IMMUTABLE - no deletes allowed"
+
+# Comments
+table_comments:
+  ncr_state_transitions: "Valid NCR workflow transitions configuration per org"
+  ncr_state_history: "Immutable audit trail for NCR state transitions (FDA 21 CFR Part 11)"
+
+column_comments:
+  "ncr_reports.status": "Full workflow states: draft, open, investigation, root_cause, corrective_action, verification, closed, reopened"
+  "ncr_reports.current_state_owner": "User responsible for current state"
+  "ncr_reports.state_entered_at": "Timestamp when entered current state"
+  "ncr_reports.state_due_at": "SLA due date for current state"
+  "ncr_reports.escalation_level": "Current escalation level (0=none, 1=supervisor, 2=manager, 3=director)"
+  "ncr_reports.reopen_count": "Number of times NCR has been reopened"
+  "ncr_state_transitions.allowed_roles": "Array of role codes that can execute this transition"
+  "ncr_state_transitions.sla_hours": "Hours until SLA deadline for target state (NULL = no SLA)"
+  "ncr_state_transitions.auto_assign_role": "Role code to auto-assign as owner on transition"
+  "ncr_state_history.was_overdue": "Whether NCR was overdue when this transition occurred"
+
+# Seed data triggers
+seed_trigger:
+  description: "Seed default transitions when new org is created"
+  trigger_on: "organizations INSERT"
+  action: "SELECT seed_ncr_transitions(NEW.id)"
+  note: "Can also be called manually for existing orgs"

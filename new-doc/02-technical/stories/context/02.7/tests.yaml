@@ -1,0 +1,478 @@
+# Story 02.7 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/routing-service.test.ts"
+    type: "unit"
+    description: "Unit tests for routing service functions"
+
+  - path: "apps/frontend/lib/validation/__tests__/routing-schema.test.ts"
+    type: "unit"
+    description: "Unit tests for Zod validation schemas"
+
+  - path: "apps/frontend/app/api/v1/technical/routings/__tests__/route.test.ts"
+    type: "integration"
+    description: "Integration tests for routing API endpoints"
+
+  - path: "supabase/tests/rls-routings.test.sql"
+    type: "integration"
+    description: "RLS policy tests for routings table"
+
+# Acceptance Criteria (from story 02.7)
+acceptance_criteria:
+  # Routings List Page
+  - id: "AC-01"
+    category: "List Page"
+    given: "user navigates to `/technical/routings`"
+    when: "page loads"
+    then: "routing list displays within 500ms for up to 100 routings"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-02"
+    category: "List Page"
+    given: "routing list displayed"
+    when: "user searches 'BREAD'"
+    then: "filtered results show only routings containing 'BREAD' in code or name within 300ms"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-03"
+    category: "List Page"
+    given: "routing list displayed"
+    when: "user filters by status 'Active'"
+    then: "only Active routings appear"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-04"
+    category: "List Page"
+    given: "empty routing list"
+    when: "page loads"
+    then: "empty state displays with 'No Routings Found' message and '[+ Create Your First Routing]' CTA"
+    test_type: "e2e"
+    priority: "P1"
+
+  # Create Routing
+  - id: "AC-05"
+    category: "Create"
+    given: "user clicks '[+ Add Routing]'"
+    when: "modal opens"
+    then: "create form displays with empty fields, status defaulting to 'Active', is_reusable defaulting to checked, and cost fields defaulting to 0"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-06"
+    category: "Create"
+    given: "valid routing data (code: 'RTG-BREAD-01', name: 'Standard Bread Line')"
+    when: "'[Create Routing]' clicked"
+    then: "routing created with version 1 and navigates to routing detail page"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-07"
+    category: "Create"
+    given: "duplicate code 'RTG-BREAD-01' already exists"
+    when: "save attempted"
+    then: "error 'Code RTG-BREAD-01 already exists in your organization' displays inline on code field"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-08"
+    category: "Create"
+    given: "invalid code format 'bread line 01' (lowercase, spaces)"
+    when: "save attempted"
+    then: "error 'Code can only contain uppercase letters, numbers, and hyphens' displays inline"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-09"
+    category: "Create"
+    given: "code field is less than 2 characters"
+    when: "save attempted"
+    then: "error 'Code must be at least 2 characters' displays inline"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-10"
+    category: "Create"
+    given: "name field is empty"
+    when: "save attempted"
+    then: "error 'Routing name is required' displays inline"
+    test_type: "unit"
+    priority: "P0"
+
+  # Edit Routing
+  - id: "AC-11"
+    category: "Edit"
+    given: "user clicks '[Edit]' on existing routing 'RTG-BREAD-01'"
+    when: "modal opens"
+    then: "current routing data pre-populates form with version displayed in header"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-12"
+    category: "Edit"
+    given: "user updates name from 'Standard Bread Line' to 'Standard Bread Production'"
+    when: "save completes"
+    then: "updated name displays immediately in list and version increments"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-13"
+    category: "Edit"
+    given: "user changes status from Active to Inactive on routing used by 3 BOMs"
+    when: "save attempted"
+    then: "warning banner displays 'This routing is used by 3 BOM(s). Marking it inactive will prevent assignment to new BOMs but won't affect existing ones.'"
+    test_type: "e2e"
+    priority: "P1"
+
+  # Routing Detail Page
+  - id: "AC-14"
+    category: "Detail Page"
+    given: "user views routing detail at `/technical/routings/:id`"
+    when: "page loads"
+    then: "header displays: Code (prominent), Name, Status badge, Version, Reusable flag, Description, Usage count"
+    test_type: "e2e"
+    priority: "P0"
+
+  # Cost Configuration (ADR-009)
+  - id: "AC-15"
+    category: "Cost Config"
+    given: "create routing modal"
+    when: "Cost Configuration section visible"
+    then: "fields display: Setup Cost (default 0), Working Cost per Unit (default 0), Overhead Percentage (default 0), Currency (default PLN)"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-16"
+    category: "Cost Config"
+    given: "user enters setup_cost = 50.00, working_cost_per_unit = 0.25, overhead_percent = 15"
+    when: "save completes"
+    then: "cost values stored correctly"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-17"
+    category: "Cost Config"
+    given: "user enters overhead_percent = 150 (invalid)"
+    when: "save attempted"
+    then: "error 'Overhead percentage cannot exceed 100%' displays inline"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-18"
+    category: "Cost Config"
+    given: "user enters negative setup_cost = -10"
+    when: "save attempted"
+    then: "error 'Setup cost cannot be negative' displays inline"
+    test_type: "unit"
+    priority: "P0"
+
+  # Clone Routing
+  - id: "AC-19"
+    category: "Clone"
+    given: "user clicks '[Clone]' icon on routing 'Standard Bread Line'"
+    when: "clone modal opens"
+    then: "source routing info displays (read-only) and name pre-fills with 'Standard Bread Line - Copy'"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-20"
+    category: "Clone"
+    given: "user enters unique name and clicks '[Clone Routing]'"
+    when: "clone completes"
+    then: "new routing created with all operations copied and toast 'Routing cloned successfully with X operations' displays"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-21"
+    category: "Clone"
+    given: "clone completes"
+    when: "viewing cloned routing"
+    then: "operations count matches source routing operations"
+    test_type: "integration"
+    priority: "P0"
+
+  # Delete Routing
+  - id: "AC-22"
+    category: "Delete"
+    given: "routing not used by any BOMs"
+    when: "user clicks '[Delete]'"
+    then: "confirmation dialog shows 'No BOMs are using this routing' and '[Delete Routing]' button"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-23"
+    category: "Delete"
+    given: "routing used by 8 BOMs"
+    when: "user clicks '[Delete]'"
+    then: "warning dialog shows usage count, lists affected BOMs (first 5), offers '[Make Inactive]' alternative, and '[Delete Routing]' button"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-24"
+    category: "Delete"
+    given: "user confirms delete on routing with BOM usage"
+    when: "delete completes"
+    then: "routing deleted, BOMs have routing_id set to NULL, toast 'Routing deleted. X BOM(s) unassigned.' displays"
+    test_type: "integration"
+    priority: "P0"
+
+  # Version Control (FR-2.46)
+  - id: "AC-25"
+    category: "Versioning"
+    given: "routing 'RTG-BREAD-01' version 1"
+    when: "user edits and saves any field"
+    then: "version increments to 2"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-26"
+    category: "Versioning"
+    given: "routing detail page"
+    when: "viewing header"
+    then: "version displays as 'Version: v2'"
+    test_type: "e2e"
+    priority: "P1"
+
+  # is_reusable flag (FR-2.55)
+  - id: "AC-27"
+    category: "Reusability"
+    given: "create routing modal"
+    when: "is_reusable checkbox is checked (default)"
+    then: "routing can be assigned to multiple BOMs"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-28"
+    category: "Reusability"
+    given: "user unchecks is_reusable"
+    when: "save completes"
+    then: "routing is marked as product-specific (non-reusable)"
+    test_type: "integration"
+    priority: "P1"
+
+  # Permission Enforcement
+  - id: "AC-29"
+    category: "Permissions"
+    given: "user has role VIEWER (read-only)"
+    when: "`/technical/routings` loaded"
+    then: "'[+ Add Routing]' button hidden, edit/delete/clone actions hidden"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-30"
+    category: "Permissions"
+    given: "user has role PROD_MANAGER"
+    when: "`/technical/routings` loaded"
+    then: "create/edit/clone actions available"
+    test_type: "e2e"
+    priority: "P0"
+
+# Unit Test Cases
+unit_tests:
+  routing_service:
+    - name: "listRoutings returns paginated results"
+      setup: "Mock successful API response with 10 routings"
+      expected: "Returns RoutingsListResponse with routings array and total count"
+
+    - name: "listRoutings filters by status"
+      setup: "Mock API call with is_active=true filter"
+      expected: "API called with correct query parameter"
+
+    - name: "getRouting returns routing detail"
+      setup: "Mock successful API response"
+      expected: "Returns RoutingDetailResponse with routing and boms_count"
+
+    - name: "getRouting throws for 404"
+      setup: "Mock 404 response"
+      expected: "Throws 'Routing not found' error"
+
+    - name: "createRouting sends correct payload"
+      setup: "Valid routing data"
+      expected: "POST request with all fields including cost configuration"
+
+    - name: "createRouting handles 409 duplicate code"
+      setup: "Mock 409 response"
+      expected: "Throws error with duplicate code message"
+
+    - name: "cloneRouting copies operations"
+      setup: "Mock successful clone response"
+      expected: "Returns new routing with operationsCount"
+
+    - name: "deleteRouting returns affected_boms count"
+      setup: "Mock successful delete response"
+      expected: "Returns { success: true, affected_boms: N }"
+
+  routing_schema:
+    - name: "createRoutingSchema validates code format"
+      input: "{ code: 'bread line 01' }"
+      expected: "Validation error: uppercase alphanumeric only"
+
+    - name: "createRoutingSchema transforms code to uppercase"
+      input: "{ code: 'rtg-bread-01', name: 'Test' }"
+      expected: "Code transformed to 'RTG-BREAD-01'"
+
+    - name: "createRoutingSchema rejects short code"
+      input: "{ code: 'A', name: 'Test' }"
+      expected: "Validation error: min 2 characters"
+
+    - name: "createRoutingSchema rejects empty name"
+      input: "{ code: 'RTG-01', name: '' }"
+      expected: "Validation error: name required"
+
+    - name: "createRoutingSchema validates overhead_percent range"
+      input: "{ code: 'RTG-01', name: 'Test', overhead_percent: 150 }"
+      expected: "Validation error: max 100%"
+
+    - name: "createRoutingSchema rejects negative setup_cost"
+      input: "{ code: 'RTG-01', name: 'Test', setup_cost: -10 }"
+      expected: "Validation error: cannot be negative"
+
+    - name: "createRoutingSchema defaults cost fields to 0"
+      input: "{ code: 'RTG-01', name: 'Test' }"
+      expected: "setup_cost=0, working_cost_per_unit=0, overhead_percent=0"
+
+    - name: "createRoutingSchema defaults currency to PLN"
+      input: "{ code: 'RTG-01', name: 'Test' }"
+      expected: "currency='PLN'"
+
+# Integration Test Cases
+integration_tests:
+  api_endpoints:
+    - name: "GET /routings returns list with operations_count"
+      setup: "Create routing with 3 operations"
+      action: "GET /api/v1/technical/routings"
+      expected: "Routing includes operations_count: 3"
+
+    - name: "POST /routings creates with code uniqueness"
+      setup: "Org with no routings"
+      action: "POST /api/v1/technical/routings with valid data"
+      expected: "201 Created, routing has version 1"
+
+    - name: "POST /routings rejects duplicate code"
+      setup: "Routing with code 'RTG-01' exists"
+      action: "POST /api/v1/technical/routings with code 'RTG-01'"
+      expected: "409 Conflict with duplicate code message"
+
+    - name: "PUT /routings increments version on edit"
+      setup: "Routing with version 1"
+      action: "PUT /api/v1/technical/routings/:id with name change"
+      expected: "200 OK, version incremented to 2"
+
+    - name: "DELETE /routings unassigns from BOMs"
+      setup: "Routing used by 2 BOMs"
+      action: "DELETE /api/v1/technical/routings/:id"
+      expected: "200 OK, affected_boms: 2, BOMs have routing_id: null"
+
+    - name: "POST /routings/:id/clone copies operations"
+      setup: "Routing with 5 operations"
+      action: "POST /api/v1/technical/routings/:id/clone"
+      expected: "201 Created, operationsCount: 5"
+
+    - name: "GET /routings/:id/boms returns usage"
+      setup: "Routing used by 3 BOMs"
+      action: "GET /api/v1/technical/routings/:id/boms"
+      expected: "200 OK with boms array and count: 3"
+
+  rls_isolation:
+    - name: "User can only read own organization routings"
+      setup: |
+        - Create Org A with User A and Routing A
+        - Create Org B with User B and Routing B
+      action: "User A queries routings table"
+      expected: "Only Routing A returned, Routing B not visible"
+
+    - name: "User can only create routings in own org"
+      setup: |
+        - Create Org A with User A
+      action: "User A creates routing"
+      expected: "Routing has org_id = Org A"
+
+    - name: "Cross-tenant write blocked"
+      setup: |
+        - Create Org A with Admin A
+        - Create Org B with Routing B
+      action: "Admin A attempts to update Routing B"
+      expected: "RLS blocks update, 0 rows affected"
+
+    - name: "Non-admin cannot create routings"
+      setup: |
+        - Create Org A with Viewer user
+      action: "Viewer attempts to create routing"
+      expected: "403 Permission denied"
+
+# Definition of Done
+definition_of_done:
+  - "All acceptance criteria tests pass"
+  - "Code uniqueness enforced (UNIQUE constraint + API validation)"
+  - "Version auto-increment on edit via database trigger"
+  - "Cost fields (ADR-009) save and display correctly"
+  - "is_reusable flag toggles correctly"
+  - "Clone copies all operations with new IDs"
+  - "Delete unassigns from BOMs (sets routing_id to NULL)"
+  - "Delete usage warning displays correctly"
+  - "RLS policies enforce org isolation"
+  - "Permission checks hide unauthorized actions"
+  - "Unit test coverage >= 90%"
+  - "Integration test coverage >= 80%"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 90
+    reason: "CRUD operations require high coverage"
+    files:
+      - "lib/services/routing-service.ts: 90%"
+      - "lib/validation/routing-schema.ts: 100%"
+
+  integration:
+    target: 80
+    reason: "API endpoints and RLS policies must be thoroughly tested"
+    files:
+      - "API endpoints: 80%"
+      - "RLS policies: 100% of policy rules tested"
+
+  e2e:
+    target: 70
+    reason: "Critical user flows must be covered"
+    flows:
+      - "Create routing end-to-end"
+      - "Edit routing with version increment"
+      - "Clone routing with operations"
+      - "Delete routing with BOM usage warning"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "Duplicate code creation race condition"
+    mitigation: "Database UNIQUE constraint as final safeguard"
+    severity: "medium"
+    test_coverage: "integration_tests.api_endpoints"
+
+  - id: "RISK-02"
+    description: "RLS policy misconfiguration could leak data"
+    mitigation: "Comprehensive RLS tests with 2+ org fixtures"
+    severity: "high"
+    test_coverage: "integration_tests.rls_isolation"
+
+  - id: "RISK-03"
+    description: "Clone fails to copy all operations"
+    mitigation: "Integration test verifies operations_count match"
+    severity: "medium"
+    test_coverage: "integration_tests.api_endpoints"
+
+  - id: "RISK-04"
+    description: "Delete leaves orphaned BOM references"
+    mitigation: "FK constraint ON DELETE SET NULL, verify in test"
+    severity: "medium"
+    test_coverage: "integration_tests.api_endpoints"
+
+  - id: "RISK-05"
+    description: "Version increment not triggering correctly"
+    mitigation: "Database trigger test + integration test"
+    severity: "low"
+    test_coverage: "integration_tests.api_endpoints"

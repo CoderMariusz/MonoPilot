@@ -1,0 +1,229 @@
+# Frontend Context for Story 08.9 - Formulation Version Comparison
+
+ux:
+  wireframes:
+    - id: "NPD-014"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/NPD-014-formulation-compare-view.md"
+      relevance: "Side-by-side formulation comparison with diff highlighting"
+      components: ["FormulationCompareView", "FormulationCompareHeader", "FormulationCompareSummary", "FormulationCompareTable", "CloneFormulationModal"]
+  patterns:
+    layout: "ShadCN Card grid for comparison sections"
+    diff_highlighting: "Tailwind conditional classes (bg-green-50, bg-red-50, bg-yellow-50)"
+    modal: "ShadCN Dialog for clone modal"
+    forms: "React Hook Form + Zod + ShadCN form components"
+    data_fetching: "Server Components (Next.js 16) for comparison page"
+    error_handling: "Error boundaries + redirect to formulation list on invalid IDs"
+  states:
+    - "loading: Skeleton loaders for comparison table"
+    - "empty: No differences found (display message in comparison table)"
+    - "error: Invalid version IDs (redirect to formulation list with toast)"
+    - "success: Comparison loaded with diff highlighting"
+
+pages:
+  - path: "apps/frontend/app/(authenticated)/npd/formulations/compare/page.tsx"
+    purpose: "Comparison view page"
+    query_params:
+      - "v1: number (formulation ID 1)"
+      - "v2: number (formulation ID 2)"
+    components_used:
+      - "FormulationCompareView"
+      - "FormulationCompareHeader"
+      - "FormulationCompareSummary"
+      - "FormulationCompareTable"
+    data_fetching: "Server-side fetch both formulations + comparison data"
+    error_handling: "Redirect to formulation list if invalid IDs"
+
+components:
+  FormulationCompareView:
+    path: "components/npd/formulation/FormulationCompareView.tsx"
+    purpose: "Main comparison container, orchestrates all sub-components"
+    props:
+      - "v1: FormulationWithItems"
+      - "v2: FormulationWithItems"
+      - "diff: Diff"
+      - "summary: ComparisonSummary"
+    state:
+      - "None (stateless display component)"
+    patterns:
+      - "ShadCN layout with Card components"
+      - "Responsive grid: single column mobile, two columns desktop"
+
+  FormulationCompareHeader:
+    path: "components/npd/formulation/FormulationCompareHeader.tsx"
+    purpose: "Display version metadata side-by-side"
+    props:
+      - "v1: FormulationWithItems"
+      - "v2: FormulationWithItems"
+    layout:
+      - "Left column: v1 details (version, status, dates, qty)"
+      - "Right column: v2 details (version, status, dates, qty)"
+      - "Center: VS indicator"
+
+  FormulationCompareSummary:
+    path: "components/npd/formulation/FormulationCompareSummary.tsx"
+    purpose: "Summary cards showing diff counts and cost difference"
+    props:
+      - "summary: ComparisonSummary"
+    cards:
+      - "Total Items v1 (blue)"
+      - "Total Items v2 (blue)"
+      - "Added (green)"
+      - "Removed (red)"
+      - "Changed (yellow)"
+      - "Cost Difference (red/green based on increase/decrease)"
+    patterns:
+      - "ShadCN Card grid (6 cards, 3 cols desktop, 2 cols tablet, 1 col mobile)"
+
+  FormulationCompareTable:
+    path: "components/npd/formulation/FormulationCompareTable.tsx"
+    purpose: "Side-by-side items comparison with diff highlighting"
+    props:
+      - "diff: Diff (added, removed, changed, unchanged arrays)"
+    columns:
+      - "Product (name)"
+      - "v1 Quantity + UoM"
+      - "v1 Percentage"
+      - "Change Indicator (arrow + delta)"
+      - "v2 Quantity + UoM"
+      - "v2 Percentage"
+    row_rendering:
+      - "Added: Empty v1 cells, green v2 cells"
+      - "Removed: Red v1 cells, empty v2 cells"
+      - "Changed: White v1 cells, yellow v2 cells"
+      - "Unchanged: White both cells"
+    patterns:
+      - "ShadCN Table component"
+      - "Tailwind conditional backgrounds (bg-green-50, bg-red-50, bg-yellow-50)"
+
+  FormulationCompareRow:
+    path: "components/npd/formulation/FormulationCompareRow.tsx"
+    purpose: "Individual item row with diff highlighting logic"
+    props:
+      - "item: ProductDiff"
+      - "changeType: 'added' | 'removed' | 'changed' | 'unchanged'"
+    rendering_logic:
+      - "Apply background color based on changeType"
+      - "Show ChangeIndicator in middle column if changed"
+      - "Display [Empty] placeholder for null values"
+
+  FormulationCompareCostCard:
+    path: "components/npd/formulation/FormulationCompareCostCard.tsx"
+    purpose: "Display cost difference if costing data available"
+    props:
+      - "costDifference: CostDifference | null"
+    states:
+      - "loading: Show skeleton"
+      - "no_data: Show 'Costing data not available' (grayed out)"
+      - "data_available: Show v1 cost, v2 cost, difference, percentage"
+    colors:
+      - "Increase: red (text-red-600)"
+      - "Decrease: green (text-green-600)"
+
+  CloneFormulationModal:
+    path: "components/npd/formulation/CloneFormulationModal.tsx"
+    purpose: "Modal for cloning formulation with version input"
+    props:
+      - "sourceFormulation: Formulation"
+      - "isOpen: boolean"
+      - "onClose: () => void"
+      - "onSuccess: (newFormulation: Formulation) => void"
+    form_fields:
+      - "formulation_number (editable, default next version)"
+      - "total_qty (editable, default source qty)"
+      - "uom (editable, default source uom)"
+      - "effective_from (optional)"
+      - "effective_to (optional)"
+      - "notes (optional)"
+    validation:
+      - "formulation_number: regex /^v\\d+\\.\\d+$/"
+      - "total_qty: positive number"
+      - "effective_to >= effective_from"
+    actions:
+      - "[Cancel] - Close modal"
+      - "[Clone Formulation] - Submit and redirect to edit page"
+    patterns:
+      - "ShadCN Dialog component"
+      - "React Hook Form + Zod validation"
+
+  VersionSelectorModal:
+    path: "components/npd/formulation/VersionSelectorModal.tsx"
+    purpose: "Select two versions to compare from project"
+    props:
+      - "projectId: number"
+      - "isOpen: boolean"
+      - "onClose: () => void"
+      - "onSelect: (v1Id: number, v2Id: number) => void"
+    form_fields:
+      - "version1: Dropdown (all versions for project)"
+      - "version2: Dropdown (all versions for project)"
+    validation:
+      - "v1 != v2 (cannot compare version to itself)"
+    actions:
+      - "[Cancel] - Close modal"
+      - "[Compare] - Navigate to /compare?v1=:id1&v2=:id2"
+    patterns:
+      - "ShadCN Dialog + Select components"
+
+  DiffBadge:
+    path: "components/npd/formulation/DiffBadge.tsx"
+    purpose: "Badge for change type (Added/Removed/Changed)"
+    props:
+      - "type: 'added' | 'removed' | 'changed' | 'unchanged'"
+    variants:
+      - "added: Green badge with '+ Added'"
+      - "removed: Red badge with '- Removed'"
+      - "changed: Yellow badge with '~ Changed'"
+      - "unchanged: Gray badge with '= Unchanged' (usually hidden)"
+    patterns:
+      - "ShadCN Badge component with variant prop"
+
+  ChangeIndicator:
+    path: "components/npd/formulation/ChangeIndicator.tsx"
+    purpose: "Arrow and delta for quantity changes"
+    props:
+      - "changeQty: number (v2 - v1)"
+      - "changePct: number (percentage change)"
+    rendering:
+      - "Increase: up arrow +10 kg (+10%) [green]"
+      - "Decrease: down arrow -5 kg (-5%) [red]"
+      - "No change: = [gray] (usually hidden)"
+    patterns:
+      - "Inline span with Lucide icon (ArrowUp, ArrowDown, Minus)"
+
+state_management:
+  comparison_data: "Fetched server-side, passed as props (no client state)"
+  clone_modal: "Local state (isOpen: boolean) in parent component"
+  form_state: "React Hook Form manages clone form state"
+
+routing:
+  comparison_url: "/npd/formulations/compare?v1=:id1&v2=:id2"
+  clone_redirect: "/npd/formulations/:newId/edit (after successful clone)"
+
+ui_states:
+  loading:
+    - "Skeleton loaders for comparison table"
+    - "Loading spinner in clone modal on submit"
+
+  empty:
+    - "No differences found: Display message in comparison table"
+
+  error:
+    - "Invalid version IDs: Redirect to formulation list with toast"
+    - "Clone validation errors: Inline field errors in modal"
+    - "Clone API error: Toast notification with retry option"
+
+  success:
+    - "Comparison loaded: Display all sections with diff highlighting"
+    - "Clone success: Toast + redirect to edit page"
+
+accessibility:
+  - "Diff colors supplemented with icons/text (not color-only)"
+  - "Modal: Focus trap, Esc to close, ARIA labels"
+  - "Table: Screen reader announces row change type"
+  - "Keyboard navigation: Tab through comparison sections"
+
+performance:
+  - "Server-side fetch: <500ms for 50 items each"
+  - "Client-side rendering: <100ms for comparison display"
+  - "Clone modal: <300ms to submit and redirect"
+  - "Memoization: Comparison calculations memoized to prevent re-renders"

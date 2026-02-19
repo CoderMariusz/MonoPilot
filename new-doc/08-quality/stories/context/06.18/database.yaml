@@ -1,0 +1,145 @@
+# Story 06.18 - Database Context
+# Generated: 2026-01-15
+# Purpose: Test result trending views and indexes
+
+# =============================================================================
+# VIEWS
+# =============================================================================
+
+views:
+  - name: test_result_trends_daily
+    description: "Daily aggregation of numeric test results for trending"
+    definition: |
+      CREATE VIEW test_result_trends_daily AS
+      SELECT
+        qtr.org_id,
+        qtr.product_id,
+        qsp.id AS parameter_id,
+        qsp.parameter_name,
+        qsp.unit,
+        qsp.min_value AS spec_min,
+        qsp.max_value AS spec_max,
+        qsp.target_value AS spec_target,
+        DATE(qtr.tested_at) AS test_date,
+        COUNT(*) AS test_count,
+        AVG(qtr.numeric_value) AS avg_value,
+        MIN(qtr.numeric_value) AS min_value,
+        MAX(qtr.numeric_value) AS max_value,
+        STDDEV(qtr.numeric_value) AS std_dev,
+        COUNT(*) FILTER (WHERE qtr.result_status = 'pass') AS pass_count,
+        COUNT(*) FILTER (WHERE qtr.result_status = 'fail') AS fail_count,
+        COUNT(*) FILTER (WHERE qtr.result_status = 'marginal') AS marginal_count
+      FROM quality_test_results qtr
+      JOIN quality_spec_parameters qsp ON qtr.parameter_id = qsp.id
+      WHERE qtr.numeric_value IS NOT NULL
+      GROUP BY
+        qtr.org_id,
+        qtr.product_id,
+        qsp.id,
+        qsp.parameter_name,
+        qsp.unit,
+        qsp.min_value,
+        qsp.max_value,
+        qsp.target_value,
+        DATE(qtr.tested_at)
+      ORDER BY test_date DESC;
+
+  - name: test_result_trends_weekly
+    description: "Weekly aggregation (Monday start)"
+    definition: |
+      CREATE VIEW test_result_trends_weekly AS
+      SELECT
+        qtr.org_id,
+        qtr.product_id,
+        qsp.id AS parameter_id,
+        qsp.parameter_name,
+        qsp.unit,
+        qsp.min_value AS spec_min,
+        qsp.max_value AS spec_max,
+        qsp.target_value AS spec_target,
+        DATE_TRUNC('week', qtr.tested_at)::DATE AS week_start,
+        COUNT(*) AS test_count,
+        AVG(qtr.numeric_value) AS avg_value,
+        MIN(qtr.numeric_value) AS min_value,
+        MAX(qtr.numeric_value) AS max_value,
+        STDDEV(qtr.numeric_value) AS std_dev,
+        COUNT(*) FILTER (WHERE qtr.result_status = 'pass') AS pass_count,
+        COUNT(*) FILTER (WHERE qtr.result_status = 'fail') AS fail_count
+      FROM quality_test_results qtr
+      JOIN quality_spec_parameters qsp ON qtr.parameter_id = qsp.id
+      WHERE qtr.numeric_value IS NOT NULL
+      GROUP BY
+        qtr.org_id,
+        qtr.product_id,
+        qsp.id,
+        qsp.parameter_name,
+        qsp.unit,
+        qsp.min_value,
+        qsp.max_value,
+        qsp.target_value,
+        DATE_TRUNC('week', qtr.tested_at)
+      ORDER BY week_start DESC;
+
+  - name: test_result_trends_monthly
+    description: "Monthly aggregation"
+    definition: |
+      CREATE VIEW test_result_trends_monthly AS
+      SELECT
+        qtr.org_id,
+        qtr.product_id,
+        qsp.id AS parameter_id,
+        qsp.parameter_name,
+        qsp.unit,
+        qsp.min_value AS spec_min,
+        qsp.max_value AS spec_max,
+        qsp.target_value AS spec_target,
+        DATE_TRUNC('month', qtr.tested_at)::DATE AS month_start,
+        COUNT(*) AS test_count,
+        AVG(qtr.numeric_value) AS avg_value,
+        MIN(qtr.numeric_value) AS min_value,
+        MAX(qtr.numeric_value) AS max_value,
+        STDDEV(qtr.numeric_value) AS std_dev,
+        COUNT(*) FILTER (WHERE qtr.result_status = 'pass') AS pass_count,
+        COUNT(*) FILTER (WHERE qtr.result_status = 'fail') AS fail_count
+      FROM quality_test_results qtr
+      JOIN quality_spec_parameters qsp ON qtr.parameter_id = qsp.id
+      WHERE qtr.numeric_value IS NOT NULL
+      GROUP BY
+        qtr.org_id,
+        qtr.product_id,
+        qsp.id,
+        qsp.parameter_name,
+        qsp.unit,
+        qsp.min_value,
+        qsp.max_value,
+        qsp.target_value,
+        DATE_TRUNC('month', qtr.tested_at)
+      ORDER BY month_start DESC;
+
+# =============================================================================
+# INDEXES
+# =============================================================================
+
+indexes:
+  - name: idx_test_results_trending
+    table: quality_test_results
+    columns: [org_id, product_id, parameter_id, tested_at DESC]
+    where: "numeric_value IS NOT NULL"
+
+  - name: idx_test_results_product_date
+    table: quality_test_results
+    columns: [product_id, tested_at DESC]
+    where: "numeric_value IS NOT NULL"
+
+# =============================================================================
+# RLS
+# =============================================================================
+
+# Views inherit RLS from quality_test_results table
+# No additional policies needed
+
+notes:
+  - "Views use quality_test_results which already has RLS"
+  - "Max 1000 data points per query for performance"
+  - "Min 5 data points required for trend calculation"
+  - "Linear regression calculated client-side"

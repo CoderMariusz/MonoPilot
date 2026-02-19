@@ -1,0 +1,118 @@
+# Story 04.8 - Material Reservations
+# Index file for AI agent consumption
+# Generated: 2026-01-14
+
+story:
+  id: "04.8"
+  name: "Material Reservations"
+  epic: "04-production"
+  phase: "1B"
+  complexity: "L"
+  estimate_days: 4
+  type: "full-stack"
+  state: "ready"
+  priority: "P0"
+
+description: |
+  Material reservation system for Work Orders. Reserves specific License Plates for
+  required materials to prevent allocation conflicts. Supports FIFO/FEFO pick suggestions,
+  manual LP selection, soft reservations, partial allocation, and auto-release on WO complete.
+
+dependencies:
+  required:
+    - story: "05.1"
+      provides: ["license_plates table", "LP service"]
+    - story: "05.3"
+      provides: ["lp_reservations table", "reservation service"]
+    - story: "03.11a"
+      provides: ["wo_materials table", "required_qty field"]
+    - story: "04.5"
+      provides: ["enable_material_reservations setting"]
+    - story: "04.2a"
+      provides: ["WO start workflow integration"]
+  blocks:
+    - story: "04.2c"
+      reason: "WO completion releases unused reservations"
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/production.md"
+  prd_sections: ["FR-PROD-016"]
+  wireframes:
+    - "docs/3-ARCHITECTURE/ux/wireframes/PLAN-026-wo-reservation-components.md"
+    - "docs/3-ARCHITECTURE/ux/wireframes/WH-RES-001-available-lps-picker.md"
+    - "docs/3-ARCHITECTURE/ux/wireframes/WH-RES-002-reserve-modal.md"
+    - "docs/3-ARCHITECTURE/ux/wireframes/WH-RES-003-wo-reservations-panel.md"
+
+context_files:
+  database: "database.yaml"
+  api: "api.yaml"
+  frontend: "frontend.yaml"
+  tests: "tests.yaml"
+
+functional_requirements:
+  - id: "FR-RES-001"
+    name: "FIFO/FEFO LP Suggestions"
+    description: "Show available LPs sorted by FIFO or FEFO algorithm from warehouse settings"
+  - id: "FR-RES-002"
+    name: "Reserve LP for Material"
+    description: "Create reservation linking LP to wo_material with quantity tracking"
+  - id: "FR-RES-003"
+    name: "Reservation Status Badge"
+    description: "Visual indicator showing full/partial/none/over coverage status"
+  - id: "FR-RES-004"
+    name: "Release Reservation"
+    description: "Manager can manually release reservations, auto-release on WO complete"
+  - id: "FR-RES-005"
+    name: "Over-Reservation Warning"
+    description: "Warn when total reserved exceeds required, allow with acknowledgment"
+
+acceptance_criteria:
+  - id: "AC-1"
+    given: "WO requires Material A = 100 kg AND LP-001 has 150 kg available"
+    when: "User reserves LP-001 for WO"
+    then: "Reservation created with reserved_qty = 100 kg"
+  - id: "AC-2"
+    given: "LP-001 has 50 kg AND LP-002 has 60 kg"
+    when: "WO requires 100 kg"
+    then: "Both LPs can be reserved totaling 110 kg"
+  - id: "AC-3"
+    given: "LP is reserved for WO-001"
+    when: "WO-002 views same LP"
+    then: "Warning shows LP reserved by WO-001 with remaining available qty"
+  - id: "AC-4"
+    given: "Reservation with reserved_qty = 100 AND consumed_qty = 40"
+    when: "Remaining calculated"
+    then: "remaining_reserved = 60 kg"
+  - id: "AC-5"
+    given: "WO completes with unused reservation of 30 kg"
+    when: "WO status changes to completed"
+    then: "Reservation status = released, LP available again"
+  - id: "AC-6"
+    given: "Available LPs list with FIFO sort"
+    when: "User views picker modal"
+    then: "LPs sorted by created_at ASC with oldest first suggested"
+  - id: "AC-7"
+    given: "User selects 300 kg but required is 250 kg"
+    when: "Confirming reservation"
+    then: "Over-reservation warning appears requiring acknowledgment"
+  - id: "AC-8"
+    given: "LP has status=blocked or qa_status!=passed"
+    when: "Available LPs queried"
+    then: "Blocked LP excluded from results"
+
+business_rules:
+  soft_reservations: "Same LP can be reserved by multiple WOs with warning"
+  pick_algorithm:
+    fifo: "Sort by created_at ASC, then expiry_date ASC"
+    fefo: "Sort by expiry_date ASC (NULL last), then created_at ASC"
+  lp_filter: "Only status=available AND qa_status=passed AND expiry_date>=today"
+  auto_release: "Release all active reservations when WO status = completed or cancelled"
+
+output_artifacts:
+  - "material_reservations table migration"
+  - "get_available_lps_for_material RPC function"
+  - "material-reservation-service.ts"
+  - "reservation-schemas.ts"
+  - "4 API endpoints"
+  - "4 React components"
+  - "Unit, integration, and E2E tests"

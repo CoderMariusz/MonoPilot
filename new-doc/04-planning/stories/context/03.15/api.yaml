@@ -1,0 +1,460 @@
+# Story 03.15 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  # GET Gantt data
+  - method: "GET"
+    path: "/api/planning/work-orders/gantt"
+    description: "Returns aggregated Gantt chart data with swimlanes and WO bars"
+    file: "apps/frontend/app/api/planning/work-orders/gantt/route.ts"
+    auth: "required"
+    roles: ["admin", "production_manager", "planner", "production_operator", "viewer"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      query_params:
+        - name: "view_by"
+          type: "enum"
+          values: ["line", "machine"]
+          default: "line"
+          description: "Swimlane grouping mode"
+        - name: "from_date"
+          type: "string"
+          format: "YYYY-MM-DD"
+          default: "today"
+          description: "Date range start"
+        - name: "to_date"
+          type: "string"
+          format: "YYYY-MM-DD"
+          default: "today + 30 days"
+          description: "Date range end"
+        - name: "status[]"
+          type: "string[]"
+          default: '["draft", "planned", "released", "in_progress", "on_hold"]'
+          description: "WO statuses to include (excludes completed by default)"
+        - name: "line_id"
+          type: "string (UUID)"
+          optional: true
+          description: "Filter by production line"
+        - name: "product_id"
+          type: "string (UUID)"
+          optional: true
+          description: "Filter by product"
+        - name: "search"
+          type: "string"
+          optional: true
+          description: "Search by WO number or product name"
+
+    response:
+      status: 200
+      type: "GanttDataResponse"
+      schema:
+        success: "boolean"
+        data:
+          swimlanes:
+            - id: "string (UUID)"
+              name: "string"
+              type: "'line' | 'machine'"
+              capacity_hours_per_day: "number | null"
+              work_orders:
+                - id: "string (UUID)"
+                  wo_number: "string"
+                  product:
+                    id: "string (UUID)"
+                    code: "string"
+                    name: "string"
+                  status: "string"
+                  priority: "string"
+                  quantity: "number"
+                  uom: "string"
+                  scheduled_date: "string (ISO date)"
+                  scheduled_start_time: "string (HH:mm)"
+                  scheduled_end_time: "string (HH:mm)"
+                  duration_hours: "number"
+                  progress_percent: "number | null"
+                  material_status: "'ok' | 'low' | 'insufficient'"
+                  is_overdue: "boolean"
+                  created_at: "string (ISO datetime)"
+          date_range:
+            from_date: "string (ISO date)"
+            to_date: "string (ISO date)"
+          filters_applied:
+            view_by: "string"
+            status: "string[]"
+            line_id: "string | null"
+            product_id: "string | null"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 400
+        code: "INVALID_DATE_RANGE"
+        message: "from_date must be before to_date"
+      - status: 400
+        code: "DATE_RANGE_TOO_LARGE"
+        message: "Date range cannot exceed 90 days"
+
+  # POST Reschedule WO
+  - method: "POST"
+    path: "/api/planning/work-orders/:id/reschedule"
+    description: "Reschedule a work order (drag-and-drop)"
+    file: "apps/frontend/app/api/planning/work-orders/[id]/reschedule/route.ts"
+    auth: "required"
+    roles: ["admin", "production_manager", "planner"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        id: "string (UUID) - Work order ID"
+      body:
+        scheduled_date: "string (ISO date) - Required"
+        scheduled_start_time: "string (HH:mm) - Required"
+        scheduled_end_time: "string (HH:mm) - Required"
+        production_line_id: "string (UUID) - Optional, if changing line"
+        validate_dependencies: "boolean - Default: true"
+        validate_materials: "boolean - Default: true"
+
+    response:
+      status: 200
+      type: "RescheduleResponse"
+      schema:
+        success: "boolean"
+        data:
+          id: "string (UUID)"
+          wo_number: "string"
+          scheduled_date: "string (ISO date)"
+          scheduled_start_time: "string (HH:mm)"
+          scheduled_end_time: "string (HH:mm)"
+          production_line_id: "string (UUID)"
+          line_name: "string"
+          duration_hours: "number"
+        warnings: "string[] - e.g., material availability warnings"
+        conflicts: "[] - empty if no conflicts"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "You do not have permission to reschedule work orders"
+      - status: 404
+        code: "WO_NOT_FOUND"
+        message: "Work order not found"
+      - status: 400
+        code: "INVALID_TIME_RANGE"
+        message: "scheduled_start_time must be before scheduled_end_time"
+      - status: 400
+        code: "DURATION_TOO_SHORT"
+        message: "Duration must be at least 1 hour"
+      - status: 400
+        code: "PAST_DATE"
+        message: "Cannot schedule in the past"
+      - status: 409
+        code: "LINE_CONFLICT"
+        message: "Line already scheduled for this time slot"
+        details: "{ conflicting_wo: { id, wo_number, product_name, start, end } }"
+      - status: 400
+        code: "WO_STATUS_INVALID"
+        message: "Cannot reschedule completed or closed work orders"
+
+  # POST Check Availability
+  - method: "POST"
+    path: "/api/planning/work-orders/check-availability"
+    description: "Pre-drop validation for line availability"
+    file: "apps/frontend/app/api/planning/work-orders/check-availability/route.ts"
+    auth: "required"
+    roles: ["admin", "production_manager", "planner"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      body:
+        line_id: "string (UUID) - Required"
+        scheduled_date: "string (ISO date) - Required"
+        scheduled_start_time: "string (HH:mm) - Required"
+        scheduled_end_time: "string (HH:mm) - Required"
+        exclude_wo_id: "string (UUID) - Optional, current WO being dragged"
+
+    response:
+      status: 200
+      type: "AvailabilityCheckResponse"
+      schema:
+        success: "boolean"
+        data:
+          is_available: "boolean"
+          conflicts:
+            - wo_id: "string (UUID)"
+              wo_number: "string"
+              product_name: "string"
+              scheduled_start_time: "string (HH:mm)"
+              scheduled_end_time: "string (HH:mm)"
+          capacity_utilization: "number (0.0 to 1.0)"
+          warnings: "string[]"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 400
+        code: "INVALID_LINE"
+        message: "Production line not found"
+
+  # GET Export Gantt to PDF
+  - method: "GET"
+    path: "/api/planning/work-orders/gantt/export"
+    description: "Export Gantt chart to PDF"
+    file: "apps/frontend/app/api/planning/work-orders/gantt/export/route.ts"
+    auth: "required"
+    roles: ["admin", "production_manager", "planner"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      query_params:
+        - name: "format"
+          type: "enum"
+          values: ["pdf"]
+          default: "pdf"
+        - name: "from_date"
+          type: "string"
+          format: "YYYY-MM-DD"
+          required: true
+        - name: "to_date"
+          type: "string"
+          format: "YYYY-MM-DD"
+          required: true
+        - name: "view_by"
+          type: "enum"
+          values: ["line", "machine"]
+          default: "line"
+        - name: "status[]"
+          type: "string[]"
+          optional: true
+
+    response:
+      status: 200
+      type: "binary"
+      content_type: "application/pdf"
+      headers:
+        Content-Disposition: 'attachment; filename="wo-gantt-schedule-YYYY-MM-DD.pdf"'
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 500
+        code: "PDF_GENERATION_FAILED"
+        message: "Failed to generate PDF"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/gantt-service.ts"
+    description: "Gantt data aggregation, reschedule, availability check"
+    exports:
+      - name: "getGanttData"
+        type: "async function"
+        params:
+          - "params: GetGanttDataParams"
+        returns: "Promise<GanttDataResponse>"
+        description: "Fetch aggregated Gantt data with filters"
+
+      - name: "rescheduleWO"
+        type: "async function"
+        params:
+          - "woId: string"
+          - "params: RescheduleParams"
+        returns: "Promise<RescheduleResponse>"
+        description: "Reschedule work order via drag-drop"
+
+      - name: "checkLineAvailability"
+        type: "async function"
+        params:
+          - "params: AvailabilityCheckParams"
+        returns: "Promise<AvailabilityCheckResponse>"
+        description: "Check line availability before drop"
+
+      - name: "exportGanttPDF"
+        type: "async function"
+        params:
+          - "params: ExportParams"
+        returns: "Promise<Blob>"
+        description: "Export Gantt chart to PDF"
+
+# Validation schemas
+validation:
+  - path: "apps/frontend/lib/validation/gantt-schemas.ts"
+    description: "Zod schemas for Gantt API validation"
+    exports:
+      - name: "getGanttDataSchema"
+        type: "zod schema"
+        fields:
+          - { name: "view_by", type: "z.enum(['line', 'machine']).default('line')" }
+          - { name: "from_date", type: "z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/)" }
+          - { name: "to_date", type: "z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/)" }
+          - { name: "status", type: "z.array(z.string()).optional()" }
+          - { name: "line_id", type: "z.string().uuid().optional()" }
+          - { name: "product_id", type: "z.string().uuid().optional()" }
+          - { name: "search", type: "z.string().optional()" }
+
+      - name: "rescheduleWOSchema"
+        type: "zod schema"
+        fields:
+          - { name: "scheduled_date", type: "z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/)" }
+          - { name: "scheduled_start_time", type: "z.string().regex(/^\\d{2}:\\d{2}$/)" }
+          - { name: "scheduled_end_time", type: "z.string().regex(/^\\d{2}:\\d{2}$/)" }
+          - { name: "production_line_id", type: "z.string().uuid().optional()" }
+          - { name: "validate_dependencies", type: "z.boolean().default(true)" }
+          - { name: "validate_materials", type: "z.boolean().default(true)" }
+        refinements:
+          - "Start time must be before end time"
+          - "Duration must be at least 1 hour"
+
+      - name: "checkAvailabilitySchema"
+        type: "zod schema"
+        fields:
+          - { name: "line_id", type: "z.string().uuid()" }
+          - { name: "scheduled_date", type: "z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/)" }
+          - { name: "scheduled_start_time", type: "z.string().regex(/^\\d{2}:\\d{2}$/)" }
+          - { name: "scheduled_end_time", type: "z.string().regex(/^\\d{2}:\\d{2}$/)" }
+          - { name: "exclude_wo_id", type: "z.string().uuid().optional()" }
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/gantt.ts"
+    description: "TypeScript interfaces for Gantt"
+    exports:
+      - "GanttSwimlane"
+      - "GanttWorkOrder"
+      - "GanttDataResponse"
+      - "RescheduleParams"
+      - "RescheduleResponse"
+      - "AvailabilityCheckParams"
+      - "AvailabilityCheckResponse"
+      - "GanttFilters"
+      - "ZoomLevel"
+
+# Implementation patterns
+patterns:
+  api_route_gantt: |
+    // apps/frontend/app/api/planning/work-orders/gantt/route.ts
+    import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+    import { cookies } from 'next/headers';
+    import { NextResponse } from 'next/server';
+    import { getGanttDataSchema } from '@/lib/validation/gantt-schemas';
+    import { getGanttData } from '@/lib/services/gantt-service';
+
+    export async function GET(request: Request) {
+      const supabase = createRouteHandlerClient({ cookies });
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+      if (authError || !user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      const { searchParams } = new URL(request.url);
+      const params = {
+        view_by: searchParams.get('view_by') || 'line',
+        from_date: searchParams.get('from_date') || new Date().toISOString().split('T')[0],
+        to_date: searchParams.get('to_date') || getDefaultEndDate(),
+        status: searchParams.getAll('status[]'),
+        line_id: searchParams.get('line_id'),
+        product_id: searchParams.get('product_id'),
+        search: searchParams.get('search'),
+      };
+
+      const validation = getGanttDataSchema.safeParse(params);
+      if (!validation.success) {
+        return NextResponse.json({ error: validation.error.errors }, { status: 400 });
+      }
+
+      try {
+        const data = await getGanttData(supabase, validation.data);
+        return NextResponse.json({ success: true, data });
+      } catch (error) {
+        return NextResponse.json({ error: 'Failed to fetch Gantt data' }, { status: 500 });
+      }
+    }
+
+  reschedule_service: |
+    // apps/frontend/lib/services/gantt-service.ts (rescheduleWO function)
+    export async function rescheduleWO(
+      supabase: SupabaseClient,
+      woId: string,
+      params: RescheduleParams
+    ): Promise<RescheduleResponse> {
+      // 1. Validate WO exists and is reschedulable
+      const { data: wo, error: woError } = await supabase
+        .from('work_orders')
+        .select('id, wo_number, status, production_line_id')
+        .eq('id', woId)
+        .single();
+
+      if (woError || !wo) {
+        throw new Error('WO_NOT_FOUND');
+      }
+
+      if (['completed', 'closed'].includes(wo.status)) {
+        throw new Error('WO_STATUS_INVALID');
+      }
+
+      // 2. Check line availability
+      const lineId = params.production_line_id || wo.production_line_id;
+      const availability = await checkLineAvailability(supabase, {
+        line_id: lineId,
+        scheduled_date: params.scheduled_date,
+        scheduled_start_time: params.scheduled_start_time,
+        scheduled_end_time: params.scheduled_end_time,
+        exclude_wo_id: woId,
+      });
+
+      if (!availability.is_available) {
+        throw new Error('LINE_CONFLICT');
+      }
+
+      // 3. Update work order
+      const { data: updated, error: updateError } = await supabase
+        .from('work_orders')
+        .update({
+          planned_start_date: params.scheduled_date,
+          scheduled_start_time: params.scheduled_start_time,
+          scheduled_end_time: params.scheduled_end_time,
+          production_line_id: lineId,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', woId)
+        .select()
+        .single();
+
+      if (updateError) {
+        throw new Error('UPDATE_FAILED');
+      }
+
+      return {
+        success: true,
+        data: updated,
+        warnings: availability.warnings,
+        conflicts: [],
+      };
+    }
+
+# Cache strategy
+cache:
+  gantt_data:
+    key_pattern: "org:{orgId}:planning:gantt:{view_by}:{from_date}:{to_date}:{filters_hash}"
+    ttl_seconds: 120
+    invalidate_on:
+      - "work_order.created"
+      - "work_order.updated"
+      - "work_order.rescheduled"
+      - "work_order.status_changed"
+  lines_cache:
+    key_pattern: "org:{orgId}:lines:active"
+    ttl_seconds: 300
+  machines_cache:
+    key_pattern: "org:{orgId}:machines:active"
+    ttl_seconds: 300

@@ -1,0 +1,99 @@
+# Story 05.7 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "05.7"
+  name: "Warehouse Dashboard"
+  slug: "warehouse-dashboard"
+  epic: "05-warehouse"
+  phase: "0"
+  complexity: "M"
+  estimate_days: 3
+  type: "backend + frontend"
+  state: "ready"
+  priority: "P0"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Database queries, views, caching
+  - api.yaml         # Endpoints, auth, errors
+  - frontend.yaml    # Components, pages, wireframes
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "05.1"
+      name: "LP Table + CRUD"
+      provides: ["license_plates", "LicensePlateService"]
+  soft:
+    - story: "05.2"
+      name: "LP Genealogy"
+      provides: ["lp_genealogy", "activity_feed_operations"]
+    - story: "05.3"
+      name: "LP Reservations"
+      provides: ["lp_reservations", "reserved_count"]
+    - story: "05.4"
+      name: "FIFO/FEFO Pick Suggestions"
+      provides: ["expiring_soon_logic"]
+    - story: "01.8"
+      name: "Warehouses CRUD"
+      provides: ["warehouses"]
+    - story: "01.9"
+      name: "Locations CRUD"
+      provides: ["locations"]
+    - story: "02.1"
+      name: "Products"
+      provides: ["products"]
+  blocked_by: []
+  blocks: []
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/warehouse.md"
+    sections: ["WH-FR-008", "WH-FR-030"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/05-warehouse/05.7.warehouse-dashboard.md"
+  wireframes:
+    path: "docs/3-ARCHITECTURE/ux/wireframes/WH-001-warehouse-dashboard.md"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern"
+  patterns:
+    - path: "docs/2-MANAGEMENT/epics/current/01-settings/context/01.1/"
+      relevance: "YAML context file structure"
+
+# High-level deliverables
+deliverables:
+  - type: "api"
+    count: 3
+    description: "Dashboard KPIs, Alerts, Activity endpoints"
+  - type: "service"
+    count: 1
+    description: "warehouse-dashboard-service.ts"
+  - type: "validation"
+    count: 1
+    description: "warehouse-dashboard.ts (Zod schemas)"
+  - type: "page"
+    count: 1
+    description: "/warehouse dashboard page"
+  - type: "component"
+    count: 5
+    description: "KPICards, LowStockAlerts, ExpiringLPsWidget, BlockedLPsWidget, ActivityFeed"
+  - type: "test"
+    count: 3
+    description: "Unit + integration + E2E tests"
+
+# Technical notes
+technical_notes:
+  - "Redis caching with 1 min TTL for KPIs and alerts"
+  - "Activity feed NOT cached (real-time)"
+  - "Auto-refresh every 60 seconds with manual refresh option"
+  - "5 KPI cards: Total LPs, Available LPs, Reserved LPs, Consumed Today, Expiring Soon"
+  - "3 Alert panels: Low Stock, Expiring Items, Blocked LPs"
+  - "Alert panels limited to 10 items each with 'View All' link"
+  - "Performance target: <2s page load, <100ms per cached query"
+  - "All queries must use indexes (verified with EXPLAIN)"

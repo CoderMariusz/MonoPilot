@@ -1,0 +1,31 @@
+# Story 08.14 - Database Schema
+# Purpose: NPD-only mode & export - No new tables
+# Agent: BACKEND-DEV
+
+# NOTE: This story does NOT create new database tables.
+# It uses existing npd_settings.npd_only_mode toggle (added in 08.1).
+
+# NPD Settings Extension
+npd_settings_field:
+  table: "npd_settings"
+  column: "npd_only_mode"
+  added_by: "08.1"
+  type: "BOOLEAN"
+  default: false
+  description: "Enable NPD-only mode (R&D consultancy mode without production integration)"
+
+# No migrations required
+migrations: []
+
+# Dependencies
+dependencies:
+  required_tables:
+    - "npd_settings (08.1)"
+    - "npd_projects (08.2)"
+    - "npd_formulations (08.4)"
+    - "npd_formulation_items (08.4)"
+  optional_tables:
+    - "npd_allergens (08.5 - for allergen section in export)"
+    - "npd_costing (08.7 - for costing section in export)"
+    - "npd_documents (08.8 - for compliance status in export)"
+  note: "Export gracefully degrades if optional data unavailable"

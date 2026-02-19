@@ -1,0 +1,319 @@
+prd_sections:
+  shipping_module:
+    file: "docs/1-BASELINE/product/modules/shipping.md"
+    module: "Epic 7 - Shipping Management"
+
+    fr_7_38:
+      title: "SSCC-18 Barcode Generation"
+      category: "GS1 Compliance & Warehouse Operations"
+      requirement: |
+        System must generate GS1-compliant SSCC-18 (Serial Shipping Container Code)
+        for each pallet/carton in shipment with MOD 10 check digit validation.
+
+      acceptance_criteria:
+        - "SSCC format: 1 extension digit + 7-10 GS1 prefix + 6-9 serial + 1 check = 18 total"
+        - "Extension digit: 0 for cartons, 9 for pallets"
+        - "GS1 Company Prefix configured in organization settings (7-10 digits)"
+        - "Serial reference auto-incremented per organization"
+        - "Check digit calculated per MOD 10 algorithm (GS1 standard)"
+        - "SSCC globally unique (no duplicates across organizations)"
+        - "generate-sscc endpoint idempotent (skip existing SSCC)"
+        - "Error handling: GS1 prefix not configured, box missing weight/dimensions"
+
+      dependencies:
+        - "Epic 01 - Settings (org settings for GS1 prefix)"
+        - "Story 07.11 - Packing (shipment_boxes table)"
+
+      scope_notes: |
+        This covers SSCC generation logic only. Label printing (ZPL format)
+        covered in FR-7.39. EDI export (FR-11.x) in future phase.
+
+    fr_7_39:
+      title: "GS1-128 Barcode Label Generation & Printing"
+      category: "Label Printing & Warehouse Operations"
+      requirement: |
+        System must generate GS1-128 barcode labels for cartons/pallets with
+        Zebra ZPL support, PDF fallback, and label format options (4x6", 4x8").
+
+      acceptance_criteria:
+        - "GS1-128 barcode encoding with FNC1 start character"
+        - "Application Identifier (00) for SSCC data type"
+        - "ZPL (Zebra Programming Language) output format for thermal printers"
+        - "PDF output format for universal printer compatibility"
+        - "Label formats: 4x6\" (standard carton), 4x8\" (pallet)"
+        - "Human-readable SSCC text (00 1234 5678 9012 3456 78)"
+        - "Ship-to address, order number, box X of Y"
+        - "Weight in kg, handling instructions if applicable"
+        - "Batch printing support (queue multiple labels, print all)"
+        - "Print settings: printer selection, format, orientation, copies"
+        - "Label preview with scale controls and format toggle"
+        - "Error handling: SSCC not generated, printer offline, invalid dimensions"
+
+      dependencies:
+        - "FR-7.38 (SSCC generation must be complete)"
+        - "Story 07.11 (shipment boxes with dimensions)"
+        - "bwip-js library for barcode rendering"
+
+      scope_notes: |
+        Covers label generation and preview. Actual hardware printer communication
+        handled by browser print API (Zebra ZPL sent via network socket or USB).
+
+    fr_7_40:
+      title: "Packing Slip PDF Generation"
+      category: "Documentation & Quality Control"
+      requirement: |
+        System must generate professional packing slip PDFs with line items,
+        lot numbers, allergen warnings, and handling instructions.
+
+      acceptance_criteria:
+        - "PDF format (8.5\" x 11\" letter size)"
+        - "Header: Sales Order #, Shipment #, Date, Tracking #"
+        - "Ship To / Ship From sections with full addresses"
+        - "Line items table: product, qty ordered, qty shipped, backorder, lot #, BBD"
+        - "Carton summary: box X of Y, SSCC, weight, dimensions"
+        - "Special instructions: customer notes, temperature requirements"
+        - "Allergen warnings (if customer has allergen restrictions)"
+        - "Signature section: Shipped By/Date, Received By/Date"
+        - "PDF storage in Supabase Storage with org_id path prefix"
+        - "24-hour caching with manual invalidation on shipment update"
+        - "Print and email workflows"
+
+      dependencies:
+        - "FR-7.38 (SSCC required for carton summary)"
+        - "Epic 02.3 (Allergens data)"
+        - "Story 07.11 (shipment boxes and contents)"
+        - "pdfmake library for PDF generation"
+
+      scope_notes: |
+        Packing slip is generated once shipment is packed.
+        Does not require carrier assignment (unlike BOL in FR-7.41).
+
+    fr_7_41:
+      title: "Bill of Lading (BOL) PDF Generation & Printing"
+      category: "Shipping Documentation & Carrier Handoff"
+      requirement: |
+        System must generate professional BOL (Bill of Lading) documents with
+        shipper/consignee info, freight details, SSCC barcodes, and carrier contact.
+
+      acceptance_criteria:
+        - "PDF format (8.5\" x 11\" letter, single or multi-page)"
+        - "Header: BOL #, Date, Carrier, Pro/Tracking #"
+        - "Shipper section: org name, address, phone, email"
+        - "Consignee section: customer name, address, phone, contact name"
+        - "Special instructions: temperature control, hazmat, handling notes"
+        - "Freight terms: Prepaid/Collect/Third Party"
+        - "Freight details table: SSCC, weight, dimensions, freight class, NMFC code"
+        - "Totals: carton count, pallet count, total weight, declared value (with currency)"
+        - "Product summary by carton: product name, lot number, BBD, quantity"
+        - "Signature section: shipper and carrier placeholders"
+        - "Multi-page support: page break after 10 cartons or 25 product lines"
+        - "BOL numbering: BOL-YYYY-XXXXXX per organization (immutable)"
+        - "Email workflow: send BOL to carrier with contact suggestions"
+        - "Print dialog support"
+        - "Download/save to device"
+        - "Error handling: no carrier assigned, SSCC missing, weights missing, address missing"
+
+      dependencies:
+        - "FR-7.38 (SSCC required for BOL)"
+        - "Story 07.2 (Customer contacts and addresses)"
+        - "Story 07.1 (Customers)"
+        - "Epic 01.7 (Organization settings for freight class defaults, currency)"
+        - "pdfmake library for PDF generation"
+
+      scope_notes: |
+        BOL generation requires shipment status 'packed' or later AND carrier assigned.
+        Email sending uses Supabase Edge Function with SendGrid/Postmark API.
+        Not applicable for local pickup (no BOL needed if not using carrier).
+
+  architecture_module:
+    file: "docs/1-BASELINE/architecture/modules/shipping.md"
+    module: "Shipping Architecture & Technical Specifications"
+
+    sscc_algorithm:
+      section: "Lines 189-191"
+      title: "SSCC-18 Structure & Generation Algorithm"
+      content: |
+        SSCC-18 Structure:
+        [Extension Digit][GS1 Company Prefix][Serial Reference][Check Digit]
+        [1 digit]      [7-10 digits]      [6-9 digits]        [1 digit]
+
+        Total: 18 digits
+
+        Extension Digit: 0 = carton/case, 9 = pallet/higher-level unit
+
+        GS1 Company Prefix: Globally unique 7-10 digit identifier
+                          (assigned by GS1 organization)
+                          Ensures SSCC uniqueness across organizations
+
+        Serial Reference: Organization-specific counter
+                         Incremented per SSCC generated (atomic)
+                         Combined with GS1 prefix ensures global uniqueness
+
+        Check Digit: MOD 10 algorithm per GS1 standard
+                    Validates SSCC integrity
+
+      relevance: "Implements FR-7.38 SSCC generation"
+
+    gs1_128_barcode:
+      section: "Lines 209-219"
+      title: "GS1-128 Barcode Encoding & Label Format"
+      content: |
+        GS1-128 Barcode Structure:
+        [FNC1 Start][Application Identifier][SSCC Data][FNC1 Separator*]
+
+        FNC1 Start: Special character indicating GS1 format
+
+        Application Identifier (00): SSCC data type designation
+
+        SSCC Data: Full 18-digit SSCC number
+
+        FNC1 Separator: After variable-length AIs (not needed for SSCC)
+
+        Encoding Library: bwip-js
+        - Supports GS1-128 with FNC1 parsing
+        - Generates PNG barcode image
+        - Human-readable text below barcode
+
+        Label Formats:
+        4x6": 813 x 1219 dots @ 203 DPI (standard carton label)
+        4x8": 813 x 1629 dots @ 203 DPI (pallet label)
+
+        ZPL (Zebra Programming Language):
+        - Native format for Zebra printers
+        - ^XA...^FS code structure
+        - Coordinates in dots
+        - Barcode, text, lines, boxes
+        - Fast direct printing to Zebra devices
+
+      relevance: "Implements FR-7.39 barcode label generation"
+
+    bol_pdf_structure:
+      section: "Lines 444-447"
+      title: "Bill of Lading PDF Layout & Content"
+      content: |
+        8.5\" x 11\" Letter Document
+        0.5\" margins all sides
+
+        Sections (top to bottom):
+        1. Header (1.75\")
+           - BOL Title, BOL #, Date
+           - Shipper info, Carrier, Pro #
+
+        2. Shipper/Consignee (1.5\")
+           - Left: Organization name, address, phone, email
+           - Right: Customer name, address, phone, contact
+
+        3. Special Instructions (1\")
+           - Temperature control, hazmat, handling notes
+
+        4. Freight Details Table (2\")
+           - Item #, SSCC, Weight, Dimensions, Freight Class, NMFC
+           - One row per carton/pallet
+
+        5. Totals (0.75\")
+           - Total cartons, pallets, weight, declared value
+
+        6. Product Summary (1.5\")
+           - By carton: product names, lots, BBD, quantities
+           - Leave blank lines for carrier updates
+
+        7. Signature Section (1.25\")
+           - Shipper: signature, name, title, date
+           - Carrier: signature, name, title, date
+
+        8. Footer (0.5\")
+           - Return email, document ID, page indicator
+
+        Multi-page: Page break after 10 cartons or 25 product lines
+
+        PDF Library: pdfmake
+        - Declarative document structure
+        - No external dependencies
+        - Works in Edge Functions (serverless)
+
+      relevance: "Implements FR-7.40 (packing slip) and FR-7.41 (BOL) PDF generation"
+
+    label_printing_system:
+      section: "Lines 1035-1072"
+      title: "Label Printing Architecture & Workflows"
+      content: |
+        Printer Support:
+        1. Zebra ZPL (native): Fast, requires Zebra printer
+        2. Brother QL (native): Native format for Brother printers
+        3. Generic PDF: Universal printer support
+        4. Email PDF: Send labels via email
+
+        Output Formats:
+        - ZPL: Raw code sent to Zebra printer (network socket or USB)
+        - PDF: Rendered and sent to any standard printer via browser
+
+        Batch Printing Workflow:
+        1. User selects multiple shipments/boxes
+        2. System generates SSCC/labels for all (batch process)
+        3. Labels queued in UI with status (Ready, Error, Printed)
+        4. User can retry errors, print individual labels
+        5. Print All sends batch to selected printer
+
+        Print Settings:
+        - Printer selection (dropdown)
+        - Label format (4x6\" or 4x8\")
+        - Orientation (portrait/landscape)
+        - Copies (1-99)
+        - Mode (Native ZPL or PDF)
+        - Auto-print option (skip confirmation)
+
+        Print Status Tracking:
+        - Print job submitted to printer
+        - Status updates: Pending, Printing, Complete, Error
+        - Audit logging for compliance
+
+        Error Handling:
+        - Printer offline: display status, disable print button
+        - SSCC generation failed: show error reason, retry button
+        - Invalid dimensions: link to box detail page for correction
+
+      relevance: "Implements FR-7.39 label printing with ZPL and PDF support"
+
+  gs1_compliance:
+    standard: "GS1-128 Barcode Standard (ISO/IEC 15128)"
+    requirements:
+      - "SSCC must be 18 digits with check digit (MOD 10)"
+      - "Barcode must include FNC1 start character for GS1 format"
+      - "Application Identifier (00) must precede SSCC data"
+      - "Check digit must be validated before use"
+      - "SSCC must be globally unique (no duplicates)"
+
+  carrier_integration:
+    bol_usage: |
+      BOL is primary document for carrier handoff. Carrier receives:
+      1. BOL PDF with all shipment details
+      2. SSCC labels on each carton for inventory tracking
+      3. Pro/Tracking number in BOL and label
+      4. Special handling instructions (temperature, hazmat, etc.)
+
+      Carrier responsibilities:
+      1. Sign BOL confirming receipt of shipment
+      2. Return signed copy to shipper
+      3. Use SSCC for shipment tracking
+      4. Update tracking system with events
+
+    email_workflow: |
+      BOL can be emailed to carrier with:
+      1. Default carrier contact from carrier_configs
+      2. Additional CC recipients as needed
+      3. Customizable subject and message
+      4. PDF attachment option
+      5. Carrier-specific instructions
+
+      Email template pre-filled with:
+      - BOL #, Pro #, shipment date
+      - Shipper and consignee info
+      - Total weight and carton count
+      - Special instructions
+      - Carrier contact at bottom
+
+version_history:
+  - version: "1.0"
+    date: "2025-12-18"
+    changes: "PRD sections mapping for Story 07.13 SSCC/BOL labels"
+    author: "TECH-WRITER"

@@ -1,0 +1,54 @@
+# Story 10.6 - API Specification
+# OEE Threshold Alerts
+
+endpoints:
+  - method: "GET"
+    path: "/api/oee/alerts"
+    description: "List performance alerts with filtering"
+    auth: "required"
+    query_params:
+      active_only: "boolean (default: true)"
+      severity: "warning | critical"
+      alert_type: "string"
+    response:
+      status: 200
+
+  - method: "GET"
+    path: "/api/oee/alerts/active"
+    description: "Get active alerts (resolved_at IS NULL)"
+    auth: "required"
+    response:
+      status: 200
+
+  - method: "PATCH"
+    path: "/api/oee/alerts/:id/acknowledge"
+    description: "Acknowledge alert"
+    auth: "required"
+    roles: ["supervisor", "production_manager", "admin"]
+    request:
+      body:
+        notes: "string (optional)"
+    response:
+      status: 200
+
+  - method: "PATCH"
+    path: "/api/oee/alerts/:id/resolve"
+    description: "Resolve alert"
+    auth: "required"
+    roles: ["supervisor", "production_manager", "admin"]
+    response:
+      status: 200
+
+services:
+  - path: "apps/frontend/lib/services/oee-alert-service.ts"
+    methods:
+      - { name: "list", returns: "Promise<PerformanceAlert[]>" }
+      - { name: "getActive", returns: "Promise<PerformanceAlert[]>" }
+      - { name: "acknowledge", params: ["id", "notes?"], returns: "Promise<PerformanceAlert>" }
+      - { name: "resolve", params: ["id"], returns: "Promise<PerformanceAlert>" }
+      - { name: "checkThresholds", params: ["machineId"], returns: "Promise<void>" }
+
+types:
+  - "PerformanceAlert"
+  - "AlertType"
+  - "AlertSeverity"

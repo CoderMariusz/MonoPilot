@@ -1,0 +1,421 @@
+# Story 05.9 - API Specification
+# Purpose: Endpoints, request/response schemas, validation, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  # GET - ASN Receive Preview
+  - method: "GET"
+    path: "/api/warehouse/asns/:id/receive"
+    description: "Get ASN receive preview with expected items and remaining quantities"
+    file: "apps/frontend/app/api/warehouse/asns/[id]/receive/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "warehouse_manager", "warehouse_operator"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        id: "ASN UUID"
+
+    response:
+      status: 200
+      type: "ASNReceivePreview"
+      schema:
+        asn:
+          id: "string (UUID)"
+          asn_number: "string"
+          status: "string (pending|partial|received)"
+          po_number: "string"
+          supplier_name: "string"
+          expected_date: "string (ISO date)"
+        items:
+          type: "array"
+          item:
+            id: "string (UUID)"
+            product_id: "string (UUID)"
+            product_name: "string"
+            product_sku: "string"
+            expected_qty: "number"
+            received_qty: "number"
+            remaining_qty: "number"
+            uom: "string"
+            supplier_batch_number: "string | null"
+            gtin: "string | null"
+            expiry_date: "string | null"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token provided"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "ASN feature not enabled"
+        when: "warehouse_settings.enable_asn = false"
+      - status: 404
+        code: "ASN_NOT_FOUND"
+        message: "ASN not found"
+        when: "ASN does not exist or belongs to different org"
+      - status: 400
+        code: "INVALID_STATUS"
+        message: "ASN already completed or cancelled"
+        when: "ASN status is 'received' or 'cancelled'"
+
+    performance:
+      target_ms: 300
+      max_ms: 500
+
+  # POST - Execute ASN Receive
+  - method: "POST"
+    path: "/api/warehouse/asns/:id/receive"
+    description: "Receive goods against ASN, creating GRN and LPs"
+    file: "apps/frontend/app/api/warehouse/asns/[id]/receive/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "warehouse_manager", "warehouse_operator"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        id: "ASN UUID"
+      body:
+        warehouse_id: "string (UUID) - required"
+        location_id: "string (UUID) - required"
+        items:
+          type: "array - required, min 1"
+          item:
+            asn_item_id: "string (UUID) - required"
+            received_qty: "number - required, positive"
+            batch_number: "string - optional"
+            supplier_batch_number: "string - optional"
+            expiry_date: "string (ISO date) - optional"
+            manufacture_date: "string (ISO date) - optional"
+            variance_reason: "string (enum) - optional"
+            variance_notes: "string - optional, max 500"
+        notes: "string - optional, max 1000"
+
+    response:
+      status: 201
+      type: "ASNReceiveResult"
+      schema:
+        grn_id: "string (UUID)"
+        grn_number: "string"
+        status: "string (completed)"
+        lps_created: "number"
+        asn_status: "string (partial|received)"
+        variances:
+          type: "array"
+          item:
+            product_name: "string"
+            expected_qty: "number"
+            received_qty: "number"
+            variance: "number"
+            variance_percent: "number"
+            variance_indicator: "string (under|over|exact)"
+
+    errors:
+      - status: 400
+        code: "VALIDATION_ERROR"
+        message: "Validation failed"
+        when: "Request body fails Zod validation"
+      - status: 400
+        code: "OVER_RECEIPT_EXCEEDED"
+        message: "Over-receipt exceeds tolerance (max: {max} units)"
+        when: "Received qty exceeds tolerance limit"
+      - status: 400
+        code: "BATCH_REQUIRED"
+        message: "Batch number required"
+        when: "warehouse_settings.require_batch_on_receipt = true and batch_number missing"
+      - status: 400
+        code: "EXPIRY_REQUIRED"
+        message: "Expiry date required"
+        when: "warehouse_settings.require_expiry_on_receipt = true and expiry_date missing"
+      - status: 400
+        code: "ASN_ITEM_NOT_FOUND"
+        message: "ASN item not found"
+        when: "asn_item_id does not exist in this ASN"
+      - status: 404
+        code: "ASN_NOT_FOUND"
+        message: "ASN not found"
+        when: "ASN does not exist or belongs to different org"
+      - status: 409
+        code: "INVALID_STATUS"
+        message: "Cannot receive against ASN with status: {status}"
+        when: "ASN status is 'received' or 'cancelled'"
+
+    performance:
+      target_ms: 500
+      max_ms: 2000
+      note: "May take longer for ASNs with many items (50+)"
+
+# Validation Schemas (Zod)
+validation:
+  schemas:
+    - name: "asnReceiveItemSchema"
+      file: "apps/frontend/lib/validation/asn-receive.ts"
+      definition: |
+        export const asnReceiveItemSchema = z.object({
+          asn_item_id: z.string().uuid("Invalid ASN item ID"),
+          received_qty: z.number().positive("Received quantity must be positive"),
+          batch_number: z.string().max(100).optional(),
+          supplier_batch_number: z.string().max(100).optional(),
+          expiry_date: z.string().date().optional(),
+          manufacture_date: z.string().date().optional(),
+          variance_reason: z.enum(['damaged', 'short-shipped', 'over-shipped', 'other']).optional(),
+          variance_notes: z.string().max(500).optional(),
+        });
+
+    - name: "asnReceiveRequestSchema"
+      file: "apps/frontend/lib/validation/asn-receive.ts"
+      definition: |
+        export const asnReceiveRequestSchema = z.object({
+          warehouse_id: z.string().uuid("Invalid warehouse ID"),
+          location_id: z.string().uuid("Invalid location ID"),
+          items: z.array(asnReceiveItemSchema).min(1, "At least one item required"),
+          notes: z.string().max(1000).optional(),
+        });
+
+    - name: "ASNReceiveRequest"
+      description: "TypeScript type inferred from schema"
+      definition: "export type ASNReceiveRequest = z.infer<typeof asnReceiveRequestSchema>;"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/asn-receive-service.ts"
+    description: "ASN receive workflow service"
+    exports:
+      - name: "getASNReceivePreview"
+        type: "async function"
+        params:
+          - "asnId: string"
+          - "orgId: string"
+        returns: "Promise<ASNReceivePreview>"
+        description: "Fetch ASN with items and calculate remaining quantities"
+
+      - name: "receiveFromASN"
+        type: "async function"
+        params:
+          - "asnId: string"
+          - "request: ASNReceiveRequest"
+          - "orgId: string"
+          - "userId: string"
+        returns: "Promise<ASNReceiveResult>"
+        description: |
+          Core receive workflow:
+          1. Validate ASN status (must be pending/partial)
+          2. Validate items and quantities
+          3. Check over-receipt tolerance
+          4. Create GRN record
+          5. Create GRN items
+          6. Create LPs for each item
+          7. Update asn_items.received_qty (cumulative)
+          8. Calculate variances
+          9. Update ASN status (partial/received)
+          10. Return result with variance summary
+
+      - name: "calculateASNVariance"
+        type: "function"
+        params:
+          - "expectedQty: number"
+          - "receivedQty: number"
+        returns: "VarianceResult"
+        description: "Calculate variance, variance_percent, indicator"
+
+      - name: "updateASNStatus"
+        type: "async function"
+        params:
+          - "asnId: string"
+          - "orgId: string"
+        returns: "Promise<void>"
+        description: |
+          Check if all items fully received
+          Update status: pending -> partial -> received
+          Set asns.actual_date if fully received
+
+      - name: "validateOverReceipt"
+        type: "async function"
+        params:
+          - "asnItemId: string"
+          - "receivedQty: number"
+          - "orgId: string"
+        returns: "Promise<{ allowed: boolean; maxAllowed: number; message?: string }>"
+        description: "Check over-receipt against warehouse_settings tolerance"
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/asn-receive.ts"
+    exports:
+      - name: "ASNReceivePreview"
+        definition: |
+          export interface ASNReceivePreview {
+            asn: {
+              id: string;
+              asn_number: string;
+              status: 'pending' | 'partial' | 'received' | 'cancelled';
+              po_number: string;
+              supplier_name: string;
+              expected_date: string;
+            };
+            items: ASNReceiveItemPreview[];
+          }
+
+      - name: "ASNReceiveItemPreview"
+        definition: |
+          export interface ASNReceiveItemPreview {
+            id: string;
+            product_id: string;
+            product_name: string;
+            product_sku: string;
+            expected_qty: number;
+            received_qty: number;
+            remaining_qty: number;
+            uom: string;
+            supplier_batch_number: string | null;
+            gtin: string | null;
+            expiry_date: string | null;
+          }
+
+      - name: "ASNReceiveResult"
+        definition: |
+          export interface ASNReceiveResult {
+            grn_id: string;
+            grn_number: string;
+            status: 'completed';
+            lps_created: number;
+            asn_status: 'partial' | 'received';
+            variances: VarianceItem[];
+          }
+
+      - name: "VarianceItem"
+        definition: |
+          export interface VarianceItem {
+            product_name: string;
+            expected_qty: number;
+            received_qty: number;
+            variance: number;
+            variance_percent: number;
+            variance_indicator: 'under' | 'over' | 'exact';
+          }
+
+      - name: "VarianceReason"
+        definition: |
+          export type VarianceReason = 'damaged' | 'short-shipped' | 'over-shipped' | 'other';
+
+# Implementation patterns
+patterns:
+  api_route: |
+    // apps/frontend/app/api/warehouse/asns/[id]/receive/route.ts
+    import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+    import { cookies } from 'next/headers';
+    import { NextResponse } from 'next/server';
+    import { asnReceiveRequestSchema } from '@/lib/validation/asn-receive';
+    import { getASNReceivePreview, receiveFromASN } from '@/lib/services/asn-receive-service';
+    import { getOrgContext } from '@/lib/services/org-context-service';
+
+    export async function GET(
+      request: Request,
+      { params }: { params: { id: string } }
+    ) {
+      const context = await getOrgContext();
+      if (!context) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      try {
+        const preview = await getASNReceivePreview(params.id, context.org_id);
+        return NextResponse.json(preview);
+      } catch (error) {
+        if (error.code === 'ASN_NOT_FOUND') {
+          return NextResponse.json({ error: 'ASN not found' }, { status: 404 });
+        }
+        throw error;
+      }
+    }
+
+    export async function POST(
+      request: Request,
+      { params }: { params: { id: string } }
+    ) {
+      const context = await getOrgContext();
+      if (!context) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      const body = await request.json();
+      const validation = asnReceiveRequestSchema.safeParse(body);
+      if (!validation.success) {
+        return NextResponse.json(
+          { error: 'Validation failed', details: validation.error.errors },
+          { status: 400 }
+        );
+      }
+
+      try {
+        const result = await receiveFromASN(
+          params.id,
+          validation.data,
+          context.org_id,
+          context.user_id
+        );
+        return NextResponse.json(result, { status: 201 });
+      } catch (error) {
+        // Handle specific error codes
+        if (error.code === 'OVER_RECEIPT_EXCEEDED') {
+          return NextResponse.json({ error: error.message }, { status: 400 });
+        }
+        throw error;
+      }
+    }
+
+  service_pattern: |
+    // apps/frontend/lib/services/asn-receive-service.ts
+    import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+    import { LicensePlateService } from './license-plate-service';
+
+    export async function receiveFromASN(
+      asnId: string,
+      request: ASNReceiveRequest,
+      orgId: string,
+      userId: string
+    ): Promise<ASNReceiveResult> {
+      const supabase = createClientComponentClient();
+
+      // Transaction wrapper
+      const { data, error } = await supabase.rpc('receive_from_asn', {
+        p_asn_id: asnId,
+        p_warehouse_id: request.warehouse_id,
+        p_location_id: request.location_id,
+        p_items: JSON.stringify(request.items),
+        p_notes: request.notes || null,
+        p_user_id: userId,
+      });
+
+      if (error) throw new Error(error.message);
+      return data;
+    }
+
+# Error handling
+error_handling:
+  strategy: "Return specific error codes for business rule violations"
+  codes:
+    - code: "ASN_NOT_FOUND"
+      status: 404
+      message: "ASN not found"
+    - code: "INVALID_STATUS"
+      status: 400
+      message: "Cannot receive against ASN with status: {status}"
+    - code: "OVER_RECEIPT_EXCEEDED"
+      status: 400
+      message: "Over-receipt exceeds tolerance (max: {max} units)"
+    - code: "BATCH_REQUIRED"
+      status: 400
+      message: "Batch number required"
+    - code: "EXPIRY_REQUIRED"
+      status: 400
+      message: "Expiry date required"
+    - code: "ASN_ITEM_NOT_FOUND"
+      status: 400
+      message: "ASN item {id} not found in this ASN"
+    - code: "VALIDATION_ERROR"
+      status: 400
+      message: "Validation failed"

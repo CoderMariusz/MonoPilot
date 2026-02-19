@@ -1,0 +1,115 @@
+# Story 05.14 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "05.14"
+  name: "LP Label Printing (ZPL)"
+  slug: "lp-label-printing"
+  epic: "05-warehouse"
+  phase: "1"
+  complexity: "M"
+  estimate_days: 3
+  type: "full-stack"
+  state: "ready"
+  model: "SONNET"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, RLS, seed data
+  - api.yaml         # Endpoints, auth, errors
+  - frontend.yaml    # Components, hooks, types
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "05.1"
+      name: "LP Table + CRUD"
+      provides: ["license_plates table", "LP service", "LP types"]
+    - story: "05.0"
+      name: "Warehouse Settings"
+      provides: ["warehouse_settings table", "label print settings"]
+  blocked_by:
+    - story: "05.1"
+  blocks:
+    - story: "05.19"
+      name: "Scanner Receive"
+      reason: "Auto-print on receipt integration"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/warehouse.md"
+    sections: ["WH-FR-014"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/warehouse.md"
+    sections: ["Label Printing (ZPL)", "GS1 Barcode Support"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/05-warehouse/05.14.lp-label-printing.md"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/WH-013-label-print-modal.md"
+      id: "WH-013"
+      description: "Print Label Modal with GS1 support"
+  patterns:
+    - path: "apps/frontend/lib/services/settings-service.ts"
+      relevance: "Service pattern reference"
+    - path: "apps/frontend/app/api/warehouse/license-plates/route.ts"
+      relevance: "API route pattern for warehouse module"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "Add label print columns to warehouse_settings, create label_print_logs table"
+  - type: "service"
+    count: 1
+    description: "LabelPrintService with ZPL generation"
+  - type: "template"
+    count: 1
+    description: "LP label ZPL template (4x6 inch)"
+  - type: "api"
+    count: 2
+    description: "POST /lps/:id/print-label, POST /lps/print-bulk"
+  - type: "validation"
+    count: 2
+    description: "printLabelQuerySchema, printBulkLabelsSchema"
+  - type: "component"
+    count: 4
+    description: "PrintLabelModal, LabelPreview, BulkPrintModal, PrintLabelButton"
+  - type: "test"
+    count: 3
+    description: "Unit + integration + E2E tests"
+
+# Technical notes
+technical_notes:
+  - "ZPL template uses Zebra ZPL II commands compatible with most Zebra printers"
+  - "QR code includes JSON with LP metadata for scanning"
+  - "CODE128 barcode for LP number (scannable)"
+  - "Settings integration: print_label_on_receipt, label_copies_default, label_size"
+  - "Bulk print limited to 100 LPs per request"
+  - "Download ZPL file option for manual printing (no printer configured)"
+  - "TCP socket printing to Zebra printers deferred to Phase 2 (05.14b)"
+
+# PRD Coverage
+prd_coverage:
+  - id: "WH-FR-014"
+    name: "Label Print"
+    coverage: "full"
+    notes: "ZPL labels for LP with barcode, QR code, product info"
+  - id: "WH-FR-001"
+    name: "LP CRUD"
+    coverage: "partial"
+    notes: "Print action from LP detail/list"
+
+# Business Rules
+business_rules:
+  - "Label copies range: 1-100 per request"
+  - "Bulk print limit: 100 LPs per request"
+  - "Label sizes: 4x6, 4x3, 3x2 inch (4x6 default)"
+  - "Auto-print on receipt: configurable via print_label_on_receipt"
+  - "QR code always includes LP metadata JSON"
+  - "Product name truncated to 40 chars on label (full in QR)"
+  - "Missing batch/expiry shows '--' or 'N/A'"
+  - "All print requests logged to label_print_logs"

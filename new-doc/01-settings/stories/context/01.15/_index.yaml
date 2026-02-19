@@ -1,0 +1,86 @@
+# Story 01.15 - Index File (Entry Point)
+# Generated: 2025-12-16
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "01.15"
+  name: "Session & Password Management"
+  slug: "session-password-management"
+  epic: "01-settings"
+  phase: "1A"
+  complexity: "M"
+  estimate_days: 2-3
+  type: "backend+frontend"
+  state: "ready"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # user_sessions, password_history, security policies
+  - api.yaml         # Session endpoints, password endpoints
+  - frontend.yaml    # Security components, session management UI
+  - tests.yaml       # Acceptance criteria, test specifications
+  - gaps.yaml        # Identified gaps, blockers
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["org_id context", "RLS patterns", "auth helpers"]
+    - story: "01.6"
+      name: "Role Permissions"
+      provides: ["Admin role checks", "permission system"]
+  blocked_by: []
+  blocks: []
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/settings.md"
+    sections: ["FR-SET-013", "FR-SET-014"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/settings.md"
+    sections: ["Security Tables", "user_sessions", "password_history"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/01-settings/01.15.session-password-management.md"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS for user_sessions table"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 3
+    description: "user_sessions, password_history, org settings extensions"
+  - type: "service"
+    count: 2
+    description: "session-service.ts, password-service.ts"
+  - type: "api"
+    count: 10
+    description: "Session management + password management endpoints"
+  - type: "validation"
+    count: 2
+    description: "Zod schemas for sessions and passwords"
+  - type: "pages"
+    count: 1
+    description: "/settings/security page"
+  - type: "components"
+    count: 8
+    description: "Session list, password form, dialogs, badges"
+  - type: "test"
+    count: 3
+    description: "Unit + integration + E2E tests"
+
+# Technical notes
+technical_notes:
+  - "Session timeout configurable per org (default 24 hours)"
+  - "Password complexity: 8+ chars, uppercase, lowercase, number, special"
+  - "Password history: Cannot reuse last 5 passwords"
+  - "Auto-logout on password change (all other sessions terminated)"
+  - "Multi-device support with session list"
+  - "Admin can terminate user sessions"
+  - "Device info parsed from user agent"
+  - "Session tokens hashed in database"
+  - "Password hashing with bcrypt (cost factor 12)"
+  - "Real-time password validation feedback"

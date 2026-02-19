@@ -1,0 +1,505 @@
+# Story 03.4 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  # Parse uploaded Excel file
+  - method: "POST"
+    path: "/api/planning/purchase-orders/import/parse"
+    description: "Parse uploaded Excel file and group by supplier"
+    file: "apps/frontend/app/api/planning/purchase-orders/import/parse/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "planner", "purchaser"]
+
+    request:
+      headers:
+        Content-Type: "multipart/form-data"
+        Authorization: "Bearer <jwt_token>"
+      body:
+        file: "Excel file (.xlsx, .xls)"
+      constraints:
+        max_size: "5MB"
+        max_rows: 1000
+        supported_types: [".xlsx", ".xls"]
+
+    response:
+      status: 200
+      type: "ParsedImportResult"
+      schema:
+        success: "boolean"
+        data:
+          rows_parsed: "number"
+          groups:
+            - supplier:
+                id: "UUID"
+                code: "string"
+                name: "string"
+                currency: "string (PLN|EUR|USD|GBP)"
+                lead_time_days: "number"
+              expected_date: "string (YYYY-MM-DD)"
+              lines:
+                - row_number: "number"
+                  product_code: "string"
+                  product_name: "string"
+                  quantity: "number"
+                  uom: "string"
+                  unit_price: "number"
+                  line_total: "number"
+                  notes: "string | null"
+              subtotal: "number"
+          total_value: "number"
+
+    errors:
+      - status: 400
+        code: "FILE_TYPE_INVALID"
+        message: "Unsupported file type. Please upload .xlsx or .xls file"
+        when: "File extension not supported"
+
+      - status: 400
+        code: "FILE_TOO_LARGE"
+        message: "File size exceeds 5MB limit"
+        when: "File > 5MB"
+
+      - status: 400
+        code: "NO_DATA_ROWS"
+        message: "File contains no data rows"
+        when: "Empty file or only headers"
+
+      - status: 400
+        code: "MISSING_COLUMN"
+        message: "Missing required column: {column_name}"
+        when: "Required column not found"
+
+      - status: 400
+        code: "INVALID_COLUMN_HEADER"
+        message: "Invalid column header: {header}"
+        when: "Unrecognized column name"
+
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+
+  # Validate parsed import data
+  - method: "POST"
+    path: "/api/planning/purchase-orders/import/validate"
+    description: "Validate parsed import data against catalog and business rules"
+    file: "apps/frontend/app/api/planning/purchase-orders/import/validate/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "planner", "purchaser"]
+
+    request:
+      body:
+        groups: "POGroup[] - Parsed groups from step 2"
+
+    response:
+      status: 200
+      type: "ValidationResult"
+      schema:
+        success: "boolean"
+        data:
+          valid_count: "number"
+          error_count: "number"
+          warning_count: "number"
+          issues:
+            - row_number: "number"
+              type: "error | warning | info"
+              code: "string"
+              message: "string"
+              field: "string"
+              value: "any"
+              resolutions:
+                - action: "string"
+                  label: "string"
+
+    errors:
+      - status: 400
+        code: "VALIDATION_FAILED"
+        message: "Validation failed with errors"
+        when: "Critical validation errors"
+
+  # Bulk create POs
+  - method: "POST"
+    path: "/api/planning/purchase-orders/bulk"
+    description: "Create multiple POs from validated import groups"
+    file: "apps/frontend/app/api/planning/purchase-orders/bulk/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "planner", "purchaser"]
+
+    request:
+      body:
+        groups:
+          - supplier_id: "UUID"
+            warehouse_id: "UUID"
+            expected_delivery_date: "string (YYYY-MM-DD)"
+            currency: "string (PLN|EUR|USD|GBP)"
+            tax_code_id: "UUID | null"
+            payment_terms: "string | null"
+            notes: "string | null"
+            lines:
+              - product_id: "UUID"
+                quantity: "number"
+                unit_price: "number"
+                uom: "string"
+                tax_code_id: "UUID | null"
+                notes: "string | null"
+
+    response:
+      status: 200
+      type: "BulkCreateResult"
+      schema:
+        success: "boolean"
+        data:
+          created_count: "number"
+          failed_count: "number"
+          purchase_orders:
+            - id: "UUID"
+              po_number: "string"
+              supplier:
+                id: "UUID"
+                name: "string"
+              lines_count: "number"
+              total: "number"
+              currency: "string"
+              status: "draft"
+          failed_orders:
+            - group_index: "number"
+              supplier:
+                id: "UUID"
+                name: "string"
+              lines_count: "number"
+              total: "number"
+              currency: "string"
+              error:
+                code: "string"
+                message: "string"
+                details: "object"
+                resolutions: "string[]"
+          total_value: "number"
+          total_lines: "number"
+
+    errors:
+      - status: 400
+        code: "NO_GROUPS"
+        message: "No PO groups provided"
+        when: "Empty groups array"
+
+      - status: 400
+        code: "VALIDATION_FAILED"
+        message: "One or more groups failed validation"
+        when: "Pre-create validation fails"
+
+      - status: 500
+        code: "BULK_CREATE_FAILED"
+        message: "Failed to create purchase orders"
+        when: "Database error during creation"
+
+  # Bulk submit POs
+  - method: "POST"
+    path: "/api/planning/purchase-orders/bulk-submit"
+    description: "Submit multiple POs for approval/confirmation"
+    file: "apps/frontend/app/api/planning/purchase-orders/bulk-submit/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "planner", "purchaser"]
+
+    request:
+      body:
+        po_ids: "UUID[] - List of PO IDs to submit"
+
+    response:
+      status: 200
+      type: "BulkSubmitResult"
+      schema:
+        success: "boolean"
+        data:
+          submitted_count: "number"
+          results:
+            - id: "UUID"
+              po_number: "string"
+              status: "string (pending_approval | confirmed)"
+              error: "string | null"
+
+    errors:
+      - status: 400
+        code: "NO_POS_PROVIDED"
+        message: "No PO IDs provided"
+
+      - status: 400
+        code: "INVALID_STATUS"
+        message: "One or more POs are not in draft status"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/bulk-po-import-service.ts"
+    description: "Service for bulk PO import operations"
+    exports:
+      - name: "parseExcelFile"
+        type: "async function"
+        params:
+          - "file: File"
+        returns: "Promise<ParsedImportResult>"
+        description: "Parse Excel file and group rows by supplier"
+
+      - name: "groupBySupplier"
+        type: "async function"
+        params:
+          - "rows: ImportRow[]"
+          - "orgId: string"
+        returns: "Promise<POGroup[]>"
+        description: "Group import rows by default supplier"
+
+      - name: "validateImport"
+        type: "async function"
+        params:
+          - "groups: POGroup[]"
+          - "orgId: string"
+        returns: "Promise<ValidationResult>"
+        description: "Validate import data against catalog"
+
+      - name: "calculateExpectedDate"
+        type: "function"
+        params:
+          - "supplierLeadTime: number"
+          - "rowExpectedDates: (string | null)[]"
+        returns: "string"
+        description: "Calculate expected delivery date from lead time"
+
+      - name: "resolveProductPrice"
+        type: "async function"
+        params:
+          - "productId: string"
+          - "supplierId: string"
+        returns: "Promise<ProductPriceInfo>"
+        description: "Get product price from supplier-product or std_price"
+
+      - name: "bulkCreatePOs"
+        type: "async function"
+        params:
+          - "groups: POGroupInput[]"
+          - "orgId: string"
+          - "userId: string"
+        returns: "Promise<BulkCreateResult>"
+        description: "Create multiple POs in parallel transactions"
+
+      - name: "bulkSubmitPOs"
+        type: "async function"
+        params:
+          - "poIds: string[]"
+        returns: "Promise<BulkSubmitResult>"
+        description: "Submit multiple POs for approval"
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/bulk-po-import.ts"
+    description: "TypeScript interfaces for bulk PO import"
+    exports:
+      - name: "ImportRow"
+        fields:
+          - "row_number: number"
+          - "product_code: string"
+          - "quantity: number"
+          - "unit_price: number | null"
+          - "supplier_code: string | null"
+          - "expected_date: string | null"
+          - "notes: string | null"
+
+      - name: "POGroup"
+        fields:
+          - "group_index: number"
+          - "supplier: SupplierInfo"
+          - "expected_date: string"
+          - "warehouse_id: string | null"
+          - "payment_terms: string | null"
+          - "tax_code_id: string | null"
+          - "lines: POGroupLine[]"
+          - "subtotal: number"
+
+      - name: "POGroupLine"
+        fields:
+          - "row_number: number"
+          - "product_id: string"
+          - "product_code: string"
+          - "product_name: string"
+          - "quantity: number"
+          - "uom: string"
+          - "unit_price: number"
+          - "line_total: number"
+          - "notes: string | null"
+
+      - name: "ValidationIssue"
+        fields:
+          - "row_number: number"
+          - "type: 'error' | 'warning' | 'info'"
+          - "code: string"
+          - "message: string"
+          - "field: string"
+          - "value: any"
+          - "resolutions: Resolution[]"
+
+      - name: "Resolution"
+        fields:
+          - "action: string"
+          - "label: string"
+
+# Error codes
+error_codes:
+  file_errors:
+    - code: "FILE_TYPE_INVALID"
+      type: "error"
+      message: "Unsupported file type. Please upload .xlsx or .xls file"
+
+    - code: "FILE_TOO_LARGE"
+      type: "error"
+      message: "File size exceeds 5MB limit"
+
+    - code: "NO_DATA_ROWS"
+      type: "error"
+      message: "File contains no data rows"
+
+    - code: "MISSING_COLUMN"
+      type: "error"
+      message: "Missing required column: {column_name}"
+
+    - code: "ROW_LIMIT_EXCEEDED"
+      type: "error"
+      message: "File exceeds maximum of 1000 rows"
+
+  validation_errors:
+    - code: "PRODUCT_NOT_FOUND"
+      type: "error"
+      message: "Product \"{code}\" not found in catalog"
+      resolutions:
+        - "create_product"
+        - "map_product"
+        - "remove_row"
+
+    - code: "SUPPLIER_NOT_FOUND"
+      type: "error"
+      message: "Supplier \"{code}\" not found"
+      resolutions:
+        - "create_supplier"
+        - "map_supplier"
+        - "remove_row"
+
+    - code: "QUANTITY_INVALID"
+      type: "error"
+      message: "Quantity must be greater than 0"
+      resolutions:
+        - "edit_inline"
+
+    - code: "UNIT_PRICE_INVALID"
+      type: "error"
+      message: "Unit price cannot be negative"
+      resolutions:
+        - "edit_inline"
+
+    - code: "EXPECTED_DATE_PAST"
+      type: "error"
+      message: "Expected date must be in the future"
+      resolutions:
+        - "edit_inline"
+
+  validation_warnings:
+    - code: "NO_DEFAULT_SUPPLIER"
+      type: "warning"
+      message: "Product \"{product}\" has no default supplier"
+      resolutions:
+        - "assign_supplier"
+        - "ignore"
+
+    - code: "NON_DEFAULT_SUPPLIER"
+      type: "warning"
+      message: "Using non-default supplier for \"{product}\""
+      resolutions:
+        - "use_file"
+        - "use_default"
+        - "ignore"
+
+    - code: "DUPLICATE_PRODUCT"
+      type: "warning"
+      message: "Product \"{code}\" appears multiple times in same PO"
+      resolutions:
+        - "merge_lines"
+        - "keep_separate"
+        - "ignore"
+
+    - code: "PRICE_DIFFERS"
+      type: "info"
+      message: "Price differs from catalog ({file} vs {catalog})"
+      resolutions:
+        - "use_file_price"
+        - "use_catalog_price"
+
+    - code: "BELOW_MOQ"
+      type: "warning"
+      message: "Quantity {qty} is below MOQ of {moq}"
+      resolutions:
+        - "increase_quantity"
+        - "ignore"
+
+  creation_errors:
+    - code: "SUPPLIER_CREDIT_LIMIT_EXCEEDED"
+      type: "error"
+      message: "Supplier has reached credit limit"
+      resolutions:
+        - "Increase credit limit"
+        - "Process payment"
+        - "Reduce order quantity"
+
+    - code: "INSUFFICIENT_BUDGET"
+      type: "error"
+      message: "Organization budget exceeded"
+
+    - code: "DUPLICATE_PO_NUMBER"
+      type: "error"
+      message: "PO number collision (system will retry)"
+
+    - code: "DATABASE_ERROR"
+      type: "error"
+      message: "Database constraint violation"
+
+# Excel template format
+excel_template:
+  columns:
+    - name: "product_code"
+      required: true
+      type: "string"
+      description: "Product code or SKU"
+      example: "RM-FLOUR-001"
+      validation: "Must exist in product catalog"
+
+    - name: "quantity"
+      required: true
+      type: "number"
+      description: "Order quantity"
+      example: 500
+      validation: "Must be > 0"
+
+    - name: "unit_price"
+      required: false
+      type: "number"
+      description: "Unit price (uses default if empty)"
+      example: 1.20
+      validation: "Must be >= 0 if provided"
+
+    - name: "supplier_code"
+      required: false
+      type: "string"
+      description: "Override default supplier"
+      example: "SUP-001"
+      validation: "Must exist if provided"
+
+    - name: "expected_date"
+      required: false
+      type: "date"
+      description: "Expected delivery (YYYY-MM-DD)"
+      example: "2024-12-20"
+      validation: "Must be >= today if provided"
+
+    - name: "notes"
+      required: false
+      type: "string"
+      description: "Line notes"
+      example: "Urgent order"
+      validation: "Max 500 chars"
+
+  download_url: "/api/planning/purchase-orders/import/template"

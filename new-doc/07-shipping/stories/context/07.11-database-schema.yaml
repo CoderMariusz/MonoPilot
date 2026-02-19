@@ -1,0 +1,534 @@
+database_schema:
+  story_id: "07.11"
+  story_name: "Packing & Shipment Creation"
+  tables_created: 3
+  rls_enabled: true
+  cascade_enabled: true
+
+table_definitions:
+  shipments:
+    name: "shipments"
+    purpose: "Core shipment records created from sales orders"
+    parent_tables:
+      - "organizations (org_id foreign key)"
+      - "sales_orders (shipment header)"
+      - "customers (ship-to customer)"
+      - "customer_addresses (shipping address)"
+      - "users (created_by, packed_by)"
+    child_tables:
+      - "shipment_boxes (boxes in shipment)"
+      - "shipment_box_contents (items in boxes)"
+
+    columns:
+      - name: "id"
+        type: "UUID"
+        constraint: "PRIMARY KEY DEFAULT gen_random_uuid()"
+        nullable: false
+        description: "Unique shipment identifier"
+
+      - name: "org_id"
+        type: "UUID"
+        constraint: "NOT NULL REFERENCES organizations(id)"
+        nullable: false
+        description: "Multi-tenant organization ID"
+        rls_filter: true
+
+      - name: "shipment_number"
+        type: "TEXT"
+        constraint: "NOT NULL"
+        nullable: false
+        description: "Auto-generated shipment number in format SH-YYYY-NNNNN"
+        example: "SH-2025-00123"
+        uniqueness: "UNIQUE(org_id, shipment_number)"
+        auto_generated: true
+        generation_method: "generate_shipment_number(org_id) DB function"
+        reset_schedule: "Annually on Jan 1"
+        sequence_scope: "Per organization"
+
+      - name: "sales_order_id"
+        type: "UUID"
+        constraint: "NOT NULL REFERENCES sales_orders(id)"
+        nullable: false
+        description: "Foreign key to sales order being packed"
+
+      - name: "customer_id"
+        type: "UUID"
+        constraint: "NOT NULL REFERENCES customers(id)"
+        nullable: false
+        description: "Denormalized customer ID from SO (for quick access)"
+
+      - name: "shipping_address_id"
+        type: "UUID"
+        constraint: "NOT NULL REFERENCES customer_addresses(id)"
+        nullable: false
+        description: "Ship-to address from SO"
+
+      - name: "status"
+        type: "TEXT"
+        constraint: "DEFAULT 'pending' CHECK(status IN ('pending','packing','packed','manifested','shipped','delivered','exception'))"
+        nullable: false
+        default: "pending"
+        description: "Shipment lifecycle status"
+        workflow:
+          - "pending: Just created from SO, no boxes yet"
+          - "packing: First box added, actively packing"
+          - "packed: Packing complete, all boxes have weight"
+          - "manifested: Assigned to carrier, manifest created"
+          - "shipped: Picked up by carrier"
+          - "delivered: Delivery confirmed by carrier"
+          - "exception: Problem during fulfillment"
+
+      - name: "carrier"
+        type: "TEXT"
+        constraint: "nullable"
+        nullable: true
+        description: "Shipping carrier code (dhl, ups, dpd, fedex, other)"
+        enum: ["dhl", "ups", "dpd", "fedex", "other"]
+        note: "Set in Story 07.14 (Manifest & Ship Confirm), null in 07.11"
+
+      - name: "service_level"
+        type: "TEXT"
+        constraint: "nullable"
+        nullable: true
+        description: "Carrier service level (Ground, Express, etc.)"
+        note: "Set in Story 07.14, null in 07.11"
+
+      - name: "tracking_number"
+        type: "TEXT"
+        constraint: "nullable"
+        nullable: true
+        description: "Carrier tracking number (e.g., 1Z999AA10012345678)"
+        note: "Set in Story 07.14 via carrier API, null in 07.11"
+
+      - name: "sscc"
+        type: "TEXT"
+        constraint: "nullable"
+        nullable: true
+        description: "Master SSCC barcode for entire shipment (GS1-18 format)"
+        format: "GS1-128 barcode"
+        scope: "Entire shipment (palletized shipments)"
+        note: "Generated in Story 07.13 (SSCC + Labels), null in 07.11"
+        generated_in_story: "07.13"
+
+      - name: "total_weight"
+        type: "DECIMAL(10,2)"
+        constraint: "nullable"
+        nullable: true
+        default: null
+        description: "Total weight of all boxes in shipment (kg)"
+        calculation: "SUM(shipment_boxes.weight)"
+        calculated_on: "Packing completion (complete_packing endpoint)"
+        precision: "2 decimal places"
+        unit: "kilograms"
+
+      - name: "total_boxes"
+        type: "INTEGER"
+        constraint: "DEFAULT 0"
+        nullable: false
+        default: 0
+        description: "Count of boxes in shipment"
+        calculation: "COUNT(shipment_boxes)"
+        calculated_on: "Packing completion"
+
+      - name: "dock_door_id"
+        type: "UUID"
+        constraint: "REFERENCES dock_doors(id), nullable"
+        nullable: true
+        description: "Assigned dock door for loading (Stage 2+)"
+        note: "Assigned in Story 07.14+, null in 07.11"
+
+      - name: "staged_location_id"
+        type: "UUID"
+        constraint: "REFERENCES locations(id), nullable"
+        nullable: true
+        description: "Staging location for temporary hold before dock"
+        note: "Assigned in Story 07.13 (when SSCC generated), null in 07.11"
+
+      - name: "packed_at"
+        type: "TIMESTAMPTZ"
+        constraint: "nullable DEFAULT NULL"
+        nullable: true
+        description: "Timestamp when packing was completed"
+        set_by: "complete_packing endpoint"
+
+      - name: "packed_by"
+        type: "UUID"
+        constraint: "REFERENCES users(id), nullable"
+        nullable: true
+        description: "User ID of person who completed packing"
+        set_by: "complete_packing endpoint"
+
+      - name: "shipped_at"
+        type: "TIMESTAMPTZ"
+        constraint: "nullable"
+        nullable: true
+        description: "Timestamp when carrier picked up shipment"
+        set_by: "Story 07.14 (ship confirm)"
+
+      - name: "delivered_at"
+        type: "TIMESTAMPTZ"
+        constraint: "nullable"
+        nullable: true
+        description: "Timestamp when customer received shipment"
+        set_by: "Carrier webhook or manual entry"
+
+      - name: "created_at"
+        type: "TIMESTAMPTZ"
+        constraint: "NOT NULL DEFAULT now()"
+        nullable: false
+        description: "Shipment creation timestamp"
+
+      - name: "created_by"
+        type: "UUID"
+        constraint: "NOT NULL REFERENCES users(id)"
+        nullable: false
+        description: "User ID who created shipment"
+
+    rls_policy:
+      name: "shipments_org_isolation"
+      type: "ALL (SELECT, INSERT, UPDATE, DELETE)"
+      using_clause: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      with_check_clause: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+    indexes:
+      - name: "idx_shipments_org_status"
+        columns: ["org_id", "status"]
+        type: "BTREE"
+        selectivity: "High - used in list queries"
+
+      - name: "idx_shipments_customer"
+        columns: ["customer_id"]
+        type: "BTREE"
+        selectivity: "Medium - used in customer detail"
+
+      - name: "idx_shipments_so"
+        columns: ["sales_order_id"]
+        type: "BTREE"
+        selectivity: "High - unique relationship"
+
+      - name: "idx_shipments_tracking"
+        columns: ["tracking_number"]
+        type: "BTREE"
+        selectivity: "High - used for tracking lookups"
+
+    unique_constraints:
+      - constraint: "UNIQUE(org_id, shipment_number)"
+        purpose: "Ensure shipment numbers are unique per org"
+
+    cascade_delete:
+      - on_delete_of: "sales_orders (parent)"
+        deletes: "shipments where status IN ('pending', 'packing')"
+        blocks_if: "shipments.status = 'packed' (cannot delete packed shipments)"
+
+  shipment_boxes:
+    name: "shipment_boxes"
+    purpose: "Carton/box records within shipments"
+    parent_tables:
+      - "organizations (org_id)"
+      - "shipments (shipment_id)"
+    child_tables:
+      - "shipment_box_contents (items in box)"
+    parent_cardinality: "1:N (shipment has many boxes)"
+
+    columns:
+      - name: "id"
+        type: "UUID"
+        constraint: "PRIMARY KEY DEFAULT gen_random_uuid()"
+        nullable: false
+
+      - name: "org_id"
+        type: "UUID"
+        constraint: "NOT NULL REFERENCES organizations(id)"
+        nullable: false
+        description: "Multi-tenant organization"
+        rls_filter: true
+
+      - name: "shipment_id"
+        type: "UUID"
+        constraint: "NOT NULL REFERENCES shipments(id) ON DELETE CASCADE"
+        nullable: false
+        description: "Parent shipment"
+        cascade: true
+
+      - name: "box_number"
+        type: "INTEGER"
+        constraint: "NOT NULL"
+        nullable: false
+        description: "Sequential box number per shipment (1, 2, 3, ...)"
+        auto_increment: true
+        increment_logic: "MAX(box_number) + 1 per shipment"
+        scope: "Per shipment"
+        example: "Shipment SH-2025-001 has boxes 1, 2, 3"
+        uniqueness: "UNIQUE(shipment_id, box_number)"
+
+      - name: "sscc"
+        type: "TEXT"
+        constraint: "nullable UNIQUE"
+        nullable: true
+        description: "SSCC-18 barcode for individual box (GS1-128)"
+        format: "18-digit GS1 standard"
+        example: "000123456789012345"
+        generated_in_story: "07.13 (SSCC + Labels)"
+        note: "Null in 07.11, populated in 07.13"
+        uniqueness: "UNIQUE(sscc) across entire system"
+
+      - name: "weight"
+        type: "DECIMAL(10,3)"
+        constraint: "CHECK(weight > 0 OR weight IS NULL)"
+        nullable: true
+        description: "Gross weight of packed box (kg)"
+        precision: "3 decimal places"
+        unit: "kilograms"
+        range: "0.001 to 9999999.999"
+        required_for: "Packing completion validation"
+        validation: "weight > 0"
+
+      - name: "length"
+        type: "DECIMAL(10,2)"
+        constraint: "CHECK(length > 0 OR length IS NULL)"
+        nullable: true
+        description: "Box length (cm)"
+        precision: "2 decimal places"
+        unit: "centimeters"
+        range: "10 to 200 (or null)"
+        optional: true
+        validation: "10 <= length <= 200 if provided"
+
+      - name: "width"
+        type: "DECIMAL(10,2)"
+        constraint: "CHECK(width > 0 OR width IS NULL)"
+        nullable: true
+        description: "Box width (cm)"
+        optional: true
+        validation: "10 <= width <= 200 if provided"
+
+      - name: "height"
+        type: "DECIMAL(10,2)"
+        constraint: "CHECK(height > 0 OR height IS NULL)"
+        nullable: true
+        description: "Box height (cm)"
+        optional: true
+        validation: "10 <= height <= 200 if provided"
+
+      - name: "tracking_number"
+        type: "TEXT"
+        constraint: "nullable"
+        nullable: true
+        description: "Individual tracking number for multi-package shipments"
+        note: "Used when shipment has multiple carrier tracking IDs (Phase 2+)"
+
+      - name: "created_at"
+        type: "TIMESTAMPTZ"
+        constraint: "NOT NULL DEFAULT now()"
+        nullable: false
+        description: "Box creation timestamp"
+
+    rls_policy:
+      name: "shipment_boxes_org_isolation"
+      type: "ALL"
+      using_clause: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+    indexes:
+      - name: "idx_shipment_boxes_shipment"
+        columns: ["shipment_id"]
+        type: "BTREE"
+        selectivity: "High - list all boxes in shipment"
+
+    unique_constraints:
+      - constraint: "UNIQUE(shipment_id, box_number)"
+        purpose: "Ensure sequential box numbering per shipment"
+      - constraint: "UNIQUE(sscc)"
+        purpose: "Ensure SSCC is globally unique"
+
+    cascade_delete:
+      - on_delete_of: "shipments (parent)"
+        deletes: "all shipment_boxes for that shipment"
+        effect: "Also cascades to shipment_box_contents"
+
+  shipment_box_contents:
+    name: "shipment_box_contents"
+    purpose: "Traceability records linking LPs and lot numbers to boxes"
+    parent_tables:
+      - "organizations (org_id)"
+      - "shipment_boxes (shipment_box_id)"
+      - "sales_order_lines (sales_order_line_id)"
+      - "products (product_id)"
+      - "license_plates (license_plate_id)"
+    parent_cardinality: "1:N (box has many contents)"
+
+    columns:
+      - name: "id"
+        type: "UUID"
+        constraint: "PRIMARY KEY DEFAULT gen_random_uuid()"
+        nullable: false
+
+      - name: "org_id"
+        type: "UUID"
+        constraint: "NOT NULL REFERENCES organizations(id)"
+        nullable: false
+        rls_filter: true
+
+      - name: "shipment_box_id"
+        type: "UUID"
+        constraint: "NOT NULL REFERENCES shipment_boxes(id) ON DELETE CASCADE"
+        nullable: false
+        description: "Parent box"
+        cascade: true
+
+      - name: "sales_order_line_id"
+        type: "UUID"
+        constraint: "NOT NULL REFERENCES sales_order_lines(id)"
+        nullable: false
+        description: "Which SO line this content fulfills"
+        purpose: "Link back to original SO for order fulfillment tracking"
+
+      - name: "product_id"
+        type: "UUID"
+        constraint: "NOT NULL REFERENCES products(id)"
+        nullable: false
+        description: "Product being shipped"
+        denormalization: "Denormalized from license_plate for query performance"
+
+      - name: "license_plate_id"
+        type: "UUID"
+        constraint: "NOT NULL REFERENCES license_plates(id)"
+        nullable: false
+        description: "Specific license plate (inventory unit) packed"
+        purpose: "Enable full genealogy: shipment → box → LP → lot → production"
+
+      - name: "lot_number"
+        type: "TEXT"
+        constraint: "nullable"
+        nullable: true
+        description: "Lot number from license plate (for traceability)"
+        source: "Captured from license_plates.lot_number at pack time"
+        purpose: "Food safety traceability for recalls"
+        example: "FLOUR-2024-001"
+
+      - name: "quantity"
+        type: "DECIMAL(15,4)"
+        constraint: "NOT NULL"
+        nullable: false
+        description: "Quantity of product packed in this box"
+        source: "From pick_list_lines.quantity_picked"
+        precision: "4 decimal places"
+        unit: "Unit of measure from product"
+
+      - name: "created_at"
+        type: "TIMESTAMPTZ"
+        constraint: "NOT NULL DEFAULT now()"
+        nullable: false
+
+    rls_policy:
+      name: "shipment_box_contents_org_isolation"
+      type: "ALL"
+      using_clause: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+    indexes:
+      - name: "idx_shipment_box_contents_box"
+        columns: ["shipment_box_id"]
+        type: "BTREE"
+        selectivity: "High - list contents of box"
+
+      - name: "idx_shipment_box_contents_lp"
+        columns: ["license_plate_id"]
+        type: "BTREE"
+        selectivity: "Medium - find which boxes contain LP"
+
+    cascade_delete:
+      - on_delete_of: "shipment_boxes (parent)"
+        deletes: "all shipment_box_contents for that box"
+
+database_functions:
+  generate_shipment_number:
+    name: "generate_shipment_number"
+    language: "plpgsql"
+    parameters:
+      - name: "org_uuid"
+        type: "UUID"
+        description: "Organization ID"
+    returns: "TEXT"
+    return_format: "SH-YYYY-NNNNN"
+    logic: |
+      1. Get current year from CURRENT_DATE (YYYY format)
+      2. Query shipments table for this org with shipment_number LIKE 'SH-YYYY-%'
+      3. Extract sequence number from existing shipments
+      4. Calculate next sequence: MAX(sequence) + 1
+      5. LPAD sequence to 5 digits with leading zeros
+      6. Concatenate: 'SH-' || year || '-' || padded_sequence
+      7. Return formatted string
+    examples:
+      - input: "org_uuid = abc-123"
+        output: "SH-2025-00001 (first shipment of 2025)"
+      - input: "org_uuid = abc-123"
+        output: "SH-2025-00247 (247th shipment of 2025)"
+      - input: "org_uuid = def-456"
+        output: "SH-2025-00001 (different org, starts fresh)"
+    reset: "Annually on January 1"
+    scope: "Per organization"
+    uniqueness: "Unique within organization and year"
+
+rls_policies:
+  shipments_org_isolation:
+    table: "shipments"
+    type: "ALL operations (SELECT, INSERT, UPDATE, DELETE)"
+    condition: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    description: "Prevent cross-org access to shipments"
+
+  shipment_boxes_org_isolation:
+    table: "shipment_boxes"
+    type: "ALL"
+    condition: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+  shipment_box_contents_org_isolation:
+    table: "shipment_box_contents"
+    type: "ALL"
+    condition: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+relationships_and_cardinality:
+  organizations_to_shipments:
+    relationship: "1:N"
+    on_delete_behavior: "CASCADE (delete org deletes all shipments)"
+    example: "Org A has 50 shipments, Org B has 30 shipments"
+
+  sales_orders_to_shipments:
+    relationship: "1:1 or 1:N (if split shipments)"
+    on_delete_behavior: "CASCADE (delete SO deletes associated pending/packing shipments, blocks if packed)"
+    example: "SO-001 creates shipment SH-2025-001 (initially 1:1)"
+
+  customers_to_shipments:
+    relationship: "1:N"
+    on_delete_behavior: "RESTRICT (cannot delete customer if shipments exist)"
+    example: "Customer ABC receives multiple shipments"
+
+  shipments_to_shipment_boxes:
+    relationship: "1:N"
+    on_delete_behavior: "CASCADE (delete shipment deletes all boxes)"
+    example: "Shipment SH-2025-001 has 3 boxes (boxes 1, 2, 3)"
+
+  shipment_boxes_to_shipment_box_contents:
+    relationship: "1:N"
+    on_delete_behavior: "CASCADE (delete box deletes all contents)"
+    example: "Box 1 contains 2 product lines (2 contents records)"
+
+  license_plates_to_shipment_box_contents:
+    relationship: "1:N"
+    on_delete_behavior: "RESTRICT (cannot delete LP if packed in shipment)"
+    example: "LP-2025-0001 packed in 1 box of 1 shipment"
+
+migration_strategy:
+  migration_name: "YYYYMMDDHHMMSS_create_shipments_packing.sql"
+  steps:
+    1: "CREATE TABLE shipments (with constraints, RLS)"
+    2: "CREATE TABLE shipment_boxes (with constraints, RLS)"
+    3: "CREATE TABLE shipment_box_contents (with constraints, RLS)"
+    4: "CREATE INDEXES on all tables"
+    5: "CREATE generate_shipment_number() function"
+    6: "CREATE RLS POLICIES on all tables"
+    7: "ALTER TABLE ... ENABLE ROW LEVEL SECURITY"
+
+version_history:
+  - version: "1.0"
+    date: "2025-12-18"
+    description: "Database schema design for Story 07.11"
+    author: "TECH-WRITER"

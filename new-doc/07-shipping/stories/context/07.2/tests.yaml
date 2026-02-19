@@ -1,0 +1,409 @@
+# Story 07.2 - Test Specifications
+# Purpose: Acceptance criteria, test specifications
+# Agent: QA + BACKEND-DEV + FRONTEND-DEV
+
+acceptance_criteria:
+  - id: "AC-1"
+    title: "List Sales Orders"
+    given: "Shipping clerk navigates to /shipping/sales-orders"
+    when: "Page loads"
+    then: "SO list displays within 500ms for up to 1000 orders with pagination"
+
+  - id: "AC-2"
+    title: "Search Sales Orders"
+    given: "SO list displayed with 500 orders"
+    when: "Clerk types 'SO-2025' in search bar"
+    then: "Filtered results show matching order numbers within 300ms, case-insensitive"
+
+  - id: "AC-3"
+    title: "Filter by Status"
+    given: "SO list displayed"
+    when: "Clerk selects status filter 'draft'"
+    then: "Only draft orders appear in list"
+
+  - id: "AC-4"
+    title: "Create Sales Order - Customer Selection"
+    given: "Clerk clicks 'Create Sales Order' button"
+    when: "Wizard opens (modal)"
+    then: "Step 1 displays customer dropdown with active customers"
+
+  - id: "AC-5"
+    title: "Customer Address Loading"
+    given: "Customer selected in wizard"
+    when: "Next clicked"
+    then: "Shipping address dropdown populates with selected customer's addresses"
+
+  - id: "AC-6"
+    title: "Add Sales Order Line"
+    given: "Clerk on Step 2 (Add Lines)"
+    when: "'Add Line' clicked"
+    then: "Product dropdown, quantity field, unit price field appear in modal"
+
+  - id: "AC-7"
+    title: "Calculate Line Total"
+    given: "Product selected (qty: 100, price: $10.50)"
+    when: "Line submitted"
+    then: "Line total displays as $1,050.00"
+
+  - id: "AC-8"
+    title: "Calculate Order Total"
+    given: "Multiple lines added: $1,050, $500, $250"
+    when: "SO saved"
+    then: "Order total shows $1,800.00"
+
+  - id: "AC-9"
+    title: "Save as Draft"
+    given: "Clerk on Step 3 (Review)"
+    when: "'Save as Draft' clicked"
+    then: "SO created with status 'draft', order_number auto-generated (SO-YYYY-NNNNN)"
+
+  - id: "AC-10"
+    title: "Confirm Sales Order"
+    given: "Draft SO opened"
+    when: "'Confirm Order' clicked with confirmation dialog accepted"
+    then: "SO status changes to 'confirmed', confirmed_at timestamp set"
+
+  - id: "AC-11"
+    title: "Edit Draft Order"
+    given: "Draft SO opened"
+    when: "'Edit' button clicked"
+    then: "Wizard reopens with pre-filled customer, address, lines"
+
+  - id: "AC-12"
+    title: "Cannot Edit Confirmed Order"
+    given: "Confirmed SO opened"
+    when: "Page loads"
+    then: "'Edit' button hidden, order is read-only"
+
+  - id: "AC-13"
+    title: "Delete Draft Order"
+    given: "Draft SO opened"
+    when: "'Delete' clicked with confirmation accepted"
+    then: "SO and all lines deleted (cascade delete)"
+
+  - id: "AC-14"
+    title: "Cannot Delete Confirmed Order"
+    given: "Confirmed SO opened"
+    when: "Delete attempted"
+    then: "Error: 'Cannot delete confirmed orders'"
+
+  - id: "AC-15"
+    title: "Auto-Generate Order Number"
+    given: "New SO created"
+    when: "Saved"
+    then: "Order number format SO-YYYY-NNNNN (e.g., SO-2025-00001)"
+
+  - id: "AC-16"
+    title: "Year-Based Sequence Reset"
+    given: "Year changes from 2025 to 2026"
+    when: "First SO of 2026 created"
+    then: "Order number resets to SO-2026-00001"
+
+  - id: "AC-17"
+    title: "Org-Scoped Sequence"
+    given: "50 orders in org A"
+    when: "Org B creates first order"
+    then: "Order number for org B is SO-2025-00001 (separate sequence)"
+
+  - id: "AC-18"
+    title: "Line Number Auto-Increment"
+    given: "First line added to SO"
+    when: "Line saved"
+    then: "line_number = 1"
+
+  - id: "AC-19"
+    title: "Line Number Sequence"
+    given: "Three lines in SO (1, 2, 3)"
+    when: "Line 2 deleted"
+    then: "Line 3 remains as line 3 (no renumbering)"
+
+  - id: "AC-20"
+    title: "Inventory Warning"
+    given: "Line qty (200) exceeds available (150)"
+    when: "Adding line"
+    then: "Warning displays: 'Available: 150, Requested: 200'"
+
+  - id: "AC-21"
+    title: "RLS Multi-Tenancy"
+    given: "User from org A logged in"
+    when: "SO list loads"
+    then: "Only org A's orders appear"
+
+  - id: "AC-22"
+    title: "Cross-Tenant Access Block"
+    given: "User from org A"
+    when: "Attempts to access org B's SO by URL"
+    then: "404 error (RLS blocks access)"
+
+  - id: "AC-23"
+    title: "Permission Enforcement - Viewer"
+    given: "User with VIEWER role"
+    when: "/shipping/sales-orders accessed"
+    then: "'Create Order' button hidden, list is read-only"
+
+  - id: "AC-24"
+    title: "Permission Enforcement - Sales"
+    given: "User with SALES role"
+    when: "SO page loaded"
+    then: "'Create', 'Edit', 'Confirm' buttons visible"
+
+  - id: "AC-25"
+    title: "Validation - Required Customer"
+    given: "Clerk creates SO without selecting customer"
+    when: "Save attempted"
+    then: "Error: 'Customer is required'"
+
+  - id: "AC-26"
+    title: "Validation - Required Lines"
+    given: "Clerk creates SO with no lines"
+    when: "Confirm attempted"
+    then: "Error: 'At least one line is required'"
+
+  - id: "AC-27"
+    title: "Validation - Positive Quantity"
+    given: "Line quantity set to 0 or negative"
+    when: "Save attempted"
+    then: "Error: 'Quantity must be greater than zero'"
+
+  - id: "AC-28"
+    title: "Validation - Date Relationship"
+    given: "required_delivery_date before order_date"
+    when: "Save attempted"
+    then: "Error: 'Delivery date must be >= order date'"
+
+  - id: "AC-29"
+    title: "Cascade Delete Lines"
+    given: "SO with 5 lines"
+    when: "SO deleted"
+    then: "All 5 lines deleted automatically"
+
+  - id: "AC-30"
+    title: "Unsaved Changes Warning"
+    given: "Clerk adds lines to form"
+    when: "Closes modal without saving"
+    then: "Confirmation dialog: 'Discard unsaved changes?'"
+
+unit_tests:
+  - file: "apps/frontend/lib/services/__tests__/sales-order-service.test.ts"
+    tests:
+      - name: "calculateLineTotal"
+        cases:
+          - { qty: 100, price: 10.50, expected: 1050.00 }
+          - { qty: 1, price: 0, expected: 0 }
+          - { qty: 0.5, price: 100, expected: 50 }
+
+      - name: "calculateOrderTotal"
+        cases:
+          - { lines: "[{qty:100, price:10.50}, {qty:50, price:10}]", expected: 1550.00 }
+          - { lines: "[]", expected: 0 }
+
+      - name: "validateSODates"
+        cases:
+          - { order_date: "2025-12-18", delivery_date: "2025-12-20", expected: true }
+          - { order_date: "2025-12-20", delivery_date: "2025-12-18", expected: false }
+          - { order_date: "2025-12-25", delivery_date: "2025-12-25", expected: true }
+
+  - file: "apps/frontend/lib/services/__tests__/sales-order-line-service.test.ts"
+    tests:
+      - name: "getNextLineNumber"
+        cases:
+          - { existingLines: 0, expected: 1 }
+          - { existingLines: 3, expected: 4 }
+
+  - file: "apps/frontend/lib/validation/__tests__/sales-order-schema.test.ts"
+    tests:
+      - name: "createSalesOrderSchema validation"
+        cases:
+          - { data: "valid SO with 1 line", expected: true }
+          - { data: "SO without customer", expected: false }
+          - { data: "SO with 0 lines", expected: false }
+
+integration_tests:
+  - endpoint: "POST /api/shipping/sales-orders"
+    tests:
+      - name: "Create SO with valid data"
+        request: "{ customer_id, order_date, required_delivery_date, shipping_address_id, lines }"
+        expected_response: "201, SO with auto-generated order_number and status='draft'"
+
+      - name: "Reject SO without customer"
+        request: "{ order_date, lines }"
+        expected_response: "400, VALIDATION_ERROR with 'customer_id required'"
+
+      - name: "Reject SO with negative quantity"
+        request: "{ lines: [{ qty: -1, price: 10 }] }"
+        expected_response: "400, VALIDATION_ERROR with 'quantity must be > 0'"
+
+  - endpoint: "GET /api/shipping/sales-orders/:id"
+    tests:
+      - name: "Fetch existing SO"
+        expected_response: "200, full SO with lines and customer details"
+
+      - name: "Fetch non-existent SO"
+        expected_response: "404, NOT_FOUND"
+
+  - endpoint: "PUT /api/shipping/sales-orders/:id"
+    tests:
+      - name: "Update draft SO"
+        changes: "{ customer_po, required_delivery_date }"
+        expected_response: "200, updated SO"
+
+      - name: "Reject update to confirmed SO"
+        expected_response: "400, INVALID_STATUS 'Cannot edit confirmed orders'"
+
+  - endpoint: "DELETE /api/shipping/sales-orders/:id"
+    tests:
+      - name: "Delete draft SO (cascades to lines)"
+        expected_response: "204, all lines deleted"
+
+      - name: "Reject delete of confirmed SO"
+        expected_response: "400, INVALID_STATUS"
+
+  - endpoint: "POST /api/shipping/sales-orders/:id/confirm"
+    tests:
+      - name: "Confirm draft SO"
+        expected_response: "200, status='confirmed', confirmed_at set"
+
+      - name: "Reject confirm of already-confirmed SO"
+        expected_response: "400, INVALID_STATUS"
+
+  - endpoint: "POST /api/shipping/sales-orders/:id/lines"
+    tests:
+      - name: "Add line to draft SO"
+        request: "{ product_id, quantity_ordered, unit_price }"
+        expected_response: "201, line with auto-generated line_number"
+
+      - name: "Reject add to confirmed SO"
+        expected_response: "400, INVALID_STATUS"
+
+  - endpoint: "DELETE /api/shipping/sales-orders/:id/lines/:lineId"
+    tests:
+      - name: "Delete line from draft SO"
+        expected_response: "204, line deleted, remaining lines resequenced"
+
+      - name: "Reject delete from confirmed SO"
+        expected_response: "400, INVALID_STATUS"
+
+e2e_tests:
+  - name: "E2E: Create and Confirm Sales Order"
+    steps:
+      - "Navigate to /shipping/sales-orders"
+      - "Click '+ Create Sales Order'"
+      - "Select customer 'Acme Corp' → click Next"
+      - "Select shipping address '123 Main St' → click Next"
+      - "Click 'Add Line', search product 'Widget A', qty 100, price $10.50"
+      - "Click 'Add Line' again, add 'Widget B', qty 50, price $20"
+      - "Review: Verify lines shown, total = $2,050"
+      - "Click 'Save as Draft'"
+      - "Verify SO created with status 'draft', order_number 'SO-2025-00001'"
+      - "Click 'Confirm Order' → confirm dialog → accept"
+      - "Verify SO status changed to 'confirmed', confirmed_at timestamp set"
+      - "Verify 'Edit' button hidden (locked)"
+
+  - name: "E2E: Edit Draft Sales Order"
+    steps:
+      - "Create draft SO with 2 lines"
+      - "Click 'Edit'"
+      - "Change line 1 quantity from 100 to 150"
+      - "Delete line 2"
+      - "Click 'Save'"
+      - "Verify total updated: (150 * 10.50) = $1,575"
+      - "Verify only 1 line in list"
+
+  - name: "E2E: Delete Draft Sales Order"
+    steps:
+      - "Create draft SO with 3 lines"
+      - "Click 'Delete'"
+      - "Confirm deletion"
+      - "Verify SO and all 3 lines deleted"
+      - "Verify removed from list"
+
+  - name: "E2E: Search and Filter"
+    steps:
+      - "Navigate to /shipping/sales-orders"
+      - "Type 'SO-2025-00001' in search → verify filtered results"
+      - "Click status filter, select 'draft' → verify only draft orders shown"
+      - "Click date range, select 'last 7 days' → verify date filtered"
+      - "Click 'Clear Filters' → verify all SOs shown again"
+
+  - name: "E2E: Inventory Warning"
+    steps:
+      - "Create SO with product qty = 200 but only 150 available"
+      - "Verify warning displays: 'Available: 150, Requested: 200'"
+      - "Verify can still save (warning, not blocking)"
+
+  - name: "E2E: Permission Check"
+    steps:
+      - "Log in as VIEWER role"
+      - "Navigate to /shipping/sales-orders"
+      - "Verify list displays but 'Create' button hidden"
+      - "Log in as SALES role"
+      - "Verify 'Create', 'Edit', 'Confirm' buttons visible"
+
+  - name: "E2E: Validation Errors"
+    steps:
+      - "Click 'Create Sales Order'"
+      - "Try to save without selecting customer"
+      - "Verify error: 'Customer is required'"
+      - "Try to save with 0 lines"
+      - "Verify error: 'At least one line required'"
+
+  - name: "E2E: Multi-Tenant Isolation"
+    steps:
+      - "Log in as org A user"
+      - "Create SO with order_number 'SO-2025-00001'"
+      - "Log in as org B user"
+      - "Create SO (should also be 'SO-2025-00001' for org B)"
+      - "Log back to org A, verify still 'SO-2025-00001' not org B's"
+
+performance_tests:
+  - name: "Load Sales Order List"
+    target: "<500ms"
+    scenario: "Load 1000 orders with pagination (25 per page)"
+
+  - name: "Search Orders"
+    target: "<300ms"
+    scenario: "Debounced search input typing (300ms debounce)"
+
+  - name: "Apply Filters"
+    target: "<400ms"
+    scenario: "Apply status + customer + date range filters"
+
+  - name: "Create SO"
+    target: "<1s"
+    scenario: "Form submission from modal open to success toast"
+
+  - name: "Confirm SO"
+    target: "<2s"
+    scenario: "Confirm order including allocation API call"
+
+quality_gates:
+  - "All 30 acceptance criteria passed"
+  - "Unit tests: >80% coverage of services"
+  - "Integration tests: All 7 API endpoints covered"
+  - "E2E tests: Happy path + error cases"
+  - "No SQL injection vulnerabilities"
+  - "RLS policies verified for multi-tenant isolation"
+  - "Performance targets met: load <500ms, search <300ms"
+  - "Accessibility: WCAG 2.1 AA compliant (contrast, touch targets, screen reader)"
+  - "Code review: Architecture patterns match ADR-013 RLS"
+  - "No breaking changes to existing APIs"
+
+definition_of_done:
+  - "[ ] sales_orders table created with RLS policies"
+  - "[ ] sales_order_lines table created with RLS policies"
+  - "[ ] Order number auto-generation working (SO-YYYY-NNNNN)"
+  - "[ ] SO list page loads within 500ms for 1000 orders"
+  - "[ ] Create SO wizard works end-to-end"
+  - "[ ] Edit SO updates immediately in UI (draft only)"
+  - "[ ] Confirm SO changes status, locks editing"
+  - "[ ] Line totals + SO total calculate correctly"
+  - "[ ] Cascade delete removes all lines when SO deleted"
+  - "[ ] Multi-tenant isolation verified (org A cannot see org B)"
+  - "[ ] Permission checks hide unauthorized actions"
+  - "[ ] Search + filters work within 300ms"
+  - "[ ] All API endpoints have integration tests"
+  - "[ ] Unit tests cover services (>80% coverage)"
+  - "[ ] E2E test covers full creation + confirmation flow"
+  - "[ ] Code review passed"
+  - "[ ] Performance benchmarks met"
+  - "[ ] Accessibility audit passed"

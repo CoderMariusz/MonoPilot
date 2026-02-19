@@ -1,0 +1,174 @@
+story:
+  id: "09.16"
+  name: "Real-Time Variance Dashboard"
+  epic: "09-finance"
+  phase: "2"
+  complexity: "L"
+  estimate_days: 5
+
+dependencies:
+  required:
+    - story: "09.1"
+      provides: ["finance_settings", "variance threshold config"]
+    - story: "09.2"
+      provides: ["standard_costs", "variance baseline"]
+    - story: "09.3"
+      provides: ["material_consumption_costs", "actual material data"]
+    - story: "09.4"
+      provides: ["labor_costs", "actual labor data"]
+    - story: "09.6"
+      provides: ["work_order_costs", "base cost calculation"]
+  cross_epic:
+    - story: "04.2"
+      provides: ["material_consumption events"]
+    - story: "04.3"
+      provides: ["operation_tracking events"]
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/finance.md"
+  prd_sections: ["FR-FIN-050", "FR-FIN-051", "FR-FIN-055", "Real-Time Cost Variance Analysis"]
+  story: "docs/2-MANAGEMENT/epics/current/09-finance/09.16.real-time-variance-dashboard.md"
+  patterns:
+    - "apps/frontend/components/production/WODetailCard.tsx"
+    - "apps/frontend/lib/hooks/use-websocket.ts"
+
+files_to_create:
+  database:
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_create_variance_thresholds.sql"
+      type: "migration"
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_create_variance_alerts.sql"
+      type: "migration"
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_create_realtime_variance_triggers.sql"
+      type: "migration"
+  api:
+    - path: "apps/frontend/app/api/finance/variance-thresholds/route.ts"
+      methods: ["GET", "POST"]
+    - path: "apps/frontend/app/api/finance/variance-thresholds/[id]/route.ts"
+      methods: ["GET", "PATCH", "DELETE"]
+    - path: "apps/frontend/app/api/finance/variance-alerts/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/finance/variance-alerts/[id]/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/finance/variance-alerts/[id]/acknowledge/route.ts"
+      methods: ["POST"]
+    - path: "apps/frontend/app/api/finance/variance-alerts/[id]/resolve/route.ts"
+      methods: ["POST"]
+    - path: "apps/frontend/app/api/finance/variance-alerts/summary/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/finance/work-order-costs/[id]/realtime/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/finance/reports/variance-trends/route.ts"
+      methods: ["GET"]
+  services:
+    - path: "apps/frontend/lib/services/variance-alert-service.ts"
+    - path: "apps/frontend/lib/services/variance-threshold-service.ts"
+    - path: "apps/frontend/lib/services/realtime-variance-service.ts"
+  validation:
+    - path: "apps/frontend/lib/validation/variance-threshold-schema.ts"
+    - path: "apps/frontend/lib/validation/variance-alert-schema.ts"
+  pages:
+    - path: "apps/frontend/app/(authenticated)/finance/reports/variance-trends/page.tsx"
+    - path: "apps/frontend/app/(authenticated)/finance/alerts/page.tsx"
+  components:
+    - path: "apps/frontend/components/finance/variance/VarianceTrendDashboard.tsx"
+    - path: "apps/frontend/components/finance/variance/VarianceTrendChart.tsx"
+    - path: "apps/frontend/components/finance/variance/VarianceCategoryChart.tsx"
+    - path: "apps/frontend/components/finance/variance/TopVarianceContributorsTable.tsx"
+    - path: "apps/frontend/components/finance/variance/RealTimeVarianceCard.tsx"
+    - path: "apps/frontend/components/finance/variance/VarianceAlertPanel.tsx"
+    - path: "apps/frontend/components/finance/variance/VarianceAlertBadge.tsx"
+    - path: "apps/frontend/components/finance/variance/AcknowledgeAlertModal.tsx"
+    - path: "apps/frontend/components/finance/settings/VarianceThresholdForm.tsx"
+  hooks:
+    - path: "apps/frontend/lib/hooks/use-realtime-variance.ts"
+    - path: "apps/frontend/lib/hooks/use-variance-alerts.ts"
+    - path: "apps/frontend/lib/hooks/use-variance-trends.ts"
+
+database:
+  tables:
+    - name: "variance_thresholds"
+      columns: ["id", "org_id", "cost_category", "warning_threshold_percent", "critical_threshold_percent", "is_active", "notify_roles", "notify_email"]
+      rls: true
+      indexes: ["org_id", "cost_category", "is_active"]
+    - name: "variance_alerts"
+      columns: ["id", "org_id", "work_order_id", "variance_type", "severity", "variance_amount", "variance_percent", "threshold_id", "status", "acknowledged_by", "acknowledged_at", "acknowledged_notes"]
+      rls: true
+      indexes: ["org_id", "status", "work_order_id", "created_at"]
+
+api_endpoints:
+  - method: "GET"
+    path: "/api/finance/variance-thresholds"
+    auth: true
+    roles: ["admin", "finance_manager"]
+  - method: "POST"
+    path: "/api/finance/variance-thresholds"
+    auth: true
+    roles: ["admin", "finance_manager"]
+  - method: "GET"
+    path: "/api/finance/variance-alerts"
+    auth: true
+    roles: ["admin", "finance_manager", "production_supervisor", "cost_accountant"]
+  - method: "POST"
+    path: "/api/finance/variance-alerts/:id/acknowledge"
+    auth: true
+    roles: ["admin", "finance_manager", "production_supervisor"]
+  - method: "GET"
+    path: "/api/finance/work-order-costs/:id/realtime"
+    auth: true
+    roles: ["admin", "finance_manager", "production_supervisor", "cost_accountant"]
+  - method: "GET"
+    path: "/api/finance/reports/variance-trends"
+    auth: true
+    roles: ["admin", "finance_manager", "cost_accountant"]
+
+ux:
+  wireframes:
+    - id: "FIN-009"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/FIN-009-real-time-variance-dashboard.md"
+      relevance: "Real-time variance dashboard with trend charts, category charts, top contributors table, real-time variance card, alert panel, and WebSocket live updates"
+  patterns:
+    dashboard: "Multi-chart dashboard with filters"
+    realtime: "WebSocket live updates with pulse animation"
+    alerts: "Toast notifications + persistent alert panel"
+  states: ["loading", "empty", "active_alerts", "no_alerts", "websocket_disconnected"]
+
+validation_rules:
+  cost_category: "enum: material, labor, overhead, total"
+  warning_threshold_percent: "number 0-100, < critical_threshold_percent"
+  critical_threshold_percent: "number 0-100, > warning_threshold_percent"
+  severity: "enum: warning, critical"
+  status: "enum: active, acknowledged, resolved"
+  notify_roles: "array of valid role names"
+
+patterns:
+  rls: "ADR-013"
+  api: "REST with org_id filter"
+  service: "class-based with static methods"
+  validation: "zod schemas"
+  realtime: "WebSocket with fallback to polling"
+
+acceptance_checklist:
+  - "variance_thresholds table created with constraints"
+  - "variance_alerts table created with indexes"
+  - "Database triggers recalculate variance on production events"
+  - "Alert triggered when variance exceeds threshold"
+  - "Email notification sent for critical alerts"
+  - "Variance trend dashboard renders with charts"
+  - "WebSocket updates work without page refresh"
+  - "Acknowledge alert workflow functional"
+  - "Dashboard filters update charts correctly"
+  - "Performance: variance calc <300ms, alert <5s"
+  - "RLS policies enforce org isolation"
+
+output_artifacts:
+  - "variance_thresholds table migration"
+  - "variance_alerts table migration"
+  - "Real-time variance calculation triggers"
+  - "Variance threshold API endpoints"
+  - "Variance alert API endpoints"
+  - "VarianceAlertService with threshold checking"
+  - "RealtimeVarianceService with WebSocket support"
+  - "Variance trend dashboard page"
+  - "Real-time variance card component"
+  - "Variance alert panel component"
+  - "Validation schemas for thresholds and alerts"

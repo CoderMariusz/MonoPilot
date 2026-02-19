@@ -1,0 +1,19 @@
+P2: test-writer 09:58 files:4 tests:61 status:red
+P3-BACKEND: ✓ backend-dev 10:59 files:5 tests:98/101
+P3: ✓ frontend-dev 11:06 files:15 tests:179/182
+P4: ✓ senior-dev 15:06 refactored:2 decision:IMPROVED
+P5: ✓ code-reviewer 15:45 issues:0 decision:APPROVED
+P6: ✓ qa-agent 18:27 ac:20/20 bugs:0 decision:PASS
+P7: ✓ tech-writer 20:37 report:done docs:updated
+
+# DEPLOY MARKER
+deploy:
+  story: "07.10"
+  name: "Pick Scanner"
+  status: "DEPLOYED"
+  date: "2026-01-22"
+  tests: 179
+  ac: "20/20"
+  docs:
+    - "docs/api/shipping/scanner-pick.md"
+    - "docs/guides/shipping/scanner-pick-workflow.md"

@@ -1,0 +1,51 @@
+story:
+  id: "09.4"
+  name: "Labor Cost Tracking"
+  epic: "09-finance"
+  phase: "1"
+  complexity: "M"
+  estimate_days: 4
+
+dependencies:
+  required:
+    - story: "04.X"
+      provides: ["operation_time_logs", "work_orders"]
+    - story: "09.1"
+      provides: ["overhead_allocation_method"]
+    - story: "09.2"
+      provides: ["standard_costs"]
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/finance.md"
+  prd_sections: ["FR-9.1.2", "FR-9.3.2"]
+  story: "docs/2-MANAGEMENT/epics/current/09-finance/09.4.labor-cost-tracking.md"
+
+files_to_create:
+  database:
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_create_cost_centers_and_labor_costs.sql"
+  api:
+    - path: "apps/frontend/app/api/finance/cost-centers/route.ts"
+    - path: "apps/frontend/app/api/finance/work-order-costs/[workOrderId]/labor/route.ts"
+  services:
+    - path: "apps/frontend/lib/services/labor-cost-service.ts"
+    - path: "apps/frontend/lib/services/cost-center-service.ts"
+
+database:
+  tables:
+    - name: "cost_centers"
+      columns: ["id", "org_id", "code", "name", "type", "production_line_id"]
+      rls: true
+    - name: "labor_costs"
+      columns: ["id", "work_order_id", "operation_id", "user_id", "hours_actual", "hourly_rate", "total_cost"]
+      rls: true
+
+api_endpoints:
+  - method: "GET"
+    path: "/api/finance/work-order-costs/:workOrderId/labor"
+    roles: ["admin", "finance_manager", "cost_accountant"]
+
+acceptance_checklist:
+  - "Cost centers CRUD functional"
+  - "Labor costs calculated from time logs"
+  - "Costs linked to work orders and operations"
+  - "API returns labor cost summary"

@@ -1,0 +1,188 @@
+story: "03.3"
+title: "Purchase Order CRUD + Lines"
+phase: "QA (Phase 6)"
+decision: "FAIL"
+
+summary:
+  total_acs: 36
+  passing: 24
+  partial: 6
+  failing: 0
+  blocked: 6
+  overall_status: "Unable to pass - blocking issues detected"
+
+blocker_count: 4
+blocker_severity:
+  - critical: 1
+  - high: 3
+
+critical_issues:
+  - id: "BUG-03.3-003"
+    title: "Build Failure - Missing @tanstack/react-table"
+    severity: "CRITICAL"
+    impact: "Blocks all E2E testing"
+    fix_effort_minutes: 5
+
+high_issues:
+  - id: "BUG-03.3-001"
+    title: "Missing UNIQUE constraint on product per PO"
+    severity: "HIGH"
+    ac_affected: "AC-03-6"
+    fix_effort_minutes: 30
+
+  - id: "BUG-03.3-002"
+    title: "RLS UPDATE policy allows editing confirmed POs"
+    severity: "HIGH"
+    ac_affected: "AC-05-4"
+    fix_effort_minutes: 30
+
+  - id: "BUG-03.3-004"
+    title: "Table name mismatch - po_lines vs purchase_order_lines"
+    severity: "HIGH"
+    ac_affected: "AC-03-1 through AC-03-6"
+    fix_effort_minutes: 15
+
+test_results:
+  ac_groups:
+    ac_01_list_page:
+      total: 4
+      pass: 2
+      partial: 1
+      fail: 1
+      status: "BLOCKED"
+      reason: "Build failure prevents UI testing"
+
+    ac_02_create_po_header:
+      total: 4
+      pass: 4
+      partial: 0
+      fail: 0
+      status: "OK"
+
+    ac_03_po_line_management:
+      total: 6
+      pass: 5
+      partial: 1
+      fail: 0
+      status: "PARTIAL"
+      reason: "Duplicate product check logic not verified in endpoint"
+
+    ac_04_po_totals_calculation:
+      total: 4
+      pass: 4
+      partial: 0
+      fail: 0
+      status: "OK"
+
+    ac_05_po_status_lifecycle:
+      total: 6
+      pass: 4
+      partial: 2
+      fail: 0
+      status: "PARTIAL"
+      reason: "Confirmed PO update policy needs status check"
+
+    ac_08_permission_enforcement:
+      total: 2
+      pass: 2
+      partial: 0
+      fail: 0
+      status: "OK"
+
+    ac_09_multi_tenancy:
+      total: 3
+      pass: 3
+      partial: 0
+      fail: 0
+      status: "OK"
+
+    ac_10_transaction_integrity:
+      total: 2
+      pass: 0
+      partial: 2
+      fail: 0
+      status: "PARTIAL"
+      reason: "Design uses separate API calls, not true transaction"
+
+validation_method: "Static code analysis + Database schema review"
+validation_limitation: "Build failure prevented E2E test execution"
+
+files_reviewed:
+  - path: "apps/frontend/app/api/planning/purchase-orders/route.ts"
+    lines: 261
+  - path: "apps/frontend/app/(authenticated)/planning/purchase-orders/page.tsx"
+    status: "partial review (build blocked)"
+  - path: "apps/frontend/lib/services/purchase-order-service.ts"
+    lines: 1521
+  - path: "supabase/migrations/079_create_purchase_orders.sql"
+    lines: 450
+  - path: "docs/2-MANAGEMENT/epics/current/03-planning/context/03.3/tests.yaml"
+    status: "complete"
+
+what_works_well:
+  - "PO number auto-generation with org/year isolation"
+  - "Database triggers for line and header totals calculation"
+  - "Org isolation via RLS policies (multi-tenancy)"
+  - "SQL injection prevention with sanitizeSearchInput()"
+  - "Permission matrix design"
+  - "Service layer types and interfaces"
+  - "Status history audit trail"
+
+issues_found:
+  database:
+    - "Missing UNIQUE(po_id, product_id) constraint"
+    - "UPDATE policy missing status check"
+    - "Table name mismatch in API code"
+
+  api:
+    - "List pagination missing meta in response"
+
+  design:
+    - "PO + Lines not in single transaction"
+    - "Duplicate product check not in add-line endpoint"
+
+handoff_to: "Development Team"
+next_phase: "Code fixes + Re-testing"
+
+required_fixes:
+  priority_1:
+    - "Install @tanstack/react-table dependency"
+    - "Fix table name references: po_lines → purchase_order_lines"
+  priority_2:
+    - "Add UNIQUE constraint on (po_id, product_id)"
+    - "Add status check to po_update RLS policy"
+    - "Add API validation for duplicate products"
+  priority_3:
+    - "Add pagination metadata to list response"
+    - "Consider atomic PO+Lines creation via RPC"
+
+estimated_fix_effort_hours: 1.5
+estimated_retest_effort_hours: 2
+estimated_total_timeline_hours: 3.5
+
+qa_artifacts:
+  - path: "docs/2-MANAGEMENT/qa/qa-report-story-03.3.md"
+    type: "comprehensive QA report"
+  - path: "docs/2-MANAGEMENT/qa/DECISION-story-03.3.md"
+    type: "QA decision document"
+  - path: "docs/2-MANAGEMENT/qa/QA-SUMMARY-story-03.3.yaml"
+    type: "this file"
+  - path: "docs/2-MANAGEMENT/qa/bugs/BUG-03.3-001-MISSING-UNIQUE-CONSTRAINT.md"
+    type: "bug report"
+  - path: "docs/2-MANAGEMENT/qa/bugs/BUG-03.3-002-UPDATE-POLICY-TOO-PERMISSIVE.md"
+    type: "bug report"
+  - path: "docs/2-MANAGEMENT/qa/bugs/BUG-03.3-003-BUILD-FAILURE-MISSING-DEPENDENCY.md"
+    type: "bug report"
+  - path: "docs/2-MANAGEMENT/qa/bugs/BUG-03.3-004-TABLE-NAME-MISMATCH.md"
+    type: "bug report"
+
+qa_agent: "Claude QA-AGENT (Haiku 4.5)"
+report_date: "2026-01-02"
+report_time: "2026-01-02T10:30:00Z"
+
+notes:
+  - "Build error prevents full validation; assessment based on code inspection"
+  - "Blocking issues are fixable within 1.5 hours"
+  - "Core architecture and logic appear sound"
+  - "No fundamental design flaws identified"
+  - "Recommended for re-submission after fixes"

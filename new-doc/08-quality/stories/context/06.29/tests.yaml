@@ -1,0 +1,101 @@
+# Story 06.29 - CoA PDF Export Test Specifications
+
+unit_tests:
+  file: lib/services/__tests__/coa-pdf-service.test.ts
+
+  test_suites:
+    - suite: "CoAPDFService.generatePDF"
+      tests:
+        - "generates PDF from CoA data"
+        - "PDF format is PDF/A"
+        - "generates verification token"
+        - "generates QR code image"
+        - "uploads PDF to storage"
+        - "updates CoA with pdf_url and token"
+        - "completes in <5 seconds"
+
+    - suite: "CoAPDFService.generateQRCode"
+      tests:
+        - "generates QR code PNG"
+        - "QR contains verification URL"
+        - "image size 300x300px"
+        - "uploads to storage"
+
+    - suite: "CoAPDFService.emailToCustomer"
+      tests:
+        - "sends email with PDF attachment"
+        - "includes verification link in body"
+        - "creates coa_email_deliveries record"
+        - "validates email format"
+
+    - suite: "CoAPDFService.getVerificationData"
+      tests:
+        - "returns CoA data for valid token"
+        - "returns null for invalid token"
+        - "includes parameters in read-only format"
+
+integration_tests:
+  file: app/api/quality/coas/__tests__/pdf.test.ts
+
+  test_suites:
+    - endpoint: "POST /api/quality/coas/:id/generate-pdf"
+      tests:
+        - "generates PDF for approved CoA"
+        - "returns 400 for non-approved CoA"
+        - "returns pdf_url and qr_code_url"
+        - "updates CoA record"
+
+    - endpoint: "POST /api/quality/coas/:id/email"
+      tests:
+        - "sends email with valid recipient"
+        - "returns 400 if PDF not generated"
+        - "returns 400 for invalid email"
+        - "creates email delivery record"
+
+    - endpoint: "GET /verify/:token"
+      tests:
+        - "returns CoA data for valid token"
+        - "returns 404 for invalid token"
+        - "no auth required"
+
+e2e_tests:
+  file: e2e/quality/coa-pdf.spec.ts
+
+  scenarios:
+    - name: "Generate PDF and email workflow"
+      steps:
+        - "Navigate to approved CoA"
+        - "Click [Generate PDF]"
+        - "Wait for generation (loading state)"
+        - "Verify success toast"
+        - "Verify [Download PDF] button appears"
+        - "Click [Download PDF]"
+        - "Verify file downloads"
+        - "Click [Email CoA]"
+        - "Enter recipient email"
+        - "Click [Preview]"
+        - "Verify PDF preview displays"
+        - "Click [Send Email]"
+        - "Verify success message"
+
+    - name: "QR code verification"
+      steps:
+        - "Generate PDF for CoA"
+        - "Extract verification token from CoA record"
+        - "Navigate to /verify/{token} (no auth)"
+        - "Verify page displays CoA info"
+        - "Verify status badge shows 'Verified'"
+        - "Verify test results table displays"
+
+performance_tests:
+  - name: "PDF generation with 30 parameters"
+    target: "<5 seconds"
+
+  - name: "PDF file size"
+    target: "<2MB"
+
+  - name: "QR code generation"
+    target: "<1 second"
+
+  - name: "Email delivery"
+    target: "<10 seconds"

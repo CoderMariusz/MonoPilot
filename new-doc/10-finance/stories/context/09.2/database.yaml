@@ -1,0 +1,49 @@
+tables:
+  currencies:
+    columns:
+      - "id UUID PRIMARY KEY"
+      - "org_id UUID REFERENCES organizations"
+      - "code TEXT (PLN, EUR, USD)"
+      - "name TEXT"
+      - "symbol TEXT"
+      - "is_base BOOLEAN"
+      - "exchange_rate NUMERIC(12,6)"
+    constraints:
+      - "UNIQUE (org_id, code)"
+      - "CHECK (exchange_rate > 0)"
+
+  tax_codes:
+    columns:
+      - "id UUID PRIMARY KEY"
+      - "org_id UUID"
+      - "code TEXT (VAT-23, VAT-8, VAT-5)"
+      - "name TEXT"
+      - "rate_percent NUMERIC(5,2)"
+      - "country_code TEXT DEFAULT 'PL'"
+      - "effective_from DATE"
+    constraints:
+      - "UNIQUE (org_id, code)"
+      - "CHECK (rate_percent >= 0 AND rate_percent <= 100)"
+
+  standard_costs:
+    columns:
+      - "id UUID PRIMARY KEY"
+      - "org_id UUID"
+      - "item_id UUID REFERENCES products"
+      - "effective_from DATE NOT NULL"
+      - "effective_to DATE"
+      - "material_cost NUMERIC(15,4)"
+      - "labor_cost NUMERIC(15,4)"
+      - "overhead_cost NUMERIC(15,4)"
+      - "total_cost NUMERIC(15,4)"
+      - "status TEXT (draft, approved, active, superseded)"
+      - "approved_by UUID"
+      - "approved_at TIMESTAMPTZ"
+    constraints:
+      - "CHECK (total_cost = material_cost + labor_cost + overhead_cost)"
+      - "EXCLUDE overlapping date ranges for active costs"
+
+functions:
+  - "calculate_standard_cost_total() - auto-calc total"
+  - "supersede_old_standard_costs() - supersede on activate"
+  - "get_active_standard_cost(org_id, item_id, date) - get active cost"

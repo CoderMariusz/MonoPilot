@@ -1,0 +1,344 @@
+story: "02.14"
+phase: "CODE REVIEW"
+status: "REQUEST_CHANGES"
+date: "2025-12-29"
+reviewer: "CODE-REVIEWER"
+
+decision:
+  verdict: "REQUEST_CHANGES"
+  blockers: 3
+  critical_issues: 3
+  major_issues: 4
+  minor_issues: 3
+
+test_results:
+  unit_tests:
+    status: "GREEN"
+    total: 67
+    passing: 67
+    failing: 0
+    files:
+      - "lib/services/__tests__/bom-service.test.ts: 67 tests"
+      - "lib/services/__tests__/bom-advanced.test.ts: 45 tests"
+
+  api_integration_tests:
+    status: "RED"
+    total: 0
+    expected: 20
+    missing_files:
+      - "app/api/technical/boms/[id]/compare/[compareId]/__tests__/route.test.ts"
+      - "app/api/technical/boms/[id]/explosion/__tests__/route.test.ts"
+      - "app/api/technical/boms/[id]/scale/__tests__/route.test.ts"
+      - "app/api/technical/boms/[id]/yield/__tests__/route.test.ts"
+
+security_score: "4/10"
+code_quality_score: "7/10"
+
+critical_issues:
+  - id: "CRITICAL-1"
+    severity: "CRITICAL"
+    category: "Testing & Security"
+    blocker: true
+    title: "Missing API Route Integration Tests"
+    description: "NO integration tests found for any of the 4 new API endpoints"
+    impact: "Cannot verify RLS enforcement, auth, authorization, or error handling at API layer"
+    files:
+      - "Missing: app/api/technical/boms/[id]/compare/[compareId]/__tests__/route.test.ts"
+      - "Missing: app/api/technical/boms/[id]/explosion/__tests__/route.test.ts"
+      - "Missing: app/api/technical/boms/[id]/scale/__tests__/route.test.ts"
+      - "Missing: app/api/technical/boms/[id]/yield/__tests__/route.test.ts"
+    required_tests:
+      - "401 Unauthorized (no session)"
+      - "403 Forbidden (wrong role)"
+      - "404 Not Found (invalid BOM ID)"
+      - "400 Bad Request (validation errors)"
+      - "200 Success (happy path)"
+      - "RLS enforcement (cross-org access blocked)"
+    estimated_fix_time: "2 hours"
+    reference_pattern: "apps/frontend/app/api/technical/boms/[id]/cost/__tests__/route.test.ts"
+
+  - id: "CRITICAL-2"
+    severity: "CRITICAL"
+    category: "Security"
+    blocker: true
+    title: "SQL Injection Risk in BOM Explosion"
+    description: "String interpolation in Supabase query (line 1179)"
+    impact: "Potential SQL injection vector, sets dangerous precedent"
+    files:
+      - "apps/frontend/lib/services/bom-service.ts:1179"
+    code_snippet: |
+      // UNSAFE:
+      .or(`effective_to.gte.${new Date().toISOString().split('T')[0]},effective_to.is.null`)
+    fix: |
+      // SAFE:
+      const today = new Date().toISOString().split('T')[0]
+      .gte('effective_to', today)
+      .or('effective_to.is.null')
+    estimated_fix_time: "15 minutes"
+
+  - id: "CRITICAL-3"
+    severity: "CRITICAL"
+    category: "Logic Error / DoS Risk"
+    blocker: true
+    title: "Circular Reference Detection Has Blind Spot"
+    description: "Path-based tracking can miss shared components at same level in different branches"
+    impact: "Infinite recursion possible with complex BOM structures, DoS risk"
+    files:
+      - "apps/frontend/lib/services/bom-service.ts:1186-1306"
+      - "apps/frontend/lib/services/__tests__/bom-advanced.test.ts"
+    example_scenario: |
+      Product A
+      ├─ Component X (level 1)
+      │  └─ Component Y (level 2)
+      └─ Component Z (level 1)
+         └─ Component Y (level 2)  // Same Y, different path - NOT CAUGHT!
+    fix: |
+      Replace path-based tracking with global component map:
+      const visitedComponents = new Map<string, number>()  // component_id -> level first seen
+
+      const explodeLevel = async (..., level: number, ...) => {
+        for (const item of levelItems) {
+          const firstSeenLevel = visitedComponents.get(item.component_id)
+          if (firstSeenLevel !== undefined && firstSeenLevel <= level) {
+            throw new Error('CIRCULAR_REFERENCE')
+          }
+          visitedComponents.set(item.component_id, level)
+          // ... continue
+        }
+      }
+    estimated_fix_time: "30 minutes"
+    requires_new_test: true
+
+major_issues:
+  - id: "MAJOR-1"
+    severity: "MAJOR"
+    category: "Security"
+    blocker: false
+    title: "Authorization Check Missing in Comparison Endpoint"
+    description: "GET /api/technical/boms/[id]/compare/[compareId] does not check user role"
+    impact: "All authenticated users can compare BOMs (potential trade secret leak)"
+    files:
+      - "apps/frontend/app/api/technical/boms/[id]/compare/[compareId]/route.ts:46"
+    fix: |
+      const allowedRoles = ['admin', 'technical', 'production_manager', 'quality']
+      if (!allowedRoles.includes(currentUser.role)) {
+        return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
+      }
+    estimated_fix_time: "10 minutes"
+
+  - id: "MAJOR-2"
+    severity: "MAJOR"
+    category: "Performance / DoS Prevention"
+    blocker: false
+    title: "No Rate Limiting on Explosion Endpoint"
+    description: "Expensive recursive queries with no rate limit"
+    impact: "User can spam endpoint to DoS the database"
+    files:
+      - "apps/frontend/app/api/technical/boms/[id]/explosion/route.ts"
+    note: "Not blocking for MVP - can be addressed in Phase 2 optimization"
+    future_fix:
+      - "Add Redis-based rate limiting (10 explosions per minute)"
+      - "Cache explosion results for 5 minutes"
+      - "Add query timeout to prevent runaway recursion"
+
+  - id: "MAJOR-3"
+    severity: "MAJOR"
+    category: "Validation"
+    blocker: false
+    title: "Missing Zod Validation in Comparison Endpoint"
+    description: "Does not validate UUID format for id and compareId"
+    impact: "Invalid UUIDs cause cryptic database errors instead of 400 Bad Request"
+    files:
+      - "apps/frontend/app/api/technical/boms/[id]/compare/[compareId]/route.ts:18"
+    fix: |
+      const compareParamsSchema = z.object({
+        id: z.string().uuid('Invalid BOM ID format'),
+        compareId: z.string().uuid('Invalid comparison BOM ID format'),
+      })
+      const { id, compareId } = compareParamsSchema.parse(await params)
+    estimated_fix_time: "15 minutes"
+
+  - id: "MAJOR-4"
+    severity: "MAJOR"
+    category: "UX / Error Handling"
+    blocker: false
+    title: "Frontend Error Handling Incomplete"
+    description: "Hooks do not handle all error codes returned by API (403, 422, 500)"
+    impact: "Users see generic error messages instead of specific guidance"
+    files:
+      - "apps/frontend/lib/hooks/use-bom-comparison.ts:26-37"
+      - "apps/frontend/lib/hooks/use-bom-explosion.ts"
+      - "apps/frontend/lib/hooks/use-bom-yield.ts"
+    fix: |
+      Add handling for:
+      - 403 Forbidden -> "Permission denied"
+      - 422 Unprocessable Entity -> "Circular reference or invalid structure"
+      - 500 Server Error -> "Try again later"
+    estimated_fix_time: "20 minutes"
+
+minor_issues:
+  - id: "MINOR-1"
+    severity: "MINOR"
+    category: "Code Quality (DRY)"
+    title: "Duplicate Auth Code"
+    description: "All 4 API routes have identical auth checking code (~25 lines)"
+    decision: "ACCEPT AS-IS"
+    rationale: "Explicit is better than middleware magic. Easy to understand."
+
+  - id: "MINOR-2"
+    severity: "MINOR"
+    category: "Documentation"
+    title: "Missing @throws JSDoc"
+    description: "Service functions missing @throws documentation"
+    impact: "LOW - developers can read error handling code"
+
+  - id: "MINOR-3"
+    severity: "MINOR"
+    category: "Testing"
+    title: "Test Coverage Could Be Higher"
+    description: "Missing performance tests for large BOMs (1000+ items), concurrency tests"
+    note: "Add in Phase 2 when optimizing"
+
+acceptance_criteria_status:
+  total: 20
+  implemented: 18
+  untested: 2
+  coverage:
+    - "AC-14.1 to AC-14.8: Comparison - PASS"
+    - "AC-14.10 to AC-14.15: Explosion - PASS"
+    - "AC-14.13: Circular reference - PARTIAL (has blind spot)"
+    - "AC-14.20 to AC-14.24: Yield - PASS"
+    - "AC-14.30 to AC-14.38: Scaling - PASS"
+    - "AC-14.40: Validation - PASS"
+    - "AC-14.41: Org isolation - UNTESTED (no API tests)"
+    - "AC-14.42: Write permission - UNTESTED (no API tests)"
+
+positive_findings:
+  - "Service layer implementation: EXCELLENT (clean, well-documented)"
+  - "Type safety: EXCELLENT (Zod + TypeScript, no any types)"
+  - "Algorithm correctness: GOOD (comparison, scaling, yield formulas)"
+  - "Frontend components: GOOD (all 4 UI states, keyboard accessible)"
+  - "Test structure: GOOD (clear organization, AC references)"
+
+files_reviewed:
+  total: 16
+  backend:
+    - "apps/frontend/lib/services/bom-service.ts (783 lines reviewed: 871-1653)"
+    - "apps/frontend/lib/validation/bom-advanced-schemas.ts (100 lines)"
+    - "apps/frontend/lib/types/bom-advanced.ts (231 lines)"
+    - "apps/frontend/app/api/technical/boms/[id]/compare/[compareId]/route.ts (86 lines)"
+    - "apps/frontend/app/api/technical/boms/[id]/explosion/route.ts (100 lines)"
+    - "apps/frontend/app/api/technical/boms/[id]/scale/route.ts (181 lines)"
+    - "apps/frontend/app/api/technical/boms/[id]/yield/route.ts (196 lines)"
+  frontend:
+    - "apps/frontend/components/technical/bom/BOMComparisonModal.tsx"
+    - "apps/frontend/components/technical/bom/BOMScaleModal.tsx"
+    - "apps/frontend/components/technical/bom/BOMVersionSelector.tsx"
+    - "apps/frontend/lib/hooks/use-bom-comparison.ts (106 lines)"
+    - "apps/frontend/lib/hooks/use-bom-explosion.ts"
+    - "apps/frontend/lib/hooks/use-bom-scale.ts (126 lines)"
+    - "apps/frontend/lib/hooks/use-bom-yield.ts"
+  tests:
+    - "apps/frontend/lib/services/__tests__/bom-service.test.ts"
+    - "apps/frontend/lib/services/__tests__/bom-advanced.test.ts"
+
+lines_reviewed: 3500
+
+required_fixes:
+  critical:
+    - name: "Add API Integration Tests"
+      priority: 1
+      issue: "CRITICAL-1"
+      estimated_time: "2 hours"
+      files_to_create:
+        - "app/api/technical/boms/[id]/compare/[compareId]/__tests__/route.test.ts"
+        - "app/api/technical/boms/[id]/explosion/__tests__/route.test.ts"
+        - "app/api/technical/boms/[id]/scale/__tests__/route.test.ts"
+        - "app/api/technical/boms/[id]/yield/__tests__/route.test.ts"
+      reference: "apps/frontend/app/api/technical/boms/[id]/cost/__tests__/route.test.ts"
+
+    - name: "Fix SQL Injection Risk"
+      priority: 1
+      issue: "CRITICAL-2"
+      estimated_time: "15 minutes"
+      files_to_modify:
+        - "apps/frontend/lib/services/bom-service.ts:1179"
+
+    - name: "Fix Circular Reference Logic"
+      priority: 1
+      issue: "CRITICAL-3"
+      estimated_time: "30 minutes"
+      files_to_modify:
+        - "apps/frontend/lib/services/bom-service.ts:1186-1306"
+        - "apps/frontend/lib/services/__tests__/bom-advanced.test.ts (add test)"
+
+  recommended:
+    - name: "Add Role Check to Comparison"
+      priority: 2
+      issue: "MAJOR-1"
+      estimated_time: "10 minutes"
+      files_to_modify:
+        - "apps/frontend/app/api/technical/boms/[id]/compare/[compareId]/route.ts:46"
+
+    - name: "Add Zod Validation to Comparison"
+      priority: 2
+      issue: "MAJOR-3"
+      estimated_time: "15 minutes"
+      files_to_modify:
+        - "apps/frontend/app/api/technical/boms/[id]/compare/[compareId]/route.ts:18"
+
+    - name: "Complete Frontend Error Handling"
+      priority: 2
+      issue: "MAJOR-4"
+      estimated_time: "20 minutes"
+      files_to_modify:
+        - "apps/frontend/lib/hooks/use-bom-comparison.ts:26-37"
+        - "apps/frontend/lib/hooks/use-bom-explosion.ts"
+        - "apps/frontend/lib/hooks/use-bom-yield.ts"
+
+total_fix_time:
+  critical: "2h 45min"
+  recommended: "45min"
+  total: "3h 30min"
+
+re_review_checklist:
+  - "All 3 CRITICAL issues fixed"
+  - "API integration tests created (20+ tests)"
+  - "All tests GREEN (unit + API)"
+  - "No new TypeScript errors"
+  - "Circular ref test catches shared component scenario"
+  - "SQL injection fixed (no string interpolation)"
+
+next_steps:
+  - "Developer: Fix 3 CRITICAL issues"
+  - "Developer: Run full test suite (pnpm test)"
+  - "Developer: Update this handoff YAML with 'READY_FOR_RE_REVIEW'"
+  - "CODE-REVIEWER: Re-review after fixes applied"
+  - "ORCHESTRATOR: Approve if re-review passes"
+
+comparison_with_previous_stories:
+  story_02_9:
+    tests: "GREEN (142/142)"
+    security: "8/10"
+    quality: "7/10"
+    decision: "APPROVED"
+  story_02_8:
+    tests: "GREEN"
+    security: "9/10"
+    quality: "8/10"
+    decision: "APPROVED"
+  story_02_14:
+    tests: "YELLOW (67 unit, 0 API)"
+    security: "4/10"
+    quality: "7/10"
+    decision: "REQUEST_CHANGES"
+
+  note: "02.14 has LOWER quality bar than approved stories due to missing API tests"
+
+handoff_to: "DEVELOPER"
+blocks_qa: true
+estimated_completion: "2025-12-30 (after fixes)"
+
+artifacts:
+  - "docs/2-MANAGEMENT/reviews/code-review-story-02.14-corrected.md"
+  - "docs/2-MANAGEMENT/reviews/code-review-story-02.14-handoff.yaml"

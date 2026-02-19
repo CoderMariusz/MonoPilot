@@ -1,0 +1,124 @@
+# Story 04.7d - Index File (Entry Point)
+# Generated: 2026-01-14
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "04.7d"
+  name: "Multiple Outputs per WO"
+  slug: "multiple-outputs-per-wo"
+  epic: "04-production"
+  phase: "1B"
+  complexity: "M"
+  estimate_days: 2
+  type: "full-stack"
+  state: "ready"
+  priority: "P0"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # work_orders updates, triggers, aggregation
+  - api.yaml         # Endpoints for output list and progress
+  - frontend.yaml    # Components, services, UI patterns
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "04.7a"
+      name: "Output Registration Desktop"
+      provides: ["production_outputs table", "output registration API", "single output flow"]
+    - story: "04.7c"
+      name: "By-Product Registration"
+      provides: ["by-product LP creation", "is_by_product flag"]
+    - story: "05.1"
+      name: "License Plates CRUD"
+      provides: ["license_plates table", "LP service"]
+    - story: "04.5"
+      name: "Production Settings"
+      provides: ["auto_complete_wo setting"]
+    - story: "03.10"
+      name: "Work Order CRUD"
+      provides: ["work_orders table", "status field"]
+  soft:
+    - story: "04.4"
+      name: "Yield Tracking"
+      reason: "Per-output yield calculations"
+  blocks:
+    - story: "04.2c"
+      reason: "WO completion validation depends on output tracking"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/production.md"
+    sections: ["FR-PROD-015"]
+  wireframe:
+    path: "docs/3-ARCHITECTURE/ux/wireframes/PROD-004-part2-modals-and-specs.md"
+    sections:
+      - "Output History Table (lines 323-335)"
+      - "WO Summary Header (lines 296-307)"
+      - "Progress Bar (lines 305-306)"
+      - "FR-PROD-015 AC Coverage (lines 704-716)"
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/04-production/04.7a.output-registration-desktop.md"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for output queries"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "Add output_qty to work_orders, create aggregation trigger"
+  - type: "api"
+    count: 2
+    description: "GET /api/production/work-orders/:id/outputs, GET /api/production/work-orders/:id/progress"
+  - type: "service"
+    count: 1
+    description: "output-aggregation-service.ts for cumulative tracking"
+  - type: "component"
+    count: 3
+    description: "OutputHistoryTable, OutputProgressCard, OutputsSummary"
+  - type: "page"
+    count: 0
+    description: "Uses existing output registration page"
+  - type: "test"
+    count: 3
+    description: "Unit + integration + E2E tests"
+
+# Technical notes
+technical_notes:
+  - "output_qty excludes by-product outputs (is_by_product = false)"
+  - "Progress calculated as (output_qty / planned_qty) * 100"
+  - "Auto-complete runs as database trigger when output_qty >= planned_qty"
+  - "Output history supports pagination for WOs with many outputs"
+  - "Each output gets unique LP number via existing LP service"
+  - "Over-production allowed - progress can exceed 100%"
+
+# MVP Scope Clarification
+mvp_scope:
+  in_scope:
+    - "Multiple LP creation per WO"
+    - "Cumulative output_qty tracking on WO"
+    - "Progress bar with percentage display"
+    - "Auto-complete WO when output >= planned (if setting enabled)"
+    - "Output history table with filters and pagination"
+    - "Over-production tracking (>100% allowed)"
+  out_of_scope:
+    - "Output editing or deletion"
+    - "Output merging or splitting"
+    - "Batch output registration (multiple at once)"
+    - "Output transfer between WOs"
+
+# FR-PROD-015 Mapping
+prd_mapping:
+  fr: "FR-PROD-015"
+  title: "Multiple Outputs per WO"
+  ac_count: 5
+  covered:
+    - "AC #1: GIVEN WO.planned_qty = 1000 AND first output = 400, WHEN output registered, THEN WO.output_qty = 400 AND progress = 40%"
+    - "AC #2: GIVEN WO.output_qty = 400 AND second output = 300, WHEN second output registered, THEN WO.output_qty = 700 AND progress = 70%"
+    - "AC #3: GIVEN 3 outputs registered (LP-001, LP-002, LP-003), WHEN output history viewed, THEN all 3 LPs display with individual quantities"
+    - "AC #4: GIVEN each output creates separate LP, WHEN output registered, THEN new unique LP ID is generated"
+    - "AC #5: GIVEN auto_complete_wo = true AND output_qty reaches 1000 (planned), WHEN output registered, THEN WO auto-completes"

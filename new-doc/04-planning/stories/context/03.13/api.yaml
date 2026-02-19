@@ -1,0 +1,77 @@
+# Story 03.13 - API Specification
+# Purpose: Endpoints, request/response schemas
+# Status: COMPLETE
+
+endpoints:
+  - method: "GET"
+    path: "/api/planning/work-orders/:id/availability"
+    file: "apps/frontend/app/api/planning/work-orders/[id]/availability/route.ts"
+    auth: true
+    roles: ["admin", "production_manager", "planner", "production_operator", "viewer"]
+    cache: "30 seconds TTL"
+
+response_schema:
+  wo_id: "UUID"
+  checked_at: "ISO8601"
+  overall_status: "sufficient | low_stock | shortage | no_stock"
+  enabled: "boolean"
+  cached: "boolean"
+  cache_expires_at: "ISO8601 (optional)"
+  materials:
+    - wo_material_id: "UUID"
+      product_id: "UUID"
+      product_code: "string"
+      product_name: "string"
+      required_qty: "number"
+      available_qty: "number"
+      reserved_qty: "number"
+      shortage_qty: "number (positive=shortage, negative=surplus)"
+      coverage_percent: "number"
+      status: "sufficient | low_stock | shortage | no_stock"
+      uom: "string"
+      expired_excluded_qty: "number"
+  summary:
+    total_materials: "number"
+    sufficient_count: "number"
+    low_stock_count: "number"
+    shortage_count: "number"
+
+errors:
+  - status: 401
+    code: "UNAUTHORIZED"
+  - status: 403
+    code: "FORBIDDEN"
+  - status: 404
+    code: "WO_NOT_FOUND"
+
+services:
+  - path: "apps/frontend/lib/services/material-availability-service.ts"
+    status: "complete"
+    exports:
+      - "checkWOAvailability(woId, orgId)"
+      - "calculateCoveragePercent(available, required)"
+      - "calculateAvailabilityStatus(coveragePercent)"
+      - "calculateOverallStatus(materialStatuses[])"
+      - "isAvailabilityEnabled(orgId)"
+
+types:
+  path: "apps/frontend/lib/types/wo-availability.ts"
+  exports:
+    - "AvailabilityStatus"
+    - "MaterialAvailability"
+    - "AvailabilitySummary"
+    - "WOAvailabilityResponse"
+
+validation:
+  path: "apps/frontend/lib/validation/material-availability.ts"
+  exports:
+    - "availabilityStatusEnum"
+    - "materialAvailabilitySchema"
+    - "availabilitySummarySchema"
+    - "availabilityResponseSchema"
+
+caching:
+  provider: "In-memory"
+  key_pattern: "org:{orgId}:wo:{woId}:availability"
+  ttl_seconds: 30
+  invalidation: "Natural expiry (30s TTL)"

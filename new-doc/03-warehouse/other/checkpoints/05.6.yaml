@@ -1,0 +1,96 @@
+# Story 05.6 - LP Detail History
+# Type: fullstack
+# Epic: 05-warehouse
+# Audit Date: 2026-01-08
+# Status: BLOCKED at P5 (code-reviewer)
+
+status: BLOCKED
+completion: 70%
+last_phase: P5
+
+blockers:
+  - id: DB-001
+    severity: CRITICAL
+    type: database
+    description: "Missing lp_transactions table"
+    file: "supabase/migrations/ (MISSING)"
+    details: |
+      Service in license-plate-detail-service.ts (lines 204-217, 260-273)
+      tries to insert into lp_transactions table that doesn't exist.
+      Block/unblock audit logging silently fails.
+    fix: |
+      Create migration 102_create_lp_transactions_table.sql:
+      CREATE TABLE lp_transactions (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        org_id UUID NOT NULL REFERENCES organizations(id),
+        lp_id UUID NOT NULL REFERENCES license_plates(id),
+        transaction_type TEXT NOT NULL,
+        old_value TEXT,
+        new_value TEXT,
+        reason TEXT,
+        reference_type TEXT,
+        reference_id UUID,
+        performed_by UUID,
+        performed_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+  - id: DB-002
+    severity: CRITICAL
+    type: database
+    description: "Missing block_reason column in license_plates"
+    file: "supabase/migrations/088_create_license_plates.sql"
+    details: |
+      Service defines block_reason (line 49), page.tsx uses it (line 290),
+      but column doesn't exist in database schema.
+      LPUnblockModal cannot show original block reason.
+    fix: |
+      Create migration 103_add_block_reason_to_license_plates.sql:
+      ALTER TABLE license_plates ADD COLUMN block_reason TEXT;
+
+  - id: CODE-001
+    severity: MAJOR
+    type: code
+    description: "Duplicate block/unblock in main route.ts"
+    file: "apps/frontend/app/api/warehouse/license-plates/[id]/route.ts"
+    lines: "80-138"
+    details: |
+      Main route handles action='block'/'unblock' but dedicated routes exist:
+      - /[id]/block/route.ts
+      - /[id]/unblock/route.ts
+      Creates duplicate implementations, maintenance issue.
+    fix: "Remove block/unblock handling from main route.ts (lines 80-138)"
+
+  - id: DEP-001
+    severity: MAJOR
+    type: dependency
+    description: "Genealogy API returns mock data"
+    file: "apps/frontend/app/api/warehouse/license-plates/[id]/genealogy/route.ts"
+    lines: "45-49"
+    details: |
+      TODO comment: "Replace with actual database query"
+      Returns empty mockAncestors/mockDescendants.
+      GenealogyTreePanel shows empty. AC-8 fails.
+    fix: "Complete genealogy queries in Story 05.2 OR mark as Phase 2"
+
+fix_sequence:
+  1: "Create migration 102_create_lp_transactions_table.sql"
+  2: "Create migration 103_add_block_reason_to_license_plates.sql"
+  3: "Apply migrations to Supabase"
+  4: "Remove duplicate code from main route.ts"
+  5: "Run tests to verify"
+  6: "Re-submit to code-reviewer (P5)"
+
+files_to_create:
+  - "supabase/migrations/102_create_lp_transactions_table.sql"
+  - "supabase/migrations/103_add_block_reason_to_license_plates.sql"
+
+files_to_modify:
+  - path: "apps/frontend/app/api/warehouse/license-plates/[id]/route.ts"
+    action: "Remove lines 80-138 (block/unblock handling)"
+
+next_phase: P3-FIX
+agent: backend-dev
+P3-FIX: ✓ backend-dev 17:50 files:3 migrations:2-applied tests:344/344-pass
+P5: ✓ code-reviewer 20:19 issues:1-minor decision:approved tests:31/31-lp-specific
+P6: ✓ qa-agent 20:26 ac:17/18 bugs:0 decision:pass
+P7: ✓ tech-writer 20:31 report:done docs:updated status:COMPLETE

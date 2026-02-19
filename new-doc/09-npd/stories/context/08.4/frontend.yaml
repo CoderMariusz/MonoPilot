@@ -1,0 +1,579 @@
+# Frontend Implementation for Story 08.4
+# Formulations CRUD & Versioning
+
+ux:
+  wireframes:
+    - id: "NPD-006"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/NPD-006-formulation-list-page.md"
+      relevance: "Formulation list page with DataTable, filtering, and version management"
+      components: ["FormulationsDataTable", "FormulationStatusBadge", "FormulationFilters"]
+    - id: "NPD-007"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/NPD-007-formulation-editor.md"
+      relevance: "Formulation editor with items table, allergen panel, costing card"
+      components: ["FormulationHeaderForm", "FormulationItemsTable", "FormulationLineageTree"]
+    - id: "NPD-009"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/NPD-009-formulation-version-timeline.md"
+      relevance: "Timeline visualization for all formulation versions"
+      components: ["FormulationVersionTimeline", "FormulationTimelineBar", "FormulationTimelineModal"]
+  patterns:
+    table: "ShadCN DataTable with sorting, filtering, pagination"
+    modal: "ShadCN Dialog for create/edit/delete/lock"
+    timeline: "Custom SVG timeline component with color-coded bars"
+  states:
+    - "loading: Skeleton rows for table and form"
+    - "empty: 'Create Your First Formulation' CTA"
+    - "error: Error message with retry button"
+    - "success: Populated list/detail view"
+
+pages:
+  formulations_list:
+    path: "app/(authenticated)/npd/projects/[id]/formulations/page.tsx"
+    description: "Formulation list page for a specific NPD project"
+    components:
+      - FormulationsDataTable
+      - ProjectSelector
+      - FormulationStatusBadge
+      - DeleteFormulationDialog
+    features:
+      - "Display formulations in DataTable with sorting, filtering, pagination"
+      - "Search by formulation_number or notes"
+      - "Filter by status (draft/approved/locked)"
+      - "Filter by effective date (currently effective)"
+      - "Actions: Create, Edit, Delete, View Timeline, View Lineage"
+      - "Empty state: 'Create Your First Formulation' CTA"
+    layout:
+      header:
+        - "Project breadcrumb: NPD Projects > NPD-001 > Formulations"
+        - "[+ Create Formulation] button (top-right)"
+        - "Search input (full-text search)"
+      filters:
+        - "Status dropdown (All, Draft, Approved, Locked)"
+        - "Effective Date toggle (Currently Effective)"
+      table:
+        columns:
+          - "Version (formulation_number)"
+          - "Status (badge)"
+          - "Effective From (date or '-')"
+          - "Effective To (date or '-')"
+          - "Items (count)"
+          - "Total Qty (qty + uom)"
+          - "Actions (Edit, Delete, Timeline, Lineage)"
+      pagination:
+        - "20 items per page"
+        - "Page numbers, Next/Prev"
+
+  formulation_create:
+    path: "app/(authenticated)/npd/formulations/new/page.tsx"
+    description: "Create new formulation"
+    components:
+      - FormulationHeaderForm
+      - ProjectSelector
+    features:
+      - "Auto-suggest next version number (v1.0, v1.1, v2.0)"
+      - "Optional effective dates"
+      - "Total quantity and UoM"
+      - "Parent formulation selector (for lineage)"
+      - "Status selection (draft/approved)"
+      - "Notes field"
+      - "Save & Continue to add items"
+    validation:
+      - "Project required"
+      - "Formulation number format: v\\d+\\.\\d+"
+      - "Total qty > 0"
+      - "UoM required"
+      - "Effective To >= Effective From (if both set)"
+    layout:
+      header:
+        - "Breadcrumb: NPD Projects > NPD-001 > Formulations > Create"
+        - "Form title: 'Create Formulation'"
+      form:
+        fields:
+          - "Project (locked after creation)"
+          - "Formulation Number (auto-suggest or manual)"
+          - "Status (dropdown)"
+          - "Effective From (date picker, optional)"
+          - "Effective To (date picker, optional)"
+          - "Parent Formulation (dropdown, optional)"
+          - "Total Quantity (number input)"
+          - "Unit of Measure (text input)"
+          - "Notes (textarea)"
+      actions:
+        - "[Cancel] button"
+        - "[Save Formulation] button (primary)"
+
+  formulation_detail:
+    path: "app/(authenticated)/npd/formulations/[id]/page.tsx"
+    description: "Formulation detail view"
+    components:
+      - FormulationHeaderForm (read-only)
+      - FormulationItemsTable
+      - FormulationLineageTree
+      - LockFormulationDialog
+    features:
+      - "Display formulation header (read-only)"
+      - "Display formulation items with auto-calculated percentages"
+      - "Display lineage tree (parent/children)"
+      - "Actions: Edit (if not locked), Lock (if approved), Delete, Clone, Export"
+      - "Lock confirmation dialog"
+    layout:
+      header:
+        - "Breadcrumb: NPD Projects > NPD-001 > Formulations > v1.0"
+        - "Title: 'Formulation v1.0 - NPD-001'"
+        - "Status badge (draft/approved/locked)"
+        - "Actions: [Edit] [Lock] [Delete] [Clone] [Export]"
+      sections:
+        - header:
+            title: "Formulation Details"
+            fields:
+              - "Project Number"
+              - "Formulation Number"
+              - "Status"
+              - "Effective From / Effective To"
+              - "Total Quantity + UoM"
+              - "Notes"
+        - items:
+            title: "Formulation Items"
+            component: FormulationItemsTable
+            columns:
+              - "Product (code + name)"
+              - "Quantity"
+              - "UoM"
+              - "Percentage (auto-calculated)"
+              - "Notes"
+            actions:
+              - "[+ Add Item]" (if not locked)
+        - lineage:
+            title: "Formulation Lineage"
+            component: FormulationLineageTree
+            features:
+              - "Tree view: Parent -> Current -> Children"
+              - "Click version to navigate"
+
+  formulation_edit:
+    path: "app/(authenticated)/npd/formulations/[id]/edit/page.tsx"
+    description: "Edit formulation (blocked if locked)"
+    components:
+      - FormulationHeaderForm
+      - ProjectSelector (disabled)
+    features:
+      - "Pre-populate form with current data"
+      - "Project field locked (immutable)"
+      - "Cannot edit if status = 'locked'"
+      - "Save updates"
+    validation:
+      - "Same as create form"
+      - "Cannot change project"
+      - "Cannot edit if locked (show error)"
+    layout:
+      header:
+        - "Breadcrumb: NPD Projects > NPD-001 > Formulations > v1.0 > Edit"
+        - "Form title: 'Edit Formulation v1.0'"
+      form:
+        fields:
+          - "Project (disabled)"
+          - "Formulation Number"
+          - "Status (dropdown)"
+          - "Effective From (date picker)"
+          - "Effective To (date picker)"
+          - "Total Quantity (number input)"
+          - "Unit of Measure (text input)"
+          - "Notes (textarea)"
+      actions:
+        - "[Cancel] button"
+        - "[Save Changes] button (primary)"
+
+components:
+  FormulationsDataTable:
+    path: "components/npd/formulation/FormulationsDataTable.tsx"
+    description: "DataTable for formulations list"
+    props:
+      formulations: Array<FormulationWithProject>
+      onEdit: (id: number) => void
+      onDelete: (id: number) => void
+      onViewTimeline: (id: number) => void
+      onViewLineage: (id: number) => void
+    features:
+      - "Sortable columns"
+      - "Search filter"
+      - "Status filter"
+      - "Effective date filter"
+      - "Pagination (20 items/page)"
+      - "Actions menu (Edit/Delete/Timeline/Lineage)"
+    pattern: "ShadCN DataTable with react-table"
+
+  FormulationHeaderForm:
+    path: "components/npd/formulation/FormulationHeaderForm.tsx"
+    description: "Reusable form for formulation header"
+    props:
+      mode: "'create' | 'edit' | 'view'"
+      initialData: FormulationWithProject | null
+      onSubmit: (data: CreateFormulationRequest | UpdateFormulationRequest) => void
+      onCancel: () => void
+    features:
+      - "Project selector (disabled in edit mode)"
+      - "Version number input (auto-suggest)"
+      - "Status dropdown"
+      - "Date pickers (effective_from, effective_to)"
+      - "Total quantity + UoM"
+      - "Parent formulation selector"
+      - "Notes textarea"
+      - "Client-side validation (Zod)"
+    validation:
+      - "formulation_number format: v\\d+\\.\\d+"
+      - "total_qty > 0"
+      - "effective_to >= effective_from"
+    pattern: "ShadCN Form with react-hook-form + Zod"
+
+  FormulationItemsTable:
+    path: "components/npd/formulation/FormulationItemsTable.tsx"
+    description: "Table for formulation items with auto-calculated percentages"
+    props:
+      formulationId: number
+      totalQty: number
+      isLocked: boolean
+    features:
+      - "Display items: Product, Quantity, UoM, Percentage, Notes"
+      - "Auto-calculate percentage: (item.qty / total_qty) * 100"
+      - "Add/Edit/Delete items (if not locked)"
+      - "Product search/select (autocomplete)"
+      - "Inline editing"
+    columns:
+      - "Product (code + name)"
+      - "Quantity (editable)"
+      - "UoM (editable)"
+      - "Percentage (read-only, auto-calculated)"
+      - "Notes (editable)"
+      - "Actions (Delete)"
+    pattern: "ShadCN Table with inline editing"
+
+  ProjectSelector:
+    path: "components/npd/formulation/ProjectSelector.tsx"
+    description: "Combobox for NPD project search/select"
+    props:
+      value: number | null
+      onChange: (value: number) => void
+      disabled: boolean
+    features:
+      - "Search projects by number or name"
+      - "Display: project_number - project_name"
+      - "Filter results client-side (debounced)"
+      - "Disabled in edit mode"
+    pattern: "ShadCN Combobox with react-select"
+
+  FormulationStatusBadge:
+    path: "components/npd/formulation/FormulationStatusBadge.tsx"
+    description: "Status indicator badge"
+    props:
+      status: "'draft' | 'approved' | 'locked'"
+    features:
+      - "Color-coded: draft (gray), approved (blue), locked (green)"
+      - "Icon + text"
+    pattern: "ShadCN Badge"
+
+  DeleteFormulationDialog:
+    path: "components/npd/formulation/DeleteFormulationDialog.tsx"
+    description: "Confirmation dialog for delete"
+    props:
+      formulation: FormulationWithProject
+      onConfirm: () => void
+      onCancel: () => void
+    features:
+      - "Show formulation number"
+      - "Warning: 'This will also delete all formulation items. This action cannot be undone.'"
+      - "Confirm/Cancel buttons"
+    pattern: "ShadCN AlertDialog"
+
+  LockFormulationDialog:
+    path: "components/npd/formulation/LockFormulationDialog.tsx"
+    description: "Confirmation dialog for lock"
+    props:
+      formulation: FormulationWithProject
+      onConfirm: () => void
+      onCancel: () => void
+    features:
+      - "Warning: 'Locking this formulation will make it immutable. Continue?'"
+      - "Checkbox: 'I understand this action cannot be undone'"
+      - "Confirm/Cancel buttons"
+    pattern: "ShadCN AlertDialog with checkbox"
+
+  FormulationVersionTimeline:
+    path: "components/npd/formulation/FormulationVersionTimeline.tsx"
+    description: "Timeline visualization for all formulation versions"
+    props:
+      projectId: number
+    features:
+      - "Horizontal timeline bars"
+      - "Color-coded by status"
+      - "Show effective date ranges"
+      - "Highlight currently active version"
+      - "Show overlap warnings"
+      - "Clickable bars (navigate to detail)"
+      - "Tooltip on hover (version, status, dates, total qty, notes preview)"
+    pattern: "Custom SVG timeline component"
+
+  FormulationTimelineModal:
+    path: "components/npd/formulation/FormulationTimelineModal.tsx"
+    description: "Modal wrapper for timeline"
+    props:
+      projectId: number
+      isOpen: boolean
+      onClose: () => void
+    features:
+      - "Full-screen or large modal"
+      - "Contains FormulationVersionTimeline"
+      - "Close button"
+    pattern: "ShadCN Dialog"
+
+  FormulationTimelineBar:
+    path: "components/npd/formulation/FormulationTimelineBar.tsx"
+    description: "Individual version bar in timeline"
+    props:
+      version: FormulationTimelineVersion
+      onClick: () => void
+    features:
+      - "SVG rectangle with color by status"
+      - "Text: version number"
+      - "Tooltip on hover"
+      - "Click to navigate"
+    pattern: "SVG rect with tooltip"
+
+  FormulationLineageTree:
+    path: "components/npd/formulation/FormulationLineageTree.tsx"
+    description: "Lineage tree (parent/children)"
+    props:
+      formulationId: number
+    features:
+      - "Tree view: Parent -> Current -> Children"
+      - "Display: version number, status badge"
+      - "Click version to navigate"
+      - "Highlight current version"
+    pattern: "Custom tree component with links"
+
+services:
+  formulation-service:
+    path: "lib/services/formulation-service.ts"
+    description: "Business logic for formulations"
+    functions:
+      - name: listFormulations
+        params:
+          - filters: FormulationFilters
+        returns: Promise<FormulationsListResponse>
+        description: "List formulations with filters"
+
+      - name: getFormulation
+        params:
+          - id: number
+        returns: Promise<FormulationWithProject>
+        description: "Get formulation by ID"
+
+      - name: createFormulation
+        params:
+          - data: CreateFormulationRequest
+        returns: Promise<Formulation>
+        description: "Create new formulation"
+
+      - name: updateFormulation
+        params:
+          - id: number
+          - data: UpdateFormulationRequest
+        returns: Promise<Formulation>
+        description: "Update formulation"
+
+      - name: deleteFormulation
+        params:
+          - id: number
+        returns: Promise<void>
+        description: "Delete formulation"
+
+      - name: lockFormulation
+        params:
+          - id: number
+        returns: Promise<Formulation>
+        description: "Lock formulation (set status = 'locked')"
+
+      - name: getNextVersion
+        params:
+          - projectId: number
+        returns: Promise<string>
+        description: "Calculate next version number (v1.0, v1.1, v2.0)"
+
+      - name: checkDateOverlap
+        params:
+          - projectId: number
+          - from: string | null
+          - to: string | null
+          - excludeId?: number
+        returns: Promise<boolean>
+        description: "Check if date range overlaps with existing formulations"
+
+      - name: getFormulationTimeline
+        params:
+          - projectId: number
+        returns: Promise<FormulationTimelineResponse>
+        description: "Get timeline data for project"
+
+      - name: getFormulationLineage
+        params:
+          - id: number
+        returns: Promise<FormulationLineageResponse>
+        description: "Get lineage (parent + children)"
+
+validation:
+  schemas:
+    createFormulationSchema:
+      path: "lib/validation/formulation-schemas.ts"
+      fields:
+        npd_project_id:
+          type: z.number().int().positive()
+          message: "Invalid project ID"
+
+        formulation_number:
+          type: z.string().regex(/^v\d+\.\d+$/)
+          message: "Version must be in format v1.0, v1.1, etc."
+
+        effective_from:
+          type: z.string().refine((val) => !val || !isNaN(Date.parse(val)))
+          nullable: true
+          optional: true
+          message: "Invalid date"
+
+        effective_to:
+          type: z.string().refine((val) => !val || !isNaN(Date.parse(val)))
+          nullable: true
+          optional: true
+          message: "Invalid date"
+
+        status:
+          type: z.enum(['draft', 'approved'])
+          default: "'draft'"
+
+        total_qty:
+          type: z.number().positive().max(999999999)
+          message: "Total quantity must be greater than 0"
+
+        uom:
+          type: z.string().min(1).max(20)
+          message: "Unit of measure is required"
+
+        parent_formulation_id:
+          type: z.number().int().positive()
+          nullable: true
+          optional: true
+
+        notes:
+          type: z.string().max(2000)
+          optional: true
+
+      custom_validation:
+        - name: effective_to_after_from
+          logic: "if (data.effective_to && data.effective_from) return new Date(data.effective_to) >= new Date(data.effective_from)"
+          message: "Effective To must be after Effective From"
+          path: ["effective_to"]
+
+    updateFormulationSchema:
+      path: "lib/validation/formulation-schemas.ts"
+      extends: "createFormulationSchema.partial().omit({ npd_project_id: true })"
+
+    lockFormulationSchema:
+      path: "lib/validation/formulation-schemas.ts"
+      fields:
+        confirmation:
+          type: z.literal(true)
+          message: "Please confirm lock action"
+
+state_management:
+  approach: "React Query (TanStack Query)"
+  queries:
+    - key: "['formulations', filters]"
+      fn: listFormulations
+      staleTime: 60000
+
+    - key: "['formulation', id]"
+      fn: getFormulation
+      staleTime: 60000
+
+    - key: "['formulation-timeline', projectId]"
+      fn: getFormulationTimeline
+      staleTime: 120000
+
+    - key: "['formulation-lineage', id]"
+      fn: getFormulationLineage
+      staleTime: 120000
+
+  mutations:
+    - key: createFormulation
+      invalidates: "[['formulations'], ['formulation-timeline']]"
+
+    - key: updateFormulation
+      invalidates: "[['formulation', id], ['formulations'], ['formulation-timeline']]"
+
+    - key: deleteFormulation
+      invalidates: "[['formulations'], ['formulation-timeline']]"
+
+    - key: lockFormulation
+      invalidates: "[['formulation', id], ['formulations']]"
+
+error_handling:
+  strategies:
+    - type: toast
+      errors: [VALIDATION_ERROR, DATE_OVERLAP, LOCKED_FORMULATION]
+      action: "Display error toast with message"
+
+    - type: inline
+      errors: [VALIDATION_ERROR]
+      action: "Show inline error below form field"
+
+    - type: modal
+      errors: [FORMULATION_IN_USE]
+      action: "Display modal with blocker list"
+
+    - type: redirect
+      errors: [NOT_FOUND]
+      action: "Redirect to formulations list with error toast"
+
+loading_states:
+  - component: FormulationsDataTable
+    state: "Skeleton rows (5 rows)"
+    duration: "Until data loaded"
+
+  - component: FormulationHeaderForm
+    state: "Disabled inputs with spinner"
+    duration: "Until data loaded"
+
+  - component: FormulationItemsTable
+    state: "Skeleton rows (3 rows)"
+    duration: "Until items loaded"
+
+  - component: FormulationVersionTimeline
+    state: "Loading spinner overlay"
+    duration: "Until timeline data loaded"
+
+permissions:
+  roles:
+    NPD_LEAD:
+      - create_formulation
+      - edit_formulation
+      - delete_formulation
+      - lock_formulation
+      - view_formulation
+
+    R&D:
+      - create_formulation (assigned projects only)
+      - edit_formulation (assigned projects only)
+      - view_formulation
+
+    REGULATORY:
+      - view_formulation
+
+    FINANCE:
+      - view_formulation
+
+    PRODUCTION:
+      - view_formulation (handoff stage only)
+
+  ui_enforcement:
+    - "[+ Create Formulation] button hidden for VIEWER, REGULATORY, FINANCE, PRODUCTION"
+    - "Edit action hidden for VIEWER, REGULATORY, FINANCE, PRODUCTION"
+    - "Delete action hidden for non-NPD_LEAD, non-ADMIN"
+    - "Lock action hidden for non-NPD_LEAD"
+    - "Form disabled if user lacks edit permission"

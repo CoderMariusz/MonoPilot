@@ -1,0 +1,167 @@
+# Story 04.6a - Database Schema
+# Table: wo_material_consumptions
+
+tables:
+  - name: "wo_material_consumptions"
+    description: "Records material consumption from LPs during production"
+    columns:
+      - name: "id"
+        type: "UUID"
+        constraints: "PRIMARY KEY DEFAULT gen_random_uuid()"
+        nullable: false
+
+      - name: "org_id"
+        type: "UUID"
+        constraints: "NOT NULL REFERENCES organizations(id)"
+        nullable: false
+
+      - name: "wo_id"
+        type: "UUID"
+        constraints: "NOT NULL REFERENCES work_orders(id)"
+        nullable: false
+
+      - name: "wo_material_id"
+        type: "UUID"
+        constraints: "NOT NULL REFERENCES wo_materials(id)"
+        nullable: false
+
+      - name: "lp_id"
+        type: "UUID"
+        constraints: "NOT NULL REFERENCES license_plates(id)"
+        nullable: false
+
+      - name: "product_id"
+        type: "UUID"
+        constraints: "NOT NULL REFERENCES products(id)"
+        nullable: false
+
+      - name: "consumed_qty"
+        type: "DECIMAL(15,6)"
+        constraints: "NOT NULL CHECK (consumed_qty > 0)"
+        nullable: false
+
+      - name: "uom"
+        type: "TEXT"
+        constraints: "NOT NULL"
+        nullable: false
+
+      - name: "is_full_lp"
+        type: "BOOLEAN"
+        constraints: "DEFAULT false"
+        description: "True if entire LP was consumed"
+
+      - name: "lp_batch_number"
+        type: "TEXT"
+        description: "Denormalized for history display"
+
+      - name: "lp_expiry_date"
+        type: "DATE"
+        description: "Denormalized for history display"
+
+      - name: "consumed_by"
+        type: "UUID"
+        constraints: "REFERENCES users(id)"
+
+      - name: "consumed_at"
+        type: "TIMESTAMPTZ"
+        constraints: "DEFAULT NOW()"
+
+      - name: "reversed_at"
+        type: "TIMESTAMPTZ"
+        description: "Set when consumption is reversed"
+
+      - name: "reversed_by"
+        type: "UUID"
+        constraints: "REFERENCES users(id)"
+
+      - name: "reversal_reason"
+        type: "TEXT"
+
+      - name: "status"
+        type: "TEXT"
+        constraints: "DEFAULT 'active' CHECK (status IN ('active', 'reversed'))"
+
+      - name: "created_at"
+        type: "TIMESTAMPTZ"
+        constraints: "DEFAULT NOW()"
+
+      - name: "updated_at"
+        type: "TIMESTAMPTZ"
+        constraints: "DEFAULT NOW()"
+
+rls_policies:
+  - name: "wo_material_consumptions_org_isolation"
+    operation: "ALL"
+    using: "org_id = get_user_org_id()"
+    with_check: "org_id = get_user_org_id()"
+
+  - name: "wo_material_consumptions_select"
+    operation: "SELECT"
+    roles:
+      - "owner"
+      - "admin"
+      - "production_manager"
+      - "production_operator"
+      - "planner"
+    using: "org_id = get_user_org_id()"
+
+  - name: "wo_material_consumptions_insert"
+    operation: "INSERT"
+    roles:
+      - "owner"
+      - "admin"
+      - "production_manager"
+      - "production_operator"
+    with_check: "org_id = get_user_org_id()"
+
+  - name: "wo_material_consumptions_update_reverse"
+    operation: "UPDATE"
+    roles:
+      - "owner"
+      - "admin"
+      - "production_manager"
+    using: "org_id = get_user_org_id()"
+    description: "Only managers can reverse consumptions"
+
+indexes:
+  - name: "idx_consumption_org"
+    columns: ["org_id"]
+
+  - name: "idx_consumption_wo"
+    columns: ["wo_id"]
+
+  - name: "idx_consumption_lp"
+    columns: ["lp_id"]
+
+  - name: "idx_consumption_material"
+    columns: ["wo_material_id"]
+
+  - name: "idx_consumption_status"
+    columns: ["status"]
+
+  - name: "idx_consumption_consumed_at"
+    columns: ["consumed_at DESC"]
+
+triggers:
+  - name: "update_wo_material_consumed_qty"
+    event: "AFTER INSERT"
+    description: "Update wo_materials.consumed_qty on new consumption"
+    action: |
+      UPDATE wo_materials
+      SET consumed_qty = consumed_qty + NEW.consumed_qty,
+          updated_at = NOW()
+      WHERE id = NEW.wo_material_id
+
+  - name: "update_lp_quantity"
+    event: "AFTER INSERT"
+    description: "Decrease LP quantity and update status if depleted"
+    action: |
+      UPDATE license_plates
+      SET quantity = quantity - NEW.consumed_qty,
+          status = CASE WHEN quantity - NEW.consumed_qty <= 0 THEN 'consumed' ELSE status END,
+          updated_at = NOW()
+      WHERE id = NEW.lp_id
+
+migration:
+  number: 120
+  filename: "120_create_wo_material_consumptions.sql"

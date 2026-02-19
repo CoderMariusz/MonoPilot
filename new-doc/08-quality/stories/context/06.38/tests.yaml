@@ -1,0 +1,169 @@
+# Story 06.38 - Audit Trail Tests
+
+unit_tests:
+  file: lib/services/__tests__/audit-trail-service.test.ts
+  coverage_target: ">80%"
+  tests:
+    - name: "AuditTrailService.list - queries with filters"
+      scenario: |
+        Given audit log entries exist
+        When calling list({ entity_type: 'inspection', date_from, date_to })
+        Then returns filtered audit logs
+        And pagination works correctly
+
+    - name: "AuditTrailService.getById - returns entry with diff"
+      scenario: |
+        Given audit log entry exists
+        When calling getById(id)
+        Then returns entry
+        And diff_html generated for old_value vs new_value
+
+    - name: "AuditTrailService.generateDiffHTML - creates HTML diff"
+      scenario: |
+        Given old_value = { status: 'draft' }, new_value = { status: 'approved' }
+        When calling generateDiffHTML(old_value, new_value)
+        Then returns HTML with:
+          - Removed: <del style="color:red">draft</del>
+          - Added: <ins style="color:green">approved</ins>
+
+    - name: "AuditTrailService.exportCSV - exports filtered data"
+      scenario: |
+        Given 1000 audit log entries
+        When calling exportCSV({ format: 'csv', entity_type: 'ncr' })
+        Then CSV file generated
+        And includes only NCR audit logs
+        And signed URL returned
+
+integration_tests:
+  file: app/api/quality/audit-trail/__tests__/audit-trail.test.ts
+  tests:
+    - name: "GET /api/quality/audit-trail - returns paginated list"
+      scenario: |
+        Given authenticated user with QA_MANAGER role
+        When GET /api/quality/audit-trail?entity_type=inspection&page=1&limit=50
+        Then status 200
+        And response contains audit logs filtered by entity_type
+        And pagination metadata included
+
+    - name: "GET /api/quality/audit-trail/:id - returns detail"
+      scenario: |
+        Given audit log entry exists
+        When GET /api/quality/audit-trail/{id}
+        Then status 200
+        And response contains entry with diff
+
+    - name: "POST /api/quality/audit-trail/export - exports CSV"
+      scenario: |
+        Given authenticated user with QA_MANAGER role
+        When POST /api/quality/audit-trail/export with {format: 'csv', entity_type: 'ncr'}
+        Then status 200
+        And response contains file_url and filename
+        And CSV downloads successfully
+
+    - name: "POST /api/quality/audit-trail/export - permission check"
+      scenario: |
+        Given user with VIEWER role
+        When POST /api/quality/audit-trail/export
+        Then status 403 Forbidden
+
+e2e_tests:
+  file: tests/e2e/quality/audit-trail.spec.ts
+  tests:
+    - name: "Audit trail list loads and filters work"
+      steps:
+        - Navigate to /quality/audit-trail
+        - Verify table displays audit logs
+        - Select entity_type filter = 'inspection'
+        - Click [Apply Filters]
+        - Verify only inspection audit logs displayed
+        - Clear filters
+        - Verify all audit logs displayed again
+
+    - name: "Audit trail detail modal opens"
+      steps:
+        - Load audit trail list
+        - Click on first audit log entry
+        - Verify detail modal opens
+        - Verify modal shows entity, action, user, change, reason sections
+        - Verify diff displayed (old value vs new value)
+        - Close modal
+
+    - name: "Audit trail CSV export works"
+      steps:
+        - Load audit trail
+        - Click [Export CSV]
+        - Wait for download (max 10 seconds)
+        - Verify CSV file downloads
+        - Open CSV
+        - Verify CSV contains all expected columns
+
+    - name: "Audit trail search works"
+      steps:
+        - Load audit trail
+        - Type "Corrective action" in search box
+        - Wait for debounce (300ms)
+        - Verify audit logs filtered by search term
+        - Verify results contain "Corrective action" in change_reason or notes
+
+immutability_tests:
+  file: tests/database/audit-log-immutability.test.ts
+  critical: true
+  tests:
+    - name: "Audit log UPDATE blocked"
+      scenario: |
+        Given audit log entry exists
+        When attempting UPDATE quality_audit_log SET change_reason = 'hacked'
+        Then exception: "Audit log records are immutable"
+        And UPDATE blocked by trigger
+
+    - name: "Audit log DELETE blocked"
+      scenario: |
+        Given audit log entry exists
+        When attempting DELETE FROM quality_audit_log WHERE id = {id}
+        Then exception: "Audit log records are immutable"
+        And DELETE blocked by trigger
+
+    - name: "Audit log INSERT allowed"
+      scenario: |
+        Given valid audit log data
+        When INSERT INTO quality_audit_log (...)
+        Then record inserted successfully
+        And RLS policy allows INSERT for authenticated user
+
+    - name: "Audit log RLS enforces org isolation"
+      scenario: |
+        Given User A from Org A and User B from Org B
+        And audit log entry for Org B
+        When User A attempts SELECT FROM quality_audit_log WHERE id = {Org B entry}
+        Then no rows returned (RLS blocks cross-org access)
+
+performance_tests:
+  file: tests/performance/audit-trail-perf.spec.ts
+  tests:
+    - name: "Audit trail query performance"
+      setup:
+        - Seed 100,000 audit log entries
+      steps:
+        - GET /api/quality/audit-trail?page=1&limit=50
+        - Measure response time
+      assertions:
+        - Response time < 500ms
+
+    - name: "Audit trail export performance"
+      setup:
+        - Seed 10,000 audit log entries
+      steps:
+        - POST /api/quality/audit-trail/export with {format: 'csv'}
+        - Measure export time
+      assertions:
+        - Export completes within 10 seconds
+
+    - name: "Full-text search performance"
+      setup:
+        - Seed 50,000 audit log entries
+      steps:
+        - GET /api/quality/audit-trail?search=corrective
+        - Measure response time
+      assertions:
+        - Response time < 1 second
+        - Full-text index used (verify EXPLAIN plan)

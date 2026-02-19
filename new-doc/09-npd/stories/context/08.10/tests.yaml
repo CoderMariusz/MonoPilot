@@ -1,0 +1,354 @@
+# Story 08.10 - Test Specifications
+# Purpose: Acceptance criteria and test cases for Risk Management
+# Agent: TEST-WRITER, QA-AGENT
+
+# Test file paths
+test_files:
+  unit:
+    - path: "lib/services/risk-service.test.ts"
+      description: "Unit tests for risk service"
+
+  integration:
+    - path: "apps/frontend/app/api/npd/projects/[projectId]/risks/route.test.ts"
+      description: "Integration tests for list risks endpoint"
+    - path: "apps/frontend/app/api/npd/risks/route.test.ts"
+      description: "Integration tests for create risk endpoint"
+    - path: "apps/frontend/app/api/npd/risks/[id]/route.test.ts"
+      description: "Integration tests for update/delete risk endpoints"
+    - path: "apps/frontend/app/api/npd/projects/[projectId]/risks/matrix/route.test.ts"
+      description: "Integration tests for risk matrix endpoint"
+
+  e2e:
+    - path: "e2e/npd-risks.spec.ts"
+      description: "E2E tests for risk management workflow"
+
+# Unit Tests
+unit_tests:
+  file: "lib/services/risk-service.test.ts"
+
+  suites:
+    - describe: "RiskService"
+
+      tests:
+        - describe: "listRisks"
+          tests:
+            - it: "returns risks for project sorted by score DESC"
+              given: "project has 5 risks with varying scores"
+              when: "listRisks(projectId) called"
+              then: "returns risks sorted by risk_score DESC (highest first)"
+
+            - it: "filters by status"
+              given: "project has 3 open, 2 mitigated, 1 closed risks"
+              when: "listRisks(projectId, { status: 'open' })"
+              then: "returns only 3 open risks"
+
+            - it: "filters by min_score"
+              given: "risks with scores: 5, 12, 20, 25"
+              when: "listRisks(projectId, { min_score: 12 })"
+              then: "returns only risks with score >= 12 (3 risks)"
+
+            - it: "returns summary counts"
+              given: "project has risks with varying scores and statuses"
+              when: "listRisks(projectId)"
+              then: "returns summary with total, open, critical, high counts"
+
+        - describe: "createRisk"
+          tests:
+            - it: "creates risk with auto-calculated score"
+              given: "likelihood = 4, impact = 5"
+              when: "createRisk({ likelihood: 4, impact: 5, ... })"
+              then: "risk created with risk_score = 20"
+
+            - it: "rejects invalid likelihood"
+              given: "likelihood = 0"
+              when: "createRisk({ likelihood: 0, ... })"
+              then: "throws validation error"
+
+            - it: "allows null owner_id"
+              given: "owner_id = null"
+              when: "createRisk({ owner_id: null, ... })"
+              then: "risk created with owner_id = null (unassigned)"
+
+        - describe: "updateRisk"
+          tests:
+            - it: "updates risk and recalculates score"
+              given: "risk with likelihood = 3, impact = 4 (score = 12)"
+              when: "updateRisk(id, { impact: 5 })"
+              then: "risk updated with score = 15 (3 × 5)"
+
+            - it: "allows status change to mitigated"
+              given: "risk with status = 'open'"
+              when: "updateRisk(id, { status: 'mitigated' })"
+              then: "risk status updated to 'mitigated'"
+
+        - describe: "deleteRisk"
+          tests:
+            - it: "deletes risk by ID"
+              given: "risk exists"
+              when: "deleteRisk(id)"
+              then: "risk deleted from database"
+
+        - describe: "getRiskMatrix"
+          tests:
+            - it: "returns 5x5 matrix with risk counts"
+              given: "project with risks at [5,5], [4,4], [2,3]"
+              when: "getRiskMatrix(projectId)"
+              then: "returns 5x5 matrix with counts: [5,5]=1, [4,4]=1, [2,3]=1, rest=0"
+
+            - it: "categorizes severity correctly"
+              given: "risks with scores 5, 12, 20, 25"
+              when: "getRiskMatrix(projectId)"
+              then: "cells have severity: 5=low, 12=high, 20=critical, 25=critical"
+
+        - describe: "calculateSeverity"
+          tests:
+            - it: "returns 'critical' for score 20-25"
+              expect: "calculateSeverity(20) === 'critical'"
+              expect: "calculateSeverity(25) === 'critical'"
+
+            - it: "returns 'high' for score 12-19"
+              expect: "calculateSeverity(12) === 'high'"
+              expect: "calculateSeverity(19) === 'high'"
+
+            - it: "returns 'medium' for score 6-11"
+              expect: "calculateSeverity(6) === 'medium'"
+              expect: "calculateSeverity(11) === 'medium'"
+
+            - it: "returns 'low' for score 1-5"
+              expect: "calculateSeverity(1) === 'low'"
+              expect: "calculateSeverity(5) === 'low'"
+
+# Integration Tests
+integration_tests:
+  file: "apps/frontend/app/api/npd/projects/[projectId]/risks/route.test.ts"
+
+  suites:
+    - describe: "GET /api/npd/projects/:projectId/risks"
+
+      tests:
+        - it: "returns risks for project"
+          given: "project with 5 risks"
+          when: "GET /api/npd/projects/123/risks"
+          then: "returns 200 with 5 risks and summary"
+
+        - it: "filters by status query param"
+          given: "project with mixed status risks"
+          when: "GET /api/npd/projects/123/risks?status=open"
+          then: "returns only open risks"
+
+        - it: "sorts by risk_score DESC by default"
+          given: "risks with scores 5, 20, 12"
+          when: "GET /api/npd/projects/123/risks"
+          then: "returns risks in order: 20, 12, 5"
+
+        - it: "returns 401 for unauthenticated"
+          given: "no auth token"
+          when: "GET /api/npd/projects/123/risks"
+          then: "returns 401 Unauthorized"
+
+        - it: "returns 404 for non-existent project"
+          given: "projectId = 999 (does not exist)"
+          when: "GET /api/npd/projects/999/risks"
+          then: "returns 404 Not Found"
+
+    - describe: "POST /api/npd/risks"
+
+      tests:
+        - it: "creates risk with valid data"
+          given: "user has NPD_LEAD role"
+          when: "POST /api/npd/risks with valid data"
+          then: "returns 201 with created risk (risk_score auto-calculated)"
+
+        - it: "rejects risk description < 10 chars"
+          given: "risk_description = 'Short'"
+          when: "POST /api/npd/risks"
+          then: "returns 400 with validation error"
+
+        - it: "rejects invalid likelihood/impact"
+          given: "likelihood = 6 (out of range 1-5)"
+          when: "POST /api/npd/risks"
+          then: "returns 400 with validation error"
+
+        - it: "rejects non-NPD-LEAD/R&D roles"
+          given: "user has VIEWER role"
+          when: "POST /api/npd/risks"
+          then: "returns 403 Forbidden"
+
+    - describe: "PUT /api/npd/risks/:id"
+
+      tests:
+        - it: "updates risk with valid data"
+          given: "risk exists and user is NPD_LEAD"
+          when: "PUT /api/npd/risks/123 with updated data"
+          then: "returns 200 with updated risk (score recalculated)"
+
+        - it: "allows R&D user to update own risk"
+          given: "user is R&D and owner of risk"
+          when: "PUT /api/npd/risks/123"
+          then: "returns 200 with updated risk"
+
+        - it: "blocks R&D user from updating others' risks"
+          given: "user is R&D but NOT owner"
+          when: "PUT /api/npd/risks/123"
+          then: "returns 403 Forbidden"
+
+    - describe: "DELETE /api/npd/risks/:id"
+
+      tests:
+        - it: "deletes risk (NPD_LEAD only)"
+          given: "user has NPD_LEAD role"
+          when: "DELETE /api/npd/risks/123"
+          then: "returns 204 No Content and risk deleted"
+
+        - it: "blocks non-NPD-LEAD from deleting"
+          given: "user has R&D role"
+          when: "DELETE /api/npd/risks/123"
+          then: "returns 403 Forbidden"
+
+# E2E Tests
+e2e_tests:
+  file: "e2e/npd-risks.spec.ts"
+
+  suites:
+    - describe: "Risk Management Workflow"
+
+      tests:
+        - it: "full risk CRUD workflow"
+          steps:
+            - "Login as NPD Lead"
+            - "Navigate to project detail page"
+            - "Click Risks tab"
+            - "Verify risk list loads"
+            - "Click [+ Add Risk]"
+            - "Fill form: description, likelihood=5, impact=5"
+            - "Verify risk_score displays 25 (auto-calculated)"
+            - "Click Save"
+            - "Verify toast 'Risk added successfully'"
+            - "Verify risk appears at top of list (highest score)"
+            - "Click Edit on created risk"
+            - "Change impact to 3"
+            - "Verify risk_score updates to 15"
+            - "Click Save"
+            - "Verify risk moves down in list (sorted by score)"
+            - "Click Delete"
+            - "Confirm deletion"
+            - "Verify risk removed from list"
+
+        - it: "risk matrix visualization"
+          steps:
+            - "Login as NPD Lead"
+            - "Navigate to project with risks"
+            - "Click Risks tab"
+            - "Click [Risk Matrix] button"
+            - "Verify 5×5 grid displays"
+            - "Verify cells with risks show count badges"
+            - "Verify cell colors match severity"
+            - "Click cell [5,5] with 2 risks"
+            - "Verify tooltip shows 2 risk names"
+            - "Verify legend shows severity color mapping"
+
+        - it: "risk filtering and sorting"
+          steps:
+            - "Navigate to project with 10 risks (mixed status)"
+            - "Open Risks tab"
+            - "Select Status filter: Open"
+            - "Verify only open risks display"
+            - "Select Owner filter: John Doe"
+            - "Verify only John's risks display"
+            - "Set Score threshold: ≥12"
+            - "Verify only high/critical risks display"
+            - "Click Clear Filters"
+            - "Verify all risks display again"
+
+        - it: "permission-based access"
+          steps:
+            - "Login as VIEWER"
+            - "Navigate to project risks"
+            - "Verify [+ Add Risk] button hidden"
+            - "Verify Edit/Delete buttons hidden in table"
+            - "Verify risk list is read-only"
+            - "Click risk row to view detail"
+            - "Verify detail modal shows risk info"
+
+# Acceptance Criteria Coverage
+acceptance_criteria:
+  risk_crud:
+    - criterion: "Create risk with auto-calculated score"
+      test: "integration: POST /api/npd/risks"
+      status: "covered"
+
+    - criterion: "Update risk recalculates score"
+      test: "unit: RiskService.updateRisk"
+      status: "covered"
+
+    - criterion: "Delete risk (NPD_LEAD only)"
+      test: "integration: DELETE /api/npd/risks/:id"
+      status: "covered"
+
+  risk_scoring:
+    - criterion: "Risk score = likelihood × impact"
+      test: "unit: calculate_risk_score trigger"
+      status: "covered"
+
+    - criterion: "Severity categorization"
+      test: "unit: RiskService.calculateSeverity"
+      status: "covered"
+
+  risk_matrix:
+    - criterion: "5×5 matrix visualization"
+      test: "e2e: risk matrix visualization"
+      status: "covered"
+
+    - criterion: "Matrix cells color-coded by severity"
+      test: "unit: getRiskMatrix"
+      status: "covered"
+
+  filtering_sorting:
+    - criterion: "Filter by status, owner, score"
+      test: "e2e: risk filtering and sorting"
+      status: "covered"
+
+    - criterion: "Sort by score DESC (default)"
+      test: "integration: GET risks with sort"
+      status: "covered"
+
+  permissions:
+    - criterion: "NPD_LEAD/R&D can create"
+      test: "integration: POST /api/npd/risks"
+      status: "covered"
+
+    - criterion: "R&D can edit own risks only"
+      test: "integration: PUT /api/npd/risks/:id (permission check)"
+      status: "covered"
+
+    - criterion: "Only NPD_LEAD can delete"
+      test: "integration: DELETE /api/npd/risks/:id"
+      status: "covered"
+
+# Test data fixtures
+fixtures:
+  risk_low:
+    npd_project_id: 123
+    risk_description: "Minor packaging design issue that could delay launch"
+    likelihood: 2
+    impact: 2
+    risk_score: 4
+    status: "open"
+    owner_id: null
+
+  risk_critical:
+    npd_project_id: 123
+    risk_description: "Supplier lead time延长 delays launch by 6 months, impacting market window"
+    likelihood: 5
+    impact: 5
+    risk_score: 25
+    mitigation_plan: "Identify backup suppliers in 3 different regions"
+    status: "open"
+    owner_id: "user-123"
+
+# Coverage targets
+coverage:
+  unit: ">= 90%"
+  integration: ">= 85%"
+  e2e: "Critical paths covered"
+  overall: ">= 90%"

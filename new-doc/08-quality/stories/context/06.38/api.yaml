@@ -1,0 +1,144 @@
+# Story 06.38 - Audit Trail API Context
+
+endpoints:
+  - method: GET
+    path: /api/quality/audit-trail
+    description: "Query audit trail with filters and pagination"
+    auth: true
+    roles: [QA_INSPECTOR, QA_MANAGER, QUALITY_DIRECTOR]
+    query_params:
+      - entity_type: string (inspection, ncr, capa, etc.)
+      - entity_id: UUID
+      - action: string (create, update, delete, approve, etc.)
+      - user_id: UUID
+      - date_from: string (ISO date)
+      - date_to: string (ISO date)
+      - search: string (full-text search on change_reason, notes)
+      - include_archived: boolean (default false)
+      - sort_by: 'action_timestamp' | 'entity_type' | 'user_name'
+      - sort_order: 'asc' | 'desc'
+      - page: number
+      - limit: number (default 50, max 100)
+    response:
+      audit_logs: AuditLogEntry[]
+      pagination: { total, page, limit, pages }
+
+  - method: GET
+    path: /api/quality/audit-trail/:id
+    description: "Get audit log entry detail with diff"
+    auth: true
+    roles: [QA_INSPECTOR, QA_MANAGER, QUALITY_DIRECTOR]
+    response:
+      audit_log: AuditLogEntry
+      diff:
+        field_name: string
+        old_value: any
+        new_value: any
+        diff_html: string (HTML-formatted diff)
+
+  - method: POST
+    path: /api/quality/audit-trail/export
+    description: "Export audit trail as CSV or PDF"
+    auth: true
+    roles: [QA_MANAGER, QUALITY_DIRECTOR]
+    body:
+      - format: 'csv' | 'pdf'
+      - entity_type: string (optional)
+      - entity_id: UUID (optional)
+      - action: string (optional)
+      - user_id: UUID (optional)
+      - date_from: string (optional)
+      - date_to: string (optional)
+      - include_archived: boolean (default false)
+    response:
+      file_url: string (signed URL, expires in 1 hour)
+      filename: string
+      generated_at: string (ISO timestamp)
+      record_count: number
+
+service_methods:
+  - name: list
+    params:
+      - params: AuditTrailListParams
+    returns: PaginatedResult<AuditLogEntry>
+    logic: |
+      1. Build query with filters (entity_type, action, user, date range)
+      2. Apply RLS filter (org_id)
+      3. Full-text search on change_reason + notes if search param
+      4. Sort by action_timestamp DESC (default)
+      5. Paginate (limit 50 per page)
+      6. Return results with pagination metadata
+
+  - name: getById
+    params:
+      - id: string
+    returns: AuditLogEntryWithDiff | null
+    logic: |
+      1. Query audit log entry by ID
+      2. Apply RLS filter (org_id)
+      3. Generate diff HTML for old_value vs new_value
+      4. Return entry with diff
+
+  - name: getChangeHistory
+    params:
+      - entityType: string
+      - entityId: string
+    returns: AuditLogEntry[]
+    logic: |
+      1. Query all audit logs for entity_id
+      2. Order by action_timestamp ASC (chronological)
+      3. Return full change history
+
+  - name: exportCSV
+    params:
+      - params: AuditTrailExportParams
+    returns: { url: string, filename: string }
+    logic: |
+      1. Query audit logs with filters (no pagination)
+      2. Generate CSV with columns: timestamp, entity_type, entity_id, action, field_name, old_value, new_value, user_name, user_email, change_reason
+      3. Upload CSV to Supabase Storage
+      4. Generate signed URL (expires in 1 hour)
+      5. Return URL and filename
+
+  - name: exportPDF
+    params:
+      - params: AuditTrailExportParams
+    returns: { url: string, filename: string }
+    logic: |
+      1. Query audit logs with filters
+      2. Render HTML template with audit log table
+      3. Use Puppeteer to generate PDF
+      4. Upload PDF to Supabase Storage
+      5. Generate signed URL
+      6. Return URL and filename
+
+  - name: generateDiffHTML
+    params:
+      - oldValue: any (JSONB)
+      - newValue: any (JSONB)
+    returns: string (HTML diff)
+    logic: |
+      1. Parse old and new values as JSON
+      2. Use diff library (e.g., diff-match-patch) to generate diff
+      3. Format diff as HTML with color coding:
+         - Removed values: red strikethrough
+         - Added values: green highlight
+         - Unchanged: gray
+      4. Return HTML string
+
+performance_targets:
+  - GET /api/quality/audit-trail: <500ms for 50 records
+  - POST /api/quality/audit-trail/export (CSV): <10s for 10,000 records
+  - POST /api/quality/audit-trail/export (PDF): <15s for 1,000 records
+
+validation:
+  - entity_type: Must be valid enum value
+  - date_from, date_to: ISO date format, date_to >= date_from
+  - format: Must be 'csv' or 'pdf'
+  - limit: Integer between 1 and 100
+
+error_handling:
+  - 404: Audit log entry not found (or cross-org access blocked)
+  - 400: Invalid query parameters
+  - 403: Insufficient permissions (export requires QA_MANAGER)
+  - 500: Export timeout or generation failure

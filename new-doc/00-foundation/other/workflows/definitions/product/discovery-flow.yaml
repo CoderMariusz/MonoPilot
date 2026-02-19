@@ -1,0 +1,568 @@
+# Discovery Flow Workflow
+# Structured interview and requirements gathering before planning
+# Ensures complete project understanding before development begins
+#
+# Documentation: @.claude/workflows/documentation/DISCOVERY-FLOW.md
+# Outputs to: @.claude/workflows/documentation/PLANNING-FLOW.md
+#             @.claude/workflows/documentation/EPIC-WORKFLOW.md
+#             @.claude/workflows/documentation/MIGRATION-WORKFLOW.md
+
+name: discovery-flow
+description: Structured discovery workflow - from trigger to validated understanding
+trigger: "discovery | new_project | migration | new_epic | unclear_requirements"
+
+# Expected duration: 45-60 minutes depending on depth
+# Parallelization: Phase 3 agents run in parallel
+
+modes:
+  - id: deep
+    description: "Full discovery for new greenfield projects"
+    triggers:
+      - "new_project"
+      - "greenfield"
+    clarity_target: 85
+    phases: [initial_scan, interview, domain_questions, gap_analysis, confirmation]
+
+  - id: quick
+    description: "Quick context gathering for migrations"
+    triggers:
+      - "migration"
+    clarity_target: 50
+    phases: [initial_scan, interview, confirmation]
+    skip_if: "scan found complete docs"
+
+  - id: standard
+    description: "Standard discovery for new epics"
+    triggers:
+      - "new_epic"
+    clarity_target: 70
+    phases: [interview, domain_questions, gap_analysis, confirmation]
+    skip_phases: [initial_scan]
+
+  - id: targeted
+    description: "Quick targeted clarification"
+    triggers:
+      - "unclear_requirements"
+      - "clarification"
+    clarity_target: 90
+    phases: [gap_analysis, confirmation]
+    skip_phases: [initial_scan, interview, domain_questions]
+
+# Input sources
+inputs:
+  optional:
+    - type: existing_project
+      source: "project root"
+      description: "Existing project files to scan"
+
+    - type: project_brief
+      source: "docs/1-BASELINE/product/project-brief.md"
+      description: "Initial project brief if available"
+
+    - type: user_context
+      source: "{user_input}"
+      description: "Context provided by user"
+
+    - type: external_docs
+      source: "{external_refs}"
+      description: "External documentation or specs"
+
+# Main workflow phases
+phases:
+
+  # ===================================================================
+  # PHASE 1: INITIAL SCAN (Quick)
+  # ===================================================================
+  - id: initial_scan
+    name: "Initial Scan"
+    description: "Quick overview of project structure and existing documentation"
+    agent: DOC-AUDITOR
+    model: opus
+    type: scan
+    duration: "5-10 minutes"
+
+    why_matters:
+      delivers: "Quick overview of project structure and existing documentation"
+      if_skipped: "Miss existing docs, duplicate work, overlook constraints"
+      prevents: "Reinventing the wheel, conflicting with existing decisions"
+
+    activities:
+      - "Scan project directory structure"
+      - "Identify existing documentation files"
+      - "List key configuration files"
+      - "Note technology indicators (package.json, requirements.txt, etc.)"
+      - "Create initial overview document"
+
+    output:
+      deliverable: "docs/0-DISCOVERY/INITIAL-SCAN.md"
+
+    checkpoint:
+      - "Project structure mapped"
+      - "Existing documentation identified"
+      - "Key files listed"
+      - "Technology stack indicators noted"
+
+    gate:
+      id: SCAN_COMPLETE
+      type: quality_gate
+      enforcer: DOC-AUDITOR
+      pass: interview
+      blocking: interview
+
+    on_blocked:
+      action: expand_scan_scope
+      recovery: "Re-run scan with expanded scope"
+
+  # ===================================================================
+  # PHASE 2: DISCOVERY INTERVIEW
+  # ===================================================================
+  - id: interview
+    name: "Discovery Interview"
+    description: "Conduct structured interview to capture core understanding"
+    agent: DISCOVERY-AGENT
+    model: opus
+    model_complex: opus
+    type: interview
+    duration: "15-30 minutes"
+
+    why_matters:
+      delivers: "Core understanding of project goals, users, and requirements"
+      if_skipped: "Building wrong product, misaligned expectations"
+      prevents: "Scope creep, wasted development, user dissatisfaction"
+
+    interview_structure:
+      vision_goals:
+        - "What is the primary purpose of this project?"
+        - "What problem does it solve?"
+        - "What does success look like?"
+
+      users_personas:
+        - "Who are the target users?"
+        - "What are their main pain points?"
+        - "How tech-savvy are they?"
+
+      features_requirements:
+        - "What are the must-have features?"
+        - "What are nice-to-have features?"
+        - "Are there any features explicitly out of scope?"
+
+      constraints:
+        - "What is the timeline?"
+        - "What is the budget (if applicable)?"
+        - "Are there technical constraints?"
+        - "Are there regulatory/compliance requirements?"
+
+      context:
+        - "Is this a new project or replacing something?"
+        - "Are there existing systems to integrate with?"
+        - "Who are the stakeholders?"
+
+    activities:
+      - "Conduct structured interview with user"
+      - "Ask clarifying questions"
+      - "Document all answers"
+      - "Identify follow-up questions"
+
+    output:
+      deliverables:
+        - path: "docs/0-DISCOVERY/PROJECT-UNDERSTANDING.md"
+          condition: "default"
+        - path: "docs/0-DISCOVERY/MIGRATION-CONTEXT.md"
+          condition: "migration trigger"
+
+    checkpoint:
+      - "All structured questions answered"
+      - "Goals and vision documented"
+      - "Target users identified"
+      - "Key requirements captured"
+      - "Constraints documented"
+
+    gate:
+      id: INTERVIEW_COMPLETE
+      type: quality_gate
+      enforcer: DISCOVERY-AGENT
+      pass: domain_questions
+      blocking: domain_questions
+
+    on_blocked:
+      action: schedule_followup
+      recovery: "Schedule follow-up interview session"
+
+  # ===================================================================
+  # PHASE 3: DOMAIN-SPECIFIC QUESTIONS (Parallel)
+  # ===================================================================
+  - id: domain_questions
+    name: "Domain-Specific Questions"
+    description: "Deep domain understanding from technical, business, and research perspectives"
+    type: parallel_execution
+    duration: "10-20 minutes"
+
+    why_matters:
+      delivers: "Deep domain understanding from technical, business, and research perspectives"
+      if_skipped: "Miss critical technical/business requirements"
+      prevents: "Architecture mismatches, market misalignment, unknown unknowns"
+
+    parallel_agents:
+      - id: technical_discovery
+        agent: ARCHITECT-AGENT
+        model: opus
+        description: "Technical requirements discovery"
+        questions:
+          - "What is the preferred tech stack?"
+          - "Are there existing systems to integrate with?"
+          - "What are the scale requirements? (users, data, transactions)"
+          - "What are the security requirements? (auth, data sensitivity, compliance)"
+          - "What are the performance requirements? (response time, availability)"
+          - "What is the deployment environment? (cloud, on-prem, CI/CD)"
+
+      - id: business_discovery
+        agent: PM-AGENT
+        model: opus
+        description: "Business context discovery"
+        questions:
+          - "What is the market context? (target, size, growth)"
+          - "Who are the competitors? (direct, indirect, advantages)"
+          - "What is the business model? (revenue, pricing)"
+          - "What are the success metrics? (KPIs, measurement)"
+          - "What are the priorities? (time-to-market, quality, cost)"
+
+      - id: research_discovery
+        agent: RESEARCH-AGENT
+        model: opus
+        optional: true
+        description: "Knowledge gap discovery"
+        questions:
+          - "What do we NOT know yet? (technical, market, user unknowns)"
+          - "What needs research? (tech eval, competitor analysis, user research)"
+          - "What assumptions are we making?"
+          - "What could invalidate our approach? (risks, dependencies, external factors)"
+
+    output:
+      deliverable: "docs/0-DISCOVERY/PROJECT-UNDERSTANDING.md"
+      update_mode: "merge domain sections"
+
+    checkpoint:
+      - "Technical requirements understood"
+      - "Business context clear"
+      - "Unknowns documented"
+      - "All domain sections complete"
+
+    gate:
+      id: DOMAINS_COVERED
+      type: quality_gate
+      enforcer: ORCHESTRATOR
+      pass: gap_analysis
+      blocking: gap_analysis
+
+    on_blocked:
+      action: focused_session
+      recovery: "Schedule focused session for incomplete domains"
+
+    conflict_resolution:
+      trigger: "Conflicting information from domains"
+      action: joint_session
+      agents: [ARCHITECT-AGENT, PM-AGENT, RESEARCH-AGENT]
+      outcome: "Resolve conflicts and update PROJECT-UNDERSTANDING.md"
+
+  # ===================================================================
+  # PHASE 4: GAP ANALYSIS
+  # ===================================================================
+  - id: gap_analysis
+    name: "Gap Analysis"
+    description: "Identify remaining gaps and propose resolution strategies"
+    agents: [DOC-AUDITOR, DISCOVERY-AGENT]
+    model: opus
+    type: analysis
+    duration: "10-15 minutes"
+
+    why_matters:
+      delivers: "Clear list of what we still don't know and how to resolve it"
+      if_skipped: "Proceed with hidden gaps, face surprises later"
+      prevents: "Late-stage discoveries, blocked development, incorrect assumptions"
+
+    activities:
+      - "Review all discovery outputs"
+      - "Identify remaining gaps"
+      - "List open questions"
+      - "Prioritize unknowns by impact"
+      - "Determine if gaps are blocking"
+      - "Propose resolution strategies"
+
+    gap_categories:
+      - category: blocking
+        examples: "Missing security requirements"
+        resolution: "Must resolve before planning"
+
+      - category: important
+        examples: "Unclear performance targets"
+        resolution: "Resolve during planning"
+
+      - category: minor
+        examples: "Nice-to-have feature details"
+        resolution: "Resolve during development"
+
+      - category: deferred
+        examples: "Future integrations"
+        resolution: "Document for later"
+
+    input:
+      context_refs:
+        - "@docs/0-DISCOVERY/PROJECT-UNDERSTANDING.md"
+        - "@docs/0-DISCOVERY/INITIAL-SCAN.md"
+
+    output:
+      deliverable: "docs/0-DISCOVERY/GAPS-AND-QUESTIONS.md"
+
+    checkpoint:
+      - "All gaps documented"
+      - "Open questions listed"
+      - "Priorities assigned (Blocking/Important/Minor/Deferred)"
+      - "Resolution strategies proposed"
+      - "No blocking gaps remaining OR resolution plan in place"
+
+    gate:
+      id: GAPS_IDENTIFIED
+      type: quality_gate
+      enforcer: DOC-AUDITOR
+      pass: confirmation
+      blocking: confirmation
+
+    on_blocked:
+      action: return_to_phase
+      target: interview
+      recovery: "Return to Phase 2 or 3 for specific gap resolution"
+
+  # ===================================================================
+  # PHASE 5: CONFIRMATION
+  # ===================================================================
+  - id: confirmation
+    name: "Confirmation"
+    description: "Present understanding summary and get user validation"
+    agent: ORCHESTRATOR
+    model: opus
+    type: confirmation
+    duration: "5 minutes"
+
+    why_matters:
+      delivers: "User-validated understanding document"
+      if_skipped: "Proceed with unvalidated assumptions"
+      prevents: "Misunderstandings, wrong direction, wasted effort"
+
+    activities:
+      - "Compile understanding summary"
+      - "Present to user in clear format"
+      - "Highlight key decisions and assumptions"
+      - "Ask for explicit confirmation"
+      - "Handle corrections and additions"
+      - "Finalize documentation"
+
+    summary_template:
+      sections:
+        - "Project Overview"
+        - "Key Goals"
+        - "Target Users"
+        - "Must-Have Features"
+        - "Technical Approach"
+        - "Business Context"
+        - "Key Assumptions"
+        - "Open Questions (Non-Blocking)"
+      footer: "Please confirm this understanding is correct or provide corrections."
+
+    input:
+      context_refs:
+        - "@docs/0-DISCOVERY/PROJECT-UNDERSTANDING.md"
+        - "@docs/0-DISCOVERY/GAPS-AND-QUESTIONS.md"
+
+    output:
+      deliverable: "docs/0-DISCOVERY/PROJECT-UNDERSTANDING.md"
+      status: "approved"
+
+    checkpoint:
+      - "Summary presented to user"
+      - "User reviewed all sections"
+      - "User confirmed accuracy OR provided corrections"
+      - "Corrections incorporated"
+      - "PROJECT-UNDERSTANDING.md marked as approved"
+
+    gate:
+      id: USER_CONFIRMED
+      type: approval_gate
+      enforcer: user
+      blocking: next_workflow
+
+    on_blocked:
+      action: address_corrections
+      recovery: "Address user corrections, re-present summary"
+
+    on_rejection:
+      action: identify_incorrect_sections
+      return_to: "appropriate phase (interview, domain_questions, or gap_analysis)"
+
+# ===================================================================
+# QUALITY GATES
+# ===================================================================
+quality_gates:
+  scan_to_interview:
+    - project_structure_mapped
+    - existing_docs_identified
+
+  interview_to_domains:
+    - all_questions_answered
+    - goals_documented
+    - users_identified
+    - requirements_captured
+
+  domains_to_gaps:
+    - technical_requirements_understood
+    - business_context_clear
+    - unknowns_documented
+
+  gaps_to_confirmation:
+    - all_gaps_documented
+    - priorities_assigned
+    - no_blocking_gaps OR resolution_plan_exists
+
+  confirmation_to_next:
+    - user_confirmed
+    - corrections_incorporated
+    - document_approved
+
+# ===================================================================
+# ERROR HANDLING
+# ===================================================================
+on_error:
+  log_to: "@.claude/logs/workflows/"
+  retry_count: 1
+  escalate_to: user
+
+error_recovery:
+  incomplete_scan:
+    phase: initial_scan
+    action: expand_scope
+    message: "Scan incomplete - expanding scope and re-running"
+
+  interview_gaps:
+    phase: interview
+    action: schedule_followup
+    message: "Key questions unanswered - scheduling follow-up session"
+
+  domain_conflicts:
+    phase: domain_questions
+    action: joint_session
+    agents: [ARCHITECT-AGENT, PM-AGENT, RESEARCH-AGENT]
+    message: "Conflicting domain information - convening joint session"
+
+  blocking_gaps:
+    phase: gap_analysis
+    action: return_to_phase
+    target: interview
+    message: "Blocking gaps identified - returning to gather more information"
+
+  user_rejects_summary:
+    phase: confirmation
+    action: identify_corrections
+    message: "Understanding incorrect - identifying sections to update"
+
+# ===================================================================
+# ARTIFACTS
+# ===================================================================
+artifacts:
+  initial_scan:
+    path: "docs/0-DISCOVERY/INITIAL-SCAN.md"
+    created_by: initial_scan
+    description: "Quick project overview from scan"
+
+  project_understanding:
+    path: "docs/0-DISCOVERY/PROJECT-UNDERSTANDING.md"
+    created_by: interview
+    updated_by: [domain_questions, confirmation]
+    description: "Core project understanding document"
+
+  migration_context:
+    path: "docs/0-DISCOVERY/MIGRATION-CONTEXT.md"
+    created_by: interview
+    condition: "migration trigger"
+    description: "Migration-specific context document"
+
+  gaps_and_questions:
+    path: "docs/0-DISCOVERY/GAPS-AND-QUESTIONS.md"
+    created_by: gap_analysis
+    description: "Open items and resolution strategies"
+
+# ===================================================================
+# NEXT WORKFLOW ROUTING
+# ===================================================================
+next_workflow:
+  default:
+    workflow: "definitions/product/planning-flow.yaml"
+    passes:
+      - "docs/0-DISCOVERY/PROJECT-UNDERSTANDING.md"
+      - "docs/0-DISCOVERY/GAPS-AND-QUESTIONS.md"
+
+  epic_trigger:
+    workflow: "documentation/EPIC-WORKFLOW.md"
+    start_at: "Phase 1: Discovery"
+    note: "Phase 1 can be shortened since discovery complete"
+    passes:
+      - "docs/0-DISCOVERY/PROJECT-UNDERSTANDING.md (Epic section)"
+      - "Domain requirements"
+
+  migration_trigger:
+    workflow: "documentation/MIGRATION-WORKFLOW.md"
+    passes:
+      - "docs/0-DISCOVERY/MIGRATION-CONTEXT.md"
+      - "docs/0-DISCOVERY/GAPS-AND-QUESTIONS.md"
+
+# ===================================================================
+# STATE UPDATES
+# ===================================================================
+state_updates:
+  on_complete:
+    file: "PROJECT-STATE.md"
+    updates:
+      phase: "Planning (or appropriate next phase)"
+      last_activity: "Discovery completed"
+      discovery_status: "COMPLETE"
+      next: "{PLANNING-FLOW | EPIC-WORKFLOW | MIGRATION-FLOW}"
+      key_outputs:
+        - "PROJECT-UNDERSTANDING.md (approved)"
+        - "GAPS-AND-QUESTIONS.md"
+
+# ===================================================================
+# METRICS
+# ===================================================================
+metrics:
+  track:
+    - name: trigger_type
+      description: "new/migration/epic/unclear"
+      update_when: "Discovery start"
+
+    - name: scan_duration
+      description: "Phase 1 time"
+      update_when: "Phase 1 complete"
+
+    - name: interview_duration
+      description: "Phase 2 time"
+      update_when: "Phase 2 complete"
+
+    - name: domain_questions_duration
+      description: "Phase 3 time"
+      update_when: "Phase 3 complete"
+
+    - name: gaps_found
+      description: "Count of gaps identified"
+      update_when: "Phase 4 complete"
+
+    - name: blocking_gaps
+      description: "Count of blocking gaps"
+      update_when: "Phase 4 complete"
+
+    - name: confirmation_cycles
+      description: "Times summary was rejected"
+      update_when: "Phase 5 complete"
+
+    - name: total_duration
+      description: "Start to USER_CONFIRMED"
+      update_when: "Discovery complete"
+
+  store_in: "@.claude/state/METRICS.md"

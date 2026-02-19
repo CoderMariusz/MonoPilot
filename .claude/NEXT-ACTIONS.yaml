@@ -1,29 +1,30 @@
 # MonoPilot - Next Actions Index
 # Quick-reference: what to work on next per epic
 # Full details: IMPLEMENTATION-ROADMAP.yaml (load only when needed)
-# Updated: 2026-02-10
+# Updated: 2026-02-10 (full audit: 03.13+07.*+06.* confirmed, 01.17+02.16 starting P2)
 
 next_actions:
   epic_01_settings:
     status: "62% (16/26)"
     next_story: "01.17"
     next_name: "Audit Trail"
-    next_phase: "P2 (tests)"
+    next_phase: "P3 (implementation) - P2 tests written 32 tests"
     blocker: null
 
   epic_02_technical:
     status: "74% (17/23)"
     next_story: "02.16"
     next_name: "Product Advanced Features"
-    next_phase: "P2 (tests)"
+    next_phase: "P3 (implementation) - P2 tests written 38 tests"
     blocker: null
 
   epic_03_planning:
-    status: "95% (18/20)"
-    next_story: "03.13"
-    next_name: "Material Availability Check"
-    next_phase: "P4 (frontend + P5-P7)"
-    blocker: "03.14 deferred to Phase 2"
+    status: "100% Phase 1 (19/20, 03.14 deferred)"
+    next_story: null
+    next_name: "All Phase 1 stories complete"
+    next_phase: "Phase 2 (03.14 WO Advanced Scheduling)"
+    blocker: "03.14 requires Epic 04+05"
+    note: "03.13 completed+deployed 2026-01-19"
 
   epic_04_production:
     status: "100% Phase 0+1 (17/17)"
@@ -40,19 +41,20 @@ next_actions:
     blocker: null
 
   epic_06_quality:
-    status: "29% (12/41)"
-    next_story: "06.8"
-    next_name: "In-progress stories (06.8-06.11)"
-    next_phase: "P3 (implementation)"
+    status: "30% (12/40 deployed)"
+    next_story: "06.12"
+    next_name: "Batch Release Approval"
+    next_phase: "P3 (implementation) - P2 partial"
     blocker: null
+    note: "06.0-06.11 all deployed (12/12). 06.12 at P2. 06.13-06.40 unstarted (28 stories)."
 
   epic_07_shipping:
-    status: "46% (11/24)"
-    next_story: "07.3"
-    next_name: "SO Status Workflow"
-    next_phase: "P2 (tests)"
+    status: "100% Phase 1-2 (16/16), 0% Phase 3 (0/8)"
+    next_story: "07.17"
+    next_name: "Customer Advanced Features (Phase 3)"
+    next_phase: "P1 (planning)"
     blocker: null
-    also_ready: ["07.8", "07.9", "07.10", "07.11"]
+    note: "All 16 Phase 1-2 stories complete+deployed. Phase 3 = 07.17-07.24."
 
   epic_08_npd:
     status: "0% (no stories)"
@@ -80,8 +82,7 @@ next_actions:
 
 # Priority order for next work:
 priority_queue:
-  - {story: "03.13", epic: 3, reason: "Partial - finish frontend"}
-  - {story: "07.3", epic: 7, reason: "Active epic - SO Status"}
-  - {story: "07.8", epic: 7, reason: "Active epic - Pick List"}
-  - {story: "06.8", epic: 6, reason: "In progress - complete Phase 1-2A"}
-  - {story: "01.17", epic: 1, reason: "Security - Audit Trail"}
+  - {story: "01.17", epic: 1, reason: "P2 done (32 tests) - needs P3 implementation"}
+  - {story: "02.16", epic: 2, reason: "P2 done (38 tests) - needs P3 implementation"}
+  - {story: "06.12", epic: 6, reason: "At P2 partial - Batch Release Approval"}
+  - {story: "06.13", epic: 6, reason: "Next unstarted - NCR Workflow"}

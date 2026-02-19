@@ -1,0 +1,226 @@
+# Story 05.10 - Database Schema
+# Purpose: Tables, RLS policies, indexes, triggers, functions
+# Agent: BACKEND-DEV (database focus)
+
+migrations:
+  - path: "supabase/migrations/XXX_create_grn_number_sequences_table.sql"
+    type: "migration"
+    description: "GRN number sequence per org per year"
+  - path: "supabase/migrations/XXX_create_grns_table.sql"
+    type: "migration"
+    description: "GRN header table with status, source, audit fields"
+  - path: "supabase/migrations/XXX_create_grn_items_table.sql"
+    type: "migration"
+    description: "GRN items detail table with LP reference"
+  - path: "supabase/migrations/XXX_grn_functions_triggers.sql"
+    type: "migration"
+    description: "generate_grn_number function and aggregate trigger"
+
+tables:
+  - name: "grn_number_sequences"
+    description: "GRN number sequence per organization per year"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id) ON DELETE CASCADE" }
+      - { name: "year", type: "INTEGER", constraints: "NOT NULL" }
+      - { name: "current_value", type: "BIGINT", constraints: "NOT NULL DEFAULT 0" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT NOW()" }
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "UNIQUE(org_id, year)"
+
+  - name: "grns"
+    description: "Goods Receipt Note header - master document"
+    columns:
+      # Identity
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id) ON DELETE CASCADE" }
+      - { name: "grn_number", type: "TEXT", constraints: "NOT NULL" }
+      # Source Reference
+      - { name: "source_type", type: "TEXT", constraints: "NOT NULL CHECK (source_type IN ('po', 'to', 'production', 'return', 'adjustment'))" }
+      - { name: "po_id", type: "UUID", constraints: "REFERENCES purchase_orders(id)" }
+      - { name: "to_id", type: "UUID", constraints: "REFERENCES transfer_orders(id)" }
+      - { name: "asn_id", type: "UUID", constraints: "REFERENCES asns(id)" }
+      - { name: "supplier_id", type: "UUID", constraints: "REFERENCES suppliers(id)" }
+      # Receipt Info
+      - { name: "receipt_date", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT NOW()" }
+      - { name: "warehouse_id", type: "UUID", constraints: "NOT NULL REFERENCES warehouses(id)" }
+      - { name: "location_id", type: "UUID", constraints: "NOT NULL REFERENCES locations(id)" }
+      # Status
+      - { name: "status", type: "TEXT", constraints: "NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'completed', 'cancelled'))" }
+      # Aggregates (denormalized for performance)
+      - { name: "total_items", type: "INTEGER", constraints: "NOT NULL DEFAULT 0" }
+      - { name: "total_qty", type: "DECIMAL(15,4)", constraints: "NOT NULL DEFAULT 0" }
+      # Notes
+      - { name: "notes", type: "TEXT", constraints: "" }
+      # Audit - Creation
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT NOW()" }
+      - { name: "created_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      # Audit - Completion
+      - { name: "completed_at", type: "TIMESTAMPTZ", constraints: "" }
+      - { name: "completed_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      # Audit - Cancellation
+      - { name: "cancelled_at", type: "TIMESTAMPTZ", constraints: "" }
+      - { name: "cancelled_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "cancellation_reason", type: "TEXT", constraints: "" }
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_grns_org_status ON grns(org_id, status)"
+      - "idx_grns_org_number ON grns(org_id, grn_number)"
+      - "idx_grns_org_source ON grns(org_id, source_type)"
+      - "idx_grns_receipt_date ON grns(receipt_date)"
+      - "idx_grns_warehouse ON grns(warehouse_id)"
+      - "idx_grns_po ON grns(po_id) WHERE po_id IS NOT NULL"
+      - "idx_grns_to ON grns(to_id) WHERE to_id IS NOT NULL"
+      - "idx_grns_asn ON grns(asn_id) WHERE asn_id IS NOT NULL"
+      - "idx_grns_supplier ON grns(supplier_id) WHERE supplier_id IS NOT NULL"
+    constraints:
+      - "UNIQUE(org_id, grn_number)"
+      - "CHECK ((source_type = 'po' AND po_id IS NOT NULL) OR (source_type != 'po'))"
+      - "CHECK ((source_type = 'to' AND to_id IS NOT NULL) OR (source_type != 'to'))"
+
+  - name: "grn_items"
+    description: "GRN line items - detail records"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "grn_id", type: "UUID", constraints: "NOT NULL REFERENCES grns(id) ON DELETE CASCADE" }
+      # Product
+      - { name: "product_id", type: "UUID", constraints: "NOT NULL REFERENCES products(id)" }
+      # Source Line Reference
+      - { name: "po_line_id", type: "UUID", constraints: "REFERENCES purchase_order_lines(id)" }
+      - { name: "to_line_id", type: "UUID", constraints: "REFERENCES transfer_order_lines(id)" }
+      # Quantities
+      - { name: "ordered_qty", type: "DECIMAL(15,4)", constraints: "NOT NULL DEFAULT 0" }
+      - { name: "received_qty", type: "DECIMAL(15,4)", constraints: "NOT NULL CHECK (received_qty >= 0)" }
+      - { name: "uom", type: "TEXT", constraints: "NOT NULL" }
+      # Created LP Reference
+      - { name: "lp_id", type: "UUID", constraints: "REFERENCES license_plates(id)" }
+      # Tracking
+      - { name: "batch_number", type: "TEXT", constraints: "" }
+      - { name: "supplier_batch_number", type: "TEXT", constraints: "" }
+      - { name: "gtin", type: "TEXT", constraints: "" }
+      - { name: "catch_weight_kg", type: "DECIMAL(10,3)", constraints: "" }
+      - { name: "expiry_date", type: "DATE", constraints: "" }
+      - { name: "manufacture_date", type: "DATE", constraints: "" }
+      # Location (can differ from GRN header)
+      - { name: "location_id", type: "UUID", constraints: "NOT NULL REFERENCES locations(id)" }
+      # QA Status
+      - { name: "qa_status", type: "TEXT", constraints: "NOT NULL DEFAULT 'pending' CHECK (qa_status IN ('pending', 'passed', 'failed', 'quarantine'))" }
+      # Line Info
+      - { name: "line_number", type: "INTEGER", constraints: "NOT NULL" }
+      - { name: "notes", type: "TEXT", constraints: "" }
+    rls: true
+    rls_pattern: "grn_id IN (SELECT id FROM grns WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid()))"
+    indexes:
+      - "idx_grn_items_grn ON grn_items(grn_id)"
+      - "idx_grn_items_product ON grn_items(product_id)"
+      - "idx_grn_items_lp ON grn_items(lp_id) WHERE lp_id IS NOT NULL"
+      - "idx_grn_items_po_line ON grn_items(po_line_id) WHERE po_line_id IS NOT NULL"
+      - "idx_grn_items_to_line ON grn_items(to_line_id) WHERE to_line_id IS NOT NULL"
+
+# RLS Policies (ADR-013)
+rls_policies:
+  pattern: "Users Table Lookup"
+  pattern_sql: "(SELECT org_id FROM users WHERE id = auth.uid())"
+  rationale:
+    - "Single source of truth (users table)"
+    - "User org reassignment takes effect immediately"
+    - "No custom JWT claim configuration required"
+    - "Performance overhead <1ms per query"
+
+  policies:
+    # grn_number_sequences policies
+    - { table: "grn_number_sequences", name: "grn_seq_org", operation: "ALL", using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())" }
+
+    # grns policies
+    - { table: "grns", name: "grn_select_org", operation: "SELECT", using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())" }
+    - { table: "grns", name: "grn_insert_org", operation: "INSERT", with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid()) AND warehouse_id IN (SELECT id FROM warehouses WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid()))" }
+    - { table: "grns", name: "grn_update_org", operation: "UPDATE", using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())", with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())" }
+    - { table: "grns", name: "grn_delete_org", operation: "DELETE", using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())" }
+
+    # grn_items policies (via grns FK)
+    - { table: "grn_items", name: "grn_items_via_grn", operation: "ALL", using: "grn_id IN (SELECT id FROM grns WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid()))" }
+
+# Database Functions
+functions:
+  - name: "generate_grn_number"
+    description: "Generate next GRN number for organization with year and sequence"
+    params: "p_org_id UUID"
+    returns: "TEXT"
+    language: "plpgsql"
+    body: |
+      DECLARE
+        v_year INTEGER;
+        v_next_val BIGINT;
+        v_grn_number TEXT;
+      BEGIN
+        -- Get current year
+        v_year := EXTRACT(YEAR FROM NOW());
+
+        -- Upsert sequence and get next value
+        INSERT INTO grn_number_sequences (org_id, year, current_value)
+        VALUES (p_org_id, v_year, 1)
+        ON CONFLICT (org_id, year)
+        DO UPDATE SET
+          current_value = grn_number_sequences.current_value + 1,
+          updated_at = NOW()
+        RETURNING current_value INTO v_next_val;
+
+        -- Format GRN number: GRN-YYYY-NNNNN
+        v_grn_number := 'GRN-' || v_year::TEXT || '-' || LPAD(v_next_val::TEXT, 5, '0');
+
+        RETURN v_grn_number;
+      END;
+
+# Database Triggers
+triggers:
+  - name: "tr_grn_items_aggregates"
+    description: "Update GRN totals when items change"
+    table: "grn_items"
+    timing: "AFTER INSERT OR UPDATE OR DELETE"
+    for_each: "ROW"
+    function: "update_grn_aggregates"
+    function_body: |
+      BEGIN
+        -- Update totals on grns table
+        UPDATE grns
+        SET
+          total_items = (SELECT COUNT(*) FROM grn_items WHERE grn_id = COALESCE(NEW.grn_id, OLD.grn_id)),
+          total_qty = (SELECT COALESCE(SUM(received_qty), 0) FROM grn_items WHERE grn_id = COALESCE(NEW.grn_id, OLD.grn_id))
+        WHERE id = COALESCE(NEW.grn_id, OLD.grn_id);
+
+        RETURN COALESCE(NEW, OLD);
+      END;
+
+# Status Transitions
+status_transitions:
+  grn:
+    - from: "draft"
+      to: "completed"
+      action: "complete"
+      requirements: ["at least 1 item", "all required fields filled"]
+    - from: "draft"
+      to: "cancelled"
+      action: "cancel"
+      requirements: ["cancellation_reason provided"]
+    - from: "completed"
+      to: "cancelled"
+      action: "cancel"
+      requirements: ["all LPs status = 'available'", "cancellation_reason provided"]
+
+# Business Rules
+business_rules:
+  - "GRN number format: GRN-YYYY-NNNNN"
+  - "Number sequence is per organization, per year"
+  - "Number sequence resets at year boundary"
+  - "GRN number must be unique within org_id"
+  - "Draft GRNs can be modified"
+  - "Completed/cancelled GRNs are immutable"
+  - "Line numbers are sequential per GRN, not renumbered on delete"
+  - "Each GRN item creates one LP on completion"
+  - "LP inherits product, qty, uom, batch, expiry, qa_status, location from GRN item"
+  - "Cancel draft: simple status change"
+  - "Cancel completed: validate all LPs available, then consume them"
+  - "Cannot cancel if any LP is reserved or consumed"

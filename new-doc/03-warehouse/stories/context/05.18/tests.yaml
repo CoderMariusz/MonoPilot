@@ -1,0 +1,428 @@
+# Story 05.18 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/license-plate-merge.test.ts"
+    type: "unit"
+    description: "Unit tests for validateMerge() and merge() methods"
+
+  - path: "apps/frontend/app/api/warehouse/license-plates/__tests__/merge.test.ts"
+    type: "integration"
+    description: "Integration tests for merge API endpoints"
+
+  - path: "apps/frontend/__tests__/e2e/warehouse/lp-merge.spec.ts"
+    type: "e2e"
+    description: "E2E tests for desktop merge workflow"
+
+# Acceptance Criteria mapped to tests
+acceptance_criteria:
+  - id: "AC-1"
+    title: "Merge Validation - Same Product Required"
+    given: "LP-001 is product A and LP-002 is product B"
+    when: "user attempts to merge [LP-001, LP-002]"
+    then:
+      - "API returns 400 Bad Request"
+      - "Error message: 'All LPs must be the same product for merge'"
+      - "No LPs modified"
+      - "No genealogy records created"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-2"
+    title: "Merge Validation - Same Batch Required"
+    given: "LP-001 batch='BATCH-001' and LP-002 batch='BATCH-002' (same product)"
+    when: "user attempts to merge [LP-001, LP-002]"
+    then:
+      - "API returns 400 Bad Request"
+      - "Error message: 'All LPs must have the same batch number for merge'"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-3"
+    title: "Merge Validation - Same Expiry Required"
+    given: "LP-001 expiry='2026-01-01' and LP-002 expiry='2026-02-01'"
+    when: "user attempts to merge [LP-001, LP-002]"
+    then:
+      - "API returns 400 Bad Request"
+      - "Error message: 'All LPs must have the same expiry date for merge'"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-4"
+    title: "Merge Validation - Same QA Status Required"
+    given: "LP-001 qa_status='passed' and LP-002 qa_status='pending'"
+    when: "user attempts to merge [LP-001, LP-002]"
+    then:
+      - "API returns 400 Bad Request"
+      - "Error message: 'All LPs must have the same QA status for merge'"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-5"
+    title: "Merge Validation - All LPs Must Be Available"
+    given: "LP-001 status='available' and LP-002 status='reserved'"
+    when: "user attempts to merge [LP-001, LP-002]"
+    then:
+      - "API returns 400 Bad Request"
+      - "Error message includes LP-002 and its status"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-6"
+    title: "Merge Validation - Same Warehouse Required"
+    given: "LP-001 in WH-001 and LP-002 in WH-002"
+    when: "user attempts to merge [LP-001, LP-002]"
+    then:
+      - "API returns 400 Bad Request"
+      - "Error message: 'All LPs must be in the same warehouse for merge'"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-7"
+    title: "Merge Validation - Same UoM Required"
+    given: "LP-001 uom='KG' and LP-002 uom='LB'"
+    when: "user attempts to merge [LP-001, LP-002]"
+    then:
+      - "API returns 400 Bad Request"
+      - "Error message: 'All LPs must have the same UoM for merge'"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-8"
+    title: "Merge Validation - Minimum 2 LPs Required"
+    given: "user selects only LP-001 (single LP)"
+    when: "user attempts to merge [LP-001]"
+    then:
+      - "API returns 400 Bad Request"
+      - "Error message: 'At least 2 LPs required for merge operation'"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-9"
+    title: "Successful Merge - Two LPs"
+    given:
+      - "LP-001 (product A, batch='BATCH-001', expiry='2026-01-01', qty=50)"
+      - "LP-002 (product A, batch='BATCH-001', expiry='2026-01-01', qty=30)"
+      - "Both status='available', qa_status='passed'"
+    when: "POST /merge with sourceLpIds: ['LP-001', 'LP-002']"
+    then:
+      - "New LP created with quantity = 80 (50 + 30)"
+      - "New LP has source='merge', parent_lp_id=LP-001"
+      - "LP-001 and LP-002 status='consumed'"
+      - "Two genealogy records created"
+      - "Response includes newLpId, newLpNumber"
+      - "Operation completes in <500ms"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-10"
+    title: "Successful Merge - Three+ LPs"
+    given: "LP-001 (qty=50), LP-002 (qty=30), LP-003 (qty=20) - all matching"
+    when: "merge [LP-001, LP-002, LP-003]"
+    then:
+      - "New LP created with quantity = 100"
+      - "All three source LPs marked consumed"
+      - "Three genealogy records created"
+      - "Operation completes in <600ms"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-11"
+    title: "Merge with NULL Batch/Expiry"
+    given: "LP-001 and LP-002 both have batch_number=NULL and expiry_date=NULL"
+    when: "merge [LP-001, LP-002]"
+    then:
+      - "Merge succeeds (NULL values match)"
+      - "New LP has batch_number=NULL and expiry_date=NULL"
+    test_type: "unit"
+    priority: "P1"
+
+  - id: "AC-12"
+    title: "Merge Location Handling"
+    given: "LP-001 at location A, LP-002 at location B (same warehouse)"
+    when: "merge with targetLocationId = location C"
+    then:
+      - "New LP created at location C"
+      - "Target location validated to be in same warehouse"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-13"
+    title: "Validate Merge API Endpoint"
+    given: "valid request payload"
+    when: "POST /validate-merge"
+    then:
+      - "Returns valid: true, errors: []"
+      - "Summary includes product, qty, batch, expiry, QA, lpCount"
+      - "Response time <200ms"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-21"
+    title: "Transaction Atomicity"
+    given: "merge operation in progress"
+    when: "any step fails (e.g., genealogy creation)"
+    then:
+      - "Entire transaction rolled back"
+      - "No new LP created"
+      - "Source LPs unchanged"
+      - "No genealogy records created"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-23"
+    title: "RLS Enforcement - Cross-Tenant Protection"
+    given: "user from Org A attempts to merge LPs from Org B"
+    when: "API call made with Org B LP IDs"
+    then:
+      - "API returns 404 Not Found (RLS blocks access)"
+      - "No merge performed"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-25"
+    title: "Genealogy Integration - Merge Links"
+    given: "successful merge of LP-001 and LP-002 into LP-003"
+    when: "viewing LP-003 genealogy"
+    then:
+      - "Backward trace shows LP-001 and LP-002"
+      - "Both have operation_type='merge'"
+      - "Quantities recorded correctly"
+    test_type: "integration"
+    priority: "P0"
+
+# Unit Test Cases
+unit_tests:
+  validate_merge:
+    - name: "returns error when less than 2 LPs"
+      input: "[LP-001]"
+      expected: "{ valid: false, errors: ['At least 2 LPs required...'] }"
+
+    - name: "returns error when products differ"
+      input: "[LP-001 (product A), LP-002 (product B)]"
+      expected: "{ valid: false, errors: ['...same product...'] }"
+
+    - name: "returns error when batches differ"
+      input: "[LP-001 (batch A), LP-002 (batch B)]"
+      expected: "{ valid: false, errors: ['...same batch...'] }"
+
+    - name: "returns error when expiry dates differ"
+      input: "[LP-001 (expiry 2026-01-01), LP-002 (expiry 2026-02-01)]"
+      expected: "{ valid: false, errors: ['...same expiry...'] }"
+
+    - name: "returns error when QA statuses differ"
+      input: "[LP-001 (passed), LP-002 (pending)]"
+      expected: "{ valid: false, errors: ['...same QA status...'] }"
+
+    - name: "returns error when any LP not available"
+      input: "[LP-001 (available), LP-002 (reserved)]"
+      expected: "{ valid: false, errors: ['...status=available...'] }"
+
+    - name: "returns error when warehouses differ"
+      input: "[LP-001 (WH-A), LP-002 (WH-B)]"
+      expected: "{ valid: false, errors: ['...same warehouse...'] }"
+
+    - name: "returns error when UoMs differ"
+      input: "[LP-001 (KG), LP-002 (LB)]"
+      expected: "{ valid: false, errors: ['...same UoM...'] }"
+
+    - name: "treats NULL batch as equal"
+      input: "[LP-001 (batch=NULL), LP-002 (batch=NULL)]"
+      expected: "{ valid: true }"
+
+    - name: "treats NULL expiry as equal"
+      input: "[LP-001 (expiry=NULL), LP-002 (expiry=NULL)]"
+      expected: "{ valid: true }"
+
+    - name: "returns multiple errors when multiple validations fail"
+      input: "[LP-001 (product A, WH-1), LP-002 (product B, WH-2)]"
+      expected: "{ valid: false, errors: ['...product...', '...warehouse...'] }"
+
+    - name: "returns summary when valid"
+      input: "[LP-001 (qty=50), LP-002 (qty=30)]"
+      expected: "{ valid: true, summary: { totalQuantity: 80, lpCount: 2 } }"
+
+  merge:
+    - name: "creates new LP with combined quantity"
+      input: "[LP-001 (qty=50), LP-002 (qty=30)]"
+      expected: "New LP quantity = 80"
+
+    - name: "marks source LPs as consumed"
+      input: "[LP-001, LP-002]"
+      expected: "LP-001.status = 'consumed', LP-002.status = 'consumed'"
+
+    - name: "sets source to 'merge'"
+      input: "[LP-001, LP-002]"
+      expected: "newLP.source = 'merge'"
+
+    - name: "sets parent_lp_id to first source LP"
+      input: "[LP-001, LP-002]"
+      expected: "newLP.parent_lp_id = LP-001.id"
+
+    - name: "uses target location when provided"
+      input: "{ sourceLpIds, targetLocationId: LOC-C }"
+      expected: "newLP.location_id = LOC-C"
+
+    - name: "defaults to first LP location when no target"
+      input: "{ sourceLpIds, targetLocationId: undefined }"
+      expected: "newLP.location_id = LP-001.location_id"
+
+    - name: "throws if target location in different warehouse"
+      input: "{ sourceLpIds (WH-A), targetLocationId: LOC in WH-B }"
+      expected: "ValidationError thrown"
+
+    - name: "calls LPGenealogyService.linkMerge"
+      input: "[LP-001, LP-002]"
+      expected: "linkMerge(sourceLpIds, newLpId) called"
+
+    - name: "rolls back on genealogy failure"
+      input: "[LP-001, LP-002] + genealogy fails"
+      expected: "New LP deleted, source LPs restored"
+
+# Integration Test Cases
+integration_tests:
+  api_endpoints:
+    - name: "POST /validate-merge returns valid result"
+      request: "{ sourceLpIds: [valid matching LPs] }"
+      expected: "200, { valid: true, summary: {...} }"
+
+    - name: "POST /validate-merge returns errors for invalid"
+      request: "{ sourceLpIds: [mismatched product LPs] }"
+      expected: "200, { valid: false, errors: [...] }"
+
+    - name: "POST /merge creates merged LP"
+      request: "{ sourceLpIds: [valid matching LPs] }"
+      expected: "201, { newLpId, newLpNumber, mergedQuantity }"
+
+    - name: "POST /merge with invalid LPs returns 400"
+      request: "{ sourceLpIds: [mismatched LPs] }"
+      expected: "400, { error: 'Merge validation failed...' }"
+
+    - name: "POST /merge creates genealogy records"
+      setup: "Merge 2 LPs"
+      verify: "lp_genealogy table has 2 records with operation_type='merge'"
+
+    - name: "POST /merge response time <800ms for 5 LPs"
+      request: "{ sourceLpIds: [5 valid LPs] }"
+      expected: "Response in <800ms"
+
+  rls:
+    - name: "Cross-org LP access returns 404"
+      setup: "User A, LPs belong to Org B"
+      request: "POST /merge"
+      expected: "404 Not Found"
+
+    - name: "Own org LPs accessible"
+      setup: "User A, LPs belong to Org A"
+      request: "POST /validate-merge"
+      expected: "200 OK"
+
+# E2E Test Cases
+e2e_tests:
+  - name: "Select 2 LPs and open merge modal"
+    steps:
+      - "Navigate to /warehouse/license-plates"
+      - "Select checkbox on LP row 1"
+      - "Select checkbox on LP row 2"
+      - "Click 'Merge (2)' button"
+    expected: "Merge modal opens with 2 LPs listed"
+
+  - name: "Validate LPs and see success"
+    steps:
+      - "Open merge modal with 2 matching LPs"
+      - "Click 'Validate' button"
+    expected:
+      - "Loading spinner during validation"
+      - "Green checkmark appears"
+      - "'LPs are eligible for merge' message"
+      - "Summary card shows product, qty, batch, expiry"
+
+  - name: "Validate LPs and see errors"
+    steps:
+      - "Open merge modal with mismatched LPs"
+      - "Click 'Validate' button"
+    expected:
+      - "Red X icon appears"
+      - "Error messages listed"
+      - "'Merge LPs' button disabled"
+
+  - name: "Execute merge successfully"
+    steps:
+      - "Open merge modal with valid LPs"
+      - "Validate successfully"
+      - "Click 'Merge LPs' button"
+      - "Click 'Confirm Merge' in dialog"
+    expected:
+      - "Loading state on button"
+      - "Success toast: 'LPs merged successfully'"
+      - "Modal closes"
+      - "LP list refreshes"
+      - "Source LPs no longer visible (consumed)"
+
+  - name: "Handle merge error"
+    steps:
+      - "Start merge operation"
+      - "Simulate API error (mock)"
+    expected:
+      - "Error toast displayed"
+      - "Modal stays open"
+      - "User can retry or cancel"
+
+# Definition of Done
+definition_of_done:
+  - "All 8 validation rules tested and passing"
+  - "Merge creates new LP with correct combined quantity"
+  - "Source LPs marked as consumed after merge"
+  - "Genealogy records created via LPGenealogyService.linkMerge()"
+  - "Transaction atomicity verified (rollback on failure)"
+  - "RLS enforced (cross-tenant returns 404)"
+  - "API response times meet requirements"
+  - "Unit test coverage >= 80%"
+  - "Integration tests cover all endpoints"
+  - "E2E test for full merge workflow"
+  - "Frontend components render correctly"
+  - "Loading/error states handled"
+  - "Success notification displayed"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    files:
+      - "lib/services/license-plate-service.ts (merge methods): 90%"
+  integration:
+    target: 80
+    files:
+      - "API routes /validate-merge and /merge: 100%"
+  e2e:
+    target: 1
+    description: "At least 1 full E2E test covering the merge workflow"
+
+# Risks and Mitigations
+risks:
+  - id: "RISK-01"
+    description: "Race condition - LP status changed during merge"
+    mitigation: "Re-validate in transaction, return 409 Conflict"
+    severity: "medium"
+    test_coverage: "Integration test with concurrent access simulation"
+
+  - id: "RISK-02"
+    description: "Transaction deadlock with concurrent merges"
+    mitigation: "Use row-level locks, retry logic"
+    severity: "low"
+    test_coverage: "Stress test with multiple simultaneous merges"
+
+  - id: "RISK-03"
+    description: "Genealogy link failure breaks merge"
+    mitigation: "Transaction rollback ensures atomicity"
+    severity: "high"
+    test_coverage: "Unit test for rollback scenario"
+
+  - id: "RISK-04"
+    description: "Performance degradation with 10+ LPs"
+    mitigation: "Limit to 20 LPs max, optimize batch operations"
+    severity: "low"
+    test_coverage: "Performance test with 20 LP merge"

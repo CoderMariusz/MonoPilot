@@ -1,0 +1,218 @@
+story:
+  id: "09.26"
+  name: "Accounting Integration (Comarch Optima)"
+  epic: "09-finance"
+  phase: "3"
+  complexity: "M"
+  estimate_days: 4-5
+  type: "backend"
+
+dependencies:
+  required:
+    - story: "09.6"
+      provides: ["work_order_costs data"]
+    - story: "09.13"
+      provides: ["material variance data"]
+    - story: "09.14"
+      provides: ["labor variance data"]
+  optional:
+    - story: "09.7"
+      provides: ["inventory_valuation data"]
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/finance.md"
+  prd_sections: ["FR-9.12.1", "FR-9.12.2", "FR-9.12.3", "FR-9.12.4", "FR-9.12.5", "FR-9.12.6", "FR-9.12.7", "FR-FIN-058"]
+  story: "docs/2-MANAGEMENT/epics/current/09-finance/09.26.accounting-integration-comarch.md"
+  patterns:
+    - "apps/frontend/lib/services/export-service.ts"
+
+files_to_create:
+  database:
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_create_finance_exports.sql"
+      type: "migration"
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_create_export_schedules.sql"
+      type: "migration"
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_create_gl_account_mappings_indexes.sql"
+      type: "migration"
+  api:
+    - path: "apps/frontend/app/api/finance/exports/wo-costs/route.ts"
+      methods: ["POST"]
+    - path: "apps/frontend/app/api/finance/exports/variances/route.ts"
+      methods: ["POST"]
+    - path: "apps/frontend/app/api/finance/exports/audit-log/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/finance/exports/[id]/download/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/finance/exports/schedules/route.ts"
+      methods: ["GET", "POST"]
+    - path: "apps/frontend/app/api/finance/exports/schedules/[id]/route.ts"
+      methods: ["PATCH", "DELETE"]
+    - path: "apps/frontend/app/api/finance/settings/gl-account-mappings/route.ts"
+      methods: ["GET", "POST"]
+    - path: "apps/frontend/app/api/finance/settings/gl-account-mappings/[id]/route.ts"
+      methods: ["PATCH", "DELETE"]
+  services:
+    - path: "apps/frontend/lib/services/export-service.ts"
+    - path: "apps/frontend/lib/services/comarch-export-service.ts"
+  validation:
+    - path: "apps/frontend/lib/validation/export.ts"
+  pages:
+    - path: "apps/frontend/app/(authenticated)/finance/exports/page.tsx"
+    - path: "apps/frontend/app/(authenticated)/finance/exports/schedules/page.tsx"
+    - path: "apps/frontend/app/(authenticated)/finance/exports/audit-log/page.tsx"
+    - path: "apps/frontend/app/(authenticated)/finance/settings/gl-account-mappings/page.tsx"
+  components:
+    - path: "apps/frontend/components/finance/export/ExportWizard.tsx"
+    - path: "apps/frontend/components/finance/export/ExportScheduleForm.tsx"
+    - path: "apps/frontend/components/finance/export/ExportAuditLog.tsx"
+    - path: "apps/frontend/components/finance/settings/GLAccountMappingConfig.tsx"
+
+database:
+  tables:
+    - name: "finance_exports"
+      columns:
+        - "id"
+        - "org_id"
+        - "export_type"
+        - "data_type"
+        - "export_format"
+        - "date_range_start"
+        - "date_range_end"
+        - "filters"
+        - "record_count"
+        - "file_name"
+        - "file_path"
+        - "file_size_bytes"
+        - "status"
+        - "error_message"
+        - "exported_by"
+        - "exported_at"
+      rls: true
+      indexes:
+        - "org_id, exported_at DESC"
+        - "org_id, status"
+    - name: "export_schedules"
+      columns:
+        - "id"
+        - "org_id"
+        - "schedule_name"
+        - "description"
+        - "frequency"
+        - "cron_expression"
+        - "time_of_day"
+        - "day_of_week"
+        - "day_of_month"
+        - "data_type"
+        - "export_format"
+        - "date_range_type"
+        - "filters"
+        - "delivery_method"
+        - "delivery_config"
+        - "is_active"
+        - "last_run_at"
+        - "last_run_status"
+        - "next_run_at"
+        - "created_by"
+      rls: true
+      indexes:
+        - "org_id"
+        - "next_run_at WHERE is_active = TRUE"
+    - name: "gl_account_mappings"
+      columns:
+        - "id"
+        - "org_id"
+        - "cost_category"
+        - "cost_subcategory"
+        - "gl_account_code"
+        - "gl_account_name"
+        - "normal_balance"
+        - "effective_from"
+        - "effective_to"
+        - "is_active"
+      rls: true
+      indexes:
+        - "org_id, cost_category"
+
+api_endpoints:
+  - method: "POST"
+    path: "/api/finance/exports/wo-costs"
+    auth: true
+    roles: ["finance_manager", "accountant"]
+  - method: "POST"
+    path: "/api/finance/exports/variances"
+    auth: true
+    roles: ["finance_manager", "accountant"]
+  - method: "GET"
+    path: "/api/finance/exports/audit-log"
+    auth: true
+    roles: ["finance_manager", "accountant"]
+  - method: "POST"
+    path: "/api/finance/exports/schedules"
+    auth: true
+    roles: ["finance_manager"]
+  - method: "GET"
+    path: "/api/finance/settings/gl-account-mappings"
+    auth: true
+    roles: ["finance_manager"]
+
+ux:
+  wireframes:
+    - id: "FIN-026"
+      description: "Comarch Export & Configuration"
+      components:
+        - "Export wizard (3 steps)"
+        - "GL account mapping table"
+        - "Export schedule configuration"
+        - "Export audit log table"
+  patterns:
+    wizard: "Multi-step export configuration"
+    table: "ShadCN DataTable"
+    form: "ShadCN Form"
+
+validation_rules:
+  gl_account_code: "4 digits (Comarch standard)"
+  debit_credit_balance: "Sum debit = sum credit per document"
+  duplicate_export: "Warn if variance already exported"
+  file_encoding: "UTF-8 for Polish characters"
+
+patterns:
+  rls: "ADR-013"
+  api: "REST with org_id filter"
+  service: "class-based with static methods"
+  validation: "zod schemas"
+  file_generation: "Server-side (XML/CSV builders)"
+
+acceptance_checklist:
+  - "finance_exports table created with RLS"
+  - "export_schedules table created"
+  - "gl_account_mappings indexes created"
+  - "Export to CSV works"
+  - "Export to XML works"
+  - "Export to Comarch Optima XML works"
+  - "GL account mapping CRUD works"
+  - "Comarch XML validates against schema"
+  - "Debit/credit balancing works"
+  - "Variance export prevents duplicates"
+  - "Scheduled export creation works"
+  - "Scheduled export execution works"
+  - "Export audit log displays correctly"
+  - "Re-download export works"
+  - "Polish characters display correctly in exports"
+  - "All tests pass"
+
+output_artifacts:
+  - "Migration: finance_exports table"
+  - "Migration: export_schedules table"
+  - "Migration: gl_account_mappings indexes"
+  - "API: 8 export endpoints"
+  - "Service: ExportService"
+  - "Service: ComarchExportService"
+  - "Component: ExportWizard"
+  - "Component: ExportScheduleForm"
+  - "Component: ExportAuditLog"
+  - "Component: GLAccountMappingConfig"
+  - "Page: Export management page"
+  - "Page: Export schedules page"
+  - "Page: Export audit log page"
+  - "Page: GL account mappings page"
+  - "Tests: Unit, integration, E2E"

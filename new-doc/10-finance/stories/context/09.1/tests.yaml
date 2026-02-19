@@ -1,0 +1,109 @@
+unit_tests:
+  FinanceSettingsService:
+    file: "apps/frontend/lib/services/__tests__/finance-settings-service.test.ts"
+    tests:
+      - name: "get() returns settings for org"
+        setup: "Mock Supabase query"
+        action: "Call FinanceSettingsService.get(orgId)"
+        assertion: "Returns FinanceSettings object"
+
+      - name: "update() validates and saves settings"
+        setup: "Mock existing settings"
+        action: "Call update with new values"
+        assertion: "Settings updated, audit log created"
+
+      - name: "initialize() creates defaults with PLN"
+        setup: "Mock org without settings"
+        action: "Call initialize(orgId, userId)"
+        assertion: "Settings created with finance_enabled=false, valuation_method=fifo"
+
+      - name: "isEnabled() returns finance_enabled flag"
+        setup: "Mock settings with finance_enabled=true"
+        action: "Call isEnabled(orgId)"
+        assertion: "Returns true"
+
+      - name: "validateUpdate() checks critical >= warning"
+        setup: "Current settings with warning=5, critical=10"
+        action: "Update critical=3"
+        assertion: "Returns validation error"
+
+    coverage_target: "80%"
+
+integration_tests:
+  api_endpoints:
+    file: "apps/frontend/app/api/finance/settings/__tests__/route.test.ts"
+    tests:
+      - name: "GET /api/finance/settings returns org settings"
+        request: "GET with auth"
+        assertion: "200 OK with FinanceSettings"
+
+      - name: "GET returns 404 if not initialized"
+        setup: "Org without settings"
+        request: "GET"
+        assertion: "404 Not Found"
+
+      - name: "PUT /api/finance/settings updates successfully"
+        request: "PUT with valid updates"
+        assertion: "200 OK, settings updated"
+
+      - name: "PUT validates critical >= warning"
+        request: "PUT with critical < warning"
+        assertion: "400 Bad Request with error message"
+
+      - name: "PUT requires finance_manager role"
+        setup: "User with viewer role"
+        request: "PUT"
+        assertion: "403 Forbidden"
+
+      - name: "POST /api/finance/settings/initialize creates defaults"
+        request: "POST with base_currency_code=PLN"
+        assertion: "201 Created with default settings"
+
+rls_tests:
+  file: "supabase/tests/finance_settings_rls.test.sql"
+  tests:
+    - name: "SELECT enforces org isolation"
+      setup: "Settings for Org A and Org B"
+      action: "User A queries settings"
+      assertion: "Returns only Org A settings"
+
+    - name: "UPDATE requires finance_manager role"
+      setup: "User with viewer role"
+      action: "Attempt UPDATE"
+      assertion: "RLS blocks update"
+
+    - name: "INSERT requires admin or finance_manager"
+      setup: "User with production_supervisor role"
+      action: "Attempt INSERT"
+      assertion: "RLS blocks insert"
+
+e2e_tests:
+  file: "apps/frontend/__tests__/e2e/finance-settings.spec.ts"
+  tests:
+    - name: "Finance Manager can update settings"
+      steps:
+        - "Login as Finance Manager"
+        - "Navigate to /finance/settings"
+        - "Change valuation_method to weighted_average"
+        - "Change variance_warning_percent to 7.5"
+        - "Click Save Settings"
+      assertion: "Success toast shown, settings persisted"
+
+    - name: "Form validates critical >= warning"
+      steps:
+        - "Set warning_percent to 10"
+        - "Set critical_percent to 5"
+        - "Attempt save"
+      assertion: "Validation error shown, save disabled"
+
+    - name: "Viewer cannot access settings page"
+      steps:
+        - "Login as Viewer"
+        - "Attempt to navigate to /finance/settings"
+      assertion: "403 Forbidden or redirect to dashboard"
+
+performance_tests:
+  - name: "GET /api/finance/settings < 200ms"
+    target: "200ms"
+  - name: "PUT /api/finance/settings < 300ms"
+    target: "300ms"

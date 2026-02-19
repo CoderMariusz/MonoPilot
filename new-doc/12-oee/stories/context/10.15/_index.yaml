@@ -1,0 +1,67 @@
+# Story 10.15 - Production Rate Tracking Context (Entry Point)
+# Generated: 2025-01-15
+# Phase: 2 (Advanced Analytics)
+
+story:
+  id: "10.15"
+  name: "Production Rate Tracking"
+  slug: "production-rate-tracking"
+  epic: "10-oee"
+  phase: "2"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "backend"
+  state: "ready"
+  priority: "P1"
+
+context_files:
+  - _index.yaml
+  - database.yaml
+  - api.yaml
+  - frontend.yaml
+  - tests.yaml
+
+dependencies:
+  required:
+    - story: "10.4"
+      name: "OEE Calculation Engine"
+      provides: ["oee_snapshots table", "production time data"]
+    - story: "04.x"
+      name: "Production Operations"
+      provides: ["operation logs", "output counts"]
+
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/oee.md"
+    sections: ["FR-OEE-023 - Production Rate Tracking"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/10-oee/10.15.production-rate-tracking.md"
+
+deliverables:
+  - type: "service"
+    count: 1
+    description: "Production rate calculation service"
+  - type: "api"
+    count: 2
+    description: "GET /api/oee/performance/rate endpoints"
+  - type: "components"
+    count: 3
+    description: "Rate trend chart, variance indicator, dashboard widget"
+
+technical_notes:
+  - "Rate = units produced / time (units/hour)"
+  - "Compare actual rate vs target rate from BOM"
+  - "Variance calculation: (actual - target) / target * 100"
+  - "Efficiency = actual / target * 100"
+  - "Trend chart: hourly and daily views"
+  - "Rate degradation alerts when below target for extended period"
+
+summary: |
+  Story 10.15 implements production rate tracking and comparison.
+
+  MVP SCOPE:
+  - Production rate calculation (units/hour)
+  - Rate vs target comparison
+  - Rate trend charts (hourly, daily)
+  - Rate degradation detection
+  - Dashboard widget for rate metrics

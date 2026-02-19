@@ -1,0 +1,44 @@
+# Story 08.13 - Test Specifications
+# Purpose: Pilot WO creation tests
+# Agent: TEST-WRITER, QA-AGENT
+# SEE: markdown lines 697-745
+
+test_files:
+  unit:
+    - "lib/services/npd-handoff-service.test.ts (pilot WO methods)"
+  integration:
+    - "app/api/npd/projects/[id]/handoff/create-pilot-wo/route.test.ts"
+  e2e:
+    - "e2e/npd-pilot-wo-creation.spec.ts"
+
+key_tests:
+  creation:
+    - "Create pilot WO with BOM from handoff"
+    - "WO number auto-generates: WO-PILOT-{PROJECT}-{SEQ}"
+    - "Default routing from npd_settings applied"
+    - "Default scheduled_date = +7 days"
+    - "NPD Lead auto-assigned"
+
+  validation:
+    - "Quantity must be > 0"
+    - "BOM must belong to product"
+    - "Product must exist"
+    - "BOM must exist"
+
+  traceability:
+    - "WO.type = 'pilot'"
+    - "WO.npd_project_id set correctly"
+    - "Query: SELECT * WHERE type = 'pilot' works"
+
+  actual_cost_feedback:
+    - "Pilot WO completion updates npd_costing.actual_cost"
+    - "Variance calculated automatically"
+
+  transaction:
+    - "Rollback on WO number collision"
+    - "Rollback on routing validation failure"
+
+  performance:
+    - "Create pilot WO < 500ms"
+
+coverage_target: ">= 80%"

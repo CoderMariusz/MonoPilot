@@ -1,0 +1,116 @@
+# Story 02.12 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "02.12"
+  name: "Technical Dashboard: Stats, Charts & Allergen Matrix"
+  slug: "technical-dashboard"
+  epic: "02-technical"
+  phase: "2E-1"
+  complexity: "M"
+  estimate_days: 3
+  type: "full-stack"
+  state: "ready"
+  priority: "P0"
+  story_points: 8
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Aggregation queries, no new tables
+  - api.yaml         # Dashboard endpoints (5 endpoints)
+  - frontend.yaml    # Page, components, services
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["org_id", "RLS policies", "permission checks"]
+    - story: "02.1"
+      name: "Products CRUD"
+      provides: ["products table", "product_types", "product counts"]
+    - story: "02.3"
+      name: "Product Allergens"
+      provides: ["product_allergens table", "allergen relations"]
+    - story: "02.4"
+      name: "BOMs CRUD"
+      provides: ["boms table", "BOM counts", "BOM timeline data"]
+    - story: "02.7"
+      name: "Routings CRUD"
+      provides: ["routings table", "routing counts"]
+    - story: "02.9"
+      name: "BOM-Routing Costs"
+      provides: ["product_costs table", "cost trends data"]
+  blocked_by:
+    - story: "02.1"
+    - story: "02.4"
+  blocks: []  # Dashboard is typically end of module flow
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/technical.md"
+    sections: ["FR-2.100", "FR-2.101", "FR-2.102", "FR-2.103"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/technical.md"
+    sections: ["Dashboard Endpoints", "Caching Strategy", "Performance Considerations"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/02-technical/02.12.technical-dashboard.md"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-017-dashboard.md"
+      relevance: "PRIMARY - Full dashboard wireframe with all widgets"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS pattern for all dashboard queries"
+
+# High-level deliverables
+deliverables:
+  - type: "api"
+    count: 5
+    description: "Dashboard API endpoints (stats, allergen-matrix, bom-timeline, recent-activity, cost-trends)"
+  - type: "page"
+    count: 1
+    description: "Dashboard page at /technical"
+  - type: "component"
+    count: 7
+    description: "DashboardStatsCard, AllergenMatrixPanel, BomTimelinePanel, RecentActivityPanel, CostTrendsChart, QuickActionsBar, dashboard-service.ts"
+  - type: "service"
+    count: 1
+    description: "dashboard-service.ts with data aggregation"
+  - type: "test"
+    count: 5
+    description: "Unit + integration + e2e tests for dashboard"
+
+# Technical notes
+technical_notes:
+  - "No new database tables - uses existing products, boms, routings, product_costs, product_allergens"
+  - "Dashboard is read-only aggregation of existing data"
+  - "All queries must include org_id filter via RLS"
+  - "Use Redis caching with TTLs: stats=1min, allergen-matrix=10min, bom-timeline=5min, activity=30sec, cost-trends=5min"
+  - "Chart library: Recharts for cost trends line chart"
+  - "PDF export for allergen matrix using jsPDF or pdfmake"
+  - "Performance targets: stats<500ms, allergen-matrix<1s, bom-timeline<800ms, activity<300ms, cost-trends<500ms"
+  - "Responsive design: Desktop (4 cards row), Tablet (2x2), Mobile (single column)"
+  - "Lazy loading for below-fold panels using IntersectionObserver"
+
+# MVP Scope
+mvp_scope:
+  in_scope:
+    - "Stats cards (Products, BOMs, Routings, Avg Cost with trend)"
+    - "Allergen matrix heatmap with product type filter"
+    - "Allergen matrix PDF export"
+    - "BOM version timeline (last 6 months)"
+    - "Recent activity feed (last 10 events)"
+    - "Cost trends line chart with toggle buttons"
+    - "Quick action buttons (New Product, BOM, Routing)"
+    - "Loading, empty, error states"
+    - "Responsive layout (desktop/tablet/mobile)"
+  out_of_scope:
+    - "Custom date range selection (Phase 1)"
+    - "Dashboard widget customization/reordering (Phase 1)"
+    - "Saved dashboard configurations per user (Phase 1)"
+    - "Real-time WebSocket updates (Phase 2)"
+    - "AI-powered anomaly detection (Phase 2)"

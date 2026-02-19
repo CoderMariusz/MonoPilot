@@ -1,0 +1,516 @@
+# Story 06.26 - CCP Deviation Alerts - Tests Context
+# Generated: 2025-01-15
+
+test_coverage:
+  target: ">80%"
+  focus_areas:
+    - "Alert creation on deviation"
+    - "Multi-channel delivery (SMS, Email, WebSocket)"
+    - "Acknowledgment tracking"
+    - "Escalation job (5min timer)"
+    - "Recipient selection by severity"
+
+unit_tests:
+  file: "lib/services/ccp-alert-service.test.ts"
+  framework: "Vitest"
+  coverage_target: ">80%"
+  test_suites:
+    - suite: "createAlert"
+      tests:
+        - name: "creates alert on deviation creation"
+          input:
+            deviationId: "deviation-uuid"
+            severity: "critical"
+          assertions:
+            - "Alert created with deviation_id"
+            - "Recipients populated based on severity"
+            - "alert_message formatted correctly"
+            - "acknowledged = false"
+
+        - name: "triggers async delivery (pg_notify)"
+          assertions:
+            - "pg_notify('ccp_deviation_alert', deviation_id) called"
+
+    - suite: "getRecipientsBySeverity"
+      tests:
+        - name: "returns QA + Prod + Director for critical"
+          input:
+            severity: "critical"
+          assertions:
+            - "Recipients: [QA_MANAGER, PRODUCTION_LEAD, DIRECTOR]"
+            - "All recipients have channels: [sms, email, websocket]"
+
+        - name: "returns QA + Prod for major"
+          input:
+            severity: "major"
+          assertions:
+            - "Recipients: [QA_MANAGER, PRODUCTION_LEAD]"
+
+        - name: "returns QA only for minor"
+          input:
+            severity: "minor"
+          assertions:
+            - "Recipients: [QA_MANAGER]"
+            - "Channels: [email, websocket] (no SMS for minor)"
+
+    - suite: "sendSMS"
+      tests:
+        - name: "sends SMS via Twilio API"
+          input:
+            recipients: [{ phone: "+1234567890", name: "John Doe" }]
+            message: "[CRITICAL] CCP DEVIATION: CCP-1..."
+          mock: "Twilio API POST /Messages.json"
+          assertions:
+            - "Twilio API called with correct params"
+            - "Returns { sent: true, error: null }"
+
+        - name: "handles Twilio error (invalid phone)"
+          mock: "Twilio API returns 400"
+          assertions:
+            - "Returns { sent: false, error: 'Invalid phone number' }"
+
+        - name: "retries on rate limit (429)"
+          mock: "Twilio API returns 429"
+          assertions:
+            - "Retries with exponential backoff (3 attempts)"
+
+    - suite: "sendEmail"
+      tests:
+        - name: "sends email via SendGrid API"
+          input:
+            recipients: [{ email: "qa@example.com", name: "Jane Smith" }]
+            subject: "[CRITICAL] CCP Deviation Alert"
+            message: "CCP-1 deviation detected..."
+          mock: "SendGrid API POST /mail/send"
+          assertions:
+            - "SendGrid API called with correct params"
+            - "Returns { sent: true, error: null }"
+
+        - name: "handles SendGrid error (invalid email)"
+          mock: "SendGrid API returns 400"
+          assertions:
+            - "Returns { sent: false, error: 'Invalid email address' }"
+
+    - suite: "sendWebSocket"
+      tests:
+        - name: "broadcasts WebSocket event to org room"
+          input:
+            recipients: [{ user_id: "uuid" }]
+            message: "[CRITICAL] CCP DEVIATION..."
+          mock: "Socket.io broadcast"
+          assertions:
+            - "Socket.io.to('org_uuid').emit('ccp_deviation_alert', payload) called"
+            - "Returns { sent: true, error: null }"
+
+    - suite: "acknowledge"
+      tests:
+        - name: "acknowledges alert"
+          input:
+            alertId: "alert-uuid"
+            userId: "user-uuid"
+          assertions:
+            - "acknowledged = true"
+            - "acknowledged_by = user-uuid"
+            - "acknowledged_at = now"
+
+        - name: "cannot acknowledge already-acknowledged alert"
+          setup: "Alert already acknowledged"
+          assertions:
+            - "Throws error: 'Alert already acknowledged'"
+
+    - suite: "escalate"
+      tests:
+        - name: "escalates unacknowledged alert (>5min old)"
+          setup: "Alert created 6 minutes ago, not acknowledged"
+          assertions:
+            - "escalated = true"
+            - "escalated_at = now"
+            - "escalation_recipients = [DIRECTOR]"
+            - "SMS/Email sent to Director"
+
+        - name: "does not escalate if <5min old"
+          setup: "Alert created 3 minutes ago"
+          assertions:
+            - "escalated = false"
+
+        - name: "does not escalate if already acknowledged"
+          setup: "Alert acknowledged"
+          assertions:
+            - "escalated = false"
+
+integration_tests:
+  file: "app/api/quality/haccp/alerts/route.test.ts"
+  framework: "Vitest + Supertest"
+  test_suites:
+    - suite: "Alert Creation (Trigger on Deviation)"
+      tests:
+        - name: "auto-creates alert on deviation creation"
+          setup: "Create deviation with POST /api/quality/haccp/ccp-deviations"
+          assertions:
+            - "Alert created in ccp_deviation_alerts table"
+            - "Recipients populated based on severity"
+            - "Alert delivery job triggered (pg_notify)"
+
+    - suite: "GET /api/quality/haccp/alerts"
+      tests:
+        - name: "lists alerts with filters"
+          request:
+            method: "GET"
+            query: "?acknowledged=false&severity=critical"
+          assertions:
+            - "Returns 200 OK"
+            - "Response: { data: [...unacknowledged critical alerts], total: N }"
+
+        - name: "filters by date range"
+          request:
+            query: "?date_from=2025-01-01&date_to=2025-01-15"
+          assertions:
+            - "Returns only alerts created in date range"
+
+    - suite: "GET /api/quality/haccp/alerts/unacknowledged"
+      tests:
+        - name: "returns unacknowledged alerts"
+          request:
+            method: "GET"
+          assertions:
+            - "Returns 200 OK"
+            - "Response: { alerts: [...], count: N }"
+            - "Only acknowledged=false alerts returned"
+
+    - suite: "POST /api/quality/haccp/alerts/:id/acknowledge"
+      tests:
+        - name: "acknowledges alert"
+          setup: "Unacknowledged alert exists"
+          request:
+            method: "POST"
+          assertions:
+            - "Returns 200 OK"
+            - "Response: { acknowledged: true, acknowledged_by: uuid, acknowledged_at: timestamp }"
+
+        - name: "returns 400 if already acknowledged"
+          setup: "Alert already acknowledged"
+          assertions:
+            - "Returns 400 Bad Request"
+            - "Error: 'Alert already acknowledged'"
+
+    - suite: "POST /api/quality/haccp/alerts/:id/resend"
+      tests:
+        - name: "resends alert (manual trigger)"
+          setup: "Alert exists with sms_sent=true, email_sent=true"
+          request:
+            method: "POST"
+            body: "{ channels: ['sms', 'email'] }"
+          assertions:
+            - "Returns 200 OK"
+            - "SMS sent again (Twilio API called)"
+            - "Email sent again (SendGrid API called)"
+            - "sms_sent_at, email_sent_at updated"
+
+    - suite: "RLS Enforcement"
+      tests:
+        - name: "org isolation on alert list"
+          setup: "User A from Org A, User B from Org B"
+          request:
+            method: "GET"
+            auth: "User A"
+          assertions:
+            - "Returns only Org A alerts"
+            - "Does not return Org B alerts"
+
+        - name: "returns 404 for cross-org alert access"
+          setup: "Alert belongs to Org B"
+          request:
+            method: "GET"
+            path: "/api/quality/haccp/alerts/:id"
+            auth: "User A (Org A)"
+          assertions:
+            - "Returns 404 Not Found (not 403)"
+
+e2e_tests:
+  file: "tests/e2e/quality/ccp-deviation-alerts.spec.ts"
+  framework: "Playwright"
+  test_suites:
+    - suite: "Alert Creation Workflow"
+      tests:
+        - name: "auto-create alert on critical deviation"
+          steps:
+            - "Record CCP monitoring with critical deviation (>100% over limit)"
+            - "Deviation auto-created (story 06.25)"
+            - "Alert auto-created (trigger)"
+            - "Navigate to /quality/haccp/alerts"
+            - "Verify alert appears in list"
+            - "Verify severity badge = 'critical' (red)"
+            - "Verify acknowledged = false"
+            - "Verify elapsed time indicator (e.g., '1 minute ago')"
+          assertions:
+            - "Alert created automatically"
+            - "Alert visible in list"
+
+    - suite: "Real-Time WebSocket Alerts"
+      tests:
+        - name: "receive WebSocket alert (real-time toast)"
+          setup: "User logged in, WebSocket connected"
+          steps:
+            - "Trigger critical deviation (in another session or API)"
+            - "WebSocket event 'ccp_deviation_alert' received"
+            - "Toast notification appears (red, critical severity)"
+            - "Audio alert plays (3 beeps, 1kHz)"
+            - "Alert added to notification center (bell icon badge +1)"
+          assertions:
+            - "Toast displayed within 1s"
+            - "Audio plays (mock)"
+            - "Notification center updated"
+
+    - suite: "Acknowledge Alert Workflow"
+      tests:
+        - name: "acknowledge alert from notification center"
+          steps:
+            - "Click bell icon (notification center)"
+            - "Dropdown shows unacknowledged alert"
+            - "Click [Acknowledge] button"
+            - "Confirm acknowledge"
+            - "Alert marked acknowledged"
+            - "Alert removed from notification center"
+            - "Notification center badge -1"
+          assertions:
+            - "acknowledged = true"
+            - "acknowledged_by = current user"
+            - "Alert no longer in unacknowledged list"
+
+        - name: "acknowledge alert from alerts list page"
+          steps:
+            - "Navigate to /quality/haccp/alerts"
+            - "Filter: acknowledged=false"
+            - "Click [Acknowledge] button on alert row"
+            - "Confirm"
+            - "Alert marked acknowledged"
+            - "Alert row updated (green checkmark)"
+          assertions:
+            - "Alert acknowledged successfully"
+
+    - suite: "Escalation Workflow"
+      tests:
+        - name: "escalate unacknowledged alert after 5min"
+          setup: "Alert created 6 minutes ago, not acknowledged"
+          steps:
+            - "Escalation job runs (manual trigger or wait 6min)"
+            - "Verify escalated = true"
+            - "Verify escalation_recipients = [DIRECTOR]"
+            - "Verify SMS/Email sent to Director (check logs)"
+            - "Navigate to alert detail"
+            - "Verify 'ESCALATED' badge displayed"
+          assertions:
+            - "Alert escalated automatically"
+            - "Director notified"
+
+        - name: "no escalation if acknowledged within 5min"
+          setup: "Alert created 3 minutes ago"
+          steps:
+            - "Acknowledge alert (before 5min)"
+            - "Wait 3 more minutes (total 6min)"
+            - "Escalation job runs"
+            - "Verify escalated = false"
+          assertions:
+            - "No escalation if acknowledged in time"
+
+    - suite: "Alert Filters and Search"
+      tests:
+        - name: "filter alerts by acknowledged status"
+          steps:
+            - "Navigate to alerts list"
+            - "Select filter: 'Unacknowledged only'"
+            - "Verify only unacknowledged alerts shown"
+          assertions:
+            - "Filter applied correctly"
+
+        - name: "filter alerts by severity"
+          steps:
+            - "Select filter: 'Critical'"
+            - "Verify only critical alerts shown"
+            - "Verify all rows have red severity badge"
+          assertions:
+            - "Filter applied correctly"
+
+    - suite: "Alert Audio Feedback"
+      tests:
+        - name: "audio alert plays on critical deviation (WebSocket)"
+          setup: "User logged in, audio enabled"
+          steps:
+            - "Trigger critical deviation"
+            - "WebSocket event received"
+            - "Audio alert plays (1kHz, 3 beeps)"
+          assertions:
+            - "Audio plays (mock Web Audio API)"
+
+        - name: "mute audio alerts"
+          steps:
+            - "Click notification center settings"
+            - "Toggle 'Mute audio alerts'"
+            - "Trigger critical deviation"
+            - "Verify audio does NOT play"
+            - "Verify toast still appears (visual alert)"
+          assertions:
+            - "Audio muted (localStorage flag)"
+            - "Visual alert still works"
+
+    - suite: "Notification Center Widget"
+      tests:
+        - name: "displays unacknowledged alerts in notification center"
+          setup: "3 unacknowledged alerts exist"
+          steps:
+            - "Navigate to any page (authenticated)"
+            - "Verify bell icon shows badge '3'"
+            - "Click bell icon"
+            - "Dropdown shows 3 alerts (most recent first)"
+            - "Each alert shows: severity badge, CCP number, elapsed time, acknowledge button"
+          assertions:
+            - "Notification center displays correctly"
+            - "Badge count matches unacknowledged count"
+
+        - name: "auto-refresh notification center (every 30s)"
+          setup: "Notification center open"
+          steps:
+            - "Wait 30s"
+            - "Verify list refreshed (auto-fetch)"
+          assertions:
+            - "Auto-refresh works (setInterval 30s)"
+
+    - suite: "Resend Alert (Manual Trigger)"
+      tests:
+        - name: "resend alert via alert detail page"
+          steps:
+            - "Navigate to alert detail"
+            - "Click [Resend Alert] button"
+            - "Select channels: SMS, Email"
+            - "Confirm"
+            - "Verify success toast: 'Alert resent successfully'"
+            - "Verify sms_sent_at, email_sent_at updated"
+          assertions:
+            - "Alert resent successfully"
+            - "SMS and Email sent again"
+
+# Background Job Tests
+background_job_tests:
+  - job: "Escalation Job"
+    schedule: "Every 1 minute"
+    test: "Escalate alerts >5min old and not acknowledged"
+    steps:
+      - "Create alert (6 minutes ago)"
+      - "Set acknowledged = false"
+      - "Run escalation job (manual trigger)"
+      - "Verify escalated = true"
+      - "Verify escalation_recipients = [DIRECTOR]"
+      - "Verify SMS/Email sent to Director"
+    assertions:
+      - "Escalation triggered correctly"
+
+  - job: "Alert Delivery Job"
+    trigger: "pg_notify('ccp_deviation_alert', deviation_id)"
+    test: "Send SMS, Email, WebSocket on alert creation"
+    steps:
+      - "Create deviation"
+      - "Alert created (trigger)"
+      - "pg_notify emitted"
+      - "Alert delivery job triggered"
+      - "Verify SMS sent (Twilio API called)"
+      - "Verify Email sent (SendGrid API called)"
+      - "Verify WebSocket broadcast (Socket.io called)"
+    assertions:
+      - "All channels delivered successfully"
+      - "sms_sent, email_sent, websocket_sent = true"
+
+# Acceptance Criteria Coverage
+ac_coverage:
+  - id: "AC-1"
+    name: "Alert Creation on Deviation"
+    tests:
+      - "e2e_tests: auto-create alert on critical deviation"
+  - id: "AC-2"
+    name: "SMS Alert Delivery"
+    tests:
+      - "unit_tests: sendSMS (Twilio API)"
+      - "background_job_tests: Alert Delivery Job"
+  - id: "AC-3"
+    name: "Email Alert Delivery"
+    tests:
+      - "unit_tests: sendEmail (SendGrid API)"
+      - "background_job_tests: Alert Delivery Job"
+  - id: "AC-4"
+    name: "WebSocket Real-Time Alert"
+    tests:
+      - "e2e_tests: receive WebSocket alert (real-time toast)"
+  - id: "AC-5"
+    name: "Alert Acknowledgment"
+    tests:
+      - "e2e_tests: acknowledge alert from notification center"
+  - id: "AC-6"
+    name: "Escalation on No Acknowledgment"
+    tests:
+      - "e2e_tests: escalate unacknowledged alert after 5min"
+  - id: "AC-7"
+    name: "Recipient Selection by Severity"
+    tests:
+      - "unit_tests: getRecipientsBySeverity (all scenarios)"
+
+# Performance Tests
+performance_tests:
+  - scenario: "Alert creation + delivery"
+    target: "<30s total"
+    breakdown: "Create record <300ms, SMS/Email delivery <10s each, WebSocket <1s"
+    test: "POST /api/quality/haccp/ccp-deviations (triggers alert)"
+  - scenario: "Unacknowledged alerts query"
+    target: "<300ms"
+    test: "GET /api/quality/haccp/alerts/unacknowledged"
+  - scenario: "Acknowledge alert"
+    target: "<300ms"
+    test: "POST /api/quality/haccp/alerts/:id/acknowledge"
+  - scenario: "WebSocket broadcast latency"
+    target: "<1s"
+    test: "Time from deviation creation to WebSocket event received by client"
+  - scenario: "SMS delivery latency"
+    target: "<10s"
+    test: "Time from alert creation to SMS received (Twilio latency)"
+  - scenario: "Email delivery latency"
+    target: "<10s"
+    test: "Time from alert creation to email received (SendGrid latency)"
+
+# Security Tests
+security_tests:
+  - test: "Cross-org alert access"
+    scenario: "User A tries to access Org B alert"
+    expected: "404 Not Found (RLS blocks)"
+  - test: "WebSocket room isolation"
+    scenario: "User A (Org A) connected, Org B alert triggered"
+    expected: "User A does NOT receive Org B alert (Socket.io room isolation)"
+  - test: "SMS/Email recipient validation"
+    scenario: "Alert with invalid phone/email in recipients JSONB"
+    expected: "Send fails gracefully, error logged, sms_error/email_error populated"
+  - test: "Cannot delete alert"
+    scenario: "User attempts DELETE /api/quality/haccp/alerts/:id"
+    expected: "403 Forbidden (RLS blocks DELETE)"
+
+# Manual Tests (SMS/Email)
+manual_tests:
+  - test: "SMS delivery on real device"
+    steps:
+      - "Trigger critical deviation"
+      - "Verify SMS received on real phone"
+      - "Verify SMS content: '[CRITICAL] CCP DEVIATION: CCP-1...'"
+      - "Verify acknowledgment link works"
+    expected: "SMS delivered within 10s"
+
+  - test: "Email delivery"
+    steps:
+      - "Trigger major deviation"
+      - "Verify email received in inbox"
+      - "Verify email subject: '[MAJOR] CCP Deviation Alert'"
+      - "Verify email body has deviation details, acknowledgment link"
+    expected: "Email delivered within 10s"
+
+  - test: "WebSocket real-time on multiple devices"
+    steps:
+      - "Login on Device A (desktop) and Device B (mobile)"
+      - "Trigger critical deviation"
+      - "Verify both devices receive WebSocket event"
+      - "Verify toast appears on both devices within 1s"
+    expected: "Real-time alerts on all connected devices"

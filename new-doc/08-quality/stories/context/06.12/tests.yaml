@@ -1,0 +1,475 @@
+# Story 06.12 - Tests Context
+# Generated: 2026-01-15
+# Purpose: Test specifications, acceptance criteria verification for Batch Release Approval
+
+# =============================================================================
+# TEST STRATEGY
+# =============================================================================
+
+test_strategy:
+  unit_tests:
+    coverage_target: 80%
+    framework: vitest
+    focus_areas:
+      - ReleaseApprovalService methods
+      - E-signature credential validation
+      - Conditions validation logic
+      - Permission enforcement
+  integration_tests:
+    framework: vitest
+    focus_areas:
+      - API endpoints (approve, reject, conditions)
+      - RLS policies
+      - Database operations
+      - Audit trail creation
+  e2e_tests:
+    framework: playwright
+    focus_areas:
+      - Complete approval workflow
+      - E-signature capture
+      - Rejection workflow
+      - Certificate generation
+
+# =============================================================================
+# UNIT TESTS
+# =============================================================================
+
+unit_tests:
+  file: lib/services/__tests__/release-approval-service.test.ts
+
+  describe_blocks:
+    - name: ReleaseApprovalService
+      tests:
+        # validateSignatureCredential
+        - describe: validateSignatureCredential
+          tests:
+            - it: validates correct password
+              given: user with valid password hash
+              when: password credential provided
+              then: returns valid=true
+
+            - it: rejects incorrect password
+              given: user password hash
+              when: wrong password provided
+              then: returns valid=false with error
+
+            - it: locks account after 3 failed attempts
+              given: 2 previous failed attempts
+              when: third incorrect password
+              then: account locked, returns ACCOUNT_LOCKED error
+
+            - it: validates PIN correctly
+              given: user with PIN set
+              when: correct 4-digit PIN provided
+              then: returns valid=true
+
+            - it: validates email confirmation code
+              given: email confirmation code sent
+              when: matching code provided within 10 min
+              then: returns valid=true
+
+        # approveRelease
+        - describe: approveRelease
+          tests:
+            - it: approves with valid e-signature
+              given: release with pending_release status
+              and: valid signature credential
+              when: approveRelease called
+              then: release_decision = approved
+              and: signature fields populated
+              and: LP.release_status updated to released
+
+            - it: captures signature metadata
+              given: approval request
+              when: approveRelease called
+              then: signature_user_id, signature_timestamp, signature_ip_address, signature_user_agent saved
+
+            - it: updates LP release_status
+              given: release with 3 output LPs
+              when: approveRelease succeeds
+              then: all 3 LPs.release_status = released
+
+            - it: creates audit log entry
+              given: approval completes
+              then: quality_audit_log entry with action=approve
+
+            - it: blocks if conditions not met
+              given: release with failed condition
+              when: approveRelease called
+              then: error VALIDATION_FAILED, conditions not met
+
+            - it: requires QA_MANAGER role
+              given: user is QA_INSPECTOR
+              when: approveRelease called
+              then: error PERMISSION_DENIED
+
+        # rejectRelease
+        - describe: rejectRelease
+          tests:
+            - it: rejects with valid e-signature
+              given: release pending approval
+              and: rejection reason provided
+              when: rejectRelease called
+              then: release_decision = rejected
+              and: rejection_reason saved
+              and: rejected_by and rejected_at set
+
+            - it: requires rejection reason min 20 chars
+              given: rejection reason with 15 chars
+              when: rejectRelease called
+              then: error VALIDATION_FAILED
+
+            - it: creates NCR if requested
+              given: create_ncr = true in request
+              when: rejectRelease called
+              then: NCR created with reference to batch
+              and: ncr_id returned
+
+            - it: updates LP release_status to rejected
+              given: release with output LPs
+              when: rejectRelease succeeds
+              then: LPs.release_status = rejected
+
+        # validateConditions
+        - describe: validateConditions
+          tests:
+            - it: returns all pass when conditions met
+              given: all 7 conditions pass
+              when: validateConditions called
+              then: all_conditions_met = true, can_approve = true, blockers = []
+
+            - it: returns blockers for failed conditions
+              given: final_inspection = fail
+              when: validateConditions called
+              then: all_conditions_met = false, blockers = ['Final inspection failed']
+
+            - it: handles conditional inspection as warning
+              given: final_inspection result = conditional
+              when: validateConditions called
+              then: result = warning, not blocking
+
+            - it: checks all 7 condition types
+              given: release
+              when: validateConditions called
+              then: 7 condition checks executed
+              assertions:
+                - final_inspection checked
+                - ccp_records checked
+                - in_process_inspections checked
+                - operation_checkpoints checked
+                - quality_holds checked
+                - ncr_review checked
+                - specification_compliance checked
+
+# =============================================================================
+# INTEGRATION TESTS
+# =============================================================================
+
+integration_tests:
+  file: app/api/quality/releases/__tests__/route.test.ts
+
+  describe_blocks:
+    - name: Batch Release Approval API
+      tests:
+        # POST /api/quality/releases/:id/approve
+        - describe: "POST /api/quality/releases/:id/approve"
+          tests:
+            - it: approves with valid signature
+              given: release pending approval
+              and: user is QA_MANAGER
+              and: valid password provided
+              when: POST /api/quality/releases/:id/approve
+              then: 200 OK, release approved
+
+            - it: returns 403 for non-QA Manager
+              given: user is QA_INSPECTOR
+              when: POST /api/quality/releases/:id/approve
+              then: 403 FORBIDDEN
+
+            - it: returns 400 for invalid signature
+              given: wrong password
+              when: POST /api/quality/releases/:id/approve
+              then: 400 BAD_REQUEST, error: Invalid password
+
+            - it: returns 400 if conditions not met
+              given: release with failed condition
+              when: POST /api/quality/releases/:id/approve
+              then: 400 BAD_REQUEST, blockers listed
+
+        # POST /api/quality/releases/:id/reject
+        - describe: "POST /api/quality/releases/:id/reject"
+          tests:
+            - it: rejects with reason
+              given: valid rejection reason
+              and: valid signature
+              when: POST /api/quality/releases/:id/reject
+              then: 200 OK, release rejected
+
+            - it: validates rejection reason length
+              given: rejection_reason with 10 chars
+              when: POST /api/quality/releases/:id/reject
+              then: 400 BAD_REQUEST
+
+            - it: creates NCR if requested
+              given: create_ncr = true
+              when: POST /api/quality/releases/:id/reject
+              then: NCR created, ncr_id in response
+
+        # GET /api/quality/releases/pending
+        - describe: "GET /api/quality/releases/pending"
+          tests:
+            - it: returns pending releases for org
+              given: 5 releases pending approval in org
+              when: GET /api/quality/releases/pending
+              then: 5 releases returned
+              and: summary stats included
+
+            - it: filters by product_id
+              given: 3 releases for product A, 2 for product B
+              when: GET /api/quality/releases/pending?product_id=A
+              then: 3 releases returned
+
+            - it: filters by priority
+              given: 2 high priority, 3 normal
+              when: GET /api/quality/releases/pending?priority=high
+              then: 2 releases returned
+
+            - it: enforces RLS
+              given: user from org A
+              and: releases exist in org B
+              when: GET /api/quality/releases/pending
+              then: only org A releases returned
+
+        # GET /api/quality/releases/:id/conditions
+        - describe: "GET /api/quality/releases/:id/conditions"
+          tests:
+            - it: validates all conditions
+              given: release with all conditions passing
+              when: GET /api/quality/releases/:id/conditions
+              then: all_conditions_met = true, 7 conditions returned
+
+            - it: identifies blockers
+              given: open NCR linked to batch
+              when: GET /api/quality/releases/:id/conditions
+              then: ncr_review = fail, blocking = true
+
+            - it: returns 404 for other org
+              given: release belongs to org B
+              and: user from org A
+              when: GET /api/quality/releases/:id/conditions
+              then: 404 NOT_FOUND
+
+        # GET /api/quality/releases/:id/certificate
+        - describe: "GET /api/quality/releases/:id/certificate"
+          tests:
+            - it: generates PDF certificate
+              given: release with decision = approved
+              when: GET /api/quality/releases/:id/certificate
+              then: 200 OK, PDF URL returned
+
+            - it: returns 400 for pending release
+              given: release with decision = pending_release
+              when: GET /api/quality/releases/:id/certificate
+              then: 400 BAD_REQUEST, error: Certificate available after approval
+
+# =============================================================================
+# RLS TESTS
+# =============================================================================
+
+rls_tests:
+  file: supabase/__tests__/rls/batch-releases.test.ts
+
+  describe_blocks:
+    - name: Batch Release RLS Policies
+      tests:
+        - it: user can only see own org releases
+          given: user A from org A
+          and: releases in org A and org B
+          when: user A queries batch_release_records
+          then: only org A releases returned
+
+        - it: cannot approve release from different org
+          given: release in org B
+          and: user A from org A (QA_MANAGER)
+          when: user A calls approve endpoint
+          then: 404 NOT_FOUND (RLS blocks access)
+
+        - it: release_conditions_log org isolation
+          given: condition logs in multiple orgs
+          when: user queries release_conditions_log
+          then: only own org conditions returned
+
+        - it: delivery log is append-only
+          given: delivery_log entry exists
+          when: attempt UPDATE on delivery_log
+          then: operation blocked
+
+# =============================================================================
+# E2E TESTS
+# =============================================================================
+
+e2e_tests:
+  file: tests/e2e/batch-release-approval.spec.ts
+
+  describe_blocks:
+    - name: Batch Release Approval Workflow
+      tests:
+        - describe: complete approval flow
+          steps:
+            - action: Login as QA Manager
+            - action: Navigate to Quality > Release Approvals
+            - verify: Pending approvals queue displayed
+            - verify: Summary shows total pending count
+            - action: Click on release REL-2025-00001
+            - verify: Release detail page loads
+            - verify: Conditions panel shows 7 checks
+            - verify: All conditions = pass
+            - action: Click [Approve Release]
+            - verify: E-signature modal opens
+            - verify: Signature meaning displayed
+            - action: Select method = Password
+            - action: Enter password
+            - action: Check "I understand" checkbox
+            - action: Click [Sign and Approve]
+            - verify: Loading spinner shown
+            - verify: Success toast "Batch approved for release"
+            - verify: Release status badge = Approved
+            - verify: [Print Certificate] button enabled
+            - verify: LP status updated to released
+
+        - describe: rejection flow
+          steps:
+            - action: Login as QA Manager
+            - action: Open release detail
+            - action: Click [Reject Release]
+            - verify: Rejection modal opens
+            - action: Enter rejection reason (50 chars)
+            - action: Check "Create NCR" checkbox
+            - action: Enter password for e-signature
+            - action: Click [Sign and Reject]
+            - verify: Success toast "Batch rejected"
+            - verify: Release status = Rejected
+            - verify: NCR created modal shown
+            - verify: LP status = rejected
+
+        - describe: conditions validation blocking
+          steps:
+            - action: Login as QA Manager
+            - action: Open release with failed condition
+            - verify: Conditions panel shows fail icon
+            - verify: Blocker message displayed
+            - verify: [Approve Release] button disabled
+            - verify: Tooltip "Cannot approve: Final inspection failed"
+
+        - describe: permission enforcement
+          steps:
+            - action: Login as QA Inspector
+            - action: Navigate to release detail
+            - verify: [Approve Release] button hidden
+            - verify: [Submit for Approval] button shown
+            - action: Logout and login as QA Manager
+            - verify: [Approve Release] button visible
+
+        - describe: certificate generation
+          steps:
+            - action: Approve release
+            - action: Click [Print Release Certificate]
+            - verify: PDF opens in new tab
+            - verify: Certificate contains:
+              - Company logo
+              - Batch number
+              - Product name
+              - Inspection summary
+              - All 7 conditions with pass status
+              - Approver name and signature timestamp
+              - Document ID
+
+# =============================================================================
+# ACCEPTANCE CRITERIA MAPPING
+# =============================================================================
+
+acceptance_criteria_mapping:
+  AC-1: # E-Signature Capture on Approval
+    tests:
+      - "unit: validateSignatureCredential with password"
+      - "integration: POST /api/quality/releases/:id/approve"
+      - "e2e: complete approval flow (signature capture)"
+    coverage: "Unit + Integration + E2E"
+
+  AC-2: # E-Signature Capture on Rejection
+    tests:
+      - "unit: rejectRelease with signature"
+      - "integration: POST /api/quality/releases/:id/reject"
+      - "e2e: rejection flow"
+    coverage: "Unit + Integration + E2E"
+
+  AC-3: # Release Conditions Validation
+    tests:
+      - "unit: validateConditions all scenarios"
+      - "integration: GET /api/quality/releases/:id/conditions"
+      - "e2e: conditions validation blocking"
+    coverage: "Unit + Integration + E2E"
+
+  AC-4: # Approval Queue for QA Managers
+    tests:
+      - "integration: GET /api/quality/releases/pending with filters"
+      - "e2e: approval queue navigation"
+    coverage: "Integration + E2E"
+
+  AC-5: # Permission Enforcement
+    tests:
+      - "unit: requiresQAManager role check"
+      - "integration: 403 for non-QA Manager"
+      - "e2e: permission enforcement"
+    coverage: "Unit + Integration + E2E"
+
+  AC-6: # Release Certificate Generation
+    tests:
+      - "unit: formatReleaseCertificate"
+      - "integration: GET /api/quality/releases/:id/certificate"
+      - "e2e: certificate generation"
+    coverage: "Unit + Integration + E2E"
+
+  AC-7: # Audit Trail for All Decisions
+    tests:
+      - "unit: logApprovalDecision creates entry"
+      - "integration: audit log entry created on approve/reject"
+    coverage: "Unit + Integration"
+
+  AC-8: # Conditional Release Approval
+    tests:
+      - "unit: conditional approval logic"
+      - "integration: POST /api/quality/releases/:id/approve with is_conditional=true"
+    coverage: "Unit + Integration"
+
+# =============================================================================
+# TEST DATA / FIXTURES
+# =============================================================================
+
+fixtures:
+  - name: releaseWithAllConditionsPass
+    description: "Batch release with all 7 conditions passing"
+    data:
+      release_decision: pending_release
+      final_inspection_result: pass
+      ccp_records_valid: true
+      no_open_ncrs: true
+      no_active_holds: true
+
+  - name: releaseWithBlocker
+    description: "Batch release with one failing condition"
+    data:
+      release_decision: pending_release
+      final_inspection_result: fail
+
+  - name: qaManagerUser
+    description: "User with QA_MANAGER role"
+    data:
+      role_code: QA_MANAGER
+      has_password: true
+
+  - name: signatureCredentials
+    description: "Valid signature credentials"
+    data:
+      method: password
+      credential: "correctPassword123"

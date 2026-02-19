@@ -1,0 +1,343 @@
+frontend:
+  pages:
+    customers_list:
+      route: "/shipping/customers"
+      name: "Customer List"
+      description: "Browse all customers with search, filters, and pagination"
+      file_path: "apps/frontend/app/(authenticated)/shipping/customers/page.tsx"
+      components:
+        - "CustomerTable"
+        - "SearchBar"
+        - "FilterPanel"
+        - "PaginationControls"
+      features:
+        - "List with 50 items per page"
+        - "Search by customer_code or name"
+        - "Filter by category and active status"
+        - "Sort by name, customer_code, created_at"
+        - "Click row to view detail"
+        - "Create button to /customers/new"
+      wireframe: "SHIP-001"
+
+    customers_create:
+      route: "/shipping/customers/new"
+      name: "Create Customer"
+      description: "Form to create new customer with initial contact and address"
+      file_path: "apps/frontend/app/(authenticated)/shipping/customers/new/page.tsx"
+      components:
+        - "CustomerForm"
+      features:
+        - "All customer fields (code, name, category, allergens, etc)"
+        - "Tax ID input (label: encrypted)"
+        - "Submit creates customer and navigates to detail page"
+        - "Cancel navigates back to list"
+        - "Form validation with error display"
+      wireframe: "SHIP-002"
+
+    customers_detail:
+      route: "/shipping/customers/:id"
+      name: "Customer Detail"
+      description: "View and edit customer with tabbed interface for contacts/addresses"
+      file_path: "apps/frontend/app/(authenticated)/shipping/customers/[id]/page.tsx"
+      components:
+        - "CustomerDetailTabs"
+        - "CustomerForm (in view/edit mode)"
+        - "ContactsTab"
+        - "AddressesTab"
+      features:
+        - "Tabs: Details | Contacts | Addresses"
+        - "Details tab: Edit customer fields, allergen restrictions"
+        - "Contacts tab: List, add, edit, delete"
+        - "Addresses tab: List, add, edit, delete, set default"
+        - "Status badge showing is_active"
+        - "Metadata (created_at, created_by, updated_at)"
+      wireframe: "SHIP-002"
+
+  components:
+    customer_table:
+      name: "CustomerTable"
+      path: "apps/frontend/app/(authenticated)/shipping/customers/components/CustomerTable.tsx"
+      description: "ShadCN DataTable for customer list"
+      props:
+        - name: "data"
+          type: "Customer[]"
+        - name: "isLoading"
+          type: "boolean"
+        - name: "onRowClick"
+          type: "(id: string) => void"
+      features:
+        - "Columns: customer_code, name, category, email, phone, is_active badge"
+        - "Sorting on click column header"
+        - "Row click navigates to detail"
+        - "Empty state with 'Create Customer' button"
+
+    customer_form:
+      name: "CustomerForm"
+      path: "apps/frontend/app/(authenticated)/shipping/customers/components/CustomerForm.tsx"
+      description: "Reusable form for create/edit customer"
+      props:
+        - name: "customer"
+          type: "Customer | null"
+          description: "Null for create, Customer object for edit"
+        - name: "onSubmit"
+          type: "(data: CustomerInput) => Promise<void>"
+        - name: "isLoading"
+          type: "boolean"
+      features:
+        - "Form fields: customer_code, name, category, email, phone, tax_id, credit_limit, payment_terms_days, allergen_restrictions, notes"
+        - "Zod validation with inline error display"
+        - "customer_code readonly in edit mode"
+        - "Allergen multi-select (dropdown with chips)"
+        - "Tax ID marked as encrypted (UI hint)"
+        - "Submit and Cancel buttons"
+        - "Loading state spinner"
+
+    customer_detail_tabs:
+      name: "CustomerDetailTabs"
+      path: "apps/frontend/app/(authenticated)/shipping/customers/components/CustomerDetailTabs.tsx"
+      description: "Tabs container for customer detail page"
+      props:
+        - name: "customerId"
+          type: "string"
+        - name: "activeTab"
+          type: "'details' | 'contacts' | 'addresses'"
+      features:
+        - "3 tabs: Details, Contacts, Addresses"
+        - "Tab content lazy-loaded"
+        - "Active tab highlighted"
+
+    contacts_tab:
+      name: "ContactsTab"
+      path: "apps/frontend/app/(authenticated)/shipping/customers/components/ContactsTab.tsx"
+      description: "Contacts list and management"
+      props:
+        - name: "customerId"
+          type: "string"
+      features:
+        - "List of contacts (name, title, email, phone, is_primary badge)"
+        - "Add Contact button opens ContactModal"
+        - "Row actions: edit, delete"
+        - "Empty state if no contacts"
+        - "Primary contact highlighted"
+
+    addresses_tab:
+      name: "AddressesTab"
+      path: "apps/frontend/app/(authenticated)/shipping/customers/components/AddressesTab.tsx"
+      description: "Addresses list and management"
+      props:
+        - name: "customerId"
+          type: "string"
+      features:
+        - "List of addresses grouped by type (billing, shipping)"
+        - "Add Address button opens AddressModal"
+        - "Row actions: edit, delete, set-as-default"
+        - "Default address marked with star icon"
+        - "Display dock_hours and notes (delivery instructions)"
+        - "Empty state if no addresses"
+      wireframe: "SHIP-003"
+
+    contact_modal:
+      name: "ContactModal"
+      path: "apps/frontend/app/(authenticated)/shipping/customers/components/ContactModal.tsx"
+      description: "Dialog for creating/editing contact"
+      props:
+        - name: "customerId"
+          type: "string"
+        - name: "contact"
+          type: "CustomerContact | null"
+        - name: "isOpen"
+          type: "boolean"
+        - name: "onClose"
+          type: "() => void"
+        - name: "onSubmit"
+          type: "(data: ContactInput) => Promise<void>"
+      features:
+        - "Form fields: name, title, email, phone, is_primary checkbox"
+        - "Validation: name required, email format"
+        - "Create or Edit mode"
+        - "Delete button in edit mode"
+        - "Loading state"
+
+    address_modal:
+      name: "AddressModal"
+      path: "apps/frontend/app/(authenticated)/shipping/customers/components/AddressModal.tsx"
+      description: "Dialog for creating/editing address"
+      props:
+        - name: "customerId"
+          type: "string"
+        - name: "address"
+          type: "CustomerAddress | null"
+        - name: "isOpen"
+          type: "boolean"
+        - name: "onClose"
+          type: "() => void"
+        - name: "onSubmit"
+          type: "(data: AddressInput) => Promise<void>"
+      features:
+        - "Form fields: address_type, address_line1, address_line2, city, state, postal_code, country, dock_hours, notes, is_default"
+        - "Dock hours: weekly calendar selector (Mon-Sun, each with HH:MM-HH:MM or null)"
+        - "Address type radio buttons (billing/shipping)"
+        - "Validation: required fields, format"
+        - "Create or Edit mode"
+        - "Delete button in edit mode"
+      wireframe: "SHIP-003"
+
+  wireframes:
+    ship_001_customer_list:
+      id: "SHIP-001"
+      name: "Customer List"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SHIP-001-customer-list.md"
+      description: "Main customer browsing interface with table, search, filters"
+      key_sections:
+        - "Header: 'Customers' + Create button"
+        - "Search bar (search by code/name)"
+        - "Filter bar: Category dropdown, Active status toggle"
+        - "Data table with columns"
+        - "Pagination controls"
+        - "Empty state: 'No customers yet' + Create button"
+      components_mapped:
+        - "CustomerTable"
+        - "SearchBar"
+        - "FilterPanel"
+      states:
+        - id: "empty"
+          description: "No customers in org"
+          show_message: "No customers yet. Create one to get started."
+        - id: "loading"
+          description: "Data loading"
+          show_spinner: true
+        - id: "with_data"
+          description: "Table with customer rows"
+          show_table: true
+        - id: "error"
+          description: "API error"
+          show_message: "Failed to load customers"
+
+    ship_002_customer_modal:
+      id: "SHIP-002"
+      name: "Customer Detail Modal"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SHIP-002-customer-modal.md"
+      description: "Customer edit form with core fields and allergen multi-select"
+      key_sections:
+        - "Modal title: Create Customer / Edit Customer"
+        - "Form fields: code, name, category, email, phone, tax_id, credit_limit, payment_terms"
+        - "Allergen multi-select with dropdown and chips"
+        - "Notes textarea"
+        - "Submit and Cancel buttons"
+        - "Metadata display (created_at, created_by) in edit mode"
+      components_mapped:
+        - "CustomerForm"
+        - "AllergenSelect"
+      states:
+        - id: "create"
+          description: "Create new customer"
+          fields_editable: ["customer_code", "name", "category", "email", "phone", "tax_id", "credit_limit", "payment_terms_days", "allergen_restrictions", "notes"]
+        - id: "edit"
+          description: "Edit existing customer"
+          fields_readonly: ["customer_code"]
+          fields_editable: ["name", "category", "email", "phone", "tax_id", "credit_limit", "payment_terms_days", "allergen_restrictions", "notes", "is_active"]
+        - id: "view"
+          description: "View customer (no edit)"
+          fields_readonly: ["all"]
+          buttons: ["Close"]
+
+    ship_003_shipping_addresses:
+      id: "SHIP-003"
+      name: "Shipping Addresses Tab"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SHIP-003-shipping-addresses.md"
+      description: "Tab showing customer addresses grouped by type with dock hours and defaults"
+      key_sections:
+        - "Subheading: Billing Addresses / Shipping Addresses"
+        - "List of addresses with full address display"
+        - "Dock hours display (readable format or calendar)"
+        - "Delivery instructions (notes)"
+        - "Default indicator (star icon)"
+        - "Row actions: Edit, Delete, Set as Default"
+        - "Add Address button (opens AddressModal)"
+      components_mapped:
+        - "AddressesTab"
+        - "AddressModal"
+        - "AddressList"
+      states:
+        - id: "empty"
+          description: "No addresses"
+          show_message: "No addresses yet. Add one to enable orders."
+        - id: "with_addresses"
+          description: "List of addresses"
+          show_list: true
+          show_default_indicator: true
+
+    ship_004_allergen_restrictions:
+      id: "SHIP-004"
+      name: "Allergen Restrictions Multi-Select"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SHIP-004-allergen-restrictions.md"
+      description: "Multi-select component for customer allergen restrictions with validation"
+      key_sections:
+        - "Label: 'Customer Cannot Receive (Allergen Restrictions)'"
+        - "Multi-select dropdown showing all allergens from system"
+        - "Selected allergens shown as chips/tags with remove button"
+        - "Warning message if customer has restrictions"
+        - "Allergen icons/colors for visual recognition"
+        - "Help text: 'Customer cannot receive orders containing these allergens'"
+      components_mapped:
+        - "AllergenSelect (multi-select)"
+        - "AllergenChip"
+      states:
+        - id: "no_restrictions"
+          description: "No allergens selected"
+          show_message: "Customer can receive any allergen"
+        - id: "with_restrictions"
+          description: "1+ allergens selected"
+          show_chips: true
+          show_warning: "Customer has allergen restrictions - validate all orders"
+
+  styling:
+    design_system: "ShadCN UI + TailwindCSS"
+    color_scheme:
+      success: "green-600"
+      warning: "amber-600"
+      error: "red-600"
+      primary: "blue-600"
+    icons:
+      default_address: "Star"
+      delete: "Trash2"
+      edit: "Pencil"
+      add: "Plus"
+      search: "Search"
+      category_retail: "Store"
+      category_wholesale: "Package"
+      category_distributor: "Truck"
+
+  responsive:
+    breakpoints:
+      mobile: "640px"
+      tablet: "1024px"
+      desktop: "1280px"
+    considerations:
+      - "Table scrollable on mobile"
+      - "Modal full-width on mobile"
+      - "Stack form fields vertically on mobile"
+      - "Touch targets minimum 44px"
+
+  form_validation:
+    library: "react-hook-form + zod"
+    error_display:
+      style: "inline below field"
+      color: "red-600"
+      icon: "AlertCircle"
+    success_feedback:
+      style: "toast notification"
+      duration: "3 seconds"
+
+implementation_notes: |
+  - All forms use react-hook-form for state management
+  - Zod schemas defined in lib/validation/customer.schema.ts
+  - API calls via customer-service methods
+  - Loading states managed per component
+  - Error boundaries on pages
+  - Allergen select fetches from allergens table
+  - Dock hours UI: can use day picker or simple text input "HH:MM-HH:MM"
+  - Table sorting/filtering client-side or server-side (API query params)
+  - Pagination: limit 50, default page 1
+  - Soft delete: archive button, not hard delete
+  - Cross-tenant isolation: 404 on redirect to other org's customer

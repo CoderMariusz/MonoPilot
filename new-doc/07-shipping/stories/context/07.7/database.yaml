@@ -1,0 +1,275 @@
+# Story 07.7 - Database Schema
+# Purpose: Tables, RLS policies, migrations, triggers, indexes
+# Agent: BACKEND-DEV (database focus)
+
+migrations:
+  - path: "supabase/migrations/080_create_inventory_allocations_table.sql"
+    type: "migration"
+    description: "Create inventory_allocations table with columns, constraints, RLS, indexes"
+
+  - path: "supabase/migrations/081_create_shipping_settings_table.sql"
+    type: "migration"
+    description: "Create shipping_settings table for org-level allocation config"
+
+tables:
+  - name: "inventory_allocations"
+    description: "Reserved License Plates for Sales Order lines (core allocation tracking)"
+    columns:
+      # Identity
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id) ON DELETE CASCADE" }
+
+      # Relationships
+      - { name: "sales_order_line_id", type: "UUID", constraints: "NOT NULL REFERENCES sales_order_lines(id) ON DELETE CASCADE" }
+      - { name: "license_plate_id", type: "UUID", constraints: "NOT NULL REFERENCES license_plates(id)" }
+
+      # Quantities
+      - { name: "quantity_allocated", type: "DECIMAL(15,4)", constraints: "NOT NULL CHECK (quantity_allocated > 0)" }
+      - { name: "quantity_picked", type: "DECIMAL(15,4)", constraints: "DEFAULT 0 CHECK (quantity_picked >= 0)" }
+
+      # Audit
+      - { name: "allocated_at", type: "TIMESTAMPTZ", constraints: "DEFAULT now()" }
+      - { name: "allocated_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "released_at", type: "TIMESTAMPTZ", constraints: "" }
+      - { name: "released_by", type: "UUID", constraints: "REFERENCES users(id)" }
+
+      # Timestamps
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT now()" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "DEFAULT now()" }
+
+    constraints:
+      - "CONSTRAINT uq_so_line_lp UNIQUE(sales_order_line_id, license_plate_id)"
+      - "CONSTRAINT allocation_qty_check CHECK (quantity_allocated > 0)"
+
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+    indexes:
+      - "idx_allocations_so_line ON inventory_allocations(sales_order_line_id)"
+      - "idx_allocations_lp ON inventory_allocations(license_plate_id)"
+      - "idx_allocations_org_active ON inventory_allocations(org_id) WHERE released_at IS NULL"
+      - "idx_allocations_org_so ON inventory_allocations(org_id, sales_order_line_id)"
+      - "idx_allocations_created ON inventory_allocations(org_id, created_at DESC)"
+
+  - name: "shipping_settings"
+    description: "Org-level allocation and shipping configuration"
+    columns:
+      # Identity
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL UNIQUE REFERENCES organizations(id) ON DELETE CASCADE" }
+
+      # Allocation Settings
+      - { name: "auto_allocate_on_confirm", type: "BOOLEAN", constraints: "DEFAULT true" }
+      - { name: "allocation_threshold_pct", type: "DECIMAL(5,2)", constraints: "DEFAULT 80.00 CHECK (allocation_threshold_pct > 0 AND allocation_threshold_pct <= 100)" }
+      - { name: "default_picking_strategy", type: "TEXT", constraints: "DEFAULT 'FIFO'" }
+
+      # FEFO Settings
+      - { name: "fefo_warning_days_threshold", type: "INTEGER", constraints: "DEFAULT 7 CHECK (fefo_warning_days_threshold > 0 AND fefo_warning_days_threshold <= 365)" }
+
+      # Freshness & Auto-Refresh
+      - { name: "auto_refresh_allocation_data", type: "BOOLEAN", constraints: "DEFAULT false" }
+      - { name: "allocation_data_refresh_interval_seconds", type: "INTEGER", constraints: "DEFAULT 30 CHECK (allocation_data_refresh_interval_seconds >= 30)" }
+
+      # Timestamps
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT now()" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "DEFAULT now()" }
+
+    constraints:
+      - "CONSTRAINT shipping_settings_valid_strategy CHECK (default_picking_strategy IN ('FIFO', 'FEFO'))"
+
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+    indexes:
+      - "idx_shipping_settings_org ON shipping_settings(org_id)"
+
+  - name: "sales_order_lines (ALTER)"
+    description: "Add backorder_flag column to existing table"
+    columns:
+      - { name: "backorder_flag", type: "BOOLEAN", constraints: "DEFAULT false" }
+
+# RLS Policies (ADR-013)
+rls_policies:
+  pattern: "Users Table Lookup"
+  pattern_sql: "(SELECT org_id FROM users WHERE id = auth.uid())"
+
+  policies:
+    - table: "inventory_allocations"
+      name: "allocations_select"
+      operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      description: "All authenticated users can read org allocations"
+
+    - table: "inventory_allocations"
+      name: "allocations_insert"
+      operation: "INSERT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      description: "Users can create allocations in their org"
+
+    - table: "inventory_allocations"
+      name: "allocations_update"
+      operation: "UPDATE"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      description: "Users can update allocations in their org (quantity_picked tracking)"
+
+    - table: "inventory_allocations"
+      name: "allocations_delete"
+      operation: "DELETE"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      description: "Users can delete allocations in their org (release)"
+
+    - table: "shipping_settings"
+      name: "shipping_settings_select"
+      operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      description: "Read shipping settings for org"
+
+    - table: "shipping_settings"
+      name: "shipping_settings_update"
+      operation: "UPDATE"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      description: "Admins can update org shipping settings"
+
+# Triggers and Functions
+triggers:
+  - name: "update_inventory_allocations_updated_at"
+    description: "Auto-update updated_at timestamp on inventory_allocations"
+    table: "inventory_allocations"
+    timing: "BEFORE UPDATE"
+    for_each: "ROW"
+    sql: |
+      CREATE OR REPLACE FUNCTION update_inventory_allocations_updated_at()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        NEW.updated_at = NOW();
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+
+    trigger_sql: |
+      CREATE TRIGGER trigger_inventory_allocations_updated_at
+      BEFORE UPDATE ON inventory_allocations
+      FOR EACH ROW
+      EXECUTE FUNCTION update_inventory_allocations_updated_at();
+
+  - name: "update_shipping_settings_updated_at"
+    description: "Auto-update updated_at timestamp on shipping_settings"
+    table: "shipping_settings"
+    timing: "BEFORE UPDATE"
+    for_each: "ROW"
+    sql: |
+      CREATE OR REPLACE FUNCTION update_shipping_settings_updated_at()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        NEW.updated_at = NOW();
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+
+    trigger_sql: |
+      CREATE TRIGGER trigger_shipping_settings_updated_at
+      BEFORE UPDATE ON shipping_settings
+      FOR EACH ROW
+      EXECUTE FUNCTION update_shipping_settings_updated_at();
+
+# Field Notes
+field_notes:
+  allocation_threshold_pct:
+    description: "Percentage of SO line quantity required to mark as 'allocated' status"
+    default: 80
+    range: "1-100"
+    example: "If 80%, SO line with 100 units becomes 'allocated' status when 80+ units allocated"
+
+  default_picking_strategy:
+    description: "Default allocation strategy for org (can be overridden per product)"
+    values:
+      - code: "FIFO"
+        label: "First In, First Out"
+        description: "Allocate oldest inventory first (by receipt_date)"
+      - code: "FEFO"
+        label: "First Expired, First Out"
+        description: "Allocate shortest shelf-life first (by expiry_date)"
+
+  fefo_warning_days_threshold:
+    description: "Days before expiry to show yellow warning in allocation UI"
+    default: 7
+    range: "1-365"
+    example: "If 7 days, LP with expiry date 7 days from today shows warning"
+
+  auto_allocate_on_confirm:
+    description: "Automatically trigger allocation when SO status changes to 'confirmed'"
+    default: true
+    type: "boolean"
+
+  auto_refresh_allocation_data:
+    description: "Auto-refresh inventory data in allocation modal (if true, every 30s)"
+    default: false
+    type: "boolean"
+
+  allocation_data_refresh_interval_seconds:
+    description: "Interval for auto-refresh in seconds (only if auto_refresh_allocation_data=true)"
+    default: 30
+    range: "30-300"
+    unit: "seconds"
+
+  backorder_flag:
+    description: "Set on SO line when quantity_allocated < quantity_required"
+    type: "boolean"
+
+# Related Tables
+related_tables:
+  - name: "sales_orders"
+    relationship: "inventory_allocations reserves LPs for SO lines"
+    fk_via: "inventory_allocations.sales_order_line_id → sales_order_lines.id → sales_order_lines.sales_order_id"
+
+  - name: "sales_order_lines"
+    relationship: "One SO line has many inventory_allocations (one per LP)"
+    fk: "inventory_allocations.sales_order_line_id → sales_order_lines.id"
+
+  - name: "license_plates"
+    relationship: "LP is allocated to SO line via inventory_allocations"
+    fk: "inventory_allocations.license_plate_id → license_plates.id"
+
+  - name: "products"
+    relationship: "Product picking_strategy determines FIFO vs FEFO"
+    via_query: "sales_order_lines.product_id → products.id"
+
+  - name: "lp_reservations"
+    relationship: "Tracks partial LP allocations (qty reserved for SO line)"
+    fk: "lp_reservations.lp_id → license_plates.id + lp_reservations.so_line_id → sales_order_lines.id"
+
+# Performance Considerations
+performance:
+  expected_volumes:
+    allocations_per_month: "500-5,000"
+    max_allocations: "100,000"
+    so_lines_per_so: "5-50"
+    lps_per_so_line: "2-10"
+
+  query_optimization:
+    - "Index (org_id, sales_order_line_id) for quick line lookup"
+    - "Index (org_id) WHERE released_at IS NULL for active allocations"
+    - "Batch allocations in transaction (SERIALIZABLE isolation)"
+    - "Use SELECT FOR UPDATE SKIP LOCKED to prevent race conditions"
+    - "Cache product picking_strategy (24-hour TTL)"
+    - "Cache shipping_settings (1-hour TTL)"
+
+  cache_keys:
+    - "org:{orgId}:allocation:in_progress:{soId} (5 min TTL - lock key)"
+    - "org:{orgId}:product:{productId}:picking_strategy (24 hour TTL)"
+    - "org:{orgId}:settings:allocation_threshold (1 hour TTL)"
+    - "org:{orgId}:settings:shipping_settings (1 hour TTL)"
+
+  indexes_priority:
+    high:
+      - "idx_allocations_so_line (frequent lookups)"
+      - "idx_allocations_lp (prevent duplicate allocations)"
+      - "idx_allocations_org_active (allocation view queries)"
+    medium:
+      - "idx_allocations_org_so (SO detail queries)"
+      - "idx_allocations_created (sorting/pagination)"
+    low:
+      - "idx_shipping_settings_org (config lookup)"

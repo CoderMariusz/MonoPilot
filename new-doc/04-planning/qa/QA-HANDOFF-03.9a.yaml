@@ -1,0 +1,65 @@
+story: "03.9a"
+name: "TO Partial Shipments (Ship/Receive Actions)"
+epic: "03-planning"
+
+decision: PASS
+qa_report: "docs/2-MANAGEMENT/qa/qa-report-story-03.9a.md"
+
+# Test Results Summary
+ac_results: "10/10 passing"
+ac_tested:
+  - "AC-1: Ship TO Modal - Full Shipment ✅"
+  - "AC-2: Ship TO Modal - Partial Shipment ✅"
+  - "AC-3: Ship TO Modal - Second Partial Shipment ✅"
+  - "AC-4: Ship TO Modal - Validation Errors ✅"
+  - "AC-5: Receive TO Modal - Full Receipt ✅"
+  - "AC-6: Receive TO Modal - Partial Receipt ✅"
+  - "AC-7: Receive TO Modal - Validation Errors ✅"
+  - "AC-8: Status-Based Action Visibility ✅"
+  - "AC-9: Progress Indicators ✅"
+  - "AC-10: Settings Toggle - Disable Partial Shipments ✅"
+
+critical_bugs_found: 0
+high_bugs_found: 0
+blocking_bugs: []
+
+critical_fixes_verified:
+  - "CRITICAL-SEC-01: Receive without shipping - BLOCKED ✅"
+  - "CRITICAL-SEC-02: RLS policy bypass - FIXED ✅"
+  - "CRITICAL-BUG-01: Race condition on immutable dates - PROTECTED ✅"
+  - "CRITICAL-DB-01: Database constraint on received_qty - FIXED ✅"
+  - "MAJOR-BUG-01: API response consistency - FIXED ✅"
+
+edge_cases_tested:
+  - "Zero quantity shipment - BLOCKED ✅"
+  - "Receive more than shipped - BLOCKED ✅"
+  - "Multiple partial shipments (3+ batches) - PASS ✅"
+  - "Receive without shipping - BLOCKED (CRITICAL-SEC-01) ✅"
+  - "Concurrent ship requests - PROTECTED by database trigger ✅"
+  - "Future receipt date - BLOCKED ✅"
+  - "Invalid date format - BLOCKED ✅"
+
+regression_testing:
+  story_03_8_transfer_order_crud: PASS
+  story_03_7_line_management: PASS
+  no_regressions: true
+
+quality_metrics:
+  test_coverage: "80%+"
+  performance: "<500ms (all operations)"
+  accessibility: "WCAG 2.1 AA"
+  code_quality: "A- (8.8/10)"
+  security: "PASS (all checks)"
+
+next_phase: DOCUMENTATION
+next_phase_owner: TECH-WRITER
+handoff_date: "2025-12-31"
+
+notes: |
+  All acceptance criteria passing. Implementation is production-ready.
+  Ready to move to DOCUMENTATION phase for user guides and API docs.
+  No blocking issues. All critical security and business logic fixes verified.
+  Code review approved with grade A- (8.8/10) after fixes applied.
+
+commit: "5c03162"
+qa_report_file: "C:/Users/Mariusz K/Documents/Programowanie/MonoPilot/docs/2-MANAGEMENT/qa/qa-report-story-03.9a.md"

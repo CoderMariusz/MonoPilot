@@ -1,0 +1,129 @@
+# Story 06.30 - HACCP Verification Records Test Specifications
+
+unit_tests:
+  file: lib/services/__tests__/haccp-verification-service.test.ts
+  coverage: ">80%"
+
+  test_suites:
+    - suite: "HACCPVerificationService.create"
+      tests:
+        - "creates verification with checklist"
+        - "generates verification number"
+        - "stores checklist in JSONB"
+        - "requires findings if result = fail/partial"
+
+    - suite: "HACCPVerificationService.approveQA"
+      tests:
+        - "verifies password"
+        - "sets QA approval fields"
+        - "changes status to pending_director_approval"
+        - "encrypts signature"
+        - "requires QA_MANAGER role"
+
+    - suite: "HACCPVerificationService.approveDirector"
+      tests:
+        - "verifies password"
+        - "sets Director approval fields"
+        - "changes status to approved"
+        - "triggers next_date calculation"
+        - "sets is_locked = true"
+        - "requires QUALITY_DIRECTOR role"
+
+    - suite: "HACCPVerificationService.getOverdue"
+      tests:
+        - "returns verifications with next_date < today"
+        - "only includes approved verifications"
+        - "sorts by next_date ascending"
+
+    - suite: "HACCPVerificationService.getDefaultChecklist"
+      tests:
+        - "returns calibration checklist for type = calibration"
+        - "returns record review checklist for type = record_review"
+        - "returns plan review checklist for type = plan_review"
+        - "returns audit checklist for type = audit"
+
+integration_tests:
+  file: app/api/quality/haccp-verifications/__tests__/route.test.ts
+
+  test_suites:
+    - endpoint: "POST /api/quality/haccp-verifications"
+      tests:
+        - "creates verification with valid data"
+        - "returns 400 if checklist empty"
+        - "returns 400 if findings missing for fail result"
+        - "enforces org_id from auth"
+
+    - endpoint: "POST /api/quality/haccp-verifications/:id/approve-qa"
+      tests:
+        - "approves with correct password"
+        - "returns 400 for incorrect password"
+        - "returns 403 for non-QA_MANAGER"
+        - "changes status correctly"
+
+    - endpoint: "POST /api/quality/haccp-verifications/:id/approve-director"
+      tests:
+        - "approves with correct password"
+        - "calculates next_verification_date"
+        - "locks verification"
+        - "returns 403 for non-QUALITY_DIRECTOR"
+
+    - endpoint: "GET /api/quality/haccp-verifications/overdue"
+      tests:
+        - "returns overdue verifications"
+        - "returns count"
+        - "respects org isolation"
+
+e2e_tests:
+  file: e2e/quality/haccp-verifications.spec.ts
+
+  scenarios:
+    - name: "Create and approve verification workflow"
+      steps:
+        - "Navigate to HACCP Verifications"
+        - "Click [+ New Verification]"
+        - "Select HACCP Plan"
+        - "Select verification type = 'record_review'"
+        - "Select frequency = 'monthly'"
+        - "Verify default checklist loads"
+        - "Check all checklist items"
+        - "Select result = 'pass'"
+        - "Click [Save Draft]"
+        - "Click [Submit for Approval]"
+        - "Login as QA_MANAGER"
+        - "Navigate to verification"
+        - "Click [Approve as QA Manager]"
+        - "Enter password"
+        - "Verify status = 'pending_director_approval'"
+        - "Login as QUALITY_DIRECTOR"
+        - "Navigate to verification"
+        - "Click [Approve as Director]"
+        - "Enter password"
+        - "Verify status = 'approved'"
+        - "Verify next_verification_date calculated"
+        - "Verify is_locked = true"
+
+    - name: "Overdue verification alert"
+      steps:
+        - "Create verification with next_date = yesterday"
+        - "Navigate to Dashboard"
+        - "Verify overdue alert displays"
+        - "Verify count = 1"
+        - "Click [View Overdue]"
+        - "Verify verification appears in list"
+        - "Verify red overdue badge"
+
+acceptance_criteria_mapping:
+  AC-1: "unit_tests.table_creation"
+  AC-2: "integration_tests.POST create"
+  AC-3: "unit_tests.getDefaultChecklist"
+  AC-4: "e2e_tests.dual_approval_workflow"
+  AC-5: "unit_tests.next_date_calculation"
+  AC-6: "unit_tests.failed_verification"
+  AC-7: "e2e_tests.overdue_alert"
+
+performance_tests:
+  - name: "Verification list with 200 records"
+    target: "<500ms response time"
+
+  - name: "Overdue verification query"
+    target: "<300ms query time"

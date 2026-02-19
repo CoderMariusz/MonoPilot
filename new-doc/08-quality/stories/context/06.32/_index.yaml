@@ -1,0 +1,42 @@
+# Story 06.32 - CAPA Action Items Context
+# Phase: 4 (Advanced Quality)
+
+story:
+  id: "06.32"
+  name: "CAPA Action Items"
+  epic: "06-quality"
+  phase: "4"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "full-stack"
+  state: "ready"
+  priority: "P1"
+
+context_files:
+  - _index.yaml
+  - database.yaml
+  - api.yaml
+  - frontend.yaml
+  - tests.yaml
+
+dependencies:
+  required:
+    - story: "06.31"
+      provides: ["capa_records table"]
+  blocks:
+    - story: "06.33"
+
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "capa_actions table"
+  - type: "api"
+    count: 6
+    description: "Action CRUD + complete + progress endpoints"
+  - type: "components"
+    count: 6
+    description: "Action list, form, complete modal, progress bar"
+
+summary: |
+  Action items checklist for CAPA implementation tracking.
+  Responsible person, due date, evidence upload, progress %.

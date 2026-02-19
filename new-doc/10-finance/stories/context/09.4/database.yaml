@@ -1,0 +1,29 @@
+tables:
+  cost_centers:
+    columns:
+      - "id UUID PRIMARY KEY"
+      - "org_id UUID"
+      - "code TEXT"
+      - "name TEXT"
+      - "type TEXT (production, overhead, admin)"
+      - "production_line_id UUID"
+      - "parent_id UUID (hierarchy)"
+    constraints:
+      - "UNIQUE (org_id, code)"
+
+  labor_costs:
+    columns:
+      - "id UUID PRIMARY KEY"
+      - "org_id UUID"
+      - "work_order_id UUID"
+      - "operation_id UUID"
+      - "user_id UUID"
+      - "hours_actual NUMERIC(10,2)"
+      - "hourly_rate NUMERIC(15,4)"
+      - "total_cost NUMERIC(15,4)"
+      - "cost_center_id UUID"
+    constraints:
+      - "CHECK (total_cost = hours_actual * hourly_rate)"
+
+functions:
+  - "calculate_labor_cost_from_timelog() - calc labor cost from time log"

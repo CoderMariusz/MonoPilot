@@ -1,0 +1,218 @@
+# Story 01.5b - Frontend Specification
+# Purpose: Components, hooks, types
+# Agent: FRONTEND-DEV
+
+# Components to Create
+components:
+  - path: "apps/frontend/components/settings/users/WarehouseAccessSection.tsx"
+    description: "Warehouse access multi-select with 'All Warehouses' checkbox"
+    props:
+      - name: "value"
+        type: "string[]"
+        description: "Selected warehouse IDs"
+      - name: "allWarehousesChecked"
+        type: "boolean"
+        description: "Whether 'All Warehouses' is selected"
+      - name: "onChange"
+        type: "(ids: string[], allWarehouses: boolean) => void"
+        description: "Callback when selection changes"
+      - name: "availableWarehouses"
+        type: "Warehouse[]"
+        description: "List of warehouses to choose from"
+      - name: "disabled"
+        type: "boolean"
+        description: "Whether the field is disabled"
+    ux_reference: "SET-009, lines 49-117"
+    implementation_notes:
+      - "Checkbox for 'All Warehouses' (default ON for admin/super_admin)"
+      - "When checkbox ON, multi-select is disabled"
+      - "When checkbox OFF, multi-select is enabled"
+      - "Use ShadCN MultiSelect component"
+      - "Show warning if unchecked and no warehouses selected"
+
+  - path: "apps/frontend/components/settings/users/WarehouseAccessBadge.tsx"
+    description: "Badge showing warehouse access status in user list"
+    props:
+      - name: "warehouseCount"
+        type: "number"
+        description: "Number of assigned warehouses"
+      - name: "allWarehouses"
+        type: "boolean"
+        description: "Whether user has access to all warehouses"
+    variants:
+      - state: "all"
+        display: '"All Warehouses" badge (green)'
+      - state: "specific"
+        display: '"3 Warehouses" badge (blue)'
+      - state: "none"
+        display: '"No Access" badge (gray)'
+
+# Component Updates (extending existing)
+component_updates:
+  - path: "apps/frontend/components/settings/users/UserModal.tsx"
+    description: "Add WarehouseAccessSection to user modal (Phase 1B)"
+    changes:
+      - "Import WarehouseAccessSection component"
+      - "Add warehouse_access_ids to form state"
+      - "Add all_warehouses to form state"
+      - "Fetch available warehouses on mount"
+      - "Enable SET-009 wireframe section (lines 49-117)"
+      - "Default all_warehouses = true for admin/super_admin roles"
+      - "Default all_warehouses = false for other roles"
+    location_in_form: "After role selection, before status toggle"
+
+  - path: "apps/frontend/components/settings/users/UsersDataTable.tsx"
+    description: "Add warehouse access column to user table"
+    changes:
+      - "Add 'Warehouse Access' column after 'Role'"
+      - "Render WarehouseAccessBadge for each user"
+      - "Fetch warehouse_access_ids in user list query"
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/useWarehouseAccess.ts"
+    description: "Hook for managing warehouse access in user form"
+    exports:
+      - name: "useWarehouseAccess"
+        returns: "UseWarehouseAccessResult"
+        description: "Manages warehouse access state and API calls"
+    pattern: |
+      import { useState, useEffect } from 'react';
+      import { useQuery, useMutation } from '@tanstack/react-query';
+
+      export function useWarehouseAccess(userId?: string) {
+        const { data: access, isLoading } = useQuery({
+          queryKey: ['user-warehouse-access', userId],
+          queryFn: () => fetchWarehouseAccess(userId!),
+          enabled: !!userId
+        });
+
+        const { data: warehouses } = useQuery({
+          queryKey: ['warehouses'],
+          queryFn: fetchWarehouses
+        });
+
+        const updateMutation = useMutation({
+          mutationFn: (data: UpdateWarehouseAccessRequest) =>
+            updateWarehouseAccess(userId!, data),
+          onSuccess: () => {
+            // Invalidate cache
+          }
+        });
+
+        return {
+          access,
+          warehouses,
+          isLoading,
+          update: updateMutation.mutate,
+          isUpdating: updateMutation.isPending
+        };
+      }
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/warehouse-access.ts"
+    description: "Warehouse access TypeScript interfaces"
+    content: |
+      export interface WarehouseAccessResponse {
+        user_id: string;
+        all_warehouses: boolean;
+        warehouse_ids: string[];
+        warehouses: Array<{
+          id: string;
+          code: string;
+          name: string;
+        }>;
+      }
+
+      export interface UpdateWarehouseAccessRequest {
+        all_warehouses: boolean;
+        warehouse_ids?: string[];
+      }
+
+      export interface UseWarehouseAccessResult {
+        access: WarehouseAccessResponse | undefined;
+        warehouses: Warehouse[] | undefined;
+        isLoading: boolean;
+        update: (data: UpdateWarehouseAccessRequest) => void;
+        isUpdating: boolean;
+      }
+
+# UX Wireframe Implementation
+ux:
+  wireframes:
+    - id: "SET-009"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SET-009-user-create-edit-modal.md"
+      lines: "49-117"
+      section: "Warehouse Access"
+      components:
+        - "WarehouseAccessSection.tsx"
+      states:
+        - state: "all_warehouses_checked"
+          display: "Checkbox ON, multi-select disabled (grayed out)"
+        - state: "specific_warehouses"
+          display: "Checkbox OFF, multi-select enabled, warehouses selected"
+        - state: "no_warehouses"
+          display: "Checkbox OFF, multi-select enabled, no selection (warning)"
+
+  patterns:
+    form: "ShadCN Form with Zod validation"
+    multiselect: "ShadCN MultiSelect component"
+    checkbox: "ShadCN Checkbox component"
+
+  validation:
+    client_side:
+      - rule: "If all_warehouses = false, must have at least one warehouse selected"
+        message: "At least one warehouse must be selected"
+      - rule: "Warehouse IDs must be valid UUIDs"
+        message: "Invalid warehouse selection"
+
+    server_side:
+      - rule: "Warehouse IDs must exist in org"
+        message: "One or more warehouse IDs do not exist"
+
+# Form State Management
+form_state:
+  - field: "warehouse_access_ids"
+    type: "string[]"
+    default: "[]"
+  - field: "all_warehouses"
+    type: "boolean"
+    default: "true (admin/super_admin), false (others)"
+
+# API Integration
+api_calls:
+  - endpoint: "GET /api/v1/settings/users/:id/warehouse-access"
+    trigger: "User modal opens (edit mode)"
+    use: "Populate warehouse access state"
+
+  - endpoint: "PUT /api/v1/settings/users/:id/warehouse-access"
+    trigger: "User form save (warehouse access changed)"
+    use: "Update warehouse access"
+
+  - endpoint: "GET /api/v1/settings/warehouses"
+    trigger: "User modal opens"
+    use: "Fetch available warehouses for multi-select"
+
+# Error Handling
+error_handling:
+  - scenario: "No warehouses exist"
+    ui: "Show message 'No warehouses configured. Create warehouses first.'"
+  - scenario: "Warehouse fetch fails"
+    ui: "Disable warehouse section, show error toast"
+  - scenario: "Update fails"
+    ui: "Show error toast, revert form state"
+
+# Accessibility
+accessibility:
+  - "Checkbox has label 'All Warehouses'"
+  - "Multi-select has label 'Specific Warehouses'"
+  - "Keyboard navigation works for checkbox and multi-select"
+  - "Screen reader announces disabled state when checkbox is ON"
+  - "Focus trap in modal includes warehouse section"
+
+# Performance
+performance:
+  - "Warehouse list cached (5 min TTL)"
+  - "Debounce search in multi-select (300ms)"
+  - "Virtual scrolling for warehouse list (if >100 warehouses)"

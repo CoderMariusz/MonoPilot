@@ -1,0 +1,267 @@
+# Story 01.7 - API Specification
+# Purpose: Module toggles endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  - method: "GET"
+    path: "/api/v1/settings/modules"
+    description: "List all modules with org-specific enabled status"
+    file: "apps/frontend/app/api/settings/modules/route.ts"
+    auth: true
+    roles: ["*"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      query_params: []
+
+    response:
+      status: 200
+      type: "Module[]"
+      schema:
+        - id: "uuid"
+          code: "string (lowercase snake_case)"
+          name: "string"
+          description: "string"
+          enabled: "boolean"
+          dependencies: "string[]"
+          dependents: "string[]"
+          can_disable: "boolean"
+          display_order: "number"
+
+    example_response: |
+      [
+        {
+          "id": "uuid-settings",
+          "code": "settings",
+          "name": "Settings",
+          "description": "Organization and user management",
+          "enabled": true,
+          "dependencies": [],
+          "dependents": [],
+          "can_disable": false,
+          "display_order": 0
+        },
+        {
+          "id": "uuid-technical",
+          "code": "technical",
+          "name": "Technical",
+          "description": "Products, BOMs, and routings",
+          "enabled": true,
+          "dependencies": [],
+          "dependents": ["planning", "warehouse", "npd"],
+          "can_disable": true,
+          "display_order": 1
+        }
+      ]
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        condition: "No valid JWT token provided"
+
+  - method: "PATCH"
+    path: "/api/v1/settings/modules/:id/toggle"
+    description: "Enable or disable a module for the organization"
+    file: "apps/frontend/app/api/settings/modules/[id]/toggle/route.ts"
+    auth: true
+    roles: ["super_admin", "admin"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      body:
+        enabled: "boolean (required)"
+        cascade: "boolean (optional, default: false) - auto-enable/disable dependencies"
+
+    response:
+      status: 200
+      type: "ToggleResponse"
+      schema:
+        success: "boolean"
+        affected_modules: "string[] - modules that were also toggled"
+        warning: "string (optional) - if cascade needed but not requested"
+
+    example_response: |
+      {
+        "success": true,
+        "affected_modules": ["planning"],
+        "warning": null
+      }
+
+    errors:
+      - status: 400
+        code: "DEPENDENCY_NOT_MET"
+        message: "Module dependencies not met"
+        condition: "Enabling without required dependencies (cascade=false)"
+      - status: 400
+        code: "HAS_ACTIVE_DEPENDENTS"
+        message: "Module has active dependents"
+        condition: "Disabling with active dependents (cascade=false)"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Admin role required"
+        condition: "Non-admin user attempts toggle"
+      - status: 404
+        code: "MODULE_NOT_FOUND"
+        message: "Module not found"
+        condition: "Invalid module ID"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/module-settings-service.ts"
+    description: "Module toggle logic with dependency validation"
+    exports:
+      - name: "getAllModules"
+        type: "async function"
+        params: ["orgId: string"]
+        returns: "Promise<Module[]>"
+        description: "Fetch all modules with org-specific enabled status"
+
+      - name: "toggleModule"
+        type: "async function"
+        params: ["orgId: string", "moduleId: string", "enabled: boolean", "cascade?: boolean"]
+        returns: "Promise<ToggleResponse>"
+        description: "Toggle module enabled/disabled with dependency validation"
+
+      - name: "validateDependencies"
+        type: "function"
+        params: ["module: Module", "enabled: boolean"]
+        returns: "{ valid: boolean; missing?: string[]; affected?: string[] }"
+        description: "Validate module toggle against dependencies"
+
+      - name: "getAffectedModules"
+        type: "function"
+        params: ["module: Module", "enabled: boolean"]
+        returns: "string[]"
+        description: "Get list of modules affected by enable/disable cascade"
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/module.ts"
+    description: "Module TypeScript interfaces"
+    exports:
+      - "Module"
+      - "ModuleCode"
+      - "ToggleResponse"
+    content: |
+      export interface Module {
+        id: string;
+        code: string;
+        name: string;
+        description: string;
+        enabled: boolean;
+        dependencies: string[];
+        dependents: string[];
+        can_disable: boolean;
+        display_order: number;
+      }
+
+      export type ModuleCode =
+        | 'settings'
+        | 'technical'
+        | 'planning'
+        | 'production'
+        | 'quality'
+        | 'warehouse'
+        | 'shipping'
+        | 'npd'
+        | 'finance'
+        | 'oee'
+        | 'integrations';
+
+      export interface ToggleResponse {
+        success: boolean;
+        affected_modules: string[];
+        warning?: string;
+      }
+
+# Implementation patterns
+patterns:
+  api_route: |
+    // apps/frontend/app/api/settings/modules/route.ts
+    import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+    import { cookies } from 'next/headers';
+    import { NextResponse } from 'next/server';
+
+    export async function GET() {
+      const supabase = createRouteHandlerClient({ cookies });
+
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      // Get user's org_id
+      const { data: userData } = await supabase
+        .from('users')
+        .select('org_id')
+        .eq('id', user.id)
+        .single();
+
+      // Join modules with organization_modules
+      const { data: modules } = await supabase
+        .from('modules')
+        .select(`
+          id, code, name, description, can_disable, display_order,
+          dependencies, organization_modules!inner(enabled)
+        `)
+        .eq('organization_modules.org_id', userData.org_id)
+        .order('display_order', { ascending: true });
+
+      return NextResponse.json(modules);
+    }
+
+  service_pattern: |
+    // apps/frontend/lib/services/module-settings-service.ts
+    import { Module, ToggleResponse, ModuleCode } from '@/lib/types/module';
+
+    export async function getAllModules(orgId: string): Promise<Module[]> {
+      const response = await fetch('/api/settings/modules', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch modules');
+      }
+
+      return response.json();
+    }
+
+    export async function toggleModule(
+      orgId: string,
+      moduleId: string,
+      enabled: boolean,
+      cascade?: boolean
+    ): Promise<ToggleResponse> {
+      const response = await fetch(`/api/settings/modules/${moduleId}/toggle`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled, cascade }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message);
+      }
+
+      return response.json();
+    }
+
+# Caching Strategy
+caching:
+  strategy: "React Query"
+  cache_key: "['settings', 'modules']"
+  stale_time: "1 minute"
+  reason: "Module toggles can change, invalidate on toggle"
+  invalidation: "Manual on toggle, refetch after PATCH success"
+  pattern: |
+    // In useModules hook
+    useQuery({
+      queryKey: ['settings', 'modules'],
+      queryFn: () => getAllModules(orgId),
+      staleTime: 1 * 60 * 1000, // 1 minute
+      cacheTime: 5 * 60 * 1000, // 5 minutes
+    });

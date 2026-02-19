@@ -1,0 +1,98 @@
+# Story 01.14 - Index File (Entry Point)
+# Generated: 2025-12-16
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "01.14"
+  name: "Wizard Steps Complete (Steps 2-6)"
+  slug: "wizard-steps-complete"
+  epic: "01-settings"
+  phase: "1A"
+  complexity: "L"
+  estimate_days: 5-7
+  type: "fullstack"
+  state: "ready"
+  competitive_differentiator: true
+  note: "15-minute onboarding promise"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # wizard_progress, badges, templates
+  - api.yaml         # Step endpoints, template endpoints
+  - frontend.yaml    # Step components, templates, celebration
+  - tests.yaml       # Acceptance criteria, test specifications
+  - gaps.yaml        # Identified gaps, blockers
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.3"
+      name: "Wizard Framework"
+      provides: ["WizardModal", "step navigation", "progress tracking"]
+    - story: "01.4"
+      name: "Org Profile Step (Step 1)"
+      provides: ["Step 1 completion", "organization data"]
+    - story: "01.8"
+      name: "Warehouses CRUD"
+      provides: ["Warehouse creation API", "warehouse types"]
+      note: "Phase 1B but wizard calls API early"
+    - story: "01.9"
+      name: "Locations CRUD"
+      provides: ["Location creation API", "location hierarchy"]
+      note: "Phase 1B but wizard calls API early"
+    - story: "01.1"
+      name: "Org Context + RLS"
+      provides: ["org_id context", "RLS patterns"]
+    - story: "01.2"
+      name: "Settings Shell"
+      provides: ["Modal mounting point"]
+  blocked_by: []
+  blocks: []
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/settings.md"
+    sections: ["FR-SET-182", "FR-SET-183", "FR-SET-184", "FR-SET-185", "FR-SET-186", "FR-SET-187", "FR-SET-188"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/settings.md"
+    sections: ["Database Schema", "organizations table"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/01-settings/01.14.wizard-steps-complete.md"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "Add wizard_progress JSONB and badges JSONB to organizations"
+  - type: "service"
+    count: 1
+    description: "wizard-service.ts with step handlers and summary"
+  - type: "api"
+    count: 7
+    description: "5 step endpoints + 2 template endpoints"
+  - type: "validation"
+    count: 1
+    description: "Zod schemas for steps 2-5"
+  - type: "components"
+    count: 15
+    description: "5 step components + templates + celebration components"
+  - type: "templates"
+    count: 2
+    description: "Location templates + product templates (constants)"
+  - type: "test"
+    count: 3
+    description: "Unit + integration + E2E tests"
+
+# Technical notes
+technical_notes:
+  - "Wizard uses simplified forms with sensible defaults"
+  - "Step 2: Create warehouse with pre-filled WH-MAIN code"
+  - "Step 3: Template-based location creation (Simple, Basic, Full, Custom)"
+  - "Step 4: Industry-based product templates with pre-filled fields"
+  - "Step 5: Optional demo work order (disabled if no product)"
+  - "Step 6: Celebration with confetti, summary, speed badge (<15 min)"
+  - "wizard_progress JSONB tracks completed steps and created entity IDs"
+  - "Speed Champion badge awarded if completion < 900 seconds (15 min)"
+  - "All steps skippable with demo/default data creation"

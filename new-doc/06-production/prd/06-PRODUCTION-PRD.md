@@ -1,5 +1,5 @@
 # PRD 06-Production — MonoPilot MES
-**Wersja**: 3.0 | **Data**: 2026-02-17 | **Status**: Draft
+**Wersja**: 3.1 | **Data**: 2026-02-18 | **Status**: Draft
 
 ---
 
@@ -108,6 +108,7 @@ Umożliwić kierownikom i operatorom produkcji pełne zarządzanie cyklem życia
 - **Redis cache** — dashboard: 30s TTL, OEE: 5min TTL
 - **Performance** — scanner APIs < 500ms, dashboard < 2s, consumption POST < 2s
 - **Decimal precision** — `DECIMAL(15,6)` na wszystkich polach ilościowych
+- **Multi-site (Phase 1 prep)** — `site_id UUID NULL` na nowych tabelach Phase 1: `downtime_reasons`, `downtime_records`, `shifts`, `production_outputs`. UWAGA: tabela `waste_categories` zdefiniowana w M01 Settings — site_id zarządzany w M01.
 
 ### Biznesowe
 - **Shared services** — scanner i desktop używają tych samych serwisów (`lib/services/wo-*`)
@@ -170,6 +171,8 @@ Guards: RELEASED→IN_PROGRESS wymaga BOM snapshot; COMPLETED wymaga ≥1 output
 ### D8. Waste Categories (z [5.1])
 
 Customizable per org. Domyślne: fat, floor, giveaway, rework, other. Każdy output rejestruje opcjonalnie `waste_qty + waste_category_id`. Waste NIE jest wliczane do output_qty.
+
+**Ważne**: Tabela `waste_categories` zdefiniowana i zarządzana w M01 Settings (D-SET-9). M06 Production referencuje ją jako FK `waste_category_id`. Klienci dodają własne kategorie (np. bone, skin, trim) przez UI Settings → Waste Categories.
 
 ### D9. Weight-Based Yield (z [5.2])
 
@@ -707,40 +710,65 @@ M05 Scanner ── uses M06 services for consume/output workflows
 
 ---
 
-## 13. Pytania doprecyzowujące
+## 13. Rozstrzygnięte pytania
 
-Poniższe kwestie wymagają decyzji przed rozpoczęciem implementacji:
+Poniższe kwestie zostały rozstrzygnięte i są wiążące dla implementacji:
 
-### Pytania biznesowe
+### Decyzje biznesowe
 
-1. **Waste categories — czy lista domyślna (fat, floor, giveaway, rework, other) jest kompletna?** Czy klient ma dodatkowe kategorie waste specyficzne dla swojej branży (np. bone, skin, trim)?
+1. **Waste categories — lista domyślna i rozszerzalność**
 
-2. **Shift model — czy wystarczą 2 shifty (AM/PM)?** Czy są zakłady z 3 zmianami (Morning/Afternoon/Night)? Czy shift może przekraczać midnight (np. Night 22:00-06:00)?
+   Lista domyślna (fat, floor, giveaway, rework, other) jest kompletna jako seed data. Tabela `waste_categories` jest w M01 Settings i jest customizable per org — klienci dodają własne kategorie (np. bone, skin, trim) przez UI Settings. M06 Production referencuje tabelę z M01.
 
-3. **Over-consumption approval — kto dokładnie zatwierdza?** Czy to zawsze Production Manager, czy może być delegowane do Shift Leader? Czy jest limit kwotowy/procentowy, powyżej którego eskalacja do wyższego poziomu?
+2. **Shift model — N zmian, przekraczanie midnight**
 
-4. **By-product vs Co-product — jak klient rozróżnia?** Czy co-product to zawsze planned output z BOM (np. mięso + kości), a by-product to incidental (np. tłuszcz)? Czy co-products mają własne target_qty w BOM?
+   System wspiera N zmian (nie tylko 2). Konfigurowalne per org w M01 Settings. Shift MOŻE przekraczać midnight (np. Night 22:00-06:00 — system obsługuje przez `start_time > end_time` logikę). Domyślny seed: AM (06:00-14:00), PM (14:00-22:00). Klient może dodać Night (22:00-06:00).
 
-5. **Downtime — czy „planned downtime" (changeover, cleaning) powinien być rejestrowany z WO, czy niezależnie od WO?** Np. cleaning między WO nie jest powiązany z żadnym konkretnym WO.
+3. **Over-consumption approval — role i eskalacja**
 
-6. **Weight-based yield — czy `net_weight` na produkcie jest już wypełnione w M02 Technical?** Jeśli nie, to weight yield nie będzie działał do czasu uzupełnienia danych. Czy to blocker?
+   Konfigurowalny per org w `production_settings`. Domyślnie: Production Manager zatwierdza. Delegowanie do Shift Leader możliwe przez role permission `production.over_consumption.approve`. Próg eskalacji: konfigurowalny (domyślnie >10% → auto-eskalacja do Plant Manager/Owner). Limit zapisany w `production_settings.over_consumption_escalation_pct` (DEFAULT 10).
 
-7. **Auto-complete WO — czy trigger powinien działać na `output_qty ≥ planned_qty` czy `output_qty ≥ planned_qty × (1 - tolerance%)`?** Np. jeśli planned = 100 i tolerance = 2%, to auto-complete przy 98?
+4. **By-product vs Co-product — definicja i rozróżnienie**
 
-### Pytania techniczne
+   Co-product = planned output zdefiniowany w BOM (tabela `co_products` z M02) z `target_qty` i cost allocation %. By-product = incidental output bez target_qty — rejestrowany ręcznie lub auto (setting). Różnica: co-products mają yield tracking, by-products nie.
 
-8. **Genealogy linking — czy przy reversal consumption genealogia powinna być soft-deleted (`is_reversed=true`) czy fizycznie usunięta?** Obecna decyzja: soft-delete. Czy to potwierdzone?
+5. **Downtime planned vs unplanned — powiązanie z WO**
 
-9. **Concurrent consumption — czy optimistic locking (version column na LP) wystarczy, czy potrzebny pessimistic lock (SELECT FOR UPDATE)?** Przy dużej liczbie operatorów na jednej linii mogą być konflikty.
+   Oba typy mogą być powiązane z WO LUB standalone. Planned downtime (cleaning, changeover) = zazwyczaj standalone (nie linked do WO). Unplanned downtime (awaria) = linked do WO jeśli WO było active. Pole `work_order_id UUID NULL` na `downtime_records` — NULL = standalone, NOT NULL = powiązany z WO.
 
-10. **Shift auto-detection — co jeśli timestamp wypada poza zdefiniowanymi shiftami?** Np. output zarejestrowany o 05:30, a AM zaczyna się o 06:00. Czy przypisać do poprzedniego shiftu, czy zostawić NULL?
+6. **Weight-based yield — brak net_weight nie jest blockerem**
 
-11. **Dashboard cache invalidation — czy Redis cache (30s TTL) wystarczy, czy potrzebny event-driven invalidation?** Przy 30s TTL dashboard może pokazywać stale dane przez max 30s po zmianie.
+   Jeśli `net_weight` nie jest wypełnione w M02, yield weight-based pokazuje "N/A" z komunikatem "Uzupełnij net_weight w Technical → Products". Warning w UI, nie blokada. System automatycznie pomija produkty bez net_weight w dashboard yield calculations.
 
-12. **Label printing (ZPL) — czy w Phase 1 drukowanie etykiet jest wymagane, czy może być Phase 2?** Wymaga konfiguracji drukarek Zebra i testowania na fizycznym sprzęcie.
+7. **Auto-complete WO — trigger bez tolerancji**
+
+   Trigger działa na `output_qty >= planned_qty`. Brak tolerance — dokładne porównanie. Jeśli output < planned, operator MUSI ręcznie complete WO. Jeśli `auto_complete_wo=false` (default), operator zawsze ręcznie completes. Tolerance % nie jest potrzebny — upraszcza logikę.
+
+### Decyzje techniczne
+
+8. **Genealogy reversal — soft-delete potwierdzony**
+
+   Soft-delete potwierdzony. `is_reversed=true` na `lp_genealogy` record. LP qty przywrócone. Audit trail zachowany. NIGDY fizyczne DELETE — wymagane przez FDA 21 CFR Part 11 i EU 178/2002.
+
+9. **Concurrent consumption — optimistic locking**
+
+   Optimistic locking (version column na `license_plates`) jako domyślny mechanizm. SELECT FOR UPDATE nie jest potrzebny — prawdopodobieństwo konfliktu jest niskie (różni operatorzy = różne LP). W przypadku konfliktu: retry z fresh version. Max retries = 3, potem error "LP modified by another user, please refresh".
+
+10. **Shift auto-detection — przypisanie do najbliższego shiftu**
+
+    Jeśli timestamp wypada poza shiftami → przypisz do NAJBLIŻSZEGO shiftu (mierzonego od start_time). Jeśli różnica > 2 godziny → `shift_id = NULL` z flagą `unassigned_shift=true`. Dashboard pokazuje "Unassigned" shift jako osobną kategorię. Admin może ręcznie reassign.
+
+11. **Dashboard cache — Redis 30s Phase 1, event-driven Phase 2**
+
+    Redis 30s TTL wystarczy dla Phase 1. Phase 2: event-driven invalidation (publish na channel `production:dashboard:invalidate` przy każdej consumption/output/complete). Phase 1 = prostota, Phase 2 = real-time.
+
+12. **Label printing (ZPL) — Phase 2; Phase 1 = PDF przez przeglądarkę**
+
+    Phase 2. Phase 1 = generowanie danych etykiety (JSON z polami: product_name, batch_number, expiry_date, weight, barcode_data). Fizyczne drukowanie ZPL wymaga konfiguracji drukarek Zebra — osobny epic. Phase 1 UI pokazuje "Print" button który generuje PDF label (browser print).
 
 ---
 
-_PRD 06-Production v3.0 — 10 epików (6 Phase 1, 4 Phase 2), ~80 wymagań, 15 PRD-UPDATE-LIST items [5.1]-[5.15] w pełni zmapowane._
+_PRD 06-Production v3.1 — 10 epików (6 Phase 1, 4 Phase 2), ~80 wymagań, 15 PRD-UPDATE-LIST items [5.1]-[5.15] w pełni zmapowane._
+_Changelog v3.1 (2026-02-18): Sekcja 13 zmieniona z "Pytania doprecyzowujące" na "Rozstrzygnięte pytania" — wszystkie 12 pytań uzyskały wiążące odpowiedzi. Dodano site_id prep note w sekcji 5 Constraints. Dodano note w D8 o zarządzaniu waste_categories przez M01 Settings._
 _Changelog v3.0: Pełna rewrite od zera. Usunięte statusy implementacji. Dodane Zod validation requirements. Dodana sekcja Integracje/Dependencies per epik. Dodana sekcja pytań doprecyzowujących. Backend-first ordering. Scanner-First UX jako D3._
-_Data: 2026-02-17_
+_Data: 2026-02-18_

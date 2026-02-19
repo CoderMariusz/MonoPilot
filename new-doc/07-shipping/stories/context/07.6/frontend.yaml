@@ -1,0 +1,336 @@
+# Story 07.6 - Frontend Components & UX
+# UI components for allergen validation, override modal, and order history
+
+frontend:
+  components:
+    - name: "AllergenAlert"
+      file_path: "apps/frontend/components/shipping/AllergenAlert.tsx"
+      type: "Presentational"
+      description: "Alert banner for displaying allergen conflicts and override status"
+      props:
+        conflicts:
+          type: "AllergenConflict[]"
+          description: "Array of allergen conflicts"
+          required: true
+        overrideApproved:
+          type: "boolean"
+          description: "Whether override has been approved"
+          default: false
+        overrideReason:
+          type: "string"
+          description: "Reason provided for override"
+          optional: true
+        overriddenBy:
+          type: "string"
+          description: "Name of user who approved override"
+          optional: true
+        overriddenAt:
+          type: "string (ISO 8601)"
+          description: "Timestamp of override approval"
+          optional: true
+        canOverride:
+          type: "boolean"
+          description: "Whether current user can override (Manager+)"
+          required: true
+        onOverride:
+          type: "() => void"
+          description: "Callback when override button clicked"
+          required: true
+      states:
+        - name: "conflict_blocking"
+          description: "Red alert with conflicts list and override button (if Manager)"
+          visual: "Red banner (bg-red-50, border-l-4 border-red-500)"
+          content:
+            - "AlertTriangle icon (red-600)"
+            - "Title: Allergen Conflict Detected"
+            - "Conflict list with line number + product + allergen"
+            - "Override button (if canOverride) or info text"
+        - name: "conflict_no_override_allowed"
+          description: "Red alert with conflicts but no override button"
+          visual: "Red banner with disabled state"
+          content:
+            - "Info text: Contact manager to override"
+        - name: "override_approved"
+          description: "Orange alert showing override status"
+          visual: "Orange banner (bg-orange-50, border-l-4 border-orange-500)"
+          content:
+            - "Info icon (orange-600)"
+            - "Title: Allergen Override Approved"
+            - "Text: Approved by {name} on {date}"
+            - "Gray box with reason text"
+      test_scenarios:
+        - "Render with single conflict"
+        - "Render with multiple conflicts"
+        - "Manager sees override button"
+        - "Non-Manager sees info text only"
+        - "Override approved state displays correctly"
+
+    - name: "AllergenOverrideModal"
+      file_path: "apps/frontend/components/shipping/AllergenOverrideModal.tsx"
+      type: "Modal Dialog"
+      description: "Modal for manager to approve allergen override with reason"
+      props:
+        isOpen:
+          type: "boolean"
+          description: "Modal visibility"
+          required: true
+        conflicts:
+          type: "AllergenConflict[]"
+          description: "Allergen conflicts to display"
+          required: true
+        onConfirm:
+          type: "(reason: string) => Promise<void>"
+          description: "Callback when override confirmed"
+          required: true
+        onCancel:
+          type: "() => void"
+          description: "Callback when cancelled"
+          required: true
+        isLoading:
+          type: "boolean"
+          description: "Loading state during submission"
+          default: false
+        error:
+          type: "string"
+          description: "Error message if override failed"
+          optional: true
+      fields:
+        - name: "reason"
+          type: "textarea"
+          label: "Override Reason"
+          placeholder: "Explain why this allergen conflict is acceptable..."
+          validation:
+            - "Required"
+            - "Minimum 20 characters"
+            - "Maximum 500 characters"
+          error_message: "Reason must be between 20-500 characters"
+        - name: "confirm_checkbox"
+          type: "checkbox"
+          label: "I confirm this override is authorized and documented"
+          validation: "Must be checked"
+          required: true
+      behavior:
+        - "Display warning text about food safety and liability"
+        - "Show conflict summary (product + allergen)"
+        - "Show conflict count (e.g., 2 allergen conflicts)"
+        - "Disable submit button until reason is valid and checkbox checked"
+        - "Show loading spinner during API call"
+        - "Display error toast if override fails"
+        - "Close modal on success"
+      test_scenarios:
+        - "Modal opens/closes correctly"
+        - "Form validation works (min 20 chars)"
+        - "Checkbox required before submit"
+        - "Submit button disabled until form valid"
+        - "API call triggered on confirm"
+        - "Error message displayed on failure"
+
+    - name: "CustomerOrderHistory"
+      file_path: "apps/frontend/components/shipping/CustomerOrderHistory.tsx"
+      type: "Data Table"
+      description: "Paginated table of customer's sales order history"
+      props:
+        customerId:
+          type: "string"
+          description: "Customer ID to fetch orders for"
+          required: true
+      behavior:
+        - "Load orders on mount"
+        - "Display loading state (skeleton table)"
+        - "Display empty state if no orders"
+        - "Display data table with 6 columns"
+        - "Support pagination (20 items per page)"
+        - "Allow user to click [View] to navigate to SO detail"
+        - "Show error message if load fails"
+      columns:
+        - name: "Order Number"
+          field: "order_number"
+          sortable: true
+          width: "15%"
+        - name: "Date"
+          field: "order_date"
+          format: "locale date (e.g., Dec 15, 2025)"
+          sortable: true
+          width: "15%"
+        - name: "Status"
+          field: "status"
+          format: "status badge (draft/confirmed/shipped/cancelled)"
+          width: "15%"
+        - name: "Total Amount"
+          field: "total_amount"
+          format: "currency ({total_amount} {currency})"
+          sortable: true
+          width: "15%"
+        - name: "Lines"
+          field: "line_count"
+          width: "10%"
+        - name: "Actions"
+          type: "action_button"
+          action: "View"
+          on_click: "Navigate to /shipping/sales-orders/{order_id}"
+          width: "10%"
+      ui_states:
+        - name: "loading"
+          description: "Skeleton loaders for each row"
+          component: "Skeleton rows with shimmer effect"
+        - name: "empty"
+          description: "No orders for customer"
+          display: |
+            Icon: ShoppingCart icon
+            Heading: No orders yet
+            Subtext: Orders for this customer will appear here
+        - name: "error"
+          description: "Failed to load orders"
+          display: |
+            Icon: AlertCircle icon
+            Heading: Failed to load order history
+            Subtext: Error message or "Please try again"
+            Button: [Retry]
+        - name: "success"
+          description: "Table displays with orders"
+          display: "DataTable with rows"
+      pagination:
+        - page_size: 20
+        - show_info: "Showing {start}-{end} of {total} orders"
+        - controls: "[Previous] [1] [2] [3] [Next]"
+        - disable_prev_on_page_1: true
+        - disable_next_on_last_page: true
+      test_scenarios:
+        - "Load orders on component mount"
+        - "Display loading state initially"
+        - "Display empty state if no orders"
+        - "Display table if orders exist"
+        - "Pagination works (next/prev buttons)"
+        - "Click View navigates to SO detail"
+        - "Status badge displays correct color"
+        - "Currency formatting correct"
+        - "Error state displays retry button"
+
+  wireframes:
+    - id: "SHIP-004"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SHIP-004-allergen-restrictions.md"
+      relevant_screens:
+        - "Screen 3: SO Confirmation Alert (Error State)"
+        - "Screen 4: Manager Override Modal"
+        - "Screen 5: SO Detail with Allergen Badges"
+        - "Screen 9: Customer Order History Tab (integrated in Customer Detail)"
+      key_elements:
+        - "AllergenAlert component mapping"
+        - "Override modal design"
+        - "Allergen badge styling (red/orange/yellow)"
+        - "Color contrast requirements (WCAG AA)"
+        - "Touch target sizes (48x48dp minimum)"
+
+  patterns:
+    alert_banner: "ShadCN Alert with AlertTriangle icon (red) or Info icon (orange)"
+    modal: "ShadCN Dialog component"
+    data_table: "ShadCN DataTable with Column Header sorting"
+    status_badge: "ShadCN Badge with color variants (draft/orange, confirmed/green, shipped/blue)"
+    button_group: "Primary [Confirm] + Secondary [Cancel]"
+    form_input: "ShadCN Form with textarea for reason field"
+    loading_state: "Skeleton components from ShadCN"
+    empty_state: "Icon + heading + subtext + action button"
+    error_state: "Alert component with error icon"
+
+  accessibility:
+    - role: "alert"
+      element: "AllergenAlert banner"
+      aria_live: "assertive"
+      description: "Alerts user to allergen conflicts"
+    - role: "dialog"
+      element: "AllergenOverrideModal"
+      aria_label: "Override Allergen Conflict Modal"
+    - role: "status"
+      element: "Allergen badge"
+      aria_live: "polite"
+      description: "Announces severity level changes"
+    - role: "button"
+      element: "Override button"
+      aria_label: "Override Allergen Block"
+    - role: "checkbox"
+      element: "Confirmation checkbox"
+      aria_label: "Confirm override authorization"
+    - role: "table"
+      element: "CustomerOrderHistory DataTable"
+      aria_label: "Customer Order History"
+    - role: "button"
+      element: "View order button"
+      aria_label: "View order SO-XXXX"
+
+  color_scheme:
+    allergen_severity_severe:
+      background: "#DC2626"
+      text: "#FFFFFF"
+      contrast: "8.44:1 (WCAG AAA)"
+      icon: "AlertTriangle, CircleAlert"
+    allergen_severity_moderate:
+      background: "#EA580C"
+      text: "#FFFFFF"
+      contrast: "5.2:1 (WCAG AA)"
+      icon: "AlertTriangle"
+    allergen_severity_normal:
+      background: "#FBBF24"
+      text: "#1F2937"
+      contrast: "4.54:1 (WCAG AA)"
+      icon: "AlertCircle"
+    alert_error:
+      background: "#FEE2E2"
+      border: "#DC2626"
+      text: "#991B1B"
+    alert_warning:
+      background: "#FEF3C7"
+      border: "#D97706"
+      text: "#92400E"
+    override_status:
+      background: "#FEF3C7"
+      border: "#D97706"
+      text: "#92400E"
+      icon: "Info, CheckCircle"
+
+  responsive_breakpoints:
+    mobile:
+      max_width: "768px"
+      layout: "Single column, full-width modals"
+      modal_style: "Bottom sheet (overlay on bottom)"
+      touch_targets: "64x64dp (larger for high-stress packing station)"
+    tablet:
+      min_width: "768px"
+      max_width: "1024px"
+      layout: "Responsive grid"
+      modal_style: "Centered modal with scrollable content"
+      touch_targets: "56x56dp"
+    desktop:
+      min_width: "1024px"
+      layout: "Full-width table, centered modals"
+      modal_style: "Centered modal with max-width-600"
+      touch_targets: "48x48dp"
+
+  performance:
+    component_metrics:
+      - "AllergenAlert: < 100ms render time"
+      - "AllergenOverrideModal: < 150ms render time"
+      - "CustomerOrderHistory: < 300ms initial load"
+    optimization_strategies:
+      - "Memoize AllergenAlert to prevent re-renders"
+      - "Lazy load CustomerOrderHistory table data"
+      - "Cache order history query for 5 minutes"
+      - "Virtual scrolling for large order lists (if > 100 items)"
+
+  dependencies:
+    - "ShadCN UI: Alert, Dialog, DataTable, Badge, Button, Form"
+    - "lucide-react: AlertTriangle, Info, ShoppingCart, AlertCircle, CheckCircle"
+    - "zod: Form validation (reason field)"
+    - "tanstack/react-query: Data fetching with caching"
+    - "next/navigation: Router for navigation"
+    - "tailwindcss: Styling and responsive design"
+
+  testing:
+    unit_test_components:
+      - "AllergenAlert renders conflicts correctly"
+      - "AllergenOverrideModal validates reason field (min 20 chars)"
+      - "CustomerOrderHistory displays loading/empty/error/success states"
+      - "Pagination controls work correctly"
+    e2e_test_flows:
+      - "User sees allergen conflict, clicks override button, fills form, submits"
+      - "User navigates to Customer Detail, clicks Order History tab, views orders"
+      - "User clicks [View] in order table, navigates to SO detail page"

@@ -1,0 +1,116 @@
+# Story 10.5 - Test Specification
+# Real-Time Machine Dashboard
+
+test_files:
+  - path: "apps/frontend/components/oee/dashboard/__tests__/MachineStatusCard.test.tsx"
+    type: "unit"
+  - path: "apps/frontend/lib/services/__tests__/oee-dashboard-service.test.ts"
+    type: "unit"
+  - path: "supabase/tests/oee_dashboard_views.test.sql"
+    type: "integration"
+  - path: "apps/frontend/app/api/oee/__tests__/dashboard-api.test.ts"
+    type: "integration"
+  - path: "tests/e2e/oee-dashboard.spec.ts"
+    type: "e2e"
+
+acceptance_criteria:
+  - id: "AC-01"
+    given: "/oee/dashboard page loads"
+    when: "user authenticated"
+    then: "4 KPI cards display with current OEE, Availability, Performance, Quality"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-02"
+    given: "machine Mixer-01 running WO-2451"
+    when: "dashboard displays"
+    then: "Mixer-01 card shows status=running (green), OEE gauge, WO-2451 number, progress"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-03"
+    given: "machine Labeler-03 down for 12 minutes"
+    when: "dashboard displays"
+    then: "Labeler-03 card shows status=down (red), duration=12min, reason code"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-04"
+    given: "machine Packer-04 idle (no active WO)"
+    when: "dashboard displays"
+    then: "Packer-04 card shows status=idle (gray), no WO data"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-05"
+    given: "Mixer-01 OEE = 76.5%, target = 85%, critical_threshold = 75%"
+    when: "alert level calculated"
+    then: "alert_level = 'warning' (yellow), appears in Active Alerts panel"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-06"
+    given: "Labeler-03 OEE = 70%, critical_threshold = 75%"
+    when: "alert level calculated"
+    then: "alert_level = 'critical' (red), highlighted in Active Alerts panel"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-07"
+    given: "dashboard page open"
+    when: "30 seconds elapse"
+    then: "useOEEDashboard refetches data automatically, cards update"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-08"
+    given: "GET /api/oee/realtime/:machineId"
+    when: "endpoint queried"
+    then: "returns machine status, OEE metrics, active WO, downtime, target within 500ms"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-09"
+    given: "GET /api/oee/dashboard"
+    when: "endpoint queried for org with 10 machines"
+    then: "returns all 10 machines with summary data within 1s"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-10"
+    given: "user filters by Production Line 1"
+    when: "line_id filter applied"
+    then: "only machines on Line 1 displayed"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-11"
+    given: "no OEE data exists (new org)"
+    when: "/oee/dashboard loads"
+    then: "empty state: 'No OEE data yet. Enable OEE tracking in settings.'"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-12"
+    given: "Active Alerts panel"
+    when: "critical alert exists"
+    then: "alert displayed at top with red badge, machine name, OEE value, [View] link"
+    test_type: "e2e"
+    priority: "P0"
+
+definition_of_done:
+  - "v_machine_oee_current and v_machine_status views created"
+  - "GET /api/oee/realtime/:machineId returns machine data < 500ms"
+  - "GET /api/oee/dashboard returns all machines < 1s"
+  - "Dashboard page displays 4 KPI cards with current metrics"
+  - "Machine status grid shows all machines with status badges"
+  - "Auto-refresh every 30s works"
+  - "Active Alerts panel displays critical/warning alerts"
+  - "OEE trend chart shows last 7 days"
+  - "Filter by line functionality works"
+  - "Unit tests >75% coverage"
+  - "E2E test covers dashboard load + auto-refresh"
+
+coverage:
+  unit: 75
+  integration: 80

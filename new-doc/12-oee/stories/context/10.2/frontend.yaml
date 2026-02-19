@@ -1,0 +1,57 @@
+# Story 10.2 - Frontend Specification
+# Downtime Reason Codes & Categories
+
+types:
+  - path: "apps/frontend/lib/types/downtime-reason.ts"
+    exports: ["DowntimeReason", "DowntimeCategory", "CreateReasonInput", "UpdateReasonInput"]
+
+components:
+  - path: "apps/frontend/components/oee/downtime/ReasonCodesDataTable.tsx"
+    description: "DataTable for reason codes with category grouping"
+    columns: ["Code", "Description", "Category", "Type (Planned/Unplanned)", "Color", "Status", "Actions"]
+
+  - path: "apps/frontend/components/oee/downtime/ReasonFormModal.tsx"
+    description: "Create/Edit reason code modal"
+    form_fields:
+      - { name: "code", type: "text", required: true, pattern: "^[A-Z0-9-]+$" }
+      - { name: "description", type: "text", required: true, maxlength: 200 }
+      - { name: "category", type: "select", options: ["Mechanical", "Electrical", "Material", "Changeover", "Break", "Quality", "Operator", "Utility", "Other"], required: true }
+      - { name: "is_planned", type: "toggle", required: true, label: "Planned Downtime" }
+      - { name: "color_code", type: "color_picker", default: "#6B7280" }
+      - { name: "sort_order", type: "number", default: 100 }
+
+  - path: "apps/frontend/components/oee/downtime/ReasonCategoryBadge.tsx"
+    description: "Badge showing reason category with icon"
+    variants:
+      - { category: "mechanical", icon: "Wrench", color: "red" }
+      - { category: "electrical", icon: "Zap", color: "orange" }
+      - { category: "material", icon: "Package", color: "purple" }
+      - { category: "changeover", icon: "RefreshCw", color: "blue" }
+      - { category: "break", icon: "Coffee", color: "green" }
+      - { category: "quality", icon: "AlertCircle", color: "yellow" }
+
+pages:
+  - path: "apps/frontend/app/(authenticated)/oee/downtime/reasons/page.tsx"
+    route: "/oee/downtime/reasons"
+    title: "Downtime Reason Codes"
+    components: ["ReasonCodesDataTable", "ReasonFormModal"]
+    actions:
+      - { label: "+ New Reason Code", onClick: "openCreateModal()", role: ["admin", "production_manager"] }
+      - { label: "Seed Defaults", onClick: "seedDefaults()", role: ["admin"], show_if: "no_reasons_exist" }
+
+hooks:
+  - name: "useDowntimeReasons"
+    type: "query"
+    queryKey: "['downtime-reasons', filters]"
+  - name: "useCreateReason"
+    type: "mutation"
+    invalidates: "['downtime-reasons']"
+
+ux:
+  wireframes:
+    - id: "OEE-REASONS-001"
+      title: "Reason Codes Management"
+      components: ["ReasonCodesDataTable", "ReasonFormModal"]
+  patterns:
+    table: "ShadCN DataTable with category grouping"
+    modal: "ShadCN Dialog with color picker"

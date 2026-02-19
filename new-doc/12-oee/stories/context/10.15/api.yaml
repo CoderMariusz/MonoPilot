@@ -1,0 +1,49 @@
+# Story 10.15 - API Specification
+# Purpose: Production rate analytics endpoints
+# Agent: BACKEND-DEV
+
+endpoints:
+  - method: "GET"
+    path: "/api/oee/performance/rate"
+    description: "Get production rate data"
+    auth: "required"
+    query_params:
+      machine_id: "string (optional)"
+      date_from: "string (required)"
+      date_to: "string (required)"
+      granularity: "string - 'hourly' | 'daily'"
+    response:
+      rates:
+        - machine_id: "string"
+          machine_name: "string"
+          timestamp: "string"
+          actual_rate: "number (units/hour)"
+          target_rate: "number (units/hour)"
+          variance: "number (%)"
+          efficiency: "number (%)"
+      summary:
+        avg_rate: "number"
+        avg_efficiency: "number"
+        below_target_periods: "number"
+
+  - method: "GET"
+    path: "/api/oee/performance/rate/trend"
+    description: "Get rate trend for specific machine"
+    auth: "required"
+
+services:
+  - path: "apps/frontend/lib/services/production-rate-service.ts"
+    exports:
+      - name: "ProductionRateService"
+        methods:
+          - "getRateData"
+          - "calculateRate"
+          - "compareToTarget"
+          - "getRateTrend"
+
+types:
+  - path: "apps/frontend/lib/types/production-rate.ts"
+    exports:
+      - "RateDataPoint"
+      - "RateSummary"
+      - "RateTrendParams"

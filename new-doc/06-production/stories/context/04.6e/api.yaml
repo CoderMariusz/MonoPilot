@@ -1,0 +1,410 @@
+# Story 04.6e - API Specification
+# Purpose: Endpoints for over-consumption approval workflow
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  - method: "POST"
+    path: "/api/production/work-orders/:woId/over-consumption/request"
+    description: "Request approval for over-consumption"
+    file: "apps/frontend/app/api/production/work-orders/[woId]/over-consumption/request/route.ts"
+    auth: "required"
+    roles: ["production_operator", "production_manager", "admin", "owner"]
+    permission: "production.consumption.request"
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        woId: "UUID - Work Order ID"
+      body:
+        type: "OverConsumptionRequest"
+        schema:
+          wo_material_id: "UUID - required - Material line ID"
+          lp_id: "UUID - required - License Plate to consume from"
+          requested_qty: "number - required - Quantity attempting to consume"
+        example:
+          wo_material_id: "123e4567-e89b-12d3-a456-426614174000"
+          lp_id: "789e4567-e89b-12d3-a456-426614174222"
+          requested_qty: 10
+
+    response:
+      status: 201
+      type: "OverConsumptionRequestResult"
+      schema:
+        request_id: "UUID"
+        status: "'pending'"
+        wo_id: "UUID"
+        wo_number: "string"
+        wo_material_id: "UUID"
+        product_code: "string"
+        product_name: "string"
+        lp_id: "UUID"
+        lp_number: "string"
+        required_qty: "number"
+        current_consumed_qty: "number"
+        requested_qty: "number"
+        total_after_qty: "number"
+        over_consumption_qty: "number"
+        variance_percent: "number"
+        requested_by: "UUID"
+        requested_by_name: "string"
+        requested_at: "ISO8601 timestamp"
+        message: "string"
+
+    errors:
+      - status: 400
+        code: "NOT_OVER_CONSUMPTION"
+        message: "This consumption does not exceed the BOM requirement"
+        when: "total_after <= required_qty"
+      - status: 400
+        code: "OVER_CONSUMPTION_ALLOWED"
+        message: "Over-consumption is allowed by settings. Proceed with normal consumption."
+        when: "allow_over_consumption = true"
+      - status: 400
+        code: "PENDING_REQUEST_EXISTS"
+        message: "A pending approval request already exists for this material"
+        when: "Active pending request for same wo_material_id"
+      - status: 404
+        code: "WO_NOT_FOUND"
+        message: "Work order not found"
+      - status: 404
+        code: "MATERIAL_NOT_FOUND"
+        message: "WO material not found"
+      - status: 404
+        code: "LP_NOT_FOUND"
+        message: "License plate not found"
+
+  - method: "POST"
+    path: "/api/production/work-orders/:woId/over-consumption/approve"
+    description: "Approve over-consumption request - Manager/Admin only"
+    file: "apps/frontend/app/api/production/work-orders/[woId]/over-consumption/approve/route.ts"
+    auth: "required"
+    roles: ["production_manager", "admin", "owner"]
+    permission: "production.over_consumption.approve"
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        woId: "UUID - Work Order ID"
+      body:
+        type: "ApproveOverConsumptionRequest"
+        schema:
+          request_id: "UUID - required - Approval request ID"
+          reason: "string - optional - Reason for approval"
+        example:
+          request_id: "abc12345-e89b-12d3-a456-426614174333"
+          reason: "Additional material needed due to higher moisture content"
+
+    response:
+      status: 200
+      type: "OverConsumptionApprovalResult"
+      schema:
+        request_id: "UUID"
+        status: "'approved'"
+        consumption_id: "UUID - Created consumption record"
+        approved_by: "UUID"
+        approved_by_name: "string"
+        approved_at: "ISO8601 timestamp"
+        reason: "string | null"
+        lp_new_qty: "number"
+        message: "string"
+
+    errors:
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Only Managers and Admins can approve over-consumption requests"
+      - status: 404
+        code: "REQUEST_NOT_FOUND"
+        message: "Approval request not found"
+      - status: 400
+        code: "ALREADY_DECIDED"
+        message: "This request has already been approved or rejected"
+
+  - method: "POST"
+    path: "/api/production/work-orders/:woId/over-consumption/reject"
+    description: "Reject over-consumption request - Manager/Admin only"
+    file: "apps/frontend/app/api/production/work-orders/[woId]/over-consumption/reject/route.ts"
+    auth: "required"
+    roles: ["production_manager", "admin", "owner"]
+    permission: "production.over_consumption.reject"
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        woId: "UUID - Work Order ID"
+      body:
+        type: "RejectOverConsumptionRequest"
+        schema:
+          request_id: "UUID - required - Approval request ID"
+          reason: "string - required - Reason for rejection"
+        example:
+          request_id: "abc12345-e89b-12d3-a456-426614174333"
+          reason: "Excessive variance. Please investigate waste in mixing process."
+
+    response:
+      status: 200
+      type: "OverConsumptionRejectionResult"
+      schema:
+        request_id: "UUID"
+        status: "'rejected'"
+        rejected_by: "UUID"
+        rejected_by_name: "string"
+        rejected_at: "ISO8601 timestamp"
+        reason: "string"
+        message: "string"
+
+    errors:
+      - status: 400
+        code: "REASON_REQUIRED"
+        message: "Rejection reason is required"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Only Managers and Admins can reject over-consumption requests"
+      - status: 404
+        code: "REQUEST_NOT_FOUND"
+        message: "Approval request not found"
+
+  - method: "GET"
+    path: "/api/production/work-orders/:woId/over-consumption/pending"
+    description: "Get pending over-consumption requests for a WO"
+    file: "apps/frontend/app/api/production/work-orders/[woId]/over-consumption/pending/route.ts"
+    auth: "required"
+    roles: ["all"]
+
+    response:
+      status: 200
+      type: "PendingRequest[]"
+      schema:
+        items:
+          request_id: "UUID"
+          wo_material_id: "UUID"
+          product_code: "string"
+          product_name: "string"
+          lp_number: "string"
+          requested_qty: "number"
+          variance_percent: "number"
+          requested_by_name: "string"
+          requested_at: "ISO8601 timestamp"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/over-consumption-service.ts"
+    description: "Over-consumption approval workflow service"
+    exports:
+      - name: "checkOverConsumption"
+        type: "async function"
+        params:
+          - "woMaterialId: string"
+          - "requestedQty: number"
+        returns: "Promise<{ isOverConsumption: boolean; overQty?: number; variancePercent?: number }>"
+        description: "Check if consumption would exceed BOM requirement"
+
+      - name: "createOverConsumptionRequest"
+        type: "async function"
+        params:
+          - "woId: string"
+          - "woMaterialId: string"
+          - "lpId: string"
+          - "requestedQty: number"
+        returns: "Promise<OverConsumptionRequestResult>"
+        description: "Create approval request for over-consumption"
+
+      - name: "approveOverConsumption"
+        type: "async function"
+        params:
+          - "requestId: string"
+          - "reason?: string"
+        returns: "Promise<OverConsumptionApprovalResult>"
+        description: "Approve request and proceed with consumption"
+
+      - name: "rejectOverConsumption"
+        type: "async function"
+        params:
+          - "requestId: string"
+          - "reason: string"
+        returns: "Promise<OverConsumptionRejectionResult>"
+        description: "Reject request and block consumption"
+
+      - name: "getPendingRequests"
+        type: "async function"
+        params:
+          - "woId: string"
+        returns: "Promise<PendingRequest[]>"
+        description: "Get pending approval requests for a WO"
+
+      - name: "getHighVarianceWOs"
+        type: "async function"
+        params: []
+        returns: "Promise<HighVarianceWO[]>"
+        description: "Get WOs with materials exceeding 10% variance (for dashboard)"
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/production.ts"
+    description: "Production TypeScript interfaces - add over-consumption types"
+    exports:
+      - name: "OverConsumptionStatus"
+        type: "type"
+        definition: "'pending' | 'approved' | 'rejected' | 'cancelled'"
+
+      - name: "OverConsumptionRequestResult"
+        type: "interface"
+        fields:
+          - "request_id: string"
+          - "status: 'pending'"
+          - "wo_id: string"
+          - "wo_number: string"
+          - "wo_material_id: string"
+          - "product_code: string"
+          - "product_name: string"
+          - "lp_id: string"
+          - "lp_number: string"
+          - "required_qty: number"
+          - "current_consumed_qty: number"
+          - "requested_qty: number"
+          - "total_after_qty: number"
+          - "over_consumption_qty: number"
+          - "variance_percent: number"
+          - "requested_by: string"
+          - "requested_by_name: string"
+          - "requested_at: string"
+          - "message: string"
+
+      - name: "OverConsumptionApprovalResult"
+        type: "interface"
+        fields:
+          - "request_id: string"
+          - "status: 'approved'"
+          - "consumption_id: string"
+          - "approved_by: string"
+          - "approved_by_name: string"
+          - "approved_at: string"
+          - "reason: string | null"
+          - "lp_new_qty: number"
+          - "message: string"
+
+      - name: "OverConsumptionRejectionResult"
+        type: "interface"
+        fields:
+          - "request_id: string"
+          - "status: 'rejected'"
+          - "rejected_by: string"
+          - "rejected_by_name: string"
+          - "rejected_at: string"
+          - "reason: string"
+          - "message: string"
+
+      - name: "VarianceIndicator"
+        type: "interface"
+        fields:
+          - "percent: number"
+          - "status: 'exact' | 'acceptable' | 'high'"
+          - "color: 'green' | 'yellow' | 'red'"
+
+# Validation
+validation:
+  - path: "apps/frontend/lib/validation/production-schemas.ts"
+    exports:
+      - name: "overConsumptionRequestSchema"
+        type: "zod schema"
+        schema: |
+          z.object({
+            wo_material_id: z.string().uuid('Invalid material ID'),
+            lp_id: z.string().uuid('Invalid LP ID'),
+            requested_qty: z.number().positive('Quantity must be positive')
+          })
+
+      - name: "overConsumptionApprovalSchema"
+        type: "zod schema"
+        schema: |
+          z.object({
+            request_id: z.string().uuid('Invalid request ID'),
+            reason: z.string().max(500).optional()
+          })
+
+      - name: "overConsumptionRejectionSchema"
+        type: "zod schema"
+        schema: |
+          z.object({
+            request_id: z.string().uuid('Invalid request ID'),
+            reason: z.string().min(1, 'Rejection reason is required').max(500)
+          })
+
+# Workflow
+workflow:
+  over_consumption_flow:
+    description: "Workflow when allow_over_consumption = false"
+    steps:
+      - step: 1
+        actor: "Operator"
+        action: "Attempts to consume quantity that exceeds BOM"
+        result: "System detects over-consumption"
+      - step: 2
+        actor: "System"
+        action: "Creates approval request, displays modal to Operator"
+        result: "Operator sees 'Awaiting Manager Approval' status"
+      - step: 3
+        actor: "Manager"
+        action: "Views pending approval in modal or dashboard"
+        result: "Approval controls displayed"
+      - step: 4a
+        actor: "Manager"
+        condition: "Approves"
+        action: "Clicks Approve, optionally enters reason"
+        result: "Consumption proceeds, LP updated, audit recorded"
+      - step: 4b
+        actor: "Manager"
+        condition: "Rejects"
+        action: "Clicks Reject, enters required reason"
+        result: "Consumption blocked, reason recorded"
+      - step: 5
+        actor: "Operator"
+        action: "Receives notification of decision"
+        result: "If approved: success. If rejected: sees reason."
+
+  allowed_flow:
+    description: "Workflow when allow_over_consumption = true"
+    steps:
+      - step: 1
+        actor: "Operator"
+        action: "Attempts to consume quantity that exceeds BOM"
+        result: "Consumption proceeds immediately"
+      - step: 2
+        actor: "System"
+        action: "Records consumption with variance tracking"
+        result: "Variance % displayed in materials table"
+      - step: 3
+        actor: "System"
+        condition: "Variance > 10%"
+        action: "Flags WO in dashboard alerts"
+        result: "Manager sees high variance alert"
+
+# Error Handling
+error_handling:
+  table:
+    - scenario: "Consumption is not over BOM"
+      http_status: 400
+      error_message: "This consumption does not exceed the BOM requirement"
+      action: "Return error, suggest normal consumption"
+    - scenario: "Over-consumption allowed by settings"
+      http_status: 400
+      error_message: "Over-consumption is allowed by settings"
+      action: "Return error, suggest normal consumption"
+    - scenario: "Pending request already exists"
+      http_status: 400
+      error_message: "A pending approval request already exists"
+      action: "Return existing request ID"
+    - scenario: "Not Manager/Admin"
+      http_status: 403
+      error_message: "Only Managers and Admins can approve/reject"
+      action: "Return error"
+    - scenario: "Request already decided"
+      http_status: 400
+      error_message: "This request has already been approved or rejected"
+      action: "Return current status"
+    - scenario: "Rejection without reason"
+      http_status: 400
+      error_message: "Rejection reason is required"
+      action: "Return validation error"

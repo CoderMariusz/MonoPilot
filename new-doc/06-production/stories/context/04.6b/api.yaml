@@ -1,0 +1,138 @@
+# Story 04.6b - API Endpoints
+
+endpoints:
+  - method: "GET"
+    path: "/api/production/work-orders/barcode/:barcode"
+    file: "apps/frontend/app/api/production/work-orders/barcode/[barcode]/route.ts"
+    description: "Lookup WO by barcode number for scanner"
+    auth: true
+    roles:
+      - "owner"
+      - "admin"
+      - "production_manager"
+      - "production_operator"
+    request:
+      params:
+        barcode: "string - WO barcode (e.g., WO-2025-0156)"
+    response:
+      success:
+        status: 200
+        body:
+          wo:
+            id: "UUID"
+            wo_number: "string"
+            product_name: "string"
+            product_sku: "string"
+            planned_qty: "number"
+            actual_qty: "number"
+            status: "in_progress | started"
+            line_name: "string"
+            batch_number: "string"
+          materials:
+            type: "array"
+            items:
+              id: "UUID"
+              material_name: "string"
+              required_qty: "number"
+              consumed_qty: "number"
+              uom: "string"
+              consume_whole_lp: "boolean"
+              progress_percent: "number"
+    errors:
+      - code: 404
+        error: "WO_NOT_FOUND"
+        message: "Work order with barcode X not found"
+      - code: 400
+        error: "WO_NOT_ACTIVE"
+        message: "Work order is not in active status"
+    performance:
+      target: "< 500ms response time"
+
+  - method: "GET"
+    path: "/api/warehouse/license-plates/barcode/:barcode"
+    file: "apps/frontend/app/api/warehouse/license-plates/barcode/[barcode]/route.ts"
+    description: "Lookup LP by barcode with validation for consumption"
+    auth: true
+    roles:
+      - "owner"
+      - "admin"
+      - "production_manager"
+      - "production_operator"
+      - "warehouse_operator"
+    request:
+      params:
+        barcode: "string - LP barcode (e.g., LP-2025-01234)"
+      query:
+        material_id: "UUID - Optional, validate product match if provided"
+    response:
+      success:
+        status: 200
+        body:
+          lp:
+            id: "UUID"
+            lp_number: "string"
+            product_id: "UUID"
+            product_name: "string"
+            quantity: "number"
+            uom: "string"
+            batch_number: "string"
+            expiry_date: "date"
+            location_name: "string"
+            status: "available | consumed | reserved"
+          validation:
+            is_available: "boolean"
+            product_match: "boolean"
+            uom_match: "boolean"
+            error_code: "string | null"
+            error_message: "string | null"
+    errors:
+      - code: 404
+        error: "LP_NOT_FOUND"
+        message: "License plate with barcode X not found"
+    performance:
+      target: "< 300ms response time"
+
+services:
+  - path: "apps/frontend/lib/services/scanner-service.ts"
+    class: "ScannerService"
+    methods:
+      - name: "playSuccessSound"
+        params: []
+        returns: "void"
+        description: "Play 1 long beep (500ms) for success"
+
+      - name: "playErrorSound"
+        params: []
+        returns: "void"
+        description: "Play 2 short beeps (200ms each) for error"
+
+      - name: "triggerVibration"
+        params: ["duration: number"]
+        returns: "void"
+        description: "Trigger device vibration (200ms success, 100ms error)"
+
+      - name: "showSuccessFeedback"
+        params: []
+        returns: "void"
+        description: "Combined success feedback (sound + vibration + visual)"
+
+      - name: "showErrorFeedback"
+        params: []
+        returns: "void"
+        description: "Combined error feedback (sound + vibration + visual)"
+
+# Reuses consumption-service from 04.6a for actual consumption recording
+# POST /api/production/work-orders/:woId/consume endpoint from 04.6a
+
+validation:
+  # Reuses consumption-schema.ts from 04.6a
+  path: "apps/frontend/lib/validation/consumption-schema.ts"
+  additional_schemas:
+    - name: "scannerStateSchema"
+      description: "State machine schema for 6-step scanner flow"
+      fields:
+        step: "z.enum(['scan_wo', 'scan_lp', 'enter_qty', 'review', 'confirm', 'next'])"
+        woId: "z.string().uuid().optional()"
+        lpId: "z.string().uuid().optional()"
+        materialId: "z.string().uuid().optional()"
+        consumeQty: "z.number().positive().optional()"

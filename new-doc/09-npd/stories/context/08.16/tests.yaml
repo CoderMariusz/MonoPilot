@@ -1,0 +1,314 @@
+# Tests Context: 08.16 - Timeline View & Reporting
+
+unit_tests:
+  service: "NPDTimelineService"
+  file: "lib/services/__tests__/npd-timeline-service.test.ts"
+  coverage_target: ">80%"
+  tests:
+    - name: "getTimeline - returns all active projects"
+      scenario: "Fetch timeline data without filters"
+      assertions:
+        - "Returns all projects with status != 'cancelled'"
+        - "Includes owner_name from users join"
+        - "Calculates is_overdue correctly"
+        - "Calculates duration_days correctly"
+        - "Sorted by created_at ASC"
+
+    - name: "getTimeline - filters by gate"
+      scenario: "Fetch timeline with gate filter"
+      assertions:
+        - "Returns only projects at specified gate"
+        - "Other projects excluded"
+
+    - name: "getTimeline - filters by category"
+      scenario: "Fetch timeline with category filter"
+      assertions:
+        - "Returns only projects in specified category"
+
+    - name: "getTimeline - filters by owner"
+      scenario: "Fetch timeline with owner filter"
+      assertions:
+        - "Returns only projects owned by specified user"
+
+    - name: "getTimeline - filters by status"
+      scenario: "Fetch timeline with status filter"
+      assertions:
+        - "Returns only projects with specified status"
+
+    - name: "getTimeline - filters by date range"
+      scenario: "Fetch timeline with date_from and date_to"
+      assertions:
+        - "Returns only projects within date range"
+
+    - name: "exportProjectsCSV - generates valid CSV"
+      scenario: "Export projects to CSV"
+      assertions:
+        - "Returns CSV string with headers"
+        - "Includes all project fields"
+        - "Escapes special characters (commas, quotes)"
+        - "Dates in ISO format (YYYY-MM-DD)"
+
+    - name: "exportCostHistoryCSV - generates valid CSV"
+      scenario: "Export cost history to CSV"
+      assertions:
+        - "Returns CSV string with cost fields"
+        - "Calculates variance correctly"
+        - "Calculates variance_pct correctly"
+        - "Includes all formulation versions"
+
+    - name: "exportComplianceChecklistPDF - generates PDF"
+      scenario: "Generate compliance checklist PDF"
+      mocks:
+        - "Puppeteer browser.launch()"
+        - "Supabase Storage upload"
+      assertions:
+        - "Calls Puppeteer to generate PDF"
+        - "Uploads PDF to Supabase Storage"
+        - "Returns signed URL and filename"
+
+    - name: "generateCSV - escapes special characters"
+      scenario: "CSV utility handles commas, quotes, newlines"
+      assertions:
+        - "Commas in values wrapped in quotes"
+        - "Quotes escaped as double quotes"
+        - "Newlines escaped"
+
+integration_tests:
+  file: "app/api/npd/__tests__/timeline-api.test.ts"
+  tests:
+    - name: "GET /api/npd/timeline - returns timeline data"
+      setup:
+        - "Create 10 NPD projects with various dates"
+      request:
+        method: "GET"
+        path: "/api/npd/timeline"
+      assertions:
+        - "Status 200"
+        - "Returns array of 10 projects"
+        - "Each project has required fields"
+        - "is_overdue calculated correctly"
+
+    - name: "GET /api/npd/timeline - filters work"
+      setup:
+        - "Create projects in G2 and G3"
+      request:
+        method: "GET"
+        path: "/api/npd/timeline?gate=G3"
+      assertions:
+        - "Returns only G3 projects"
+
+    - name: "GET /api/npd/export/projects - downloads CSV"
+      setup:
+        - "Create 5 NPD projects"
+      request:
+        method: "GET"
+        path: "/api/npd/export/projects"
+      assertions:
+        - "Status 200"
+        - "Content-Type: text/csv"
+        - "Content-Disposition header has filename"
+        - "CSV contains 5 project rows + header"
+
+    - name: "GET /api/npd/export/cost-history - downloads CSV"
+      setup:
+        - "Create project with 3 formulation versions"
+      request:
+        method: "GET"
+        path: "/api/npd/export/cost-history?project_id=1"
+      assertions:
+        - "Status 200"
+        - "CSV contains 3 formulation rows + header"
+        - "Variance calculated correctly"
+
+    - name: "POST /api/npd/export/compliance-checklist - generates PDF"
+      setup:
+        - "Create project with gate checklists and compliance docs"
+      request:
+        method: "POST"
+        path: "/api/npd/export/compliance-checklist"
+        body: { project_id: 1 }
+      assertions:
+        - "Status 200"
+        - "Returns pdf_url and filename"
+        - "PDF accessible via signed URL"
+
+    - name: "GET /api/npd/timeline - RLS enforces org isolation"
+      setup:
+        - "Create project in Org A"
+        - "User from Org B"
+      request:
+        method: "GET"
+        path: "/api/npd/timeline"
+      assertions:
+        - "Org B user does NOT see Org A project"
+
+e2e_tests:
+  file: "e2e/npd/timeline.spec.ts"
+  framework: "Playwright"
+  tests:
+    - name: "Timeline view loads and displays projects"
+      steps:
+        - "Navigate to /npd/timeline"
+        - "Wait for timeline to load"
+      assertions:
+        - "Timeline chart visible"
+        - "Project bars rendered"
+        - "X-axis shows months"
+        - "Y-axis shows project names"
+
+    - name: "Timeline bars color-coded by status"
+      steps:
+        - "Create projects with various statuses"
+        - "Navigate to /npd/timeline"
+      assertions:
+        - "Idea project has gray bar"
+        - "Feasibility project has blue bar"
+        - "Development project has yellow bar"
+        - "Validation project has orange bar"
+        - "Launched project has green bar"
+
+    - name: "Overdue projects highlighted"
+      steps:
+        - "Create project with target_launch_date in past"
+        - "Navigate to /npd/timeline"
+      assertions:
+        - "Overdue project has red border"
+
+    - name: "Timeline filters work"
+      steps:
+        - "Create projects in G2 and G3"
+        - "Navigate to /npd/timeline"
+        - "Select gate filter = G3"
+      assertions:
+        - "Only G3 projects visible on timeline"
+        - "Filter chip shows 'Gate: G3'"
+        - "Clear filters button visible"
+
+    - name: "Timeline zoom controls work"
+      steps:
+        - "Navigate to /npd/timeline"
+        - "Click [Month View]"
+      assertions:
+        - "X-axis shows daily granularity"
+        - "Month View button highlighted"
+      steps:
+        - "Click [Year View]"
+      assertions:
+        - "X-axis shows quarterly granularity"
+        - "Year View button highlighted"
+
+    - name: "Timeline tooltip on hover"
+      steps:
+        - "Navigate to /npd/timeline"
+        - "Hover over project bar"
+      assertions:
+        - "Tooltip visible"
+        - "Tooltip shows project name, status, gate, owner, dates, duration"
+
+    - name: "Click timeline bar navigates to project"
+      steps:
+        - "Navigate to /npd/timeline"
+        - "Click project bar"
+      assertions:
+        - "Navigates to /npd/projects/:id"
+
+    - name: "Export projects CSV"
+      steps:
+        - "Navigate to /npd/timeline"
+        - "Click [Export Projects CSV]"
+      assertions:
+        - "CSV file downloads"
+        - "Filename: NPD-Projects-{date}.csv"
+
+    - name: "Export cost history CSV"
+      steps:
+        - "Navigate to /npd/timeline"
+        - "Click [Export Cost History CSV]"
+      assertions:
+        - "CSV file downloads"
+        - "Filename: NPD-Cost-History-{date}.csv"
+
+    - name: "Export compliance checklist PDF"
+      steps:
+        - "Navigate to /npd/timeline"
+        - "Click [Export Compliance Checklist PDF]"
+        - "Select project from modal"
+        - "Click [Export PDF]"
+      assertions:
+        - "PDF file downloads"
+        - "Filename: NPD-{project_number}-Compliance-Checklist-{date}.pdf"
+
+    - name: "Timeline empty state"
+      steps:
+        - "Navigate to /npd/timeline (no projects)"
+      assertions:
+        - "Empty state message visible"
+        - "[Create First Project] button visible"
+
+    - name: "Timeline mobile view"
+      steps:
+        - "Set viewport to mobile (375px)"
+        - "Navigate to /npd/timeline"
+      assertions:
+        - "Timeline switches to list view"
+        - "Projects displayed as cards"
+        - "Filters collapse into dropdown"
+
+performance_tests:
+  file: "e2e/npd/timeline-performance.spec.ts"
+  tests:
+    - name: "Timeline load time with 100 projects"
+      setup:
+        - "Create 100 NPD projects"
+      steps:
+        - "Navigate to /npd/timeline"
+        - "Measure page load time"
+      assertions:
+        - "Page loads within 2 seconds"
+        - "Timeline renders within 1.5 seconds"
+
+    - name: "CSV export time with 500 projects"
+      setup:
+        - "Create 500 NPD projects"
+      steps:
+        - "Click [Export Projects CSV]"
+        - "Measure export time"
+      assertions:
+        - "CSV generates within 5 seconds"
+
+    - name: "PDF export time"
+      setup:
+        - "Create project with 10 gate checklists + 5 compliance docs"
+      steps:
+        - "Click [Export Compliance Checklist PDF]"
+        - "Measure PDF generation time"
+      assertions:
+        - "PDF generates within 10 seconds"
+
+    - name: "Filter response time"
+      steps:
+        - "Navigate to /npd/timeline"
+        - "Change gate filter"
+        - "Measure response time"
+      assertions:
+        - "Timeline updates within 200ms"
+
+test_data:
+  - name: "timeline_projects"
+    count: 10
+    fields:
+      - "project_number: NPD-001 to NPD-010"
+      - "name: Various product names"
+      - "status: Mix of idea, feasibility, development, validation, launched"
+      - "current_gate: G1 to G5"
+      - "category: Beverage, Snack, Bakery"
+      - "created_at: Various dates (Jan-Dec 2025)"
+      - "target_launch_date: Various dates (2025-2026)"
+      - "1 project overdue (target_launch_date < today, status = development)"
+
+  - name: "formulation_versions"
+    count: 15
+    fields:
+      - "3 projects with 3 formulation versions each"
+      - "target_cost, estimated_cost, actual_cost vary"
+      - "Variance: 5%, 15%, 25%"

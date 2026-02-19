@@ -1,0 +1,367 @@
+# Story 03.1 - Frontend Specification
+# Purpose: Pages, components, types, hooks
+# Agent: FRONTEND-DEV
+
+# Pages
+pages:
+  - path: "apps/frontend/app/(authenticated)/planning/suppliers/page.tsx"
+    description: "Supplier list page with KPIs, filters, search, pagination"
+    wireframe: "PLAN-001"
+    components:
+      - "SupplierListKPIs"
+      - "SupplierFilters"
+      - "SupplierListTable"
+      - "SupplierBulkActions"
+      - "SupplierCreateEditModal"
+    states:
+      - "loading"
+      - "empty"
+      - "success"
+      - "error"
+      - "filtered_empty"
+
+  - path: "apps/frontend/app/(authenticated)/planning/suppliers/[id]/page.tsx"
+    description: "Supplier detail page with tabs (Products, Purchase Orders)"
+    wireframe: "PLAN-003"
+    components:
+      - "SupplierHeader"
+      - "SupplierInfoCards"
+      - "SupplierTabs"
+      - "SupplierProductsTable"  # Story 03.2
+      - "SupplierPurchaseOrders"  # Story 03.3
+    states:
+      - "loading"
+      - "success"
+      - "error"
+      - "empty_products"
+      - "empty_pos"
+
+# Components
+components:
+  - path: "apps/frontend/components/planning/suppliers/SupplierListTable.tsx"
+    description: "Main table with columns: Code, Name, Contact, Email, Phone, Status, Products, Actions"
+    props:
+      - { name: "data", type: "Supplier[]" }
+      - { name: "selectedIds", type: "string[]" }
+      - { name: "onSelect", type: "(ids: string[]) => void" }
+      - { name: "onEdit", type: "(id: string) => void" }
+      - { name: "onDelete", type: "(id: string) => void" }
+      - { name: "onViewDetails", type: "(id: string) => void" }
+    features:
+      - "Multi-row selection via checkboxes"
+      - "Sortable columns (code, name)"
+      - "3-line row layout (desktop)"
+      - "Card layout (mobile)"
+      - "Row actions dropdown menu"
+
+  - path: "apps/frontend/components/planning/suppliers/SupplierListKPIs.tsx"
+    description: "4 KPI cards: Total, Active, Inactive, This Month"
+    props:
+      - { name: "summary", type: "SupplierSummary" }
+      - { name: "onCardClick", type: "(filter: string) => void" }
+    features:
+      - "Active rate percentage calculation"
+      - "Clickable cards to apply filters"
+      - "Responsive: 4-column (desktop), 2x2 (tablet), stacked (mobile)"
+
+  - path: "apps/frontend/components/planning/suppliers/SupplierFilters.tsx"
+    description: "Filter bar with Status, Currency, Payment Terms, Search"
+    props:
+      - { name: "filters", type: "SupplierFilters" }
+      - { name: "onFilterChange", type: "(filters: SupplierFilters) => void" }
+      - { name: "onClearFilters", type: "() => void" }
+    features:
+      - "Status toggle: All/Active/Inactive"
+      - "Currency multi-select dropdown"
+      - "Payment terms searchable dropdown"
+      - "Search input with 300ms debounce"
+      - "URL query param sync"
+      - "Mobile: bottom sheet modal"
+
+  - path: "apps/frontend/components/planning/suppliers/SupplierCreateEditModal.tsx"
+    description: "Modal for create/edit supplier form"
+    wireframe: "PLAN-002"
+    props:
+      - { name: "open", type: "boolean" }
+      - { name: "onClose", type: "() => void" }
+      - { name: "supplier", type: "Supplier | null", description: "null = create mode" }
+      - { name: "onSuccess", type: "(supplier: Supplier) => void" }
+    features:
+      - "Auto-generated supplier code (SUP-XXX)"
+      - "Manual code entry toggle"
+      - "Code uniqueness validation (debounced 500ms)"
+      - "Code locking if supplier has POs (edit mode)"
+      - "Tax code dropdown from Settings"
+      - "Country dropdown (ISO 3166-1)"
+      - "Success confirmation (2s auto-close)"
+      - "Zod validation with react-hook-form"
+    sections:
+      - "Basic Information (code, name)"
+      - "Contact Information (name, email, phone)"
+      - "Address Information (street, city, postal, country)"
+      - "Business Terms (currency, tax code, payment terms)"
+
+  - path: "apps/frontend/components/planning/suppliers/SupplierBulkActions.tsx"
+    description: "Bulk action bar: Deactivate, Activate, Export"
+    props:
+      - { name: "selectedIds", type: "string[]" }
+      - { name: "selectedSuppliers", type: "Supplier[]" }
+      - { name: "onDeactivate", type: "() => void" }
+      - { name: "onActivate", type: "() => void" }
+      - { name: "onExport", type: "() => void" }
+    features:
+      - "Deactivate only visible when active suppliers selected"
+      - "Activate only visible when inactive suppliers selected"
+      - "Confirmation modals for bulk actions"
+      - "Mixed result handling with detailed feedback"
+
+  - path: "apps/frontend/components/planning/suppliers/SupplierDeleteModal.tsx"
+    description: "Confirmation modal for delete action"
+    props:
+      - { name: "open", type: "boolean" }
+      - { name: "supplier", type: "Supplier" }
+      - { name: "onConfirm", type: "() => void" }
+      - { name: "onCancel", type: "() => void" }
+    features:
+      - "Warning about permanent deletion"
+      - "Error display if deletion blocked"
+      - "Destructive button styling"
+
+  - path: "apps/frontend/components/planning/suppliers/SupplierRow.tsx"
+    description: "Table row component for desktop view"
+    props:
+      - { name: "supplier", type: "Supplier" }
+      - { name: "selected", type: "boolean" }
+      - { name: "onSelect", type: "() => void" }
+      - { name: "onEdit", type: "() => void" }
+      - { name: "onViewDetails", type: "() => void" }
+    features:
+      - "3-line row layout"
+      - "Status badge (Active/Inactive)"
+      - "Products count display"
+      - "Row actions dropdown"
+
+  - path: "apps/frontend/components/planning/suppliers/SupplierCard.tsx"
+    description: "Card component for mobile view"
+    props:
+      - { name: "supplier", type: "Supplier" }
+      - { name: "selected", type: "boolean" }
+      - { name: "onSelect", type: "() => void" }
+      - { name: "onEdit", type: "() => void" }
+      - { name: "onViewDetails", type: "() => void" }
+    features:
+      - "Vertical card layout"
+      - "Swipe left for quick actions"
+      - "Touch-optimized (48dp targets)"
+
+# TypeScript Types
+types:
+  - path: "apps/frontend/lib/types/supplier.ts"
+    content: |
+      export interface Supplier {
+        id: string;
+        org_id: string;
+        code: string;
+        name: string;
+        address: string | null;
+        city: string | null;
+        postal_code: string | null;
+        country: string | null;
+        contact_name: string | null;
+        contact_email: string | null;
+        contact_phone: string | null;
+        currency: 'PLN' | 'EUR' | 'USD' | 'GBP';
+        tax_code_id: string;
+        tax_code?: TaxCode;
+        payment_terms: string;
+        notes: string | null;
+        is_active: boolean;
+        // Phase 3 fields
+        approved_supplier: boolean;
+        supplier_rating: number | null;
+        last_audit_date: string | null;
+        next_audit_due: string | null;
+        // Computed
+        products_count?: number;
+        has_open_pos?: boolean;
+        // Audit
+        created_at: string;
+        updated_at: string;
+        created_by: string | null;
+        updated_by: string | null;
+      }
+
+      export interface SupplierSummary {
+        total_count: number;
+        active_count: number;
+        inactive_count: number;
+        active_rate: number;
+        this_month_count: number;
+      }
+
+      export interface SupplierFilters {
+        status: 'all' | 'active' | 'inactive';
+        currency: string[];
+        payment_terms: string | null;
+        search: string;
+      }
+
+      export interface SupplierListParams extends SupplierFilters {
+        page: number;
+        limit: number;
+        sort: string;
+        order: 'asc' | 'desc';
+      }
+
+      export interface CreateSupplierDto {
+        code: string;
+        name: string;
+        contact_name?: string;
+        contact_email?: string;
+        contact_phone?: string;
+        address?: string;
+        city?: string;
+        postal_code?: string;
+        country?: string;
+        currency: 'PLN' | 'EUR' | 'USD' | 'GBP';
+        tax_code_id: string;
+        payment_terms: string;
+        notes?: string;
+        is_active?: boolean;
+      }
+
+      export interface UpdateSupplierDto extends Partial<CreateSupplierDto> {}
+
+      export interface BulkActionResult {
+        success_count: number;
+        failed_count: number;
+        results: Array<{
+          id: string;
+          status: 'success' | 'failed';
+          error?: string;
+        }>;
+      }
+
+      export interface ValidationResult {
+        allowed: boolean;
+        reason?: string;
+        message?: string;
+      }
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-suppliers.ts"
+    description: "React Query hooks for suppliers"
+    exports:
+      - name: "useSuppliers"
+        type: "function"
+        params: ["params: SupplierListParams"]
+        returns: "UseQueryResult<{ data: Supplier[]; meta: PaginationMeta }>"
+
+      - name: "useSupplierSummary"
+        type: "function"
+        params: []
+        returns: "UseQueryResult<SupplierSummary>"
+
+      - name: "useSupplier"
+        type: "function"
+        params: ["id: string"]
+        returns: "UseQueryResult<Supplier>"
+
+      - name: "useCreateSupplier"
+        type: "function"
+        params: []
+        returns: "UseMutationResult<Supplier, Error, CreateSupplierDto>"
+
+      - name: "useUpdateSupplier"
+        type: "function"
+        params: []
+        returns: "UseMutationResult<Supplier, Error, { id: string; data: UpdateSupplierDto }>"
+
+      - name: "useDeleteSupplier"
+        type: "function"
+        params: []
+        returns: "UseMutationResult<void, Error, string>"
+
+      - name: "useBulkDeactivateSuppliers"
+        type: "function"
+        params: []
+        returns: "UseMutationResult<BulkActionResult, Error, { ids: string[]; reason?: string }>"
+
+      - name: "useBulkActivateSuppliers"
+        type: "function"
+        params: []
+        returns: "UseMutationResult<BulkActionResult, Error, string[]>"
+
+      - name: "useNextSupplierCode"
+        type: "function"
+        params: []
+        returns: "UseQueryResult<string>"
+
+      - name: "useValidateSupplierCode"
+        type: "function"
+        params: ["code: string", "excludeId?: string"]
+        returns: "UseQueryResult<boolean>"
+
+# UX Specifications
+ux:
+  wireframes:
+    - id: "PLAN-001"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-001-supplier-list.md"
+      description: "Supplier List Page"
+
+    - id: "PLAN-002"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-002-supplier-create-edit.md"
+      description: "Supplier Create/Edit Modal"
+
+    - id: "PLAN-003"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-003-supplier-detail.md"
+      description: "Supplier Detail Page"
+
+  patterns:
+    table: "ShadCN DataTable with selection, sorting, pagination"
+    modal: "ShadCN Dialog with form validation"
+    filters: "ShadCN Select, Input, Button components"
+    cards: "ShadCN Card for KPIs"
+    badges: "ShadCN Badge for status"
+    toast: "ShadCN Sonner for notifications"
+
+  states:
+    loading: "Skeleton loaders for table, KPIs"
+    empty: "Empty state illustration with CTA"
+    error: "Error message with retry button"
+    success: "Data displayed with all interactions"
+    filtered_empty: "No results message with clear filters CTA"
+
+  accessibility:
+    touch_targets: "48x48dp minimum"
+    contrast:
+      active_badge: "Text #065F46 on #D1FAE5 = 8.39:1 (AAA)"
+      inactive_badge: "Text #1F2937 on #F3F4F6 = 11.83:1 (AAA)"
+      primary_text: "#111827 on #FFFFFF = 16.65:1 (AAA)"
+    keyboard:
+      - "Tab: Navigate between elements"
+      - "Enter: Activate buttons, submit forms"
+      - "Space: Toggle checkboxes"
+      - "Escape: Close modals"
+      - "/: Focus search input"
+      - "Ctrl+A: Select all rows"
+    aria:
+      - "Table with proper role and labels"
+      - "Status badges with role='status'"
+      - "Actions menu with role='menu'"
+      - "Pagination with nav aria-label"
+
+  responsive:
+    desktop: ">1024px - Full table, 4-column KPIs, numbered pagination"
+    tablet: "768-1024px - Condensed table, 2x2 KPIs, numbered pagination"
+    mobile: "<768px - Card layout, stacked KPIs, Load More button, bottom sheet filters"
+
+# Performance Targets
+performance:
+  initial_load: "<500ms (P95)"
+  filter_change: "<300ms"
+  search_debounce: "300ms"
+  code_validation: "<200ms"
+  export_100: "<2s"
+  bulk_action_10: "<1s"

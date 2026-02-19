@@ -1,0 +1,482 @@
+# Story 02.8 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+# API Endpoints
+endpoints:
+  # Operations CRUD
+  - method: "GET"
+    path: "/api/v1/technical/routings/:id/operations"
+    description: "List all operations for a routing with summary stats"
+    file: "apps/frontend/app/api/v1/technical/routings/[id]/operations/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        id: "UUID - routing ID"
+
+    response:
+      status: 200
+      type: "OperationsListResponse"
+      schema:
+        operations:
+          type: "array"
+          items:
+            id: "UUID"
+            routing_id: "UUID"
+            sequence: "number"
+            name: "string"
+            description: "string | null"
+            machine_id: "string | null"
+            machine_name: "string | null"  # Joined from machines table
+            machine_code: "string | null"
+            setup_time: "number"  # minutes, default 0
+            duration: "number"    # minutes, required
+            cleanup_time: "number"  # minutes, default 0
+            labor_cost_per_hour: "number"
+            instructions: "string | null"  # max 2000 chars
+            attachment_count: "number"
+            created_at: "string"
+            updated_at: "string"
+        summary:
+          total_operations: "number"
+          total_duration: "number"       # minutes (considers parallel: MAX per sequence)
+          total_setup_time: "number"
+          total_cleanup_time: "number"
+          total_labor_cost: "number"
+          average_yield: "number"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 404
+        code: "ROUTING_NOT_FOUND"
+        message: "Routing not found"
+
+  - method: "POST"
+    path: "/api/v1/technical/routings/:id/operations"
+    description: "Create a new operation for a routing"
+    file: "apps/frontend/app/api/v1/technical/routings/[id]/operations/route.ts"
+    auth: "required"
+    roles: ["ADMIN", "SUPER_ADMIN", "PRODUCTION_MANAGER"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        id: "UUID - routing ID"
+      body:
+        sequence: "number - required, positive integer"
+        name: "string - required, 3-100 chars"
+        description: "string | null - optional, max 500 chars"
+        machine_id: "string | null - optional, UUID FK to machines"
+        setup_time: "number - optional, default 0, non-negative"
+        duration: "number - required, positive integer"
+        cleanup_time: "number - optional, default 0, non-negative"
+        labor_cost_per_hour: "number - optional, default 0, non-negative"
+        instructions: "string | null - optional, max 2000 chars"
+
+    response:
+      status: 201
+      type: "CreateOperationResponse"
+      schema:
+        operation:
+          id: "UUID"
+          routing_id: "UUID"
+          sequence: "number"
+          name: "string"
+          machine_id: "string | null"
+          machine_name: "string | null"
+          setup_time: "number"
+          duration: "number"
+          cleanup_time: "number"
+          labor_cost_per_hour: "number"
+          instructions: "string | null"
+          created_at: "string"
+
+    errors:
+      - status: 400
+        code: "VALIDATION_ERROR"
+        message: "Validation failed"
+        fields: ["sequence", "name", "duration"]
+      - status: 404
+        code: "ROUTING_NOT_FOUND"
+        message: "Routing not found"
+
+  - method: "PUT"
+    path: "/api/v1/technical/routings/:id/operations/:opId"
+    description: "Update an existing operation"
+    file: "apps/frontend/app/api/v1/technical/routings/[id]/operations/[opId]/route.ts"
+    auth: "required"
+    roles: ["ADMIN", "SUPER_ADMIN", "PRODUCTION_MANAGER"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        id: "UUID - routing ID"
+        opId: "UUID - operation ID"
+      body:
+        sequence: "number - optional"
+        name: "string - optional"
+        description: "string | null - optional"
+        machine_id: "string | null - optional"
+        setup_time: "number - optional"
+        duration: "number - optional"
+        cleanup_time: "number - optional"
+        labor_cost_per_hour: "number - optional"
+        instructions: "string | null - optional"
+
+    response:
+      status: 200
+      type: "UpdateOperationResponse"
+
+    errors:
+      - status: 404
+        code: "OPERATION_NOT_FOUND"
+        message: "Operation not found"
+      - status: 400
+        code: "VALIDATION_ERROR"
+        message: "Validation failed"
+
+  - method: "DELETE"
+    path: "/api/v1/technical/routings/:id/operations/:opId"
+    description: "Delete an operation (also deletes attachments from storage)"
+    file: "apps/frontend/app/api/v1/technical/routings/[id]/operations/[opId]/route.ts"
+    auth: "required"
+    roles: ["ADMIN", "SUPER_ADMIN", "PRODUCTION_MANAGER"]
+
+    request:
+      params:
+        id: "UUID - routing ID"
+        opId: "UUID - operation ID"
+
+    response:
+      status: 200
+      schema:
+        success: true
+        message: "Operation deleted"
+        attachments_deleted: "number"
+
+    errors:
+      - status: 404
+        code: "OPERATION_NOT_FOUND"
+        message: "Operation not found"
+
+  - method: "PATCH"
+    path: "/api/v1/technical/routings/:id/operations/:opId/reorder"
+    description: "Move operation up or down (swap sequences)"
+    file: "apps/frontend/app/api/v1/technical/routings/[id]/operations/[opId]/reorder/route.ts"
+    auth: "required"
+    roles: ["ADMIN", "SUPER_ADMIN", "PRODUCTION_MANAGER"]
+
+    request:
+      params:
+        id: "UUID - routing ID"
+        opId: "UUID - operation ID"
+      body:
+        direction: "'up' | 'down'"
+
+    response:
+      status: 200
+      schema:
+        success: true
+        updated_operations:
+          type: "array"
+          items:
+            id: "string"
+            sequence: "number"
+
+    errors:
+      - status: 400
+        code: "INVALID_DIRECTION"
+        message: "Direction must be 'up' or 'down'"
+      - status: 400
+        code: "CANNOT_MOVE"
+        message: "Cannot move operation (already at top/bottom)"
+
+  # Attachment endpoints (FR-2.45)
+  - method: "POST"
+    path: "/api/v1/technical/routings/:id/operations/:opId/attachments"
+    description: "Upload attachment for operation work instructions"
+    file: "apps/frontend/app/api/v1/technical/routings/[id]/operations/[opId]/attachments/route.ts"
+    auth: "required"
+    roles: ["ADMIN", "SUPER_ADMIN", "PRODUCTION_MANAGER"]
+
+    request:
+      params:
+        id: "UUID - routing ID"
+        opId: "UUID - operation ID"
+      body:
+        type: "multipart/form-data"
+        file: "File - required, max 10MB, PDF/PNG/JPG/DOCX"
+
+    response:
+      status: 201
+      schema:
+        attachment:
+          id: "UUID"
+          operation_id: "UUID"
+          file_name: "string"
+          file_type: "string"
+          file_size: "number"
+          storage_path: "string"
+          uploaded_by: "UUID"
+          uploaded_at: "string"
+
+    errors:
+      - status: 400
+        code: "FILE_TOO_LARGE"
+        message: "File size must be less than 10MB"
+      - status: 400
+        code: "INVALID_FILE_TYPE"
+        message: "File type not allowed (PDF, PNG, JPG, DOCX only)"
+      - status: 400
+        code: "MAX_ATTACHMENTS_REACHED"
+        message: "Maximum 5 attachments per operation"
+
+  - method: "GET"
+    path: "/api/v1/technical/routings/:id/operations/:opId/attachments/:attachId/download"
+    description: "Get signed URL for attachment download"
+    file: "apps/frontend/app/api/v1/technical/routings/[id]/operations/[opId]/attachments/[attachId]/download/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    response:
+      status: 200
+      schema:
+        url: "string"
+        expires_in: "number"  # seconds
+
+  - method: "DELETE"
+    path: "/api/v1/technical/routings/:id/operations/:opId/attachments/:attachId"
+    description: "Delete attachment from operation and storage"
+    file: "apps/frontend/app/api/v1/technical/routings/[id]/operations/[opId]/attachments/[attachId]/route.ts"
+    auth: "required"
+    roles: ["ADMIN", "SUPER_ADMIN", "PRODUCTION_MANAGER"]
+
+    response:
+      status: 200
+      schema:
+        success: true
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/routing-operations-service.ts"
+    description: "Routing operations CRUD and calculations"
+    exports:
+      - name: "getRoutingWithOperations"
+        type: "async function"
+        params: ["routingId: string"]
+        returns: "Promise<RoutingDetailResponse>"
+
+      - name: "getOperations"
+        type: "async function"
+        params: ["routingId: string"]
+        returns: "Promise<OperationsListResponse>"
+
+      - name: "createOperation"
+        type: "async function"
+        params: ["routingId: string", "data: CreateOperationRequest"]
+        returns: "Promise<RoutingOperation>"
+
+      - name: "updateOperation"
+        type: "async function"
+        params: ["routingId: string", "opId: string", "data: UpdateOperationRequest"]
+        returns: "Promise<RoutingOperation>"
+
+      - name: "deleteOperation"
+        type: "async function"
+        params: ["routingId: string", "opId: string"]
+        returns: "Promise<void>"
+
+      - name: "reorderOperation"
+        type: "async function"
+        params: ["routingId: string", "opId: string", "direction: 'up' | 'down'"]
+        returns: "Promise<ReorderResponse>"
+
+      - name: "getNextSequence"
+        type: "async function"
+        params: ["routingId: string"]
+        returns: "Promise<number>"
+
+      - name: "calculateSummary"
+        type: "function"
+        params: ["operations: RoutingOperation[]"]
+        returns: "OperationsSummary"
+
+      - name: "detectParallelOperations"
+        type: "function"
+        params: ["operations: RoutingOperation[]"]
+        returns: "Map<number, string[]>"
+        description: "Returns sequence -> operation names map for parallel detection"
+
+      - name: "uploadAttachment"
+        type: "async function"
+        params: ["routingId: string", "opId: string", "file: File"]
+        returns: "Promise<OperationAttachment>"
+
+      - name: "deleteAttachment"
+        type: "async function"
+        params: ["routingId: string", "opId: string", "attachId: string"]
+        returns: "Promise<void>"
+
+      - name: "getAttachmentDownloadUrl"
+        type: "async function"
+        params: ["routingId: string", "opId: string", "attachId: string"]
+        returns: "Promise<string>"
+
+      - name: "getMachinesForDropdown"
+        type: "async function"
+        params: []
+        returns: "Promise<Machine[]>"
+        description: "Returns machines list or empty array if none configured"
+
+      - name: "hasMachinesConfigured"
+        type: "async function"
+        params: []
+        returns: "Promise<boolean>"
+
+# TypeScript Interfaces
+types:
+  - name: "RoutingOperation"
+    interface: |
+      interface RoutingOperation {
+        id: string;
+        routing_id: string;
+        sequence: number;
+        name: string;
+        description: string | null;
+        machine_id: string | null;
+        machine_name: string | null;
+        machine_code: string | null;
+        setup_time: number;           // minutes, default 0
+        duration: number;             // minutes, required
+        cleanup_time: number;         // minutes, default 0
+        labor_cost_per_hour: number;
+        instructions: string | null;  // max 2000 chars
+        attachments?: OperationAttachment[];
+        attachment_count: number;
+        created_at: string;
+        updated_at: string;
+      }
+
+  - name: "OperationsSummary"
+    interface: |
+      interface OperationsSummary {
+        total_operations: number;
+        total_duration: number;       // minutes (MAX per sequence for parallel)
+        total_setup_time: number;
+        total_cleanup_time: number;
+        total_labor_cost: number;     // SUM all ops including parallel
+        average_yield: number;        // weighted by duration
+      }
+
+  - name: "CreateOperationRequest"
+    interface: |
+      interface CreateOperationRequest {
+        sequence: number;               // Required, positive, can duplicate for parallel
+        name: string;                   // Required, 3-100 chars
+        description?: string | null;
+        machine_id?: string | null;     // Optional, NULLABLE FK
+        setup_time?: number;            // Default 0
+        duration: number;               // Required, positive
+        cleanup_time?: number;          // Default 0
+        labor_cost_per_hour?: number;   // Default 0
+        instructions?: string | null;   // Max 2000 chars
+      }
+
+  - name: "OperationAttachment"
+    interface: |
+      interface OperationAttachment {
+        id: string;
+        operation_id: string;
+        file_name: string;
+        file_type: 'pdf' | 'png' | 'jpg' | 'jpeg' | 'docx';
+        file_size: number;            // bytes
+        storage_path: string;
+        uploaded_by: string;
+        uploaded_at: string;
+      }
+
+# Validation Schemas (Zod)
+validation:
+  operation_form:
+    schema: |
+      const operationFormSchema = z.object({
+        sequence: z.number()
+          .int("Sequence must be an integer")
+          .min(1, "Sequence must be at least 1"),
+        name: z.string()
+          .min(3, "Name must be at least 3 characters")
+          .max(100, "Name must be less than 100 characters"),
+        description: z.string()
+          .max(500, "Description must be less than 500 characters")
+          .nullable()
+          .optional(),
+        machine_id: z.string().uuid().nullable().optional(),  // NULLABLE
+        setup_time: z.number()
+          .int("Setup time must be an integer")
+          .min(0, "Setup time cannot be negative")
+          .default(0),
+        duration: z.number()
+          .int("Duration must be an integer")
+          .min(1, "Duration must be at least 1 minute"),
+        cleanup_time: z.number()
+          .int("Cleanup time must be an integer")
+          .min(0, "Cleanup time cannot be negative")
+          .default(0),
+        labor_cost_per_hour: z.number()
+          .min(0, "Labor cost cannot be negative")
+          .default(0),
+        instructions: z.string()
+          .max(2000, "Instructions must be less than 2000 characters")
+          .nullable()
+          .optional(),
+      });
+
+  attachment:
+    schema: |
+      const ALLOWED_TYPES = [
+        'application/pdf',
+        'image/png',
+        'image/jpeg',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      ];
+
+      const attachmentSchema = z.object({
+        file: z.instanceof(File)
+          .refine(file => file.size <= 10 * 1024 * 1024, "File size must be less than 10MB")
+          .refine(file => ALLOWED_TYPES.includes(file.type), "File type not allowed (PDF, PNG, JPG, DOCX only)"),
+      });
+
+# Error Codes
+error_codes:
+  - code: "ROUTING_NOT_FOUND"
+    message: "Routing not found"
+    status: 404
+  - code: "OPERATION_NOT_FOUND"
+    message: "Operation not found"
+    status: 404
+  - code: "VALIDATION_ERROR"
+    message: "Validation failed"
+    status: 400
+  - code: "INVALID_MACHINE_ID"
+    message: "Machine not found"
+    status: 400
+  - code: "FILE_TOO_LARGE"
+    message: "File size must be less than 10MB"
+    status: 400
+  - code: "INVALID_FILE_TYPE"
+    message: "File type not allowed (PDF, PNG, JPG, DOCX only)"
+    status: 400
+  - code: "MAX_ATTACHMENTS_REACHED"
+    message: "Maximum 5 attachments per operation"
+    status: 400
+  - code: "CANNOT_MOVE"
+    message: "Cannot move operation (already at top/bottom)"
+    status: 400

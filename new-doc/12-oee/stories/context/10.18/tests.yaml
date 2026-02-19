@@ -1,0 +1,64 @@
+# Story 10.18 - Test Specification
+# Purpose: Mobile downtime logging tests
+# Agent: QA-AGENT
+
+acceptance_criteria:
+  - id: "AC-01"
+    given: "operator on /scanner/downtime"
+    when: "scans machine QR code (MACH-001)"
+    then: "machine auto-selected and displayed"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-02"
+    given: "machine selected"
+    when: "operator taps 'Jam' reason and 'Start Downtime'"
+    then: "downtime event created with start_time = now"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-03"
+    given: "active downtime"
+    when: "operator taps 'End Downtime' and captures photo"
+    then: "event ended, photo uploaded, synced to server"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-04"
+    given: "no internet connection"
+    when: "operator logs 3 downtime events"
+    then: "events stored locally, badge shows '3 events pending sync'"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-05"
+    given: "3 offline events queued"
+    when: "internet reconnects"
+    then: "events auto-sync to server, queue cleared"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-06"
+    given: "reason selection screen"
+    when: "inspecting button sizes"
+    then: "all buttons minimum 44x44 pixels"
+    test_type: "unit"
+    priority: "P0"
+
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/mobile-downtime-service.test.ts"
+    type: "unit"
+  - path: "apps/frontend/lib/services/__tests__/offline-storage-service.test.ts"
+    type: "unit"
+  - path: "apps/frontend/app/api/oee/downtime/mobile/__tests__/api.test.ts"
+    type: "integration"
+  - path: "tests/e2e/mobile-downtime-logging.spec.ts"
+    type: "e2e"
+
+definition_of_done:
+  - "QR scan works on mobile"
+  - "Quick reason buttons touch-optimized"
+  - "Photo capture functional"
+  - "Offline storage works (IndexedDB)"
+  - "Auto-sync on reconnect"
+  - "Mobile responsive design"

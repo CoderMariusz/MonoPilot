@@ -1,0 +1,415 @@
+# Story 01.13 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  unit:
+    - path: "apps/frontend/lib/services/__tests__/tax-code-service.test.ts"
+      description: "Unit tests for tax code service methods"
+    - path: "apps/frontend/lib/utils/__tests__/tax-code-helpers.test.ts"
+      description: "Unit tests for getTaxCodeStatus helper"
+
+  integration:
+    - path: "apps/frontend/__tests__/integration/api/settings/tax-codes.test.ts"
+      description: "Integration tests for tax code API endpoints"
+    - path: "supabase/tests/tax-codes-rls.test.sql"
+      description: "RLS policy tests"
+
+  e2e:
+    - path: "apps/frontend/__tests__/e2e/settings/tax-codes.spec.ts"
+      description: "End-to-end tests for tax code flows"
+
+# Acceptance Criteria (from story)
+acceptance_criteria:
+  - id: "AC-01"
+    feature: "Tax Code List Page"
+    scenarios:
+      - given: "admin navigates to /settings/tax-codes"
+        when: "page loads"
+        then: "tax code list displays within 300ms"
+        test_type: "e2e"
+        priority: "P0"
+
+      - given: "tax code list with 10+ tax codes"
+        when: "admin enters search 'VAT'"
+        then: "only tax codes matching code or name display within 200ms"
+        test_type: "e2e"
+        priority: "P0"
+
+  - id: "AC-02"
+    feature: "Create Tax Code"
+    scenarios:
+      - given: "admin enters valid data"
+        when: "'Create' clicked"
+        then: "tax code created and appears in list within 1 second"
+        test_type: "integration"
+        priority: "P0"
+
+      - given: "tax code 'VAT23' exists for 'PL'"
+        when: "admin creates another with code 'VAT23' for 'PL'"
+        then: "error 'Tax code must be unique within jurisdiction' displays"
+        test_type: "integration"
+        priority: "P0"
+
+      - given: "admin enters code 'invalid code!'"
+        when: "save attempted"
+        then: "error 'Code must be uppercase alphanumeric' displays"
+        test_type: "unit"
+        priority: "P1"
+
+  - id: "AC-03"
+    feature: "Tax Rate Configuration"
+    scenarios:
+      - given: "admin enters rate '-5'"
+        when: "save attempted"
+        then: "error 'Rate must be between 0 and 100' displays"
+        test_type: "unit"
+        priority: "P0"
+
+      - given: "admin enters rate '150'"
+        when: "save attempted"
+        then: "error 'Rate must be between 0 and 100' displays"
+        test_type: "unit"
+        priority: "P0"
+
+      - given: "admin enters rate '0.00'"
+        when: "save completed"
+        then: "tax code created with 0% rate (valid for exempt)"
+        test_type: "integration"
+        priority: "P1"
+
+  - id: "AC-04"
+    feature: "Effective Date Ranges"
+    scenarios:
+      - given: "admin enters valid_from '2025-12-01' and valid_to '2025-06-01'"
+        when: "save attempted"
+        then: "error 'Valid to must be after valid from' displays"
+        test_type: "unit"
+        priority: "P0"
+
+      - given: "tax code with valid_to '2024-01-01' exists"
+        when: "viewing tax code list"
+        then: "status shows 'Expired' badge in red"
+        test_type: "e2e"
+        priority: "P1"
+
+  - id: "AC-05"
+    feature: "Default Tax Code Assignment"
+    scenarios:
+      - given: "'VAT8' is current default"
+        when: "admin sets 'VAT23' as default"
+        then: "'VAT23' becomes default AND 'VAT8' loses default status"
+        test_type: "integration"
+        priority: "P0"
+
+      - given: "admin sets 'VAT23' as default"
+        when: "checking database"
+        then: "exactly one tax code has is_default=true for org"
+        test_type: "integration"
+        priority: "P0"
+
+  - id: "AC-06"
+    feature: "Edit Tax Code"
+    scenarios:
+      - given: "tax code 'VAT23' is referenced by suppliers"
+        when: "edit modal opens"
+        then: "code field is disabled with tooltip"
+        test_type: "e2e"
+        priority: "P1"
+
+  - id: "AC-07"
+    feature: "Delete Tax Code"
+    scenarios:
+      - given: "tax code 'TEST' has no references"
+        when: "admin confirms delete"
+        then: "tax code removed within 500ms"
+        test_type: "e2e"
+        priority: "P0"
+
+      - given: "tax code 'VAT23' is referenced by suppliers"
+        when: "admin clicks 'Delete Tax Code'"
+        then: "error 'Cannot delete tax code referenced by 5 suppliers' displays"
+        test_type: "integration"
+        priority: "P0"
+
+  - id: "AC-08"
+    feature: "Permission Enforcement"
+    scenarios:
+      - given: "user with VIEWER role"
+        when: "accessing /settings/tax-codes"
+        then: "'Add Tax Code' button is hidden"
+        test_type: "e2e"
+        priority: "P0"
+
+      - given: "user with ADMIN role"
+        when: "accessing /settings/tax-codes"
+        then: "all CRUD actions available"
+        test_type: "e2e"
+        priority: "P0"
+
+  - id: "AC-09"
+    feature: "Multi-tenancy"
+    scenarios:
+      - given: "User A from Org A"
+        when: "requesting /api/settings/tax-codes"
+        then: "only Org A tax codes returned"
+        test_type: "integration"
+        priority: "P0"
+
+      - given: "User A from Org A"
+        when: "requesting tax code ID from Org B"
+        then: "404 Not Found returned (not 403)"
+        test_type: "integration"
+        priority: "P0"
+
+# Unit Test Cases
+unit_tests:
+  tax_code_service:
+    - name: "list() returns org-scoped tax codes"
+      setup: "Mock Supabase response with org_id filter"
+      expected: "Only current org tax codes returned"
+
+    - name: "list() filters by country_code"
+      setup: "Call list({ country_code: 'PL' })"
+      expected: "Only Polish tax codes returned"
+
+    - name: "list() filters by status=active"
+      setup: "Mock tax codes with various dates"
+      expected: "Only active tax codes (valid_from <= today <= valid_to)"
+
+    - name: "create() validates code uniqueness per country"
+      setup: "Mock existing VAT23/PL"
+      action: "create({ code: 'VAT23', country_code: 'PL' })"
+      expected: "Throws validation error"
+
+    - name: "create() auto-uppercases code and country"
+      setup: "create({ code: 'vat23', country_code: 'pl' })"
+      expected: "Stored as 'VAT23', 'PL'"
+
+    - name: "create() validates rate range"
+      setup: "create({ rate: 150 })"
+      expected: "Throws validation error 'Rate must be 0-100'"
+
+    - name: "create() validates date range"
+      setup: "create({ valid_from: '2025-12-01', valid_to: '2025-06-01' })"
+      expected: "Throws validation error"
+
+    - name: "setDefault() unsets previous default"
+      setup: "Mock VAT8 as current default"
+      action: "setDefault('vat23-id')"
+      expected: "VAT23 is_default=true, VAT8 is_default=false"
+
+    - name: "delete() blocks with references"
+      setup: "Mock hasReferences returning count=5"
+      action: "delete('vat23-id')"
+      expected: "Throws error 'Cannot delete, 5 references'"
+
+    - name: "getTaxCodeStatus() returns correct status"
+      cases:
+        - input: "{ valid_from: '2026-01-01' }"
+          expected: "'scheduled'"
+        - input: "{ valid_from: '2024-01-01', valid_to: '2024-12-31' }"
+          expected: "'expired'"
+        - input: "{ valid_from: '2024-01-01', valid_to: null }"
+          expected: "'active'"
+
+# Integration Test Cases
+integration_tests:
+  api_endpoints:
+    - name: "GET /tax-codes returns paginated list"
+      request: "GET /api/v1/settings/tax-codes?page=1&limit=20"
+      expected: "{ data: [...], total: X, page: 1, limit: 20 }"
+
+    - name: "GET /tax-codes?country_code=PL filters"
+      request: "GET /api/v1/settings/tax-codes?country_code=PL"
+      expected: "Only Polish tax codes returned"
+
+    - name: "GET /tax-codes?status=active filters"
+      request: "GET /api/v1/settings/tax-codes?status=active"
+      expected: "Only active tax codes returned"
+
+    - name: "POST /tax-codes creates with validation"
+      request: "POST /api/v1/settings/tax-codes"
+      body: "{ code: 'VAT23', name: 'VAT 23%', rate: 23, country_code: 'PL', valid_from: '2025-01-01' }"
+      expected: "201 Created with tax code object"
+
+    - name: "POST /tax-codes duplicate code+country returns 409"
+      setup: "VAT23/PL already exists"
+      request: "POST /api/v1/settings/tax-codes"
+      body: "{ code: 'VAT23', country_code: 'PL', ... }"
+      expected: "409 Conflict"
+
+    - name: "POST /tax-codes invalid rate returns 400"
+      request: "POST /api/v1/settings/tax-codes"
+      body: "{ rate: 150, ... }"
+      expected: "400 Bad Request with validation errors"
+
+    - name: "PUT /tax-codes/:id updates mutable fields"
+      request: "PUT /api/v1/settings/tax-codes/:id"
+      body: "{ name: 'Updated Name', rate: 22 }"
+      expected: "200 OK with updated tax code"
+
+    - name: "PUT /tax-codes/:id code immutable with refs"
+      setup: "Tax code referenced by suppliers"
+      request: "PUT /api/v1/settings/tax-codes/:id"
+      body: "{ code: 'NEW-CODE' }"
+      expected: "400 Bad Request 'Cannot change code'"
+
+    - name: "PATCH /tax-codes/:id/set-default atomicity"
+      setup: "VAT8 is current default"
+      request: "PATCH /api/v1/settings/tax-codes/:vat23-id/set-default"
+      expected: "200 OK, VAT23 default=true, VAT8 default=false"
+
+    - name: "DELETE /tax-codes/:id with references"
+      setup: "Tax code referenced by 5 suppliers"
+      request: "DELETE /api/v1/settings/tax-codes/:id"
+      expected: "400 Bad Request with reference count"
+
+    - name: "GET /tax-codes/default returns default"
+      setup: "VAT23 is default"
+      request: "GET /api/v1/settings/tax-codes/default"
+      expected: "200 OK with VAT23 object"
+
+    - name: "Cross-org access returns 404"
+      setup: "User A from Org A, tax code from Org B"
+      request: "GET /api/v1/settings/tax-codes/:org-b-tax-code-id"
+      expected: "404 Not Found"
+
+    - name: "Non-admin POST returns 403"
+      setup: "User with VIEWER role"
+      request: "POST /api/v1/settings/tax-codes"
+      expected: "403 Forbidden"
+
+  rls_policies:
+    - name: "SELECT policy filters to own org"
+      setup: "2 orgs with tax codes"
+      action: "User A queries tax_codes"
+      expected: "Only Org A tax codes visible"
+
+    - name: "INSERT policy requires admin role"
+      setup: "Non-admin user"
+      action: "INSERT INTO tax_codes"
+      expected: "RLS blocks insert"
+
+    - name: "UPDATE policy requires admin role"
+      setup: "Non-admin user"
+      action: "UPDATE tax_codes"
+      expected: "RLS blocks update"
+
+    - name: "DELETE policy requires admin role"
+      setup: "Non-admin user"
+      action: "DELETE FROM tax_codes"
+      expected: "RLS blocks delete"
+
+# E2E Test Cases
+e2e_tests:
+  - name: "Create tax code flow"
+    steps:
+      - "Navigate to /settings/tax-codes"
+      - "Click 'Add Tax Code' button"
+      - "Fill form: code=VAT10, name=VAT 10%, rate=10, country=PL, valid_from=today"
+      - "Click 'Create'"
+      - "Verify success toast displays"
+      - "Verify VAT10 appears in list"
+
+  - name: "Edit tax code flow"
+    steps:
+      - "Navigate to /settings/tax-codes"
+      - "Click actions menu on VAT23"
+      - "Click 'Edit'"
+      - "Change name to 'VAT 23% Standard'"
+      - "Click 'Save'"
+      - "Verify success toast"
+      - "Verify updated name in list"
+
+  - name: "Set default tax code"
+    steps:
+      - "Navigate to /settings/tax-codes"
+      - "Click actions menu on VAT23"
+      - "Click 'Set as Default'"
+      - "Confirm dialog"
+      - "Verify success toast"
+      - "Verify VAT23 shows star icon"
+      - "Verify previous default no longer has star"
+
+  - name: "Delete tax code"
+    steps:
+      - "Navigate to /settings/tax-codes"
+      - "Click actions menu on TEST-CODE"
+      - "Click 'Delete'"
+      - "Confirm dialog"
+      - "Verify success toast"
+      - "Verify TEST-CODE removed from list"
+
+  - name: "Search and filter"
+    steps:
+      - "Navigate to /settings/tax-codes"
+      - "Enter 'VAT' in search box"
+      - "Verify only VAT codes visible"
+      - "Select country filter 'PL'"
+      - "Verify only Polish VAT codes visible"
+      - "Select status filter 'Active'"
+      - "Verify only active codes visible"
+
+  - name: "Date range validation"
+    steps:
+      - "Click 'Add Tax Code'"
+      - "Set valid_from to '2025-12-01'"
+      - "Set valid_to to '2025-06-01'"
+      - "Blur valid_to field"
+      - "Verify inline error 'Valid to must be after valid from'"
+
+  - name: "Rate input validation"
+    steps:
+      - "Click 'Add Tax Code'"
+      - "Enter rate '150'"
+      - "Blur rate field"
+      - "Verify inline error 'Rate must be between 0 and 100'"
+
+  - name: "Permission-based UI"
+    steps:
+      - "Login as VIEWER"
+      - "Navigate to /settings/tax-codes"
+      - "Verify 'Add Tax Code' button hidden"
+      - "Verify action menus hidden"
+
+# Definition of Done (Testing)
+definition_of_done:
+  - "Unit tests >= 80% coverage"
+  - "Integration tests for all 8 endpoints"
+  - "RLS policy tests pass"
+  - "E2E tests for critical flows pass"
+  - "Loading, empty, error states tested"
+  - "Toast notifications tested"
+  - "Permission enforcement tested"
+  - "Multi-tenancy isolation tested"
+  - "All AC scenarios covered"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    files:
+      - "lib/services/tax-code-service.ts: 85%"
+      - "lib/utils/tax-code-helpers.ts: 90%"
+
+  integration:
+    target: 100
+    endpoints:
+      - "GET /api/v1/settings/tax-codes"
+      - "POST /api/v1/settings/tax-codes"
+      - "GET /api/v1/settings/tax-codes/:id"
+      - "PUT /api/v1/settings/tax-codes/:id"
+      - "DELETE /api/v1/settings/tax-codes/:id"
+      - "PATCH /api/v1/settings/tax-codes/:id/set-default"
+      - "GET /api/v1/settings/tax-codes/validate-code"
+      - "GET /api/v1/settings/tax-codes/default"
+
+  e2e:
+    critical_flows:
+      - "Create tax code"
+      - "Edit tax code"
+      - "Set default"
+      - "Delete tax code"
+      - "Search and filter"

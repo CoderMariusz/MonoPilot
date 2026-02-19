@@ -1,0 +1,330 @@
+# Story 08.1 - Test Specifications
+# Purpose: Acceptance criteria and test cases
+# Agent: TEST-WRITER, QA-AGENT
+
+# Test file paths
+test_files:
+  unit:
+    - path: "lib/services/npd-settings-service.test.ts"
+      description: "Unit tests for NPD settings service"
+
+  integration:
+    - path: "apps/frontend/app/api/npd/settings/route.test.ts"
+      description: "Integration tests for API endpoints"
+
+  e2e:
+    - path: "e2e/npd-settings.spec.ts"
+      description: "E2E tests for settings management"
+
+# Unit Tests
+unit_tests:
+  file: "lib/services/npd-settings-service.test.ts"
+
+  suites:
+    - describe: "NPDSettingsService"
+
+      tests:
+        - describe: "getSettings"
+          tests:
+            - it: "returns existing settings for org"
+              given: "org has existing npd_settings record"
+              when: "getSettings(orgId) called"
+              then: "returns settings from database"
+
+            - it: "creates default settings if none exist"
+              given: "org has no npd_settings record"
+              when: "getSettings(orgId) called"
+              then: "creates record with defaults and returns"
+
+            - it: "throws error for invalid org_id"
+              given: "org_id does not exist"
+              when: "getSettings(invalidOrgId) called"
+              then: "throws error 'Organization not found'"
+
+        - describe: "updateSettings"
+          tests:
+            - it: "updates settings with valid data"
+              given: "admin user with valid updates"
+              when: "updateSettings(orgId, updates) called"
+              then: "updates database and returns updated settings"
+
+            - it: "rejects invalid cost variance thresholds"
+              given: "cost_variance_warning_pct = -10"
+              when: "updateSettings called"
+              then: "throws validation error"
+
+            - it: "rejects warning > blocker threshold"
+              given: "cost_variance_warning_pct = 60, cost_variance_blocker_pct = 50"
+              when: "updateSettings called"
+              then: "throws validation error 'Warning must be <= blocker'"
+
+            - it: "enforces RLS (cannot update other org settings)"
+              given: "user from Org A tries to update Org B settings"
+              when: "updateSettings(orgBId, updates) called"
+              then: "RLS blocks query, returns 0 rows updated"
+
+        - describe: "createDefaultSettings"
+          tests:
+            - it: "creates settings with default values"
+              given: "new org without settings"
+              when: "createDefaultSettings(orgId) called"
+              then: "creates record with all defaults"
+
+            - it: "throws error if settings already exist"
+              given: "org already has npd_settings"
+              when: "createDefaultSettings(orgId) called"
+              then: "throws error 'Settings already exist'"
+
+        - describe: "isNPDEnabled"
+          tests:
+            - it: "returns true when enable_npd_module = true"
+              given: "settings.enable_npd_module = true"
+              when: "isNPDEnabled(orgId) called"
+              then: "returns true"
+
+            - it: "returns false when enable_npd_module = false"
+              given: "settings.enable_npd_module = false"
+              when: "isNPDEnabled(orgId) called"
+              then: "returns false"
+
+        - describe: "canEnableNPD"
+          tests:
+            - it: "allows paid tier orgs to enable NPD"
+              given: "org on Growth or Enterprise tier"
+              when: "canEnableNPD(orgId) called"
+              then: "returns { allowed: true }"
+
+            - it: "blocks free tier orgs with reason message"
+              given: "org on Free tier"
+              when: "canEnableNPD(orgId) called"
+              then: "returns { allowed: false, reason: 'NPD is a premium add-on' }"
+
+        - describe: "evaluateCostVariance"
+          tests:
+            - it: "returns 'ok' when variance < warning threshold"
+              given: "variance = 10%, warning = 20%, blocker = 50%"
+              when: "evaluateCostVariance(orgId, 10) called"
+              then: "returns { level: 'ok', blocking: false }"
+
+            - it: "returns 'warning' when variance >= warning && < blocker"
+              given: "variance = 30%, warning = 20%, blocker = 50%"
+              when: "evaluateCostVariance(orgId, 30) called"
+              then: "returns { level: 'warning', blocking: false }"
+
+            - it: "returns 'blocker' when variance >= blocker threshold"
+              given: "variance = 60%, warning = 20%, blocker = 50%"
+              when: "evaluateCostVariance(orgId, 60) called"
+              then: "returns { level: 'blocker', blocking: true }"
+
+        - describe: "validateHandoffEligibility"
+          tests:
+            - it: "passes validation when all requirements met"
+              given: "costing approved, docs complete, variance OK"
+              when: "validateHandoffEligibility(orgId, projectData) called"
+              then: "returns { eligible: true, errors: [], warnings: [], blockers: [] }"
+
+            - it: "fails when costing not approved (require_costing_approval = true)"
+              given: "require_costing_approval = true, costing not approved"
+              when: "validateHandoffEligibility called"
+              then: "returns { eligible: false, blockers: ['Costing not approved'] }"
+
+            - it: "fails when compliance docs missing (require_compliance_docs = true)"
+              given: "require_compliance_docs = true, HACCP missing"
+              when: "validateHandoffEligibility called"
+              then: "returns { eligible: false, blockers: ['Missing HACCP plan'] }"
+
+            - it: "fails when cost variance exceeds blocker"
+              given: "variance = 60%, blocker = 50%"
+              when: "validateHandoffEligibility called"
+              then: "returns { eligible: false, blockers: ['Cost variance exceeds blocker threshold'] }"
+
+# Integration Tests
+integration_tests:
+  file: "apps/frontend/app/api/npd/settings/route.test.ts"
+
+  suites:
+    - describe: "GET /api/npd/settings"
+
+      tests:
+        - it: "returns org settings for authenticated user"
+          given: "user authenticated with org_id"
+          when: "GET /api/npd/settings"
+          then: "returns 200 with settings"
+
+        - it: "creates defaults if settings not exist"
+          given: "org has no npd_settings record"
+          when: "GET /api/npd/settings"
+          then: "returns 200 with default settings"
+
+        - it: "returns 401 for unauthenticated"
+          given: "no auth token"
+          when: "GET /api/npd/settings"
+          then: "returns 401 Unauthorized"
+
+        - it: "returns only own org settings (RLS)"
+          given: "User A from Org A authenticated"
+          when: "GET /api/npd/settings"
+          then: "returns only Org A settings (RLS enforced)"
+
+    - describe: "PUT /api/npd/settings"
+
+      tests:
+        - it: "admin can update settings"
+          given: "user has ADMIN role"
+          when: "PUT /api/npd/settings with valid data"
+          then: "returns 200 with updated settings"
+
+        - it: "non-admin gets 403"
+          given: "user has OPERATOR role"
+          when: "PUT /api/npd/settings"
+          then: "returns 403 Forbidden"
+
+        - it: "validates cost variance threshold order"
+          given: "warning = 60, blocker = 50"
+          when: "PUT /api/npd/settings"
+          then: "returns 400 with validation error"
+
+        - it: "validates max_formulation_versions > 0"
+          given: "max_formulation_versions = 0"
+          when: "PUT /api/npd/settings"
+          then: "returns 400 with validation error"
+
+        - it: "updates updated_at timestamp"
+          given: "admin updates settings"
+          when: "PUT /api/npd/settings"
+          then: "updated_at timestamp is updated"
+
+# E2E Tests
+e2e_tests:
+  file: "e2e/npd-settings.spec.ts"
+
+  suites:
+    - describe: "NPD Settings Management"
+
+      tests:
+        - it: "admin can toggle NPD module"
+          steps:
+            - "Login as admin"
+            - "Navigate to /settings/npd"
+            - "Toggle 'Enable NPD Module' switch"
+            - "Click Save"
+            - "Verify settings saved"
+            - "Reload page"
+            - "Verify toggle persisted"
+
+        - it: "free tier org blocked from enabling NPD"
+          steps:
+            - "Login as admin (Free tier org)"
+            - "Navigate to /settings/npd"
+            - "Attempt to toggle 'Enable NPD Module'"
+            - "Verify blocked with 'NPD is a premium add-on' message"
+
+        - it: "settings persist after page reload"
+          steps:
+            - "Login as admin"
+            - "Update cost_variance_warning_pct to 25"
+            - "Click Save"
+            - "Reload page"
+            - "Verify value is 25"
+
+        - it: "cost variance thresholds enforce validation"
+          steps:
+            - "Login as admin"
+            - "Set warning to 60"
+            - "Set blocker to 50"
+            - "Click Save"
+            - "Verify error 'Warning must be <= blocker'"
+
+        - it: "default pilot routing selector shows existing routings"
+          steps:
+            - "Login as admin"
+            - "Navigate to /settings/npd"
+            - "Open 'Default Pilot Routing' dropdown"
+            - "Verify list of routings displays"
+            - "Select routing"
+            - "Click Save"
+            - "Verify routing saved"
+
+# Acceptance Criteria Coverage
+acceptance_criteria:
+  module_activation:
+    - criterion: "Auto-create settings on org creation"
+      test: "unit: createDefaultSettings"
+      status: "covered"
+
+    - criterion: "Enable NPD module for paid tier"
+      test: "unit: canEnableNPD"
+      status: "covered"
+
+    - criterion: "Block free tier from enabling NPD"
+      test: "e2e: free tier org blocked"
+      status: "covered"
+
+  pilot_wo:
+    - criterion: "Enable/disable pilot WO creation"
+      test: "integration: PUT /api/npd/settings"
+      status: "covered"
+
+    - criterion: "Default pilot routing auto-selected"
+      test: "e2e: default pilot routing selector"
+      status: "covered"
+
+  costing:
+    - criterion: "Warning threshold triggers yellow alert"
+      test: "unit: evaluateCostVariance"
+      status: "covered"
+
+    - criterion: "Blocker threshold blocks handoff"
+      test: "unit: validateHandoffEligibility"
+      status: "covered"
+
+    - criterion: "Warning <= blocker validation"
+      test: "integration: validates threshold order"
+      status: "covered"
+
+  compliance:
+    - criterion: "Require compliance docs for handoff"
+      test: "unit: validateHandoffEligibility"
+      status: "covered"
+
+  settings_api:
+    - criterion: "GET /api/npd/settings returns org settings"
+      test: "integration: GET /api/npd/settings"
+      status: "covered"
+
+    - criterion: "PUT /api/npd/settings updates (admin only)"
+      test: "integration: PUT /api/npd/settings"
+      status: "covered"
+
+  multi_tenancy:
+    - criterion: "RLS enforces org_id isolation"
+      test: "integration: returns only own org settings"
+      status: "covered"
+
+# Test data fixtures
+fixtures:
+  default_settings:
+    org_id: "test-org-uuid"
+    enable_npd_module: false
+    npd_only_mode: false
+    enable_pilot_wo: true
+    default_pilot_routing: null
+    require_costing_approval: true
+    cost_variance_warning_pct: 20.00
+    cost_variance_blocker_pct: 50.00
+    require_compliance_docs: true
+    max_formulation_versions: 10
+    enable_formulation_export: true
+    event_retention_days: 90
+
+  updated_settings:
+    cost_variance_warning_pct: 25.00
+    cost_variance_blocker_pct: 60.00
+    max_formulation_versions: 15
+
+# Coverage targets
+coverage:
+  unit: ">= 90%"
+  integration: ">= 85%"
+  e2e: "Critical paths covered"
+  overall: ">= 90%"

@@ -1,0 +1,294 @@
+# Tests Context: 08.17 - Finance Approval Workflow
+
+unit_tests:
+  service: "NPDCostingApprovalService"
+  file: "lib/services/__tests__/npd-costing-approval-service.test.ts"
+  coverage_target: ">80%"
+  tests:
+    - name: "submitCosting - auto-approves if variance below threshold"
+      scenario: "Variance 8%, threshold 10%"
+      assertions:
+        - "Costing status = 'approved'"
+        - "auto_approved = true"
+        - "approved_at = NOW()"
+        - "Auto-approve email sent to NPD Lead"
+        - "No email sent to Finance"
+
+    - name: "submitCosting - requires manual approval if variance exceeds threshold"
+      scenario: "Variance 15%, threshold 10%"
+      assertions:
+        - "Costing status = 'submitted'"
+        - "auto_approved = false"
+        - "Submission email sent to Finance"
+
+    - name: "submitCosting - fails if target_cost missing"
+      scenario: "Costing with target_cost = null"
+      assertions:
+        - "Throws error: 'Target cost and estimated cost required'"
+
+    - name: "submitCosting - fails if already submitted"
+      scenario: "Costing with status = 'submitted'"
+      assertions:
+        - "Throws error: 'Costing already submitted'"
+
+    - name: "approveCosting - approves submitted costing"
+      scenario: "Finance user approves costing"
+      assertions:
+        - "Costing status = 'approved'"
+        - "approved_at = NOW()"
+        - "approved_by_id = Finance user ID"
+        - "Approval email sent to NPD Lead"
+
+    - name: "approveCosting - fails if not Finance role"
+      scenario: "R&D user attempts approve"
+      assertions:
+        - "Throws error: 'Finance role required'"
+
+    - name: "approveCosting - fails if status != 'submitted'"
+      scenario: "Costing with status = 'draft'"
+      assertions:
+        - "Throws error: 'Costing not submitted for approval'"
+
+    - name: "rejectCosting - rejects submitted costing"
+      scenario: "Finance user rejects costing with reason"
+      assertions:
+        - "Costing status = 'rejected'"
+        - "rejected_at = NOW()"
+        - "rejected_by_id = Finance user ID"
+        - "rejection_reason = provided reason"
+        - "Rejection email sent to NPD Lead"
+
+    - name: "rejectCosting - fails if reason missing"
+      scenario: "Reject without reason"
+      assertions:
+        - "Throws error: 'Rejection reason required'"
+
+    - name: "getPendingApprovals - returns only submitted costing"
+      scenario: "3 costing: 1 draft, 1 submitted, 1 approved"
+      assertions:
+        - "Returns only submitted costing"
+        - "Sorted by submitted_at ASC"
+
+    - name: "sendSubmissionEmail - sends to all Finance users"
+      scenario: "2 Finance users in org"
+      mocks:
+        - "sendEmail function"
+      assertions:
+        - "Email sent to both Finance users"
+        - "Email contains variance data"
+
+integration_tests:
+  file: "app/api/npd/costing/__tests__/approval-api.test.ts"
+  tests:
+    - name: "POST /api/npd/costing/:id/submit - auto-approves low variance"
+      setup:
+        - "Create costing with variance 8%"
+        - "Set org variance threshold 10%"
+      request:
+        method: "POST"
+        path: "/api/npd/costing/1/submit"
+      assertions:
+        - "Status 200"
+        - "Response: { status: 'approved', auto_approved: true }"
+        - "Costing in DB: status = 'approved', auto_approved = true"
+
+    - name: "POST /api/npd/costing/:id/submit - requires approval for high variance"
+      setup:
+        - "Create costing with variance 15%"
+      request:
+        method: "POST"
+        path: "/api/npd/costing/1/submit"
+      assertions:
+        - "Status 200"
+        - "Response: { status: 'submitted', auto_approved: false }"
+        - "Costing in DB: status = 'submitted'"
+
+    - name: "POST /api/npd/costing/:id/approve - Finance approves"
+      setup:
+        - "Create submitted costing"
+        - "Login as Finance user"
+      request:
+        method: "POST"
+        path: "/api/npd/costing/1/approve"
+        body: { notes: "Approved" }
+      assertions:
+        - "Status 200"
+        - "Costing in DB: status = 'approved', approved_by_id = Finance user"
+
+    - name: "POST /api/npd/costing/:id/approve - fails if not Finance role"
+      setup:
+        - "Login as R&D user"
+      request:
+        method: "POST"
+        path: "/api/npd/costing/1/approve"
+      assertions:
+        - "Status 403"
+        - "Error: 'Finance role required to approve costing'"
+
+    - name: "POST /api/npd/costing/:id/reject - Finance rejects"
+      setup:
+        - "Create submitted costing"
+        - "Login as Finance user"
+      request:
+        method: "POST"
+        path: "/api/npd/costing/1/reject"
+        body: { reason: "Variance too high" }
+      assertions:
+        - "Status 200"
+        - "Costing in DB: status = 'rejected', rejection_reason = 'Variance too high'"
+
+    - name: "POST /api/npd/costing/:id/reject - fails if reason missing"
+      setup:
+        - "Login as Finance user"
+      request:
+        method: "POST"
+        path: "/api/npd/costing/1/reject"
+        body: { reason: "" }
+      assertions:
+        - "Status 400"
+        - "Error: 'Rejection reason required'"
+
+    - name: "GET /api/npd/approvals - Finance lists pending"
+      setup:
+        - "Create 3 costing: 1 draft, 2 submitted"
+        - "Login as Finance user"
+      request:
+        method: "GET"
+        path: "/api/npd/approvals"
+      assertions:
+        - "Status 200"
+        - "Returns 2 submitted costing"
+        - "Sorted by submitted_at ASC"
+
+    - name: "GET /api/npd/approvals - non-Finance gets 403"
+      setup:
+        - "Login as R&D user"
+      request:
+        method: "GET"
+        path: "/api/npd/approvals"
+      assertions:
+        - "Status 403"
+
+e2e_tests:
+  file: "e2e/npd/approval-workflow.spec.ts"
+  framework: "Playwright"
+  tests:
+    - name: "NPD Lead submits costing for approval"
+      steps:
+        - "Login as NPD Lead"
+        - "Navigate to /npd/projects/1/costing"
+        - "Fill target_cost = 10.00, estimated_cost = 11.50"
+        - "Click [Submit for Approval]"
+      assertions:
+        - "Toast: 'Costing submitted for approval'"
+        - "Status badge: 'Pending Approval'"
+        - "Submit button disabled"
+
+    - name: "Costing auto-approved if variance low"
+      steps:
+        - "Login as NPD Lead"
+        - "Navigate to /npd/projects/1/costing"
+        - "Fill target_cost = 10.00, estimated_cost = 10.80 (8% variance)"
+        - "Click [Submit for Approval]"
+      assertions:
+        - "Toast: 'Costing automatically approved'"
+        - "Status badge: 'Auto-Approved'"
+
+    - name: "Finance approves costing"
+      steps:
+        - "Login as Finance user"
+        - "Navigate to /npd/approvals"
+        - "See NPD-001 in pending table"
+        - "Click [Approve] on NPD-001"
+        - "Modal opens, fill notes (optional)"
+        - "Click [Approve] in modal"
+      assertions:
+        - "Toast: 'Costing approved'"
+        - "NPD-001 removed from pending table"
+
+    - name: "Finance rejects costing"
+      steps:
+        - "Login as Finance user"
+        - "Navigate to /npd/approvals"
+        - "Click [Reject] on NPD-001"
+        - "Modal opens, fill rejection reason: 'Variance too high'"
+        - "Click [Reject] in modal"
+      assertions:
+        - "Toast: 'Costing rejected'"
+        - "NPD-001 removed from pending table"
+
+    - name: "NPD Lead resubmits rejected costing"
+      steps:
+        - "Login as NPD Lead"
+        - "Navigate to /npd/projects/1/costing (rejected)"
+        - "Update estimated_cost = 10.50 (lower variance)"
+        - "Click [Resubmit for Approval]"
+      assertions:
+        - "Toast: 'Costing resubmitted for approval'"
+        - "Status badge: 'Pending Approval'"
+
+    - name: "Handoff blocked until costing approved"
+      steps:
+        - "Login as NPD Lead"
+        - "Navigate to /npd/projects/1 (costing submitted, not approved)"
+        - "Click [Handoff]"
+      assertions:
+        - "Error: 'Finance approval required before handoff'"
+        - "Handoff wizard disabled"
+
+    - name: "Handoff allowed after costing approved"
+      steps:
+        - "Finance approves costing"
+        - "Login as NPD Lead"
+        - "Navigate to /npd/projects/1"
+        - "Click [Handoff]"
+      assertions:
+        - "Handoff wizard opens"
+        - "Shows '✓ Finance Approved' badge"
+
+performance_tests:
+  file: "e2e/npd/approval-performance.spec.ts"
+  tests:
+    - name: "Submit costing response time"
+      steps:
+        - "Login as NPD Lead"
+        - "Submit costing"
+        - "Measure response time"
+      assertions:
+        - "Response < 500ms"
+
+    - name: "Approve costing response time"
+      steps:
+        - "Login as Finance user"
+        - "Approve costing"
+        - "Measure response time"
+      assertions:
+        - "Response < 300ms"
+
+    - name: "Auto-approve logic performance"
+      steps:
+        - "Submit costing with variance < threshold"
+        - "Measure auto-approve time"
+      assertions:
+        - "Auto-approve < 200ms"
+
+test_data:
+  - name: "costing_low_variance"
+    fields:
+      - "target_cost: 10.00"
+      - "estimated_cost: 10.80"
+      - "variance: 0.80"
+      - "variance_pct: 8.00"
+      - "status: draft"
+
+  - name: "costing_high_variance"
+    fields:
+      - "target_cost: 10.00"
+      - "estimated_cost: 11.50"
+      - "variance: 1.50"
+      - "variance_pct: 15.00"
+      - "status: draft"
+
+  - name: "org_variance_threshold"
+    fields:
+      - "cost_variance_auto_approve_pct: 10.00"

@@ -1,0 +1,452 @@
+# Story 08.7 - API Context
+# Generated: 2026-01-15
+# Purpose: API endpoints, service layer, validation for formulation costing
+
+# API Endpoints
+endpoints:
+  - method: "PUT"
+    path: "/api/npd/formulations/:id/costing/target"
+    description: "Set or update target cost for formulation"
+    auth_required: true
+    roles: ["R&D", "NPD_LEAD", "Finance"]
+    request_body:
+      type: "object"
+      schema: "SetTargetCostRequest"
+      fields:
+        - { name: "target_cost", type: "number", required: true, validation: "positive, max 999999999" }
+        - { name: "notes", type: "string", required: false, validation: "max 2000 chars" }
+    response:
+      success_code: 200
+      schema: "FormulationCostingResponse"
+    error_responses:
+      - { code: 400, condition: "target_cost <= 0 or > 999999999" }
+      - { code: 403, condition: "User lacks permission" }
+      - { code: 404, condition: "Formulation not found" }
+      - { code: 409, condition: "Costing status = 'approved' (cannot edit)" }
+    service_method: "setTargetCost(formulationId, targetCost, notes)"
+    validation_schema: "setTargetCostSchema"
+
+  - method: "GET"
+    path: "/api/npd/formulations/:id/costing"
+    description: "Get costing data with breakdown for formulation"
+    auth_required: true
+    roles: ["all authenticated users"]
+    query_params: []
+    response:
+      success_code: 200
+      schema: "FormulationCostingResponse"
+      includes:
+        - "target_cost, estimated_cost, actual_cost, variance_pct"
+        - "status, approved_by, approved_at"
+        - "breakdown (per-ingredient costs)"
+        - "variance_alert (type, message, threshold_exceeded)"
+        - "can_submit, can_approve, can_edit flags"
+    error_responses:
+      - { code: 403, condition: "User lacks permission" }
+      - { code: 404, condition: "Formulation not found or no costing record" }
+    service_method: "getFormulationCosting(formulationId)"
+
+  - method: "POST"
+    path: "/api/npd/formulations/:id/costing/recalculate"
+    description: "Recalculate estimated cost using current formulation items and product costs"
+    auth_required: true
+    roles: ["R&D", "NPD_LEAD", "Finance"]
+    request_body:
+      type: "empty"
+      description: "No body - uses current formulation_items data"
+    response:
+      success_code: 200
+      schema: "FormulationCostingResponse"
+      description: "Returns updated costing with recalculated estimated_cost"
+    error_responses:
+      - { code: 400, condition: "Missing cost data for one or more ingredients" }
+      - { code: 403, condition: "User lacks permission" }
+      - { code: 404, condition: "Formulation not found" }
+    service_method: "recalculateEstimatedCost(formulationId)"
+
+  - method: "POST"
+    path: "/api/npd/formulations/:id/costing/submit"
+    description: "Submit costing for Finance approval (status draft -> submitted)"
+    auth_required: true
+    roles: ["R&D", "NPD_LEAD"]
+    request_body:
+      type: "object"
+      schema: "SubmitCostingRequest"
+      fields:
+        - { name: "notes", type: "string", required: false, validation: "max 2000 chars" }
+    response:
+      success_code: 200
+      schema: "FormulationCostingResponse"
+      description: "Returns costing with status = 'submitted'"
+    error_responses:
+      - { code: 400, condition: "Costing status not 'draft' or 'rejected'" }
+      - { code: 403, condition: "User lacks permission" }
+      - { code: 404, condition: "Formulation or costing not found" }
+    service_method: "submitCosting(formulationId, notes)"
+    validation_schema: "submitCostingSchema"
+    side_effects:
+      - "Notify Finance role users (if notifications enabled)"
+      - "Log event: NPD.CostingSubmitted"
+
+  - method: "POST"
+    path: "/api/npd/formulations/:id/costing/approve"
+    description: "Approve costing (Finance role only, status submitted -> approved)"
+    auth_required: true
+    roles: ["Finance"]
+    request_body:
+      type: "object"
+      schema: "ApproveCostingRequest"
+      fields:
+        - { name: "notes", type: "string", required: false, validation: "max 2000 chars" }
+    response:
+      success_code: 200
+      schema: "FormulationCostingResponse"
+      description: "Returns costing with status = 'approved', approved_by, approved_at"
+    error_responses:
+      - { code: 400, condition: "Costing status not 'submitted'" }
+      - { code: 403, condition: "User lacks Finance role" }
+      - { code: 404, condition: "Formulation or costing not found" }
+    service_method: "approveCosting(formulationId, notes)"
+    validation_schema: "approveCostingSchema"
+    side_effects:
+      - "Set approved_by = current_user, approved_at = NOW()"
+      - "Notify R&D role users (if notifications enabled)"
+      - "Log event: NPD.CostingApproved"
+
+  - method: "POST"
+    path: "/api/npd/formulations/:id/costing/reject"
+    description: "Reject costing (Finance role only, status submitted -> rejected)"
+    auth_required: true
+    roles: ["Finance"]
+    request_body:
+      type: "object"
+      schema: "RejectCostingRequest"
+      fields:
+        - { name: "reason", type: "string", required: true, validation: "min 5 chars, max 2000 chars" }
+    response:
+      success_code: 200
+      schema: "FormulationCostingResponse"
+      description: "Returns costing with status = 'rejected', notes updated with reason"
+    error_responses:
+      - { code: 400, condition: "Costing status not 'submitted' or reason missing" }
+      - { code: 403, condition: "User lacks Finance role" }
+      - { code: 404, condition: "Formulation or costing not found" }
+    service_method: "rejectCosting(formulationId, reason)"
+    validation_schema: "rejectCostingSchema"
+    side_effects:
+      - "Append rejection reason to notes field"
+      - "Notify R&D role users (if notifications enabled)"
+      - "Log event: NPD.CostingRejected"
+
+  - method: "GET"
+    path: "/api/npd/formulations/:id/costing/history"
+    description: "Get cost history for all formulation versions in the project"
+    auth_required: true
+    roles: ["all authenticated users"]
+    query_params: []
+    response:
+      success_code: 200
+      schema: "CostingHistoryResponse"
+      includes:
+        - "Array of CostingHistoryRecord (one per formulation version)"
+        - "Fields: formulation_number, target_cost, estimated_cost, actual_cost, variance_pct, status, created_at, approved_at"
+    error_responses:
+      - { code: 403, condition: "User lacks permission" }
+      - { code: 404, condition: "Formulation not found" }
+    service_method: "getCostingHistory(formulationId)"
+
+# Service Layer
+service:
+  file: "apps/frontend/lib/services/formulation-costing-service.ts"
+  description: "Business logic for formulation costing operations"
+  methods:
+    - name: "getFormulationCosting"
+      description: "Fetch costing data with breakdown and variance alert"
+      parameters:
+        - { name: "formulationId", type: "number" }
+      returns: "Promise<FormulationCostingResponse>"
+      logic: |
+        1. Fetch npd_costing record by formulation_id
+        2. If not exists, create default record (status = 'draft', all costs NULL)
+        3. Fetch formulation items with product costs for breakdown
+        4. Calculate variance_alert based on npd_settings thresholds
+        5. Determine can_submit, can_approve, can_edit based on status and user role
+        6. Return FormulationCostingResponse
+
+    - name: "setTargetCost"
+      description: "Set or update target cost (manual entry)"
+      parameters:
+        - { name: "formulationId", type: "number" }
+        - { name: "targetCost", type: "number" }
+        - { name: "notes", type: "string | undefined" }
+      returns: "Promise<FormulationCostingResponse>"
+      validation: "Validate targetCost > 0, status not 'approved'"
+      logic: |
+        1. Validate targetCost > 0
+        2. Check costing status != 'approved' (cannot edit approved)
+        3. UPDATE npd_costing SET target_cost = $1, notes = $2, updated_at = NOW()
+        4. Trigger auto-calculate variance_pct (if actual_cost exists)
+        5. Return updated costing
+
+    - name: "recalculateEstimatedCost"
+      description: "Recalculate estimated cost using current formulation items"
+      parameters:
+        - { name: "formulationId", type: "number" }
+      returns: "Promise<FormulationCostingResponse>"
+      logic: |
+        1. Call calculate_formulation_cost(formulationId) function
+        2. If any ingredient missing cost_per_unit, throw error with product name
+        3. UPDATE npd_costing SET estimated_cost = result, updated_at = NOW()
+        4. Return updated costing
+
+    - name: "submitCosting"
+      description: "Submit costing for Finance approval (draft/rejected -> submitted)"
+      parameters:
+        - { name: "formulationId", type: "number" }
+        - { name: "notes", type: "string | undefined" }
+      returns: "Promise<FormulationCostingResponse>"
+      validation: "Validate status = 'draft' or 'rejected'"
+      logic: |
+        1. Check current status = 'draft' or 'rejected'
+        2. UPDATE npd_costing SET status = 'submitted', notes = $1, updated_at = NOW()
+        3. Log event: NPD.CostingSubmitted
+        4. Notify Finance role users (if notifications enabled)
+        5. Return updated costing
+
+    - name: "approveCosting"
+      description: "Approve costing (Finance role only, submitted -> approved)"
+      parameters:
+        - { name: "formulationId", type: "number" }
+        - { name: "notes", type: "string | undefined" }
+      returns: "Promise<FormulationCostingResponse>"
+      validation: "Validate status = 'submitted', user has Finance role"
+      logic: |
+        1. Check user has Finance role
+        2. Check current status = 'submitted'
+        3. UPDATE npd_costing SET status = 'approved', approved_by = current_user, approved_at = NOW(), notes = $1
+        4. Log event: NPD.CostingApproved
+        5. Notify R&D role users (if notifications enabled)
+        6. Return updated costing
+
+    - name: "rejectCosting"
+      description: "Reject costing (Finance role only, submitted -> rejected)"
+      parameters:
+        - { name: "formulationId", type: "number" }
+        - { name: "reason", type: "string" }
+      returns: "Promise<FormulationCostingResponse>"
+      validation: "Validate status = 'submitted', user has Finance role, reason min 5 chars"
+      logic: |
+        1. Check user has Finance role
+        2. Check current status = 'submitted'
+        3. UPDATE npd_costing SET status = 'rejected', notes = CONCAT(notes, 'Rejected: ', reason), updated_at = NOW()
+        4. Log event: NPD.CostingRejected
+        5. Notify R&D role users (if notifications enabled)
+        6. Return updated costing
+
+    - name: "getCostingHistory"
+      description: "Get cost history for all formulation versions in project"
+      parameters:
+        - { name: "formulationId", type: "number" }
+      returns: "Promise<CostingHistoryResponse>"
+      logic: |
+        1. Get npd_project_id from formulation
+        2. Fetch all npd_costing records for project, JOIN npd_formulations
+        3. Order by created_at DESC
+        4. Return CostingHistoryResponse
+
+    - name: "calculateFormulationCost"
+      description: "Calculate estimated cost (wrapper for DB function)"
+      parameters:
+        - { name: "formulationId", type: "number" }
+      returns: "Promise<number>"
+      logic: "Call calculate_formulation_cost(formulationId) DB function"
+
+    - name: "getVarianceAlert"
+      description: "Determine variance alert type and message based on thresholds"
+      parameters:
+        - { name: "variance", type: "number | null" }
+        - { name: "settings", type: "NPDSettings" }
+      returns: "Promise<VarianceAlert>"
+      logic: |
+        1. If variance is NULL, return { type: 'none', message: null, threshold_exceeded: false }
+        2. If ABS(variance) > blocker_pct, return { type: 'blocker', message: 'Cost variance exceeds 50% limit. Handoff blocked...', threshold_exceeded: true }
+        3. If ABS(variance) > warning_pct, return { type: 'warning', message: 'Cost variance exceeds 20% target. Review...', threshold_exceeded: true }
+        4. Else return { type: 'none', message: null, threshold_exceeded: false }
+
+  helper_functions:
+    - name: "calculateVariancePercent"
+      description: "Calculate variance percentage ((actual - target) / target * 100)"
+      parameters:
+        - { name: "target", type: "number" }
+        - { name: "actual", type: "number" }
+      returns: "number"
+      formula: "((actual - target) / target) * 100"
+
+    - name: "getVarianceType"
+      description: "Determine variance type (none/warning/blocker)"
+      parameters:
+        - { name: "variance", type: "number" }
+        - { name: "warningThreshold", type: "number" }
+        - { name: "blockerThreshold", type: "number" }
+      returns: "'none' | 'warning' | 'blocker'"
+      logic: |
+        if (Math.abs(variance) > blockerThreshold) return 'blocker';
+        if (Math.abs(variance) > warningThreshold) return 'warning';
+        return 'none';
+
+# Validation Schemas (Zod)
+validation:
+  - name: "setTargetCostSchema"
+    type: "zod"
+    schema: |
+      z.object({
+        target_cost: z.number().positive("Target cost must be greater than 0").max(999999999, "Target cost too large"),
+        notes: z.string().max(2000).optional(),
+      })
+
+  - name: "submitCostingSchema"
+    type: "zod"
+    schema: |
+      z.object({
+        notes: z.string().max(2000).optional(),
+      })
+
+  - name: "approveCostingSchema"
+    type: "zod"
+    schema: |
+      z.object({
+        notes: z.string().max(2000).optional(),
+      })
+
+  - name: "rejectCostingSchema"
+    type: "zod"
+    schema: |
+      z.object({
+        reason: z.string().min(5, "Rejection reason is required (min 5 characters)").max(2000),
+      })
+
+# TypeScript Interfaces
+interfaces:
+  - name: "SetTargetCostRequest"
+    fields:
+      - { name: "target_cost", type: "number", description: "Target cost (manual entry)" }
+      - { name: "notes", type: "string | undefined", description: "Optional notes" }
+
+  - name: "FormulationCostingResponse"
+    fields:
+      - { name: "id", type: "number", description: "Costing record ID" }
+      - { name: "org_id", type: "string", description: "Organization ID" }
+      - { name: "npd_project_id", type: "number", description: "Project ID" }
+      - { name: "formulation_id", type: "number", description: "Formulation ID" }
+      - { name: "formulation_number", type: "string", description: "Formulation version (v1.0)" }
+      - { name: "target_cost", type: "number | null", description: "Target cost (manual)" }
+      - { name: "estimated_cost", type: "number | null", description: "Estimated cost (calculated)" }
+      - { name: "actual_cost", type: "number | null", description: "Actual cost (from pilot WO)" }
+      - { name: "variance_pct", type: "number | null", description: "Variance percentage" }
+      - { name: "status", type: "'draft' | 'submitted' | 'approved' | 'rejected'", description: "Costing status" }
+      - { name: "approved_by", type: "string | null", description: "Finance user who approved" }
+      - { name: "approved_at", type: "string | null", description: "Approval timestamp" }
+      - { name: "notes", type: "string | null", description: "Notes / rejection reason" }
+      - { name: "created_at", type: "string", description: "Record creation timestamp" }
+      - { name: "updated_at", type: "string", description: "Last update timestamp" }
+      - { name: "breakdown", type: "FormulationCostBreakdown", description: "Per-ingredient cost breakdown" }
+      - { name: "variance_alert", type: "VarianceAlert", description: "Variance alert type/message" }
+      - { name: "can_submit", type: "boolean", description: "Can submit for approval" }
+      - { name: "can_approve", type: "boolean", description: "Can approve (Finance role)" }
+      - { name: "can_edit", type: "boolean", description: "Can edit target cost" }
+
+  - name: "FormulationCostBreakdown"
+    fields:
+      - { name: "items", type: "FormulationCostItem[]", description: "Per-ingredient costs" }
+      - { name: "total_cost", type: "number", description: "Total cost (sum of items)" }
+      - { name: "currency", type: "string", description: "Currency (default PLN)" }
+
+  - name: "FormulationCostItem"
+    fields:
+      - { name: "product_id", type: "string", description: "Product ID" }
+      - { name: "product_code", type: "string", description: "Product code" }
+      - { name: "product_name", type: "string", description: "Product name" }
+      - { name: "quantity", type: "number", description: "Ingredient quantity" }
+      - { name: "uom", type: "string", description: "Unit of measure" }
+      - { name: "unit_cost", type: "number", description: "Cost per unit (from products.cost_per_unit)" }
+      - { name: "total_cost", type: "number", description: "Quantity * unit_cost" }
+      - { name: "percentage", type: "number", description: "(total_cost / breakdown.total_cost) * 100" }
+
+  - name: "VarianceAlert"
+    fields:
+      - { name: "type", type: "'none' | 'warning' | 'blocker'", description: "Alert severity" }
+      - { name: "message", type: "string | null", description: "Alert message" }
+      - { name: "threshold_exceeded", type: "boolean", description: "Whether threshold exceeded" }
+
+  - name: "SubmitCostingRequest"
+    fields:
+      - { name: "notes", type: "string | undefined", description: "Optional submission notes" }
+
+  - name: "ApproveCostingRequest"
+    fields:
+      - { name: "notes", type: "string | undefined", description: "Optional approval notes" }
+
+  - name: "RejectCostingRequest"
+    fields:
+      - { name: "reason", type: "string", description: "Required rejection reason" }
+
+  - name: "CostingHistoryResponse"
+    fields:
+      - { name: "history", type: "CostingHistoryRecord[]", description: "Cost history records" }
+
+  - name: "CostingHistoryRecord"
+    fields:
+      - { name: "formulation_id", type: "number", description: "Formulation ID" }
+      - { name: "formulation_number", type: "string", description: "Formulation version" }
+      - { name: "target_cost", type: "number | null", description: "Target cost" }
+      - { name: "estimated_cost", type: "number | null", description: "Estimated cost" }
+      - { name: "actual_cost", type: "number | null", description: "Actual cost" }
+      - { name: "variance_pct", type: "number | null", description: "Variance percentage" }
+      - { name: "status", type: "string", description: "Costing status" }
+      - { name: "created_at", type: "string", description: "Record creation timestamp" }
+      - { name: "approved_at", type: "string | null", description: "Approval timestamp" }
+
+# Error Handling
+error_handling:
+  - error: "Missing ingredient cost data"
+    code: 400
+    message: "Missing cost data for ingredient: {product_name}. Update product cost_per_unit before calculating."
+    recovery: "User updates products.cost_per_unit, retries recalculate"
+
+  - error: "Cannot edit approved costing"
+    code: 409
+    message: "Cannot edit approved costing. Reject and resubmit to make changes."
+    recovery: "Finance rejects costing, R&D resubmits with changes"
+
+  - error: "Invalid status transition"
+    code: 400
+    message: "Cannot submit costing with status '{current_status}'. Must be 'draft' or 'rejected'."
+    recovery: "Check current status, use correct workflow action"
+
+  - error: "Insufficient permissions"
+    code: 403
+    message: "Finance role required to approve/reject costing."
+    recovery: "Request approval from Finance role user"
+
+  - error: "Variance exceeds blocker threshold"
+    code: 400
+    message: "Cost variance {variance_pct}% exceeds blocker threshold {blocker_pct}%. Handoff blocked."
+    recovery: "Adjust formulation or target cost to reduce variance"
+
+# Performance Considerations
+performance:
+  - consideration: "Cost calculation with up to 50 formulation items"
+    target: "<500ms"
+    solution: "calculate_formulation_cost() uses single SUM query with JOIN"
+
+  - consideration: "Cost breakdown query joins products table"
+    target: "<300ms"
+    solution: "products.cost_per_unit indexed via primary key"
+
+  - consideration: "Variance alert calculation on every GET"
+    target: "<50ms"
+    solution: "In-memory calculation using npd_settings thresholds"
+
+  - consideration: "Auto-update trigger on formulation_items change"
+    target: "<100ms"
+    solution: "Trigger updates only affected formulation (WHERE formulation_id = ...)"

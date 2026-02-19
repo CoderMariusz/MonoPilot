@@ -1,0 +1,438 @@
+# Story 03.11a - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/wo-snapshot-service.test.ts"
+    type: "unit"
+    description: "Unit tests for scaleQuantity and snapshot logic"
+  - path: "apps/frontend/app/api/planning/work-orders/[id]/materials/__tests__/route.test.ts"
+    type: "integration"
+    description: "Integration tests for GET /materials endpoint"
+  - path: "apps/frontend/app/api/planning/work-orders/[id]/snapshot/__tests__/route.test.ts"
+    type: "integration"
+    description: "Integration tests for POST /snapshot endpoint"
+  - path: "supabase/tests/wo-materials-rls.test.sql"
+    type: "integration"
+    description: "RLS policy tests for wo_materials table"
+  - path: "apps/frontend/__tests__/e2e/planning/wo-materials.spec.ts"
+    type: "e2e"
+    description: "End-to-end tests for materials UI"
+
+# Acceptance Criteria
+acceptance_criteria:
+  - id: "AC-1"
+    name: "BOM Snapshot Created on WO Creation"
+    given: "a Work Order is created with product_id and planned_quantity"
+    when: "the WO creation API completes"
+    then: "all bom_items from the selected BOM are copied to wo_materials with scaled quantities"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-2"
+    name: "Quantity Scaling Formula"
+    given: "BOM has output_qty = 100 kg, bom_item flour with quantity = 50 kg"
+    when: "WO is created with planned_quantity = 250 kg"
+    then: "wo_material.required_qty = 50 * (250/100) = 125 kg"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-2b"
+    name: "Scrap Percentage Applied"
+    given: "BOM item has scrap_percent = 5%"
+    when: "WO is created"
+    then: "required_qty includes scrap: 125 * (1 + 5/100) = 131.25 kg"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-3"
+    name: "BOM Version Tracking"
+    given: "BOM has version = 3"
+    when: "WO snapshot created"
+    then: "each wo_material record has bom_version = 3"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-4"
+    name: "Snapshot Immutability After Release"
+    given: "WO status = 'released'"
+    when: "POST /api/planning/work-orders/:id/snapshot called"
+    then: "API returns 409 Conflict: Cannot modify materials after WO is released"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-4b"
+    name: "Snapshot Refresh Allowed for Draft/Planned"
+    given: "WO status = 'draft' or 'planned'"
+    when: "POST /api/planning/work-orders/:id/snapshot called"
+    then: "wo_materials are deleted and re-created from current BOM"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-5"
+    name: "Materials List Display"
+    given: "WO detail page /planning/work-orders/:id"
+    when: "materials section loads"
+    then: "wo_materials display in sequence order within 500ms"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-6"
+    name: "By-Products Included"
+    given: "bom_item has is_by_product = true, yield_percent = 5"
+    when: "BOM snapshot created"
+    then: "wo_material created with is_by_product = true, yield_percent = 5, required_qty = 0"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-7"
+    name: "Material Name Denormalization"
+    given: "bom_item references product_id with name = 'All-Purpose Flour'"
+    when: "snapshot created"
+    then: "wo_material.material_name = 'All-Purpose Flour' (denormalized for display)"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-8"
+    name: "RLS Org Isolation"
+    given: "WO belongs to Org A"
+    when: "User from Org B requests materials"
+    then: "API returns 404 Not Found (not 403)"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-9"
+    name: "Refresh Button Visibility"
+    given: "WO status = 'draft'"
+    when: "materials section displayed"
+    then: "Refresh from BOM button is visible and enabled"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-9b"
+    name: "Refresh Button Disabled After Release"
+    given: "WO status = 'released'"
+    when: "materials section displayed"
+    then: "Refresh from BOM button is hidden or disabled with tooltip"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-10"
+    name: "Performance - 100 Item BOM"
+    given: "BOM has 100 items"
+    when: "snapshot created"
+    then: "all wo_materials inserted in single transaction within 2 seconds"
+    test_type: "integration"
+    priority: "P1"
+
+# Unit Test Cases
+unit_tests:
+  scale_quantity:
+    file: "apps/frontend/lib/services/__tests__/wo-snapshot-service.test.ts"
+    cases:
+      - name: "scales correctly for standard BOM"
+        input: { itemQty: 50, woQty: 250, bomOutputQty: 100, scrapPercent: 0 }
+        expected: 125
+        description: "BOM: 100kg output, 50kg flour; WO: 250kg planned"
+
+      - name: "applies scrap percentage"
+        input: { itemQty: 50, woQty: 250, bomOutputQty: 100, scrapPercent: 5 }
+        expected: 131.25
+        description: "125kg + 5% scrap = 131.25kg"
+
+      - name: "handles unit BOM (output_qty = 1)"
+        input: { itemQty: 0.5, woQty: 10, bomOutputQty: 1, scrapPercent: 0 }
+        expected: 5
+        description: "1 unit output, 0.5kg ingredient; WO: 10 units"
+
+      - name: "maintains 6 decimal precision"
+        input: { itemQty: 0.000001, woQty: 100, bomOutputQty: 1, scrapPercent: 0 }
+        expected: 0.0001
+        description: "Small quantities maintain precision"
+
+      - name: "handles large batch scaling (1000x)"
+        input: { itemQty: 1, woQty: 1000, bomOutputQty: 1, scrapPercent: 0 }
+        expected: 1000
+        description: "Large scale factor"
+
+      - name: "handles fractional output_qty"
+        input: { itemQty: 0.25, woQty: 2, bomOutputQty: 0.5, scrapPercent: 0 }
+        expected: 1
+        description: "BOM: 0.5kg output, 0.25kg ingredient; WO: 2kg"
+
+      - name: "handles 100% scrap (doubles quantity)"
+        input: { itemQty: 10, woQty: 100, bomOutputQty: 100, scrapPercent: 100 }
+        expected: 20
+        description: "100% scrap means double the quantity"
+
+      - name: "handles zero scrap"
+        input: { itemQty: 10, woQty: 100, bomOutputQty: 100, scrapPercent: 0 }
+        expected: 10
+        description: "No scrap, 1:1 ratio"
+
+  can_modify_snapshot:
+    file: "apps/frontend/lib/services/__tests__/wo-snapshot-service.test.ts"
+    cases:
+      - name: "returns true for draft status"
+        input: "draft"
+        expected: true
+
+      - name: "returns true for planned status"
+        input: "planned"
+        expected: true
+
+      - name: "returns false for released status"
+        input: "released"
+        expected: false
+
+      - name: "returns false for in_progress status"
+        input: "in_progress"
+        expected: false
+
+      - name: "returns false for completed status"
+        input: "completed"
+        expected: false
+
+      - name: "returns false for cancelled status"
+        input: "cancelled"
+        expected: false
+
+# Integration Test Cases
+integration_tests:
+  get_materials:
+    file: "apps/frontend/app/api/planning/work-orders/[id]/materials/__tests__/route.test.ts"
+    cases:
+      - name: "returns materials for valid WO"
+        setup: "Create WO with BOM snapshot"
+        action: "GET /api/planning/work-orders/:id/materials"
+        expected: "200 with materials array, total, bom_version"
+
+      - name: "returns empty array for WO without materials"
+        setup: "Create WO without triggering snapshot"
+        action: "GET /api/planning/work-orders/:id/materials"
+        expected: "200 with empty materials array, total=0"
+
+      - name: "returns 404 for non-existent WO"
+        setup: "Random UUID"
+        action: "GET /api/planning/work-orders/:invalid_id/materials"
+        expected: "404 WO_NOT_FOUND"
+
+      - name: "returns 404 for cross-org access"
+        setup: "WO from Org A, user from Org B"
+        action: "GET /api/planning/work-orders/:id/materials"
+        expected: "404 WO_NOT_FOUND (not 403)"
+
+      - name: "includes product details in response"
+        setup: "WO with materials"
+        action: "GET /api/planning/work-orders/:id/materials"
+        expected: "Each material has product.code, product.name, product.product_type"
+
+      - name: "orders materials by sequence"
+        setup: "WO with materials at sequence 30, 10, 20"
+        action: "GET /api/planning/work-orders/:id/materials"
+        expected: "Materials returned in order 10, 20, 30"
+
+  post_snapshot:
+    file: "apps/frontend/app/api/planning/work-orders/[id]/snapshot/__tests__/route.test.ts"
+    cases:
+      - name: "creates snapshot for draft WO"
+        setup: "Create draft WO with BOM"
+        action: "POST /api/planning/work-orders/:id/snapshot"
+        expected: "200 with success=true, materials_count > 0"
+
+      - name: "creates snapshot for planned WO"
+        setup: "Create planned WO with BOM"
+        action: "POST /api/planning/work-orders/:id/snapshot"
+        expected: "200 with success=true"
+
+      - name: "returns 409 for released WO"
+        setup: "Create released WO"
+        action: "POST /api/planning/work-orders/:id/snapshot"
+        expected: "409 WO_RELEASED"
+
+      - name: "returns 409 for in_progress WO"
+        setup: "Create in_progress WO"
+        action: "POST /api/planning/work-orders/:id/snapshot"
+        expected: "409 WO_RELEASED"
+
+      - name: "returns 400 for WO without BOM"
+        setup: "Create WO with bom_id = null"
+        action: "POST /api/planning/work-orders/:id/snapshot"
+        expected: "400 NO_BOM_SELECTED"
+
+      - name: "replaces existing materials on refresh"
+        setup: "Create WO, trigger snapshot, modify BOM"
+        action: "POST /api/planning/work-orders/:id/snapshot"
+        expected: "Old materials deleted, new ones created from updated BOM"
+
+      - name: "scales quantities correctly"
+        setup: "BOM: output=100, item=50; WO: planned=250"
+        action: "POST /api/planning/work-orders/:id/snapshot"
+        expected: "wo_material.required_qty = 125"
+
+      - name: "includes by-products with qty=0"
+        setup: "BOM with by-product item"
+        action: "POST /api/planning/work-orders/:id/snapshot"
+        expected: "By-product has is_by_product=true, required_qty=0"
+
+      - name: "copies bom_version for audit"
+        setup: "BOM with version=3"
+        action: "POST /api/planning/work-orders/:id/snapshot"
+        expected: "All wo_materials have bom_version=3"
+
+      - name: "returns 404 for cross-org WO"
+        setup: "WO from Org A, user from Org B"
+        action: "POST /api/planning/work-orders/:id/snapshot"
+        expected: "404 WO_NOT_FOUND"
+
+  rls_policies:
+    file: "supabase/tests/wo-materials-rls.test.sql"
+    cases:
+      - name: "User can read own org materials"
+        setup: "Create Org A with User A and WO with materials"
+        action: "User A queries wo_materials"
+        expected: "Returns only Org A materials"
+
+      - name: "User cannot read other org materials"
+        setup: "Create Org A with materials, Org B with User B"
+        action: "User B queries wo_materials"
+        expected: "Returns empty result (not error)"
+
+      - name: "Planner can insert materials"
+        setup: "User with planner role"
+        action: "Insert wo_material"
+        expected: "Insert succeeds"
+
+      - name: "Viewer cannot insert materials"
+        setup: "User with viewer role"
+        action: "Insert wo_material"
+        expected: "RLS blocks insert"
+
+      - name: "Cannot delete materials for released WO"
+        setup: "WO with status=released"
+        action: "Delete wo_material"
+        expected: "RLS blocks delete"
+
+      - name: "Can delete materials for draft WO"
+        setup: "WO with status=draft"
+        action: "Delete wo_material"
+        expected: "Delete succeeds"
+
+# E2E Test Cases
+e2e_tests:
+  file: "apps/frontend/__tests__/e2e/planning/wo-materials.spec.ts"
+  cases:
+    - name: "Materials table displays on WO detail page"
+      steps:
+        - "Navigate to /planning/work-orders/:id"
+        - "Click Materials tab (if not default)"
+      expected: "Materials table visible with columns"
+
+    - name: "Materials show sequence, name, qty, uom"
+      steps:
+        - "Navigate to WO detail with materials"
+      expected: "Each row shows sequence, material code+name, required_qty, uom"
+
+    - name: "By-product shows badge"
+      steps:
+        - "Navigate to WO with by-product material"
+      expected: "By-product row shows 'By-product' badge and yield %"
+
+    - name: "Refresh button visible for draft WO"
+      steps:
+        - "Navigate to draft WO"
+      expected: "Refresh from BOM button is visible and clickable"
+
+    - name: "Refresh button hidden for released WO"
+      steps:
+        - "Navigate to released WO"
+      expected: "Refresh button is hidden or disabled"
+
+    - name: "Refresh snapshot shows confirmation"
+      steps:
+        - "Navigate to draft WO"
+        - "Click Refresh from BOM"
+      expected: "Confirmation dialog appears"
+
+    - name: "Refresh snapshot updates table"
+      steps:
+        - "Navigate to draft WO"
+        - "Click Refresh from BOM"
+        - "Confirm"
+      expected: "Table refreshes with new data, success toast shows"
+
+    - name: "Loading state shows skeleton"
+      steps:
+        - "Navigate to WO detail (slow network)"
+      expected: "Skeleton rows display while loading"
+
+    - name: "Empty state shows message"
+      steps:
+        - "Navigate to WO without materials"
+      expected: "No materials message with info icon"
+
+# Definition of Done
+definition_of_done:
+  - "wo_materials table created with all columns and constraints"
+  - "RLS policies enforce org isolation"
+  - "BOM snapshot created on WO creation (integration with 03.10)"
+  - "Scaling formula correctly applied"
+  - "Scrap percentage included in calculation"
+  - "BOM version and bom_item_id tracked for audit"
+  - "Snapshot refresh works for draft/planned WOs"
+  - "Snapshot refresh blocked for released WOs (409 response)"
+  - "GET /materials returns sorted, complete data"
+  - "POST /snapshot creates materials correctly"
+  - "WOMaterialsTable displays within 500ms"
+  - "By-products displayed with badge"
+  - "Refresh button conditionally shown based on status"
+  - "All API endpoints have integration tests"
+  - "Unit tests cover scaleQuantity edge cases"
+  - "Immutability tests pass"
+  - "Cross-org access returns 404"
+  - "Performance: <2s for 100-item BOM"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 90
+    reason: "Critical business logic (scaling formula)"
+    files:
+      - "wo-snapshot-service.ts: 90%"
+  integration:
+    target: 80
+    reason: "API and RLS must be thoroughly tested"
+    files:
+      - "materials/route.ts: 80%"
+      - "snapshot/route.ts: 80%"
+  e2e:
+    target: 70
+    reason: "Critical user flows covered"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "Scaling formula precision loss"
+    mitigation: "Use DECIMAL(15,6), round to 6 places, test edge cases"
+    severity: "medium"
+    test_coverage: "unit_tests.scale_quantity"
+
+  - id: "RISK-02"
+    description: "RLS policy allows cross-tenant access"
+    mitigation: "Integration tests with 2+ orgs verify isolation"
+    severity: "high"
+    test_coverage: "integration_tests.rls_policies"
+
+  - id: "RISK-03"
+    description: "Snapshot not created during WO creation"
+    mitigation: "Integration test verifies snapshot on WO create"
+    severity: "medium"
+    test_coverage: "integration_tests.post_snapshot"
+
+  - id: "RISK-04"
+    description: "Materials modified after WO release"
+    mitigation: "409 response enforced, RLS delete policy checks status"
+    severity: "high"
+    test_coverage: "acceptance_criteria.AC-4"

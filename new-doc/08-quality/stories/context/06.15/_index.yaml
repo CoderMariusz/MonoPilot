@@ -1,0 +1,100 @@
+# Story 06.15 - Index File (Entry Point)
+# Generated: 2025-01-15
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "06.15"
+  name: "NCR Corrective Action"
+  slug: "ncr-corrective-action"
+  epic: "06-quality"
+  phase: "2B"
+  complexity: "M"
+  estimate_days: 3
+  type: "fullstack"
+  state: "ready"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, RLS, triggers
+  - api.yaml         # Endpoints, auth, errors
+  - frontend.yaml    # Components, services, types
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["organizations", "users", "roles"]
+    - story: "01.5"
+      name: "Users CRUD"
+      provides: ["user assignment for owners"]
+    - story: "06.9"
+      name: "Basic NCR Creation"
+      provides: ["ncr_reports table"]
+    - story: "06.13"
+      name: "NCR Workflow"
+      provides: ["NCR status states", "workflow transitions"]
+    - story: "06.14"
+      name: "NCR Root Cause Analysis"
+      provides: ["root_cause_approved flag", "corrective_action status"]
+  blocked_by:
+    - story: "06.14"
+      reason: "Root cause must be approved before creating corrective actions"
+  blocks:
+    - story: "06.16"
+      name: "NCR Verification & Close"
+    - story: "06.17"
+      name: "Quality Alerts"
+      reason: "Due date alerts for actions"
+    - story: "06.31"
+      name: "CAPA Creation"
+      reason: "source_type='corrective_action'"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/quality.md"
+    sections: ["FR-QA-009", "Section 8"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/quality.md"
+    sections: ["NCR Tables", "Corrective Action Tables"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/06-quality/06.15.ncr-corrective-action.md"
+  patterns:
+    - path: "docs/2-MANAGEMENT/epics/current/06-quality/06.9.basic-ncr-creation.md"
+      relevance: "NCR table structure pattern"
+    - path: "docs/2-MANAGEMENT/epics/current/06-quality/06.5.incoming-inspection.md"
+      relevance: "Quality module patterns"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "3 tables: ncr_corrective_actions, ncr_action_items, ncr_action_evidence + sequences + triggers"
+  - type: "api"
+    count: 15
+    description: "Corrective actions CRUD, items CRUD, evidence CRUD, workflow actions"
+  - type: "service"
+    count: 1
+    description: "corrective-action-service.ts"
+  - type: "validation"
+    count: 9
+    description: "Zod schemas for all request types"
+  - type: "component"
+    count: 20
+    description: "React components for actions, items, evidence, progress"
+  - type: "test"
+    count: 4
+    description: "Unit + integration + RLS + E2E tests"
+
+# Technical notes
+technical_notes:
+  - "Root cause must be approved before corrective actions can be created"
+  - "Two action types: immediate (containment) vs long_term (permanent fix)"
+  - "Progress auto-calculated via database trigger from items completion"
+  - "Action items support drag-drop reorder"
+  - "Evidence upload supports PDF, DOC, XLS, PNG, JPG (max 10MB)"
+  - "100% item completion required before action can be completed"
+  - "Use ADR-013 RLS pattern for org isolation"

@@ -1,0 +1,262 @@
+# Story 04.6d - Database Schema
+# Purpose: Table updates, RLS policies, indexes for consumption reversal
+# Agent: BACKEND-DEV (database focus)
+
+migrations:
+  - path: "supabase/migrations/XXX_add_consumption_reversal_fields.sql"
+    type: "migration"
+    description: "Add reversal fields to material_consumptions table"
+
+# Tables Modified
+tables_modified:
+  - name: "material_consumptions"
+    description: "Consumption records - add reversal tracking fields"
+    existing_table: true
+    source: "Story 04.6a - Material Consumption Desktop"
+    added_columns:
+      - name: "reversed"
+        type: "BOOLEAN"
+        constraints: "NOT NULL DEFAULT false"
+        description: "Flag indicating if consumption was reversed"
+      - name: "reversed_at"
+        type: "TIMESTAMPTZ"
+        constraints: ""
+        description: "Timestamp when reversal occurred"
+      - name: "reversed_by"
+        type: "UUID"
+        constraints: "REFERENCES users(id)"
+        description: "User who performed the reversal (Manager/Admin)"
+      - name: "reversal_reason"
+        type: "TEXT"
+        constraints: ""
+        description: "Reason category for reversal"
+        valid_values: ["scanned_wrong_lp", "wrong_quantity", "operator_error", "quality_issue", "other"]
+      - name: "reversal_notes"
+        type: "TEXT"
+        constraints: ""
+        description: "Additional notes about the reversal"
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_material_consumptions_reversed ON material_consumptions(org_id, reversed)"
+      - "idx_material_consumptions_wo_reversed ON material_consumptions(wo_id, reversed)"
+
+  - name: "license_plates"
+    description: "LP table - qty updated on reversal"
+    existing_table: true
+    source: "Epic 05 - Warehouse Module"
+    updated_columns:
+      - name: "qty"
+        type: "DECIMAL(15,4)"
+        description: "Quantity restored on reversal: qty += consumed_qty"
+      - name: "status"
+        type: "TEXT"
+        description: "Status may change from 'consumed' to 'available'"
+        valid_values: ["available", "reserved", "consumed", "shipped", "expired", "damaged"]
+    rls: true
+
+  - name: "lp_genealogy"
+    description: "Genealogy records - mark reversed"
+    existing_table: true
+    source: "Epic 05 - Warehouse Module"
+    updated_columns:
+      - name: "is_reversed"
+        type: "BOOLEAN"
+        constraints: "NOT NULL DEFAULT false"
+        description: "Mark genealogy link as reversed"
+    rls: true
+
+  - name: "audit_log"
+    description: "Audit trail for reversal action"
+    existing_table: true
+    source: "Epic 01 - Settings Module"
+    action: "INSERT"
+    record_fields:
+      - name: "action"
+        value: "'consumption_reversal'"
+      - name: "entity_type"
+        value: "'material_consumption'"
+      - name: "entity_id"
+        value: "consumption.id"
+      - name: "user_id"
+        value: "auth.uid()"
+      - name: "org_id"
+        value: "user.org_id"
+      - name: "metadata"
+        value: "JSON with original_qty, lp_id, wo_id, reason, notes"
+
+# Migration SQL
+migration_sql: |
+  -- Add reversal fields to material_consumptions
+  ALTER TABLE material_consumptions
+    ADD COLUMN IF NOT EXISTS reversed BOOLEAN NOT NULL DEFAULT false,
+    ADD COLUMN IF NOT EXISTS reversed_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS reversed_by UUID REFERENCES users(id),
+    ADD COLUMN IF NOT EXISTS reversal_reason TEXT,
+    ADD COLUMN IF NOT EXISTS reversal_notes TEXT;
+
+  -- Add constraint for reversal reason values
+  ALTER TABLE material_consumptions
+    ADD CONSTRAINT chk_reversal_reason CHECK (
+      reversal_reason IS NULL OR
+      reversal_reason IN ('scanned_wrong_lp', 'wrong_quantity', 'operator_error', 'quality_issue', 'other')
+    );
+
+  -- Add is_reversed to lp_genealogy if not exists
+  ALTER TABLE lp_genealogy
+    ADD COLUMN IF NOT EXISTS is_reversed BOOLEAN NOT NULL DEFAULT false;
+
+  -- Index for finding reversed consumptions
+  CREATE INDEX IF NOT EXISTS idx_material_consumptions_reversed
+    ON material_consumptions(org_id, reversed);
+
+  -- Index for WO consumption queries (exclude reversed)
+  CREATE INDEX IF NOT EXISTS idx_material_consumptions_wo_active
+    ON material_consumptions(wo_id)
+    WHERE reversed = false;
+
+# RLS Policies (ADR-013)
+rls_policies:
+  pattern: "Users Table Lookup"
+  pattern_sql: "(SELECT org_id FROM users WHERE id = auth.uid())"
+
+  policies:
+    - table: "material_consumptions"
+      name: "consumption_reversal_update"
+      operation: "UPDATE"
+      using: |
+        org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        AND reversed = false
+        AND EXISTS (
+          SELECT 1 FROM users u
+          JOIN roles r ON r.id = u.role_id
+          WHERE u.id = auth.uid()
+          AND (r.name = 'admin' OR r.name = 'production_manager' OR r.name = 'owner')
+        )
+      note: "Only Manager/Admin can reverse consumptions, and only non-reversed ones"
+
+# Data Queries
+queries:
+  get_consumption_for_reversal: |
+    SELECT
+      mc.id,
+      mc.wo_id,
+      mc.wo_material_id,
+      mc.lp_id,
+      mc.quantity,
+      mc.consumed_at,
+      mc.consumed_by,
+      mc.reversed,
+      lp.lp_number,
+      lp.qty as current_lp_qty,
+      lp.status as lp_status,
+      lp.product_id,
+      p.name as product_name,
+      u.name as consumed_by_name
+    FROM material_consumptions mc
+    JOIN license_plates lp ON lp.id = mc.lp_id
+    JOIN products p ON p.id = lp.product_id
+    JOIN users u ON u.id = mc.consumed_by
+    WHERE mc.id = :consumption_id
+    AND mc.org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+
+  reverse_consumption: |
+    UPDATE material_consumptions
+    SET
+      reversed = true,
+      reversed_at = NOW(),
+      reversed_by = auth.uid(),
+      reversal_reason = :reason,
+      reversal_notes = :notes,
+      updated_at = NOW()
+    WHERE id = :consumption_id
+    AND org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+    AND reversed = false
+    RETURNING *
+
+  restore_lp_quantity: |
+    UPDATE license_plates
+    SET
+      qty = qty + :consumed_qty,
+      status = CASE
+        WHEN status = 'consumed' THEN 'available'
+        ELSE status
+      END,
+      updated_at = NOW()
+    WHERE id = :lp_id
+    AND org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+    RETURNING *
+
+  mark_genealogy_reversed: |
+    UPDATE lp_genealogy
+    SET
+      is_reversed = true,
+      updated_at = NOW()
+    WHERE parent_lp_id = :lp_id
+    AND consumption_id = :consumption_id
+    AND org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+    RETURNING *
+
+  create_audit_log: |
+    INSERT INTO audit_log (
+      org_id,
+      user_id,
+      action,
+      entity_type,
+      entity_id,
+      metadata,
+      created_at
+    ) VALUES (
+      (SELECT org_id FROM users WHERE id = auth.uid()),
+      auth.uid(),
+      'consumption_reversal',
+      'material_consumption',
+      :consumption_id,
+      :metadata::jsonb,
+      NOW()
+    )
+    RETURNING *
+
+# Transaction Pattern
+transaction:
+  description: "Reversal must be atomic - all or nothing"
+  steps:
+    - step: 1
+      action: "Validate consumption exists and not reversed"
+      rollback: "Return error"
+    - step: 2
+      action: "Update material_consumptions (set reversed = true)"
+      rollback: "Rollback transaction"
+    - step: 3
+      action: "Restore LP quantity"
+      rollback: "Rollback transaction"
+    - step: 4
+      action: "Update LP status if was 'consumed'"
+      rollback: "Rollback transaction"
+    - step: 5
+      action: "Mark lp_genealogy as reversed"
+      rollback: "Rollback transaction"
+    - step: 6
+      action: "Create audit_log entry"
+      rollback: "Rollback transaction"
+    - step: 7
+      action: "Commit transaction"
+      rollback: "N/A"
+
+# Reversal Reason Values
+reversal_reasons:
+  - code: "scanned_wrong_lp"
+    label: "Scanned Wrong LP"
+    description: "Operator scanned incorrect License Plate"
+  - code: "wrong_quantity"
+    label: "Wrong Quantity Entered"
+    description: "Incorrect quantity was entered during consumption"
+  - code: "operator_error"
+    label: "Operator Error"
+    description: "General operator mistake"
+  - code: "quality_issue"
+    label: "Quality Issue"
+    description: "Material quality problem discovered after consumption"
+  - code: "other"
+    label: "Other"
+    description: "Other reason - requires notes"

@@ -1,0 +1,302 @@
+# Handoff: Story 01.1 - Org Context + Base RLS
+# From: QA-AGENT → To: TECH-WRITER
+# Date: 2025-12-17
+# Phase: 6 QA VALIDATION → 7 DOCUMENTATION
+
+story:
+  id: "01.1"
+  name: "Org Context + Base RLS"
+  epic: "01-settings"
+  type: "Backend (Security-Critical)"
+
+qa_validation:
+  decision: "APPROVED"
+  qa_agent: "QA-AGENT"
+  date: "2025-12-17"
+  status: "READY FOR DOCUMENTATION"
+
+test_execution:
+  total_tests: 8
+  priority_1_critical: 3
+  priority_2_high: 3
+  priority_3_medium: 2
+  tests_passed: 8
+  tests_failed: 0
+  tests_blocked: 0
+  pass_rate: "100%"
+
+test_coverage:
+  unit_tests:
+    org_context_service: 24
+    permission_service: 25
+  integration_tests:
+    api_context_endpoint: 22
+  total: 71
+  coverage_estimate: "95%+"
+  target: "95% (security critical)"
+
+acceptance_criteria:
+  ac_01:
+    description: "Derive user_id and org_id from session"
+    status: "PASS"
+    evidence: "org-context-service.ts:26-108, deriveUserIdFromSession:193-214"
+  ac_02:
+    description: "Cross-tenant access returns 404 (not 403)"
+    status: "PASS"
+    evidence: "org-context-service.ts:98-102"
+  ac_03:
+    description: "404 response prevents existence leak"
+    status: "PASS"
+    evidence: "not-found-error.ts:6-7, generic error messages"
+  ac_04:
+    description: "Query without org_id filter blocked"
+    status: "PASS"
+    evidence: "058_rls_policies.sql (all 12 policies)"
+  ac_05:
+    description: "RLS auto-filters to user's org_id"
+    status: "PASS"
+    evidence: "ADR-013 pattern applied (12/12 policies)"
+  ac_06:
+    description: "Non-admin writes rejected"
+    status: "PASS"
+    evidence: "058_rls_policies.sql:55-59, permission-service.ts:31-76"
+  summary: "6/6 PASS (100%)"
+
+security_validation:
+  rating: "EXCELLENT"
+  multi_tenant_isolation: "PASS"
+  authentication: "PASS"
+  sql_injection_prevention: "PASS"
+  enumeration_protection: "PASS"
+  critical_issues: 0
+  high_issues: 0
+  medium_issues: 2
+  low_issues: 3
+
+performance_validation:
+  query_efficiency: "EXCELLENT"
+  api_response_time: "EXCELLENT"
+  rls_overhead: "OPTIMIZED"
+  single_join_query: true
+  n_plus_one_problem: false
+  indexed_columns: true
+
+adr_compliance:
+  overall: "FULL COMPLIANCE"
+  adr_011:
+    name: "Module Toggle Storage"
+    status: "PASS"
+    score: "100%"
+  adr_012:
+    name: "Role Permission Storage"
+    status: "PASS"
+    score: "100%"
+  adr_013:
+    name: "RLS Org Isolation Pattern"
+    status: "PASS"
+    score: "100%"
+
+code_quality:
+  overall: "EXCELLENT"
+  typescript_safety: "EXCELLENT"
+  documentation: "EXCELLENT"
+  architecture: "EXCELLENT"
+  test_quality: "EXCELLENT"
+
+issues_found:
+  critical: []
+  high: []
+  medium:
+    - id: "M-01"
+      description: "Session expiration timestamp format assumption"
+      file: "org-context-service.ts:207"
+      recommendation: "Verify session.expires_at format in staging"
+      blocking: false
+    - id: "M-02"
+      description: "No rate limiting on context endpoint"
+      file: "app/api/v1/settings/context/route.ts"
+      recommendation: "Add rate limiting (10 req/min per user) in Story 01.6"
+      blocking: false
+  low:
+    - id: "L-01"
+      description: "No query performance monitoring"
+      recommendation: "Add logging for queries > 50ms"
+      blocking: false
+    - id: "L-02"
+      description: "Type assertion 'as any' in permission check"
+      file: "permission-service.ts:33"
+      recommendation: "Use type guard instead"
+      blocking: false
+    - id: "L-03"
+      description: "Missing input sanitization on error messages"
+      recommendation: "Add defense-in-depth sanitization"
+      blocking: false
+
+deployment_readiness:
+  all_p1_tests: "PASS"
+  all_p2_tests: "PASS"
+  performance_validated: true
+  cross_tenant_isolation_confirmed: true
+  security_validation: "PASS"
+  adr_compliance: "FULL"
+  recommendation: "APPROVE FOR DEPLOYMENT"
+  conditions: []
+  confidence: "HIGH - Production-ready implementation"
+
+documentation_needed:
+  api_documentation:
+    - endpoint: "GET /api/v1/settings/context"
+      description: "Returns org context for authenticated user"
+      response_format: "OrgContext with org_id, user_id, role, permissions, organization"
+      status_codes: [200, 401, 403, 404]
+
+  developer_guides:
+    - title: "Using Org Context in API Routes"
+      topics:
+        - "Calling deriveUserIdFromSession()"
+        - "Calling getOrgContext(userId)"
+        - "Using context for org-scoped queries"
+        - "Error handling (401, 403, 404)"
+
+    - title: "Permission Checks in API Routes"
+      topics:
+        - "Using hasAdminAccess()"
+        - "Using canModifyOrganization()"
+        - "Using canModifyUsers()"
+
+  database_documentation:
+    - title: "RLS Policies for Settings Module"
+      topics:
+        - "ADR-013 RLS pattern explanation"
+        - "12 RLS policies overview"
+        - "Admin enforcement in policies"
+
+  changelog_entry:
+    version: "0.1.0"
+    type: "feat"
+    scope: "settings"
+    message: "Add org context resolution and base RLS policies"
+    breaking_changes: false
+
+  migration_notes:
+    - "Run migrations 054-059 in sequence"
+    - "Verify seed data (10 roles, 11 modules)"
+    - "Enable RLS on all Settings tables"
+    - "Test cross-tenant isolation in staging"
+
+files_for_documentation:
+  core_implementation:
+    - path: "apps/frontend/lib/services/org-context-service.ts"
+      lines: 215
+      description: "Org context resolution service"
+
+    - path: "apps/frontend/lib/services/permission-service.ts"
+      lines: 146
+      description: "Permission checking service"
+
+    - path: "apps/frontend/app/api/v1/settings/context/route.ts"
+      lines: 49
+      description: "Context API endpoint"
+
+  database:
+    - path: "supabase/migrations/054_create_organizations_table.sql"
+      description: "Organizations table schema"
+
+    - path: "supabase/migrations/055_create_roles_table.sql"
+      description: "Roles table with JSONB permissions (ADR-012)"
+
+    - path: "supabase/migrations/056_create_users_table.sql"
+      description: "Users table with org_id and role_id"
+
+    - path: "supabase/migrations/057_create_modules_tables.sql"
+      description: "Modules and organization_modules tables (ADR-011)"
+
+    - path: "supabase/migrations/058_rls_policies.sql"
+      description: "12 RLS policies following ADR-013"
+
+    - path: "supabase/migrations/059_seed_system_data.sql"
+      description: "Seed data: 10 roles, 11 modules"
+
+  tests:
+    - path: "apps/frontend/lib/services/__tests__/org-context-service.test.ts"
+      lines: 370
+      tests: 24
+      description: "Org context service unit tests"
+
+    - path: "apps/frontend/lib/services/__tests__/permission-service.test.ts"
+      lines: 362
+      tests: 25
+      description: "Permission service unit tests"
+
+    - path: "apps/frontend/__tests__/api/settings/context.test.ts"
+      lines: 419
+      tests: 22
+      description: "Context API integration tests"
+
+  review_documentation:
+    - path: "docs/2-MANAGEMENT/reviews/code-review-story-01.1-final.md"
+      description: "Comprehensive code review report"
+
+    - path: "docs/2-MANAGEMENT/reviews/01.1-HANDOFF-TO-QA.yaml"
+      description: "Code review to QA handoff"
+
+    - path: "docs/2-MANAGEMENT/qa/qa-report-story-01.1-final.md"
+      description: "Comprehensive QA validation report"
+
+staging_validation_checklist:
+  before_staging:
+    - "Run all 71 unit/integration tests"
+    - "Verify database migrations applied"
+    - "Confirm seed data present (10 roles, 11 modules)"
+
+  in_staging:
+    - "Verify session.expires_at format (M-01)"
+    - "Test cross-tenant isolation with real data"
+    - "Test admin enforcement with multiple roles"
+    - "Monitor RLS performance (<1ms overhead)"
+    - "Verify error responses (401, 403, 404)"
+    - "Load test context endpoint (<100ms)"
+
+  before_production:
+    - "All QA tests pass"
+    - "Performance benchmarks met"
+    - "Security review approved"
+    - "Documentation complete"
+
+next_phase:
+  phase: "7 DOCUMENTATION"
+  agent: "TECH-WRITER"
+  deliverables:
+    - "API documentation for /api/v1/settings/context"
+    - "Developer guide: Using org-context-service in API routes"
+    - "Developer guide: Permission checks in API routes"
+    - "Database documentation: RLS policies overview"
+    - "CHANGELOG entry for v0.1.0"
+    - "Migration notes for staging/production deployment"
+  exit_criteria:
+    - "All API endpoints documented"
+    - "All developer guides complete"
+    - "CHANGELOG entry added"
+    - "Migration notes reviewed"
+    - "Documentation reviewed by SENIOR-DEV"
+
+metrics:
+  total_files_reviewed: 20
+  total_lines_code: 2157
+  total_tests: 71
+  test_to_code_ratio: "1.15:1"
+  test_pass_rate: "100%"
+  security_issues: "0 critical, 0 high, 2 medium, 3 low"
+  adr_compliance: "3/3 (100%)"
+  code_quality: "EXCELLENT"
+  qa_confidence: "HIGH"
+
+summary:
+  status: "APPROVED FOR DOCUMENTATION"
+  decision: "PROCEED TO PHASE 7"
+  quality: "Production-ready implementation"
+  security: "EXCELLENT - Zero critical/high issues"
+  testing: "COMPREHENSIVE - 71 tests, 100% pass rate"
+  compliance: "FULL - All 3 ADRs satisfied"
+  blocking_issues: "NONE"
+  recommendation: "Ready for documentation and deployment"

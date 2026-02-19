@@ -1,0 +1,268 @@
+# Story 11.3 - Tests Context
+# Test specifications for Integration Logs
+
+unit_tests:
+  service:
+    file: "lib/services/integration-logs-service.test.ts"
+    coverage_target: 85%
+    tests:
+      - describe: "createLog"
+        tests:
+          - "creates log entry successfully"
+          - "masks sensitive data before insert"
+          - "returns log ID"
+          - "throws on invalid data"
+
+      - describe: "queryLogs"
+        tests:
+          - "returns paginated logs"
+          - "filters by status"
+          - "filters by integration_type"
+          - "filters by date_range"
+          - "filters by external_system"
+          - "combines multiple filters"
+          - "enforces RLS (org isolation)"
+          - "sorts by timestamp DESC"
+          - "pagination works correctly"
+
+      - describe: "getLog"
+        tests:
+          - "returns single log by ID"
+          - "returns null for non-existent log"
+          - "enforces RLS"
+          - "formats JSON payloads"
+
+      - describe: "getStats"
+        tests:
+          - "calculates total_logs"
+          - "calculates success/error/warning counts"
+          - "calculates success_rate"
+          - "calculates avg_duration_ms"
+          - "groups by_type and by_status"
+
+      - describe: "exportLogs"
+        tests:
+          - "generates CSV file"
+          - "applies filters"
+          - "excludes request/response bodies"
+          - "UTF-8 with BOM encoding"
+          - "returns download URL"
+          - "limits to 10K rows"
+
+      - describe: "maskSensitiveData"
+        tests:
+          - "masks password field"
+          - "masks api_key field"
+          - "masks api_secret field"
+          - "masks Authorization header"
+          - "preserves non-sensitive fields"
+          - "handles nested objects"
+
+      - describe: "searchLogs"
+        tests:
+          - "searches request_body"
+          - "searches response_body"
+          - "searches error_message"
+          - "searches external_id"
+          - "returns relevant results"
+
+      - describe: "cleanupOldLogs"
+        tests:
+          - "deletes logs older than retention period"
+          - "preserves recent logs"
+          - "returns deleted count"
+
+integration_tests:
+  api:
+    file: "app/api/integrations/logs/route.test.ts"
+    tests:
+      - describe: "GET /api/integrations/logs"
+        tests:
+          - "returns paginated logs"
+          - "filters by status work"
+          - "filters by date_range work"
+          - "search works"
+          - "pagination headers correct"
+          - "returns 403 for non-admin"
+          - "response time < 800ms"
+
+      - describe: "GET /api/integrations/logs/:id"
+        tests:
+          - "returns log details"
+          - "returns 404 for non-existent log"
+          - "enforces RLS (other org returns 404)"
+
+      - describe: "GET /api/integrations/logs/stats"
+        tests:
+          - "returns statistics"
+          - "calculates success_rate correctly"
+          - "filters by date_range"
+
+      - describe: "POST /api/integrations/logs/export"
+        tests:
+          - "generates CSV export"
+          - "returns download URL"
+          - "applies filters"
+          - "returns 400 for >10K rows"
+
+  rls:
+    file: "__tests__/rls/integration-logs.test.ts"
+    tests:
+      - "User A cannot see User B's logs"
+      - "Admin can view own org logs"
+      - "IT_Manager can view own org logs"
+      - "Regular user cannot access logs (403)"
+      - "Logs cannot be updated"
+      - "Logs cannot be deleted by users"
+
+  immutability:
+    file: "__tests__/integration/log-immutability.test.ts"
+    tests:
+      - "UPDATE on log entry fails"
+      - "DELETE on log entry fails (for users)"
+      - "Service role can delete (cleanup job)"
+
+e2e_tests:
+  file: "e2e/integrations/logs.spec.ts"
+  framework: "Playwright"
+  tests:
+    - describe: "View Logs"
+      tests:
+        - "Navigate to /integrations/logs"
+        - "Logs table displays"
+        - "Apply status filter"
+        - "Results filtered correctly"
+        - "Search for event"
+        - "Results filtered"
+
+    - describe: "Log Detail"
+      tests:
+        - "Click log entry"
+        - "Detail modal opens"
+        - "Request/response JSON formatted"
+        - "Sensitive fields masked"
+        - "Error message displayed (if error)"
+
+    - describe: "Filters"
+      tests:
+        - "Filter by status=error"
+        - "Filter by integration_type=api"
+        - "Filter by date_range=last_24_hours"
+        - "Combine multiple filters"
+        - "Clear filters"
+
+    - describe: "Search"
+      tests:
+        - "Enter search query"
+        - "Results filtered"
+        - "Matched fields highlighted"
+
+    - describe: "Export"
+      tests:
+        - "Click [Export CSV]"
+        - "CSV file downloads"
+        - "File contains filtered data"
+        - "UTF-8 encoding correct"
+
+    - describe: "Pagination"
+      tests:
+        - "Navigate to page 2"
+        - "Results updated"
+        - "No duplicates"
+
+    - describe: "Permissions"
+      tests:
+        - "Admin can view logs"
+        - "IT_Manager can view logs"
+        - "Regular user redirected with 403"
+
+performance_tests:
+  file: "lib/services/__tests__/integration-logs-perf.test.ts"
+  tests:
+    - name: "Query 100K logs with filters"
+      setup: "Insert 100K logs"
+      assertion: "queryLogs() < 800ms"
+
+    - name: "Full-text search on 50K logs"
+      setup: "Insert 50K logs"
+      assertion: "searchLogs() < 1s"
+
+    - name: "Export 10K logs to CSV"
+      setup: "Insert 10K logs"
+      assertion: "exportLogs() < 5s"
+
+acceptance_criteria_mapping:
+  AC-1:
+    tests:
+      - "lib/services/integration-logs-service.test.ts: createLog"
+      - "__tests__/integration/log-immutability.test.ts: UPDATE fails"
+
+  AC-2:
+    tests:
+      - "app/api/integrations/logs/route.test.ts: GET filters work"
+
+  AC-3:
+    tests:
+      - "lib/services/integration-logs-service.test.ts: searchLogs"
+
+  AC-4:
+    tests:
+      - "app/api/integrations/logs/route.test.ts: GET pagination works"
+
+  AC-5:
+    tests:
+      - "app/api/integrations/logs/:id/route.test.ts: GET returns details"
+
+  AC-6:
+    tests:
+      - "lib/services/integration-logs-service.test.ts: maskSensitiveData"
+
+  AC-7:
+    tests:
+      - "app/api/integrations/logs/export/route.test.ts: POST generates CSV"
+
+  AC-8:
+    tests:
+      - "lib/services/integration-logs-service.test.ts: cleanupOldLogs"
+
+  AC-9:
+    tests:
+      - "lib/services/__tests__/integration-logs-perf.test.ts: Query performance"
+
+  AC-10:
+    tests:
+      - "e2e/integrations/logs.spec.ts: Permissions"
+
+  AC-11:
+    tests:
+      - "__tests__/rls/integration-logs.test.ts: User A cannot see User B's logs"
+
+test_data:
+  integration_logs:
+    - id: "log-1-uuid"
+      org_id: "org-a-uuid"
+      timestamp: "2024-12-15T10:00:00Z"
+      integration_type: "api"
+      event_type: "products.list"
+      direction: "inbound"
+      status: "success"
+      http_status: 200
+      api_key_id: "key-1-uuid"
+      duration_ms: 145
+
+    - id: "log-2-uuid"
+      org_id: "org-a-uuid"
+      timestamp: "2024-12-15T10:05:00Z"
+      integration_type: "webhook"
+      event_type: "order.created"
+      direction: "outbound"
+      status: "error"
+      http_status: 500
+      error_message: "Connection timeout"
+      retry_count: 3
+
+coverage_requirements:
+  overall: ">80%"
+  service_layer: ">85%"
+  api_routes: ">80%"
+  critical_paths: "100%"

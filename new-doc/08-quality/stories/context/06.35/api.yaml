@@ -1,0 +1,12 @@
+# Story 06.35 - API Schema
+
+endpoints:
+  - GET /api/quality/supplier-audits
+  - GET /api/quality/supplier-audits/:id
+  - POST /api/quality/supplier-audits
+  - PUT /api/quality/supplier-audits/:id
+  - DELETE /api/quality/supplier-audits/:id
+  - POST /api/quality/supplier-audits/:id/complete
+  - GET /api/quality/supplier-audits/supplier/:supplierId
+
+service: "supplier-audit-service.ts"

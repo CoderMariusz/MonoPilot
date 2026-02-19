@@ -1,0 +1,114 @@
+# Story 05.4 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "05.4"
+  name: "LP Status Management"
+  slug: "lp-status-management"
+  epic: "05-warehouse"
+  phase: "0"
+  complexity: "M"
+  estimate_days: 3
+  type: "backend + frontend"
+  state: "ready"
+  model: "opus"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, RLS, audit trail
+  - api.yaml         # Endpoints, services, validation
+  - frontend.yaml    # Components, types, modals
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "05.1"
+      name: "LP Table + CRUD"
+      provides:
+        - "license_plates table"
+        - "license_plates.status field"
+        - "license_plates.qa_status field"
+        - "LP service base methods"
+  blocked_by:
+    - story: "05.1"
+  blocks:
+    - story: "05.5"
+      name: "LP Search & Filters"
+      reason: "Status filtering depends on status management"
+    - story: "05.6"
+      name: "LP Detail & History"
+      reason: "Status audit trail display"
+
+# External Dependencies
+external_dependencies:
+  - epic: "04"
+    story: "04.6"
+    name: "Material Consumption"
+    relationship: "Consumer - uses validateLPForConsumption()"
+    critical: true
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/warehouse.md"
+    sections:
+      - "WH-FR-002"
+      - "WH-FR-008"
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/05-warehouse/05.4.lp-status-management.md"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/WH-003-license-plate-detail.md"
+      relevance: "LP Detail page with status badges and audit trail"
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/WH-009-qa-status-change-modal.md"
+      relevance: "QA Status Change modal UI specification"
+  patterns:
+    - path: "docs/2-MANAGEMENT/epics/current/01-settings/context/01.1/"
+      relevance: "Context YAML structure pattern"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "lp_status_audit table with RLS"
+  - type: "service"
+    count: 1
+    description: "lp-status-service.ts with status validation and transitions"
+  - type: "api"
+    count: 6
+    description: "Status update, QA status, block/unblock, validate, audit endpoints"
+  - type: "component"
+    count: 5
+    description: "StatusBadge, QAStatusBadge, ChangeQAStatusModal, BlockLPModal, StatusAuditTrail"
+  - type: "validation"
+    count: 1
+    description: "Zod schemas for status operations"
+  - type: "test"
+    count: 4
+    description: "Unit + integration + permission + edge case tests"
+
+# Technical notes
+technical_notes:
+  - "CRITICAL: Epic 04.6 Material Consumption depends on validateLPForConsumption()"
+  - "Terminal state: 'consumed' status allows NO transitions out"
+  - "QA status 'failed' automatically triggers LP status -> 'blocked'"
+  - "QA status 'quarantine -> passed' automatically triggers LP status -> 'available'"
+  - "All status changes MUST create audit trail entries"
+  - "Manager/QA role required for QA status changes"
+  - "Reason field required for Failed/Quarantine QA status changes"
+
+# Business Rules Summary
+business_rules:
+  status_values:
+    - { value: "available", description: "Ready for consumption/movement" }
+    - { value: "reserved", description: "Allocated to WO/TO" }
+    - { value: "consumed", description: "Terminal - fully used in production" }
+    - { value: "blocked", description: "Quality hold, manual block" }
+  qa_status_values:
+    - { value: "pending", description: "Awaiting QA inspection" }
+    - { value: "passed", description: "QA approved for consumption" }
+    - { value: "failed", description: "QA failed, consumption blocked" }
+    - { value: "quarantine", description: "Isolated pending investigation" }
+  consumption_rule: "Only status='available|reserved' AND qa_status='passed' can be consumed"

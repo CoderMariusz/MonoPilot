@@ -1,0 +1,114 @@
+# Story 01.15 - Database Schema
+# Purpose: Session tracking, password history, security policies
+# Agent: BACKEND-DEV
+
+migrations:
+  - path: "supabase/migrations/064_create_user_sessions_table.sql"
+    type: "migration"
+    description: "User sessions table with device tracking"
+  - path: "supabase/migrations/065_create_password_history_table.sql"
+    type: "migration"
+    description: "Password history table with cleanup trigger"
+  - path: "supabase/migrations/066_extend_organizations_security.sql"
+    type: "migration"
+    description: "Add session_timeout_hours and password_expiry_days to organizations"
+
+tables:
+  - name: "user_sessions"
+    description: "Active user sessions across devices"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "user_id", type: "UUID", constraints: "NOT NULL REFERENCES users(id) ON DELETE CASCADE" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id) ON DELETE CASCADE" }
+      - { name: "session_token", type: "VARCHAR(255)", constraints: "UNIQUE NOT NULL" }
+      - { name: "refresh_token", type: "VARCHAR(255)", constraints: "UNIQUE" }
+      - { name: "device_type", type: "VARCHAR(50)", constraints: "NOT NULL DEFAULT 'browser'" }
+      - { name: "device_name", type: "VARCHAR(255)", constraints: "" }
+      - { name: "ip_address", type: "INET", constraints: "NOT NULL" }
+      - { name: "user_agent", type: "TEXT", constraints: "" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+      - { name: "last_activity_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+      - { name: "expires_at", type: "TIMESTAMPTZ", constraints: "NOT NULL" }
+      - { name: "revoked_at", type: "TIMESTAMPTZ", constraints: "" }
+      - { name: "revoked_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "revocation_reason", type: "VARCHAR(100)", constraints: "" }
+    rls: true
+    rls_pattern: "user_id = auth.uid() OR (admin role + same org)"
+    indexes:
+      - "idx_user_sessions_user_id ON user_sessions(user_id)"
+      - "idx_user_sessions_org_id ON user_sessions(org_id)"
+      - "idx_user_sessions_token ON user_sessions(session_token)"
+      - "idx_user_sessions_active ON user_sessions(user_id) WHERE revoked_at IS NULL"
+    notes:
+      - "device_type: 'browser', 'mobile', 'api'"
+      - "revocation_reason: 'user_logout', 'admin_terminate', 'password_change', 'timeout'"
+
+  - name: "password_history"
+    description: "Password history for reuse prevention"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "user_id", type: "UUID", constraints: "NOT NULL REFERENCES users(id) ON DELETE CASCADE" }
+      - { name: "password_hash", type: "VARCHAR(255)", constraints: "NOT NULL" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+    rls: true
+    rls_pattern: "System access only (via service role)"
+    indexes:
+      - "idx_password_history_user_id ON password_history(user_id)"
+    constraints:
+      - "UNIQUE(user_id, password_hash)"
+
+  - name: "organizations (extended)"
+    action: "ALTER TABLE"
+    columns:
+      - { name: "session_timeout_hours", type: "INTEGER", constraints: "DEFAULT 24 CHECK (session_timeout_hours >= 1 AND session_timeout_hours <= 720)" }
+      - { name: "password_expiry_days", type: "INTEGER", constraints: "DEFAULT NULL CHECK (password_expiry_days IS NULL OR password_expiry_days >= 30)" }
+      - { name: "enforce_password_history", type: "BOOLEAN", constraints: "DEFAULT true" }
+
+  - name: "users (extended)"
+    action: "ALTER TABLE"
+    columns:
+      - { name: "password_changed_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+      - { name: "password_expires_at", type: "TIMESTAMPTZ", constraints: "" }
+      - { name: "force_password_change", type: "BOOLEAN", constraints: "DEFAULT false" }
+
+# Trigger: Maintain last 5 passwords
+trigger:
+  name: "password_history_cleanup"
+  function: "maintain_password_history"
+  timing: "AFTER INSERT"
+  table: "password_history"
+  logic: |
+    DELETE FROM password_history
+    WHERE user_id = NEW.user_id
+    AND id NOT IN (
+      SELECT id FROM password_history
+      WHERE user_id = NEW.user_id
+      ORDER BY created_at DESC
+      LIMIT 5
+    );
+
+# RLS Policies
+rls_policies:
+  user_sessions:
+    - name: "sessions_own_read"
+      operation: "SELECT"
+      using: |
+        user_id = auth.uid()
+        OR (
+          org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+          AND (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid()) IN ('SUPER_ADMIN', 'ADMIN')
+        )
+
+    - name: "sessions_own_delete"
+      operation: "DELETE"
+      using: "Same as sessions_own_read"
+
+    - name: "sessions_insert"
+      operation: "INSERT"
+      with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+  password_history:
+    - name: "password_history_none"
+      operation: "ALL"
+      using: "false"
+      note: "Only system/service role can access"

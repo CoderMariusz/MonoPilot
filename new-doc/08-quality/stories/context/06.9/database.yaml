@@ -1,0 +1,165 @@
+# Story 06.9 - Database Schema
+# Purpose: Tables, RLS policies, indexes, migrations
+# Agent: BACKEND-DEV (database focus)
+
+migrations:
+  - path: "supabase/migrations/xxx_create_ncr_reports_table.sql"
+    type: "migration"
+    description: "NCR Reports table with basic Phase 1 fields"
+  - path: "supabase/migrations/xxx_create_ncr_number_sequences.sql"
+    type: "migration"
+    description: "NCR number sequence table for auto-generation"
+
+tables:
+  ncr_reports:
+    description: "Non-Conformance Reports (Phase 1 - Basic). Expanded workflow in story 06.13"
+    columns:
+      # Identity
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id) ON DELETE CASCADE" }
+      - { name: "ncr_number", type: "TEXT", constraints: "NOT NULL" }
+
+      # Basic Information
+      - { name: "title", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "description", type: "TEXT", constraints: "NOT NULL" }
+
+      # Severity and Status
+      - { name: "severity", type: "TEXT", constraints: "NOT NULL CHECK (severity IN ('minor', 'major', 'critical'))" }
+      - { name: "status", type: "TEXT", constraints: "NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'open', 'closed'))" }
+      - { name: "category", type: "TEXT", constraints: "CHECK (category IN ('product_defect', 'process_deviation', 'documentation_error', 'equipment_failure', 'supplier_issue', 'customer_complaint', 'other'))" }
+
+      # Detection
+      - { name: "detection_point", type: "TEXT", constraints: "NOT NULL CHECK (detection_point IN ('incoming', 'in_process', 'final', 'customer', 'internal_audit', 'supplier_audit', 'other'))" }
+      - { name: "detected_date", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT now()" }
+      - { name: "detected_by", type: "UUID", constraints: "NOT NULL REFERENCES users(id) ON DELETE RESTRICT" }
+
+      # Source Reference (polymorphic - optional)
+      - { name: "source_type", type: "TEXT", constraints: "CHECK (source_type IN ('inspection', 'hold', 'batch', 'work_order', 'supplier', 'customer_complaint', 'audit', 'other'))" }
+      - { name: "source_id", type: "UUID", constraints: "" }
+      - { name: "source_description", type: "TEXT", constraints: "" }
+
+      # Assignment (optional in Phase 1)
+      - { name: "assigned_to", type: "UUID", constraints: "REFERENCES users(id) ON DELETE SET NULL" }
+      - { name: "assigned_at", type: "TIMESTAMPTZ", constraints: "" }
+
+      # Closure (Phase 1 - simple closure)
+      - { name: "closed_at", type: "TIMESTAMPTZ", constraints: "" }
+      - { name: "closed_by", type: "UUID", constraints: "REFERENCES users(id) ON DELETE SET NULL" }
+      - { name: "closure_notes", type: "TEXT", constraints: "" }
+
+      # Audit
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT now()" }
+      - { name: "created_by", type: "UUID", constraints: "NOT NULL REFERENCES users(id) ON DELETE RESTRICT" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT now()" }
+      - { name: "updated_by", type: "UUID", constraints: "REFERENCES users(id) ON DELETE SET NULL" }
+
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+    indexes:
+      - "idx_ncr_org_status ON ncr_reports(org_id, status)"
+      - "idx_ncr_org_severity ON ncr_reports(org_id, severity)"
+      - "idx_ncr_detection_point ON ncr_reports(org_id, detection_point)"
+      - "idx_ncr_detected_date ON ncr_reports(org_id, detected_date DESC)"
+      - "idx_ncr_detected_by ON ncr_reports(detected_by)"
+      - "idx_ncr_assigned_to ON ncr_reports(assigned_to) WHERE assigned_to IS NOT NULL"
+      - "idx_ncr_source ON ncr_reports(source_type, source_id) WHERE source_type IS NOT NULL"
+      - "idx_ncr_created ON ncr_reports(org_id, created_at DESC)"
+      - "idx_ncr_list_query ON ncr_reports(org_id, status, severity, detected_date DESC)"
+
+    constraints:
+      - "UNIQUE(org_id, ncr_number)"
+      - "CHECK ((status = 'closed' AND closed_at IS NOT NULL AND closed_by IS NOT NULL) OR (status != 'closed' AND closed_at IS NULL AND closed_by IS NULL))"
+
+  ncr_number_sequences:
+    description: "Sequence for auto-generating NCR numbers per org per year"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id) ON DELETE CASCADE" }
+      - { name: "year", type: "INTEGER", constraints: "NOT NULL" }
+      - { name: "current_value", type: "BIGINT", constraints: "NOT NULL DEFAULT 0" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT now()" }
+
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+    indexes:
+      - "UNIQUE(org_id, year)"
+
+# Function: Generate NCR number (NCR-YYYY-NNNNN)
+function:
+  name: "generate_ncr_number"
+  signature: "(p_org_id UUID) RETURNS TEXT"
+  description: "Generate next NCR number in format NCR-YYYY-NNNNN"
+  logic: |
+    DECLARE
+      v_year INTEGER;
+      v_next_val BIGINT;
+      v_ncr_number TEXT;
+    BEGIN
+      v_year := EXTRACT(YEAR FROM CURRENT_DATE);
+
+      INSERT INTO ncr_number_sequences (org_id, year, current_value)
+      VALUES (p_org_id, v_year, 1)
+      ON CONFLICT (org_id, year)
+      DO UPDATE SET
+        current_value = ncr_number_sequences.current_value + 1,
+        updated_at = NOW()
+      RETURNING current_value INTO v_next_val;
+
+      v_ncr_number := 'NCR-' || v_year::TEXT || '-' || LPAD(v_next_val::TEXT, 5, '0');
+
+      RETURN v_ncr_number;
+    END;
+
+# Trigger: Update updated_at timestamp
+trigger:
+  name: "tr_ncr_reports_updated_at"
+  table: "ncr_reports"
+  timing: "BEFORE UPDATE"
+  logic: "Execute function update_updated_at_column()"
+
+# RLS Policies (ADR-013)
+rls_policies:
+  ncr_reports:
+    select:
+      name: "ncr_select"
+      operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+    insert:
+      name: "ncr_insert"
+      operation: "INSERT"
+      with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+    update:
+      name: "ncr_update"
+      operation: "UPDATE"
+      using: |
+        org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        AND (status = 'draft' OR assigned_to = auth.uid())
+
+    delete:
+      name: "ncr_delete"
+      operation: "DELETE"
+      using: |
+        org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        AND status = 'draft'
+
+  ncr_number_sequences:
+    all:
+      name: "ncr_seq_org"
+      operation: "ALL"
+      to: "authenticated"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+# Comments
+table_comments:
+  ncr_reports: "Non-Conformance Reports (Phase 1 - Basic). Expanded workflow in story 06.13"
+  ncr_number_sequences: "Sequence for NCR number auto-generation"
+
+column_comments:
+  "ncr_reports.status": "Phase 1: draft, open, closed. Phase 2 (06.13): full workflow states"
+  "ncr_reports.source_type": "Polymorphic reference to inspection, hold, batch, etc."
+  "ncr_reports.detection_point": "Where was the non-conformance detected"
+  "ncr_reports.category": "Type of non-conformance (product, process, equipment, etc.)"

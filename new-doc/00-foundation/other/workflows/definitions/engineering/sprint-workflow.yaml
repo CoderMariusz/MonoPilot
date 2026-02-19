@@ -1,0 +1,578 @@
+# Sprint Workflow
+# Complete sprint lifecycle: Start -> Daily Cycle -> Review -> Retrospective -> Archive
+#
+# Documentation: @.claude/workflows/documentation/SPRINT-WORKFLOW.md
+
+name: sprint-workflow
+description: Sprint management from initialization to retrospective
+trigger: "sprint_start | sprint_planning | new_sprint"
+
+# Expected duration: 1-2 weeks per sprint
+# Daily cycle repeats throughout sprint duration
+
+documentation: "@.claude/workflows/documentation/SPRINT-WORKFLOW.md"
+
+prerequisites:
+  - backlog_prioritized
+  - capacity_available
+  - previous_sprint_closed
+
+phases:
+  # Sprint Start
+  - id: sprint_start
+    name: "Sprint Start"
+    steps:
+      - id: initialization
+        agent: ORCHESTRATOR
+        type: sprint_setup
+        description: "Create sprint folder, set goal, define capacity"
+        duration: "15-30 minutes"
+        activities:
+          - "Create sprint folder structure"
+          - "Set sprint goal"
+          - "Define capacity"
+          - "Initialize TASK-QUEUE.md"
+          - "Update PROJECT-STATE.md"
+        output:
+          deliverables:
+            - "docs/2-MANAGEMENT/sprints/sprint-{N}/sprint-plan.md"
+
+      - id: doc_sync_check
+        agent: DOC-AUDITOR
+        type: documentation_audit
+        description: "Catch documentation drift before sprint begins"
+        duration: "30 minutes"
+        checkpoint:
+          - "Check changed files since last sprint"
+          - "Verify API docs current"
+          - "Flag undocumented changes"
+        drift_score:
+          green: "0-10% - proceed with sprint"
+          yellow: "11-25% - schedule doc updates this sprint"
+          red: "26%+ - prioritize doc sync before new features"
+        decision:
+          green: planning
+          yellow: add_doc_tasks
+          red: escalate_to_scrum_master
+
+      - id: planning
+        agent: SCRUM-MASTER
+        type: sprint_planning
+        description: "Review backlog, select stories, break down tasks"
+        duration: "1-2 hours"
+        activities:
+          - "Review prioritized backlog"
+          - "Review doc sync check results"
+          - "Select stories for sprint"
+          - "Break stories into tasks"
+          - "Estimate and assign"
+          - "Commit to sprint scope"
+        output:
+          deliverables:
+            - ".claude/state/TASK-QUEUE.md"
+        checkpoint:
+          - "Stories selected within capacity"
+          - "Tasks created with estimates"
+          - "All tasks assigned"
+
+    gate:
+      id: SPRINT_INITIALIZED
+      type: quality_gate
+      enforcer: SCRUM-MASTER
+      criteria:
+        - "Sprint folder structure created"
+        - "Sprint goal documented"
+        - "Capacity defined and documented"
+        - "TASK-QUEUE.md initialized"
+        - "PROJECT-STATE.md updated"
+      on_pass: doc_sync_check
+      on_fail:
+        action: return_to_phase
+        target: initialization
+      block_message: |
+        [STOP] Cannot proceed to doc sync check:
+        - Sprint folder: [status]
+        - Sprint goal: [status]
+        - Capacity: [status]
+        - TASK-QUEUE.md: [status]
+        - PROJECT-STATE.md: [status]
+
+      # AUTO STATE UPDATE + COMMIT
+      on_complete:
+        state_update:
+          update_root: true
+          script: "bash scripts/sync-state.sh --phase sprint --commit"
+        commit:
+          enabled: true
+          message: "Start Sprint {sprint_number}: {sprint_goal}"
+
+    # Gate after doc sync check
+    doc_sync_gate:
+      id: DOC_SYNC_COMPLETE
+      type: quality_gate
+      enforcer: DOC-AUDITOR
+      criteria:
+        - "Changed files since last sprint analyzed"
+        - "API documentation verified current"
+        - "Undocumented changes flagged"
+        - "Drift score calculated (green/yellow/red)"
+      on_pass: planning
+      on_fail:
+        action: escalate
+        target: scrum-master
+      block_message: |
+        [STOP] Cannot proceed to planning:
+        - File analysis: [status]
+        - API docs: [status]
+        - Drift score: [value]%
+
+    # Gate after planning
+    planning_gate:
+      id: SPRINT_PLANNED
+      type: approval_gate
+      enforcer: SCRUM-MASTER
+      criteria:
+        - "Sprint goal defined and approved"
+        - "Capacity calculated for team"
+        - "Stories selected within capacity"
+        - "Tasks created with estimates"
+        - "All tasks assigned to agents"
+      on_pass: daily_cycle
+      on_fail:
+        action: return_to_phase
+        target: planning
+      block_message: |
+        [STOP] Cannot proceed to daily cycle:
+        - Goal defined: [status]
+        - Capacity calculated: [status]
+        - Stories selected: [status]
+        - Tasks created: [status]
+        - Tasks assigned: [status]
+
+  # Daily Cycle (Repeats)
+  - id: daily_cycle
+    name: "Daily Cycle"
+    repeat: "for_each_sprint_day"
+    steps:
+      - id: morning_standup
+        agent: SCRUM-MASTER
+        type: standup
+        description: "Review progress, identify blockers"
+        duration: "15-30 minutes"
+        activities:
+          - "Review AGENT-STATE.md"
+          - "Check TASK-QUEUE.md progress"
+          - "Identify blockers"
+          - "Update status report"
+        output:
+          deliverables:
+            - "docs/2-MANAGEMENT/sprints/sprint-{N}/daily/day-{X}.md"
+        report_format:
+          completed_yesterday: "table"
+          planned_today: "table"
+          blockers: "table"
+          sprint_health: "status"
+
+      - id: task_queue_update
+        agent: ORCHESTRATOR
+        type: coordination
+        description: "Process completed tasks, resolve dependencies, assign ready tasks"
+        duration: "15-30 minutes"
+        activities:
+          - "Process completed tasks"
+          - "Resolve dependencies"
+          - "Assign ready tasks"
+          - "Handle blocked items"
+          - "Update priorities"
+
+      - id: agent_work
+        type: parallel_execution
+        description: "Multiple story/bug workflows execute in parallel"
+        parallel:
+          - workflow: "engineering/story-delivery.yaml"
+            for_each: "active_story"
+          - workflow: "engineering/bug-workflow.yaml"
+            for_each: "active_bug"
+
+      - id: quality_gates
+        type: continuous
+        description: "Throughout-day quality monitoring"
+        checks:
+          - "Tests passing for completed work"
+          - "Code reviews completed"
+          - "No critical bugs unaddressed"
+          - "Documentation updated"
+
+      - id: end_of_day
+        agent: SCRUM-MASTER
+        type: daily_wrap
+        description: "Update metrics, record decisions, prepare tomorrow"
+        duration: "30 minutes"
+        activities:
+          - "Update METRICS.md with burndown"
+          - "Record decisions in DECISION-LOG.md"
+          - "Update AGENT-STATE.md"
+          - "Prepare next day priorities"
+
+    decision:
+      more_days: daily_cycle
+      last_day: sprint_end
+
+    gate:
+      id: DAILY_STANDUP_COMPLETE
+      type: quality_gate
+      enforcer: ORCHESTRATOR
+      criteria:
+        - "Morning standup completed"
+        - "AGENT-STATE.md reviewed and updated"
+        - "TASK-QUEUE.md progress checked"
+        - "Blockers identified and documented"
+        - "Daily report generated"
+      on_pass: task_queue_update
+      on_fail:
+        action: return_to_phase
+        target: morning_standup
+      block_message: |
+        [STOP] Cannot proceed with daily work:
+        - Standup: [status]
+        - AGENT-STATE.md: [status]
+        - TASK-QUEUE.md: [status]
+        - Blockers: [status]
+        - Daily report: [status]
+
+  # Sprint End
+  - id: sprint_end
+    name: "Sprint End"
+    steps:
+      - id: doc_audit
+        agent: DOC-AUDITOR
+        type: documentation_audit
+        description: "Verify documentation quality before sprint closes"
+        duration: "30 min - 1 hour"
+        checkpoint:
+          - "All completed features documented"
+          - "API changes reflected in docs"
+          - "README updated if needed"
+        decision:
+          pass: sprint_review
+          needs_work: route_to_tech_writer
+
+      - id: sprint_review
+        agents:
+          - SCRUM-MASTER
+          - PRODUCT-OWNER
+        type: demo_and_accept
+        description: "Demo completed stories, accept or reject"
+        duration: "1-2 hours"
+        activities:
+          - "Demo completed stories"
+          - "Review acceptance criteria"
+          - "Accept or reject stories"
+          - "Gather feedback"
+          - "Update backlog"
+        output:
+          deliverables:
+            - "docs/2-MANAGEMENT/sprints/sprint-{N}/review-report.md"
+        gate:
+          id: SPRINT_REVIEW_READY
+          type: approval_gate
+          enforcer: PRODUCT-OWNER
+          criteria:
+            - "All completed stories demoed"
+            - "Acceptance criteria reviewed for each story"
+            - "Stories accepted or rejected with reasons"
+            - "Feedback documented"
+            - "Review report generated"
+          on_pass: retrospective
+          on_fail:
+            action: return_to_phase
+            target: sprint_review
+          block_message: |
+            [STOP] Cannot proceed to retrospective:
+            - Stories demoed: [status]
+            - Acceptance criteria: [status]
+            - Stories accepted/rejected: [status]
+            - Feedback: [status]
+            - Review report: [status]
+
+      - id: retrospective
+        agent: SCRUM-MASTER
+        type: retrospective
+        description: "Reflect on sprint, identify improvements"
+        duration: "1 hour"
+        activities:
+          - "What went well?"
+          - "What needs improvement?"
+          - "Action items for next sprint"
+          - "Update process documentation"
+        output:
+          deliverables:
+            - "docs/2-MANAGEMENT/sprints/sprint-{N}/retrospective.md"
+        gate:
+          id: RETROSPECTIVE_COMPLETE
+          type: quality_gate
+          enforcer: SCRUM-MASTER
+          criteria:
+            - "What went well section completed"
+            - "What needs improvement section completed"
+            - "Action items identified for next sprint"
+            - "Process documentation updated"
+            - "Retrospective report generated"
+          on_pass: velocity_tracking
+          on_fail:
+            action: return_to_phase
+            target: retrospective
+          block_message: |
+            [STOP] Cannot proceed to velocity tracking:
+            - Went well: [status]
+            - Needs improvement: [status]
+            - Action items: [status]
+            - Process docs: [status]
+            - Retrospective report: [status]
+
+      - id: velocity_tracking
+        agent: SCRUM-MASTER
+        type: metrics
+        description: "Calculate and track velocity"
+        duration: "15-30 minutes"
+        activities:
+          - "Calculate velocity (points completed)"
+          - "Update velocity history"
+          - "Calculate moving average"
+          - "Forecast future sprints"
+
+      - id: deployment_release
+        agent: DEVOPS-AGENT
+        type: deployment
+        description: "Deploy sprint deliverables to staging/production"
+        duration: "1-2 hours"
+        condition: "sprint_has_deployable_changes == true"
+        activities:
+          - "Run CI/CD pipeline"
+          - "Deploy to staging"
+          - "Run smoke tests"
+          - "Deploy to production (if approved)"
+          - "Verify deployment health"
+          - "Update deployment logs"
+        checkpoint:
+          - "CI/CD pipeline green"
+          - "Staging deployment verified"
+          - "Production deployment successful (if applicable)"
+          - "Rollback capability confirmed"
+        output:
+          deliverables:
+            - "docs/2-MANAGEMENT/sprints/sprint-{N}/deployment-report.md"
+        gate:
+          id: DEPLOYMENT_COMPLETE
+          type: quality_gate
+          enforcer: DEVOPS-AGENT
+          criteria:
+            - "CI/CD pipeline executed successfully"
+            - "Staging deployment verified"
+            - "Smoke tests passed"
+            - "Production deployment successful (if applicable)"
+            - "Rollback capability confirmed"
+            - "Deployment report generated"
+          on_pass: archive_transition
+          on_fail:
+            action: escalate
+            target: devops-agent
+          block_message: |
+            [STOP] Cannot proceed to archive:
+            - CI/CD pipeline: [status]
+            - Staging: [status]
+            - Smoke tests: [status]
+            - Production: [status]
+            - Rollback: [status]
+            - Deployment report: [status]
+
+      - id: archive_transition
+        steps:
+          - agent: TECH-WRITER
+            type: archive
+            description: "Archive sprint documentation"
+            activities:
+              - "Archive sprint documentation"
+              - "Update release notes"
+              - "Update changelog"
+              - "Archive completed stories"
+
+          - agent: ORCHESTRATOR
+            type: transition
+            description: "Reset for next sprint"
+            activities:
+              - "Reset TASK-QUEUE.md"
+              - "Update PROJECT-STATE.md"
+              - "Prepare for next sprint"
+
+  # Completion
+  - id: complete
+    type: sprint_complete
+    summary: "Sprint completed"
+    actions:
+      - "Archive sprint folder"
+      - "Update velocity metrics"
+      - "Transition to next sprint or release"
+
+    # AUTO STATE UPDATE + COMMIT (MAJOR CHECKPOINT)
+    on_complete:
+      state_update:
+        phase: "reset_development"  # Reset dev phases for next sprint
+        update_root: true
+        script: "bash scripts/sync-state.sh --phase reset_development --commit"
+      commit:
+        enabled: true
+        message: "Complete Sprint {sprint_number} - velocity {actual_velocity}/{planned_velocity}"
+
+    next_workflow:
+      options:
+        - workflow: "engineering/sprint-workflow.yaml"
+          condition: "more_sprints_planned"
+        - workflow: "engineering/release-workflow.yaml"
+          condition: "milestone_reached"
+
+# =============================================================================
+# QUALITY GATES SUMMARY
+# =============================================================================
+quality_gates:
+  # Sprint Start Phase Gates
+  SPRINT_INITIALIZED:
+    phase: sprint_start.initialization
+    enforcer: SCRUM-MASTER
+    type: quality_gate
+    blocker: "Cannot proceed to doc sync check"
+
+  DOC_SYNC_COMPLETE:
+    phase: sprint_start.doc_sync_check
+    enforcer: DOC-AUDITOR
+    type: quality_gate
+    blocker: "Cannot proceed to planning"
+
+  SPRINT_PLANNED:
+    phase: sprint_start.planning
+    enforcer: SCRUM-MASTER
+    type: approval_gate
+    blocker: "Cannot proceed to daily cycle"
+
+  # Daily Cycle Gate
+  DAILY_STANDUP_COMPLETE:
+    phase: daily_cycle.morning_standup
+    enforcer: ORCHESTRATOR
+    type: quality_gate
+    blocker: "Cannot proceed with daily work"
+
+  # Sprint End Phase Gates
+  SPRINT_REVIEW_READY:
+    phase: sprint_end.sprint_review
+    enforcer: PRODUCT-OWNER
+    type: approval_gate
+    blocker: "Cannot proceed to retrospective"
+
+  RETROSPECTIVE_COMPLETE:
+    phase: sprint_end.retrospective
+    enforcer: SCRUM-MASTER
+    type: quality_gate
+    blocker: "Cannot proceed to velocity tracking"
+
+  DEPLOYMENT_COMPLETE:
+    phase: sprint_end.deployment_release
+    enforcer: DEVOPS-AGENT
+    type: quality_gate
+    blocker: "Cannot proceed to archive"
+
+  # Legacy gate groupings (for reference)
+  _legacy_groupings:
+    start_to_daily:
+      - SPRINT_INITIALIZED
+      - DOC_SYNC_COMPLETE
+      - SPRINT_PLANNED
+
+    daily_gates:
+      - DAILY_STANDUP_COMPLETE
+
+    end_gates:
+      - SPRINT_REVIEW_READY
+      - RETROSPECTIVE_COMPLETE
+      - DEPLOYMENT_COMPLETE
+
+# Error handling
+on_error:
+  log_to: "@.claude/logs/workflows/"
+  retry_count: 1
+  escalate_to: SCRUM-MASTER
+
+error_recovery:
+  blocker_unresolved:
+    options:
+      - "Swap blocked story for another"
+      - "Reduce sprint scope"
+      - "Extend timeline (if critical)"
+
+  sprint_goal_at_risk:
+    options:
+      - "Descope non-critical stories"
+      - "Add resources (if available)"
+      - "Accept partial completion"
+
+  critical_bug:
+    action: follow_bug_workflow
+    workflow: "engineering/bug-workflow.yaml"
+    severity: critical
+
+  agent_overloaded:
+    options:
+      - "Reassign tasks"
+      - "Pair agents"
+      - "Defer lower priority items"
+
+  deployment_failed:
+    action: rollback_and_investigate
+    agent: DEVOPS-AGENT
+    options:
+      - "Rollback to previous version"
+      - "Fix and redeploy"
+      - "Defer to next sprint"
+
+  pipeline_broken:
+    action: fix_pipeline
+    agent: DEVOPS-AGENT
+
+# Metrics
+metrics:
+  sprint:
+    - velocity
+    - commitment_rate
+    - bug_rate
+    - blocker_time
+    - cycle_time
+
+  cumulative:
+    - average_velocity
+    - velocity_trend
+    - quality_score
+    - team_health
+
+  update_frequency: daily
+  store_in: "@.claude/state/METRICS.md"
+
+# Artifacts
+artifacts:
+  sprint_plan:
+    path: "docs/2-MANAGEMENT/sprints/sprint-{N}/sprint-plan.md"
+    created_by: sprint_start.planning
+
+  daily_reports:
+    path: "docs/2-MANAGEMENT/sprints/sprint-{N}/daily/"
+    created_by: daily_cycle.morning_standup
+
+  review_report:
+    path: "docs/2-MANAGEMENT/sprints/sprint-{N}/review-report.md"
+    created_by: sprint_end.sprint_review
+
+  retrospective:
+    path: "docs/2-MANAGEMENT/sprints/sprint-{N}/retrospective.md"
+    created_by: sprint_end.retrospective
+
+  deployment_report:
+    path: "docs/2-MANAGEMENT/sprints/sprint-{N}/deployment-report.md"
+    created_by: sprint_end.deployment_release

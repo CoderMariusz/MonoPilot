@@ -1,0 +1,116 @@
+# Story 01.9 - Locations CRUD (Hierarchical)
+# Type: fullstack
+# Epic: 01-settings
+# Audit Date: 2026-01-08
+
+story:
+  id: "01.9"
+  name: "Locations CRUD (Hierarchical)"
+  epic: "01-settings"
+  phase: "1A"
+  complexity: "L"
+
+audit:
+  code_exists: true
+  estimated_completion: 55
+
+  files_found:
+    migrations:
+      - path: "supabase/migrations/010_create_locations_table.sql"
+        status: "COMPLETE"
+        features:
+          - "Self-referencing parent_id for hierarchy"
+          - "location_level enum (zone, aisle, rack, bin)"
+          - "location_type enum (bulk, pallet, shelf, floor, staging)"
+          - "Computed full_path column"
+          - "Capacity tracking fields"
+          - "8 performance indexes"
+      - path: "supabase/migrations/011_locations_rls_policies.sql"
+        status: "COMPLETE"
+        policies: 4
+
+    services:
+      - path: "apps/frontend/lib/services/location-service.ts"
+        status: "PARTIAL - uses OLD flat schema"
+        implemented:
+          - "createLocation()"
+          - "updateLocation()"
+          - "getLocations()"
+          - "getLocationById()"
+          - "deleteLocation()"
+        missing:
+          - "getTree()"
+          - "getAncestors()"
+          - "getDescendants()"
+          - "moveLocation()"
+          - "validateHierarchy()"
+
+    validation:
+      - path: "apps/frontend/lib/validation/location-schemas.ts"
+        status: "COMPLETE"
+
+    components:
+      - path: "apps/frontend/components/settings/locations/LocationTree.tsx"
+        lines: 200
+        status: "EXISTS but uses wrong schema"
+      - path: "apps/frontend/components/settings/locations/LocationModal.tsx"
+        lines: 200
+        status: "EXISTS but uses wrong schema"
+      - "CapacityIndicator.tsx - incomplete"
+      - "LocationBreadcrumb.tsx - incomplete"
+
+  missing:
+    api_routes:
+      - "GET /api/settings/warehouses/:warehouseId/locations"
+      - "POST /api/settings/warehouses/:warehouseId/locations"
+      - "GET /api/settings/warehouses/:warehouseId/locations/:id"
+      - "PUT /api/settings/warehouses/:warehouseId/locations/:id"
+      - "DELETE /api/settings/warehouses/:warehouseId/locations/:id"
+      - "GET /api/settings/warehouses/:warehouseId/locations/:id/tree"
+
+    hooks:
+      - "use-location-tree.ts"
+      - "use-create-location.ts"
+      - "use-update-location.ts"
+      - "use-delete-location.ts"
+
+  tests_exist: true
+  test_files:
+    - path: "apps/frontend/lib/services/__tests__/location-service.test.ts"
+      lines: 592
+      status: "Placeholder assertions (expect(1).toBe(1))"
+
+status: PARTIAL
+
+phases:
+  P1: "COMPLETE"
+  P2: "PARTIAL (RED phase placeholders)"
+  P3: "BLOCKED - API routes missing"
+  P4: "PENDING"
+  P5: "PENDING"
+  P6: "PENDING"
+  P7: "PENDING"
+
+blockers:
+  - "NO API routes implemented"
+  - "NO hooks implemented"
+  - "Components use wrong schema (flat vs hierarchical)"
+  - "Tests are placeholder stubs"
+
+recommendation: |
+  SIGNIFICANT WORK NEEDED:
+  1. Implement 6 API routes (4-6 hours)
+  2. Implement 4 hooks (3-4 hours)
+  3. Refactor 5 components to hierarchical schema (6-8 hours)
+  4. Implement page at correct path (2-3 hours)
+  5. Write real tests (4-5 hours)
+
+  Total estimate: 26-35 hours (~1 week)
+
+next_phase: P3
+next_agent: backend-dev
+P3: ✓ backend-dev 20:47 service:6-methods api:6 hooks:4
+P4: ✓ senior-dev 21:36 refactored:3 complexity:reduced
+P5: ✓ code-reviewer 22:11 issues:2-minor decision:approved
+P6: ✓ qa-agent 22:59 ac:5/5 bugs:0 decision:pass
+P7: ✓ tech-writer 14:32 docs:updated report:done

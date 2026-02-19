@@ -1,0 +1,552 @@
+# Story 04.5 - Frontend Specification
+# Purpose: Components, hooks, types, UI patterns
+# Agent: FRONTEND-DEV (UI focus)
+
+# UX Reference
+ux:
+  wireframes:
+    - id: "PROD-007"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/PROD-007-production-settings.md"
+      sections:
+        - "All sections - Full production settings page"
+      components:
+        - "Settings Page Header"
+        - "Section Containers (7 sections)"
+        - "Toggle Settings"
+        - "Number Input Settings"
+        - "Validation Error State"
+        - "Unsaved Changes Warning Modal"
+        - "Success Toast"
+  patterns:
+    section: "Collapsible Card pattern with header icon"
+    toggle: "ShadCN Switch component"
+    number_input: "ShadCN Input with validation"
+    toast: "ShadCN Toast (sonner) for success/error"
+    modal: "ShadCN AlertDialog for unsaved changes"
+    tooltip: "ShadCN Tooltip for setting descriptions"
+    card: "ShadCN Card for section containers"
+  states:
+    - loading: "Skeleton loader for all sections"
+    - empty: "Initialize Default Settings button (new org)"
+    - error: "Error banner with retry button"
+    - success: "Toast notification on successful save"
+    - unsaved: "[Unsaved *] indicator, enabled Save button"
+    - validation_error: "Red border, inline error message"
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-production-settings.ts"
+    description: "React Query hook for fetching production settings"
+    exports:
+      - name: "useProductionSettings"
+        returns: "UseQueryResult<ProductionSettings>"
+    pattern: |
+      import { useQuery } from '@tanstack/react-query';
+      import { getProductionSettings, ProductionSettings } from '@/lib/services/production-settings-service';
+
+      export function useProductionSettings() {
+        return useQuery<ProductionSettings>({
+          queryKey: ['production-settings'],
+          queryFn: getProductionSettings,
+          staleTime: 60 * 1000, // 1 minute
+          refetchOnWindowFocus: true,
+        });
+      }
+
+  - path: "apps/frontend/lib/hooks/use-update-production-settings.ts"
+    description: "React Query mutation hook for updating production settings"
+    exports:
+      - name: "useUpdateProductionSettings"
+        returns: "UseMutationResult"
+    pattern: |
+      import { useMutation, useQueryClient } from '@tanstack/react-query';
+      import { updateProductionSettings, UpdateProductionSettingsInput, ProductionSettings } from '@/lib/services/production-settings-service';
+      import { toast } from 'sonner';
+
+      export function useUpdateProductionSettings() {
+        const queryClient = useQueryClient();
+
+        return useMutation({
+          mutationFn: (updates: UpdateProductionSettingsInput) =>
+            updateProductionSettings(updates),
+          onSuccess: (data) => {
+            toast.success('Production settings saved', {
+              description: 'Changes applied successfully',
+            });
+            queryClient.setQueryData(['production-settings'], data);
+          },
+          onError: (error: Error) => {
+            toast.error('Failed to save settings', {
+              description: error.message,
+            });
+          },
+        });
+      }
+
+# Components
+components:
+  - path: "apps/frontend/app/(authenticated)/settings/production/page.tsx"
+    description: "Production settings page"
+    type: "page"
+    pattern: |
+      'use client';
+
+      import { useProductionSettings } from '@/lib/hooks/use-production-settings';
+      import { useUpdateProductionSettings } from '@/lib/hooks/use-update-production-settings';
+      import { ProductionSettingsForm } from './components/ProductionSettingsForm';
+      import { Skeleton } from '@/components/ui/skeleton';
+      import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+      import { Button } from '@/components/ui/button';
+      import { AlertCircle, RefreshCw } from 'lucide-react';
+
+      export default function ProductionSettingsPage() {
+        const { data: settings, isLoading, error, refetch } = useProductionSettings();
+        const updateMutation = useUpdateProductionSettings();
+
+        if (isLoading) {
+          return <ProductionSettingsSkeleton />;
+        }
+
+        if (error) {
+          return (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Failed to Load Production Settings</AlertTitle>
+              <AlertDescription>
+                Unable to retrieve production configuration. Check your connection.
+                <Button variant="outline" size="sm" onClick={() => refetch()} className="ml-4">
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Retry
+                </Button>
+              </AlertDescription>
+            </Alert>
+          );
+        }
+
+        return (
+          <div className="container mx-auto py-6">
+            <div className="mb-6">
+              <h1 className="text-2xl font-bold">Production Settings</h1>
+              <p className="text-muted-foreground">
+                Configure production execution behavior including work order lifecycle,
+                material consumption, output registration, and dashboard settings.
+              </p>
+            </div>
+            <ProductionSettingsForm
+              settings={settings!}
+              onSave={(updates) => updateMutation.mutate(updates)}
+              isSaving={updateMutation.isPending}
+            />
+          </div>
+        );
+      }
+
+  - path: "apps/frontend/app/(authenticated)/settings/production/components/ProductionSettingsForm.tsx"
+    description: "Main form with all 15 settings grouped by section"
+    props:
+      - "settings: ProductionSettings"
+      - "onSave: (updates: UpdateProductionSettingsInput) => void"
+      - "isSaving: boolean"
+    pattern: |
+      'use client';
+
+      import { useState, useEffect, useMemo, useCallback } from 'react';
+      import { useRouter } from 'next/navigation';
+      import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+      import { Button } from '@/components/ui/button';
+      import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+      import { SettingsSection } from './SettingsSection';
+      import { SettingToggle } from './SettingToggle';
+      import { SettingNumberInput } from './SettingNumberInput';
+      import { settingsConfig } from './settings-config';
+      import { Badge } from '@/components/ui/badge';
+      import { Info, Save, RotateCcw } from 'lucide-react';
+      import type { ProductionSettings, UpdateProductionSettingsInput } from '@/lib/types/production-settings';
+
+      // ... full implementation with:
+      // - State management for draft settings
+      // - Unsaved changes detection
+      // - Form validation
+      // - Navigation guard (beforeunload + router events)
+      // - Reset functionality
+      // - Save functionality
+
+  - path: "apps/frontend/app/(authenticated)/settings/production/components/SettingsSection.tsx"
+    description: "Collapsible section container with title and icon"
+    props:
+      - "title: string"
+      - "icon: React.ReactNode"
+      - "phase: '0' | '1' | '2'"
+      - "enforced: boolean"
+      - "children: React.ReactNode"
+      - "defaultOpen?: boolean"
+    pattern: |
+      'use client';
+
+      import { useState } from 'react';
+      import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+      import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+      import { Badge } from '@/components/ui/badge';
+      import { ChevronDown, ChevronUp } from 'lucide-react';
+      import { cn } from '@/lib/utils';
+
+      // Collapsible section with:
+      // - Header with icon, title, phase badge
+      // - Collapse/expand toggle
+      // - Children (settings)
+
+  - path: "apps/frontend/app/(authenticated)/settings/production/components/SettingToggle.tsx"
+    description: "Reusable toggle setting component"
+    props:
+      - "label: string"
+      - "description: string"
+      - "value: boolean"
+      - "onChange: (value: boolean) => void"
+      - "default: boolean"
+      - "disabled?: boolean"
+      - "tooltip?: string"
+    pattern: |
+      'use client';
+
+      import { Switch } from '@/components/ui/switch';
+      import { Label } from '@/components/ui/label';
+      import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+      import { Info } from 'lucide-react';
+
+      // Toggle with:
+      // - Label (bold)
+      // - Description (muted)
+      // - Switch component
+      // - Default indicator
+      // - Optional tooltip
+
+  - path: "apps/frontend/app/(authenticated)/settings/production/components/SettingNumberInput.tsx"
+    description: "Reusable number input setting component with validation"
+    props:
+      - "label: string"
+      - "description: string"
+      - "value: number"
+      - "onChange: (value: number) => void"
+      - "default: number"
+      - "min: number"
+      - "max: number"
+      - "unit: string"
+      - "error?: string"
+      - "disabled?: boolean"
+    pattern: |
+      'use client';
+
+      import { Input } from '@/components/ui/input';
+      import { Label } from '@/components/ui/label';
+      import { cn } from '@/lib/utils';
+      import { AlertTriangle } from 'lucide-react';
+
+      // Number input with:
+      // - Label (bold)
+      // - Description (muted)
+      // - Input field with unit suffix
+      // - Validation error display
+      // - Default indicator
+
+  - path: "apps/frontend/app/(authenticated)/settings/production/components/settings-config.ts"
+    description: "Settings configuration - groups, labels, defaults, validation"
+    pattern: |
+      import type { SettingsGroup, SettingConfig } from '@/lib/types/production-settings';
+      import { Factory, Cog, Package, ClipboardList, LayoutDashboard, TrendingUp, Settings } from 'lucide-react';
+
+      export const settingsGroups: SettingsGroup[] = [
+        {
+          id: 'wo_execution',
+          label: 'Work Order Lifecycle',
+          phase: '0',
+          enforced: true,
+          icon: Factory,
+          settings: [
+            {
+              key: 'allow_pause_wo',
+              label: 'Allow Pause/Resume Work Orders',
+              description: 'Enable pause and resume functionality for active work orders',
+              type: 'toggle',
+              default: false,
+            },
+            {
+              key: 'auto_complete_wo',
+              label: 'Auto-Complete Work Orders',
+              description: 'Automatically complete WO when output >= planned quantity',
+              type: 'toggle',
+              default: false,
+            },
+          ],
+        },
+        {
+          id: 'operations',
+          label: 'Operations',
+          phase: '0',
+          enforced: true,
+          icon: Cog,
+          settings: [
+            {
+              key: 'require_operation_sequence',
+              label: 'Require Operation Sequence',
+              description: 'Operations must be completed in sequential order',
+              type: 'toggle',
+              default: true,
+            },
+          ],
+        },
+        {
+          id: 'material_consumption',
+          label: 'Material Consumption',
+          phase: '1',
+          enforced: false,
+          tooltip: 'Available in Phase 1 after Epic 05',
+          icon: Package,
+          settings: [
+            {
+              key: 'allow_over_consumption',
+              label: 'Allow Over-Consumption',
+              description: 'Allow material consumption to exceed BOM requirements',
+              type: 'toggle',
+              default: false,
+            },
+            {
+              key: 'enable_material_reservations',
+              label: 'Enable Material Reservations',
+              description: 'Automatically reserve materials when WO starts',
+              type: 'toggle',
+              default: true,
+            },
+          ],
+        },
+        {
+          id: 'output',
+          label: 'Output Registration',
+          phase: '1',
+          enforced: false,
+          tooltip: 'Available in Phase 1 after Epic 05',
+          icon: ClipboardList,
+          settings: [
+            {
+              key: 'require_qa_on_output',
+              label: 'Require QA Status on Output',
+              description: 'Output license plates require quality assurance status',
+              type: 'toggle',
+              default: true,
+            },
+            {
+              key: 'auto_create_by_product_lp',
+              label: 'Auto-Create By-Product License Plates',
+              description: 'Automatically create LPs for by-products during output registration',
+              type: 'toggle',
+              default: true,
+            },
+          ],
+        },
+        {
+          id: 'dashboard',
+          label: 'Dashboard',
+          phase: '0',
+          enforced: true,
+          icon: LayoutDashboard,
+          settings: [
+            {
+              key: 'dashboard_refresh_seconds',
+              label: 'Dashboard Refresh Interval (seconds)',
+              description: 'How often the dashboard auto-refreshes (min: 5s, max: 300s)',
+              type: 'number',
+              default: 30,
+              validation: {
+                min: 5,
+                max: 300,
+                errorMin: 'Refresh interval must be at least 5 seconds',
+                errorMax: 'Refresh interval cannot exceed 300 seconds',
+              },
+            },
+            {
+              key: 'show_material_alerts',
+              label: 'Show Material Shortage Alerts',
+              description: 'Display alerts when materials are insufficient for WO',
+              type: 'toggle',
+              default: true,
+            },
+            {
+              key: 'show_delay_alerts',
+              label: 'Show Work Order Delay Alerts',
+              description: 'Display alerts when work orders are past due date',
+              type: 'toggle',
+              default: true,
+            },
+            {
+              key: 'show_quality_alerts',
+              label: 'Show Quality Hold Alerts',
+              description: 'Display alerts when output is placed on quality hold',
+              type: 'toggle',
+              default: true,
+            },
+          ],
+        },
+        {
+          id: 'oee',
+          label: 'OEE & Downtime (Phase 2)',
+          phase: '2',
+          enforced: false,
+          tooltip: 'Available in Phase 2 - OEE Module',
+          icon: TrendingUp,
+          settings: [
+            {
+              key: 'enable_oee_tracking',
+              label: 'Enable OEE Tracking',
+              description: 'Enable Overall Equipment Effectiveness calculation',
+              type: 'toggle',
+              default: false,
+            },
+            {
+              key: 'target_oee_percent',
+              label: 'Target OEE Percentage',
+              description: 'Target OEE % displayed on dashboards (min: 0, max: 100)',
+              type: 'number',
+              default: 85,
+              validation: {
+                min: 0,
+                max: 100,
+                errorMin: 'Target OEE must be at least 0',
+                errorMax: 'Target OEE cannot exceed 100',
+              },
+            },
+            {
+              key: 'enable_downtime_tracking',
+              label: 'Enable Downtime Tracking',
+              description: 'Track and categorize machine downtime events',
+              type: 'toggle',
+              default: false,
+            },
+          ],
+        },
+        {
+          id: 'advanced',
+          label: 'Advanced',
+          phase: '1',
+          enforced: false,
+          icon: Settings,
+          settings: [
+            {
+              key: 'allow_partial_lp_consumption',
+              label: 'Allow Partial License Plate Consumption',
+              description: 'Allow consuming partial quantities from license plates',
+              type: 'toggle',
+              default: true,
+            },
+          ],
+        },
+      ];
+
+  - path: "apps/frontend/app/(authenticated)/settings/production/components/UnsavedChangesModal.tsx"
+    description: "Modal warning when navigating away with unsaved changes"
+    props:
+      - "open: boolean"
+      - "onCancel: () => void"
+      - "onDiscard: () => void"
+      - "onSave: () => void"
+      - "changedSettings: string[]"
+    pattern: |
+      'use client';
+
+      import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+      import { Button } from '@/components/ui/button';
+
+      // Modal with:
+      // - Title: "Unsaved Changes"
+      // - Message: "You have unsaved production setting changes. Leave without saving?"
+      // - Changed list: Bullet list of changed settings
+      // - Actions: [Cancel] [Discard] [Save & Leave]
+
+# Page Route
+pages:
+  - path: "apps/frontend/app/(authenticated)/settings/production/page.tsx"
+    description: "Production settings page"
+    route: "/settings/production"
+
+# Component File Structure
+file_structure: |
+  apps/frontend/
+    app/(authenticated)/settings/production/
+      page.tsx                                # Main settings page
+      components/
+        ProductionSettingsForm.tsx            # Main form with sections
+        SettingsSection.tsx                   # Collapsible section container
+        SettingToggle.tsx                     # Toggle component
+        SettingNumberInput.tsx                # Number input component
+        UnsavedChangesModal.tsx               # Unsaved changes warning
+        settings-config.ts                    # Settings configuration
+
+    lib/services/
+      production-settings-service.ts          # Service functions
+
+    lib/hooks/
+      use-production-settings.ts              # Query hook
+      use-update-production-settings.ts       # Mutation hook
+
+    lib/types/
+      production-settings.ts                  # TypeScript interfaces
+
+    lib/validation/
+      production-settings.ts                  # Zod schemas
+
+# UI/UX Notes
+ui_notes:
+  section_icons:
+    wo_execution: "Factory"
+    operations: "Cog"
+    material_consumption: "Package"
+    output: "ClipboardList"
+    dashboard: "LayoutDashboard"
+    oee: "TrendingUp"
+    advanced: "Settings"
+
+  phase_badges:
+    phase_0: "bg-green-100 text-green-800 (Enforced)"
+    phase_1: "bg-yellow-100 text-yellow-800 (Phase 1)"
+    phase_2: "bg-blue-100 text-blue-800 (Phase 2)"
+
+  toggle_states:
+    on: "bg-green-500 (ON indicator)"
+    off: "bg-gray-300 (OFF indicator)"
+
+  number_input_states:
+    valid: "border-gray-300"
+    invalid: "border-red-500 with error message below"
+
+  loading_states:
+    page: "Skeleton loaders for all sections"
+    save: "Loading spinner on Save button, disable form"
+
+  unsaved_indicator:
+    location: "Page header, next to title"
+    text: "[Unsaved *]"
+    style: "Badge with yellow background"
+
+  toast_notifications:
+    success:
+      title: "Production settings saved"
+      description: "Changes applied successfully"
+      duration: 3000
+    error:
+      title: "Failed to save settings"
+      description: "{error message}"
+      duration: 5000
+
+  accessibility:
+    keyboard_nav: "Tab through sections, settings, buttons"
+    aria_labels: "All toggles, inputs, buttons have labels"
+    focus_management: "Focus returns to trigger after modal closes"
+    screen_reader: "Setting changes announced"
+
+  responsive:
+    desktop: "Full page layout with side-by-side sections"
+    tablet: "Stacked sections"
+    mobile: "Full-width sections, larger touch targets"
+
+  info_banner:
+    text: "Changes to these settings affect all users in your organization."
+    icon: "Info"
+    position: "Above footer/save button"

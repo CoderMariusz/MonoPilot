@@ -1,0 +1,465 @@
+# Story 07.16 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+base_path: "/api/shipping/rma"
+
+endpoints:
+  - method: "GET"
+    path: "/api/shipping/rma"
+    description: "List RMAs with filters and search"
+    file: "apps/frontend/app/api/shipping/rma/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    query_params:
+      - { name: "status", type: "string", enum: ["pending", "approved", "receiving", "received", "processed", "closed"], required: false }
+      - { name: "customer_id", type: "string", format: "UUID", required: false }
+      - { name: "reason_code", type: "string", enum: ["damaged", "expired", "wrong_product", "quality_issue", "customer_change", "other"], required: false }
+      - { name: "search", type: "string", required: false, description: "Search by RMA number or customer name (min 2 chars)" }
+      - { name: "date_from", type: "string", format: "ISO-8601", required: false }
+      - { name: "date_to", type: "string", format: "ISO-8601", required: false }
+      - { name: "sort_by", type: "string", enum: ["rma_number", "created_at", "customer_name", "status"], default: "created_at" }
+      - { name: "sort_order", type: "string", enum: ["asc", "desc"], default: "desc" }
+      - { name: "page", type: "integer", default: 1, min: 1 }
+      - { name: "limit", type: "integer", default: 20, min: 1, max: 100 }
+
+    response:
+      status: 200
+      type: "PaginatedResult<RMAListItem>"
+      schema:
+        rmas:
+          - id: "UUID"
+            rma_number: "string (RMA-YYYY-NNNNN)"
+            customer_id: "UUID"
+            customer_name: "string"
+            status: "enum"
+            reason_code: "enum"
+            total_value: "decimal"
+            line_count: "integer"
+            created_at: "ISO-8601"
+        pagination:
+          total: "integer"
+          page: "integer"
+          limit: "integer"
+          pages: "integer"
+        stats:
+          pending_count: "integer"
+          approved_count: "integer"
+          total_count: "integer"
+
+    errors:
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+      - { status: 400, code: "INVALID_QUERY", message: "Invalid query parameters" }
+
+  - method: "GET"
+    path: "/api/shipping/rma/:id"
+    description: "Get RMA detail with lines and metadata"
+    file: "apps/frontend/app/api/shipping/rma/[id]/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    response:
+      status: 200
+      type: "RMADetailResponse"
+      schema:
+        rma:
+          id: "UUID"
+          org_id: "UUID"
+          rma_number: "string"
+          customer_id: "UUID"
+          customer_name: "string"
+          sales_order_id: "UUID | null"
+          sales_order_number: "string | null"
+          reason_code: "enum"
+          disposition: "enum | null"
+          status: "enum"
+          notes: "string | null"
+          total_value: "decimal | null"
+          approved_at: "ISO-8601 | null"
+          approved_by_id: "UUID | null"
+          approved_by_name: "string | null"
+          created_at: "ISO-8601"
+          created_by_id: "UUID"
+          created_by_name: "string"
+          updated_at: "ISO-8601"
+        lines:
+          - id: "UUID"
+            product_id: "UUID"
+            product_name: "string"
+            quantity_expected: "decimal"
+            quantity_received: "decimal"
+            lot_number: "string | null"
+            reason_notes: "string | null"
+            disposition: "enum | null"
+        permissions:
+          can_edit: "boolean (pending status only)"
+          can_delete: "boolean (pending status only)"
+          can_approve: "boolean (MANAGER+ role only, pending status)"
+          can_close: "boolean (MANAGER+ role only)"
+          can_add_lines: "boolean (pending status only)"
+
+    errors:
+      - { status: 404, code: "NOT_FOUND", message: "RMA not found" }
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+
+  - method: "POST"
+    path: "/api/shipping/rma"
+    description: "Create new RMA request"
+    file: "apps/frontend/app/api/shipping/rma/route.ts"
+    auth: "required"
+    roles: ["SHIPPER", "MANAGER", "ADMIN"]
+
+    request:
+      type: "CreateRMARequest"
+      schema:
+        customer_id:
+          type: "UUID"
+          required: true
+          description: "Customer requesting return"
+        sales_order_id:
+          type: "UUID"
+          required: false
+          description: "Optional link to original sales order"
+        reason_code:
+          type: "enum"
+          enum: ["damaged", "expired", "wrong_product", "quality_issue", "customer_change", "other"]
+          required: true
+        disposition:
+          type: "enum"
+          enum: ["restock", "scrap", "quality_hold", "rework"]
+          required: false
+          description: "If null, will be suggested based on reason_code"
+        notes:
+          type: "string"
+          max_length: 2000
+          required: false
+        lines:
+          type: "array<RMALineInput>"
+          required: true
+          min_items: 1
+          description: "At least one line item required"
+          schema:
+            product_id:
+              type: "UUID"
+              required: true
+            quantity_expected:
+              type: "decimal"
+              required: true
+              min: 0.0001
+              max: 999999.9999
+            lot_number:
+              type: "string"
+              max_length: 100
+              required: false
+            reason_notes:
+              type: "string"
+              max_length: 500
+              required: false
+            disposition:
+              type: "enum"
+              enum: ["restock", "scrap", "quality_hold", "rework"]
+              required: false
+              description: "Line-level override of RMA disposition"
+
+    response:
+      status: 201
+      type: "RMADetailResponse"
+      schema:
+        rma: "Full RMA object with generated RMA number"
+        lines: "Array of created RMA lines"
+        permissions: "User permissions for this RMA"
+
+    errors:
+      - { status: 400, code: "VALIDATION_ERROR", message: "Invalid input", details: "Field-level errors" }
+      - { status: 400, code: "CUSTOMER_NOT_FOUND", message: "Customer does not exist" }
+      - { status: 400, code: "PRODUCT_NOT_FOUND", message: "One or more products not found" }
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+      - { status: 403, code: "FORBIDDEN", message: "Insufficient permissions" }
+
+  - method: "PUT"
+    path: "/api/shipping/rma/:id"
+    description: "Update RMA (pending status only)"
+    file: "apps/frontend/app/api/shipping/rma/[id]/route.ts"
+    auth: "required"
+    roles: ["SHIPPER", "MANAGER", "ADMIN"]
+
+    request:
+      type: "UpdateRMARequest"
+      schema:
+        reason_code:
+          type: "enum"
+          required: false
+        disposition:
+          type: "enum"
+          required: false
+        notes:
+          type: "string"
+          max_length: 2000
+          required: false
+
+    response:
+      status: 200
+      type: "RMADetailResponse"
+
+    errors:
+      - { status: 400, code: "INVALID_STATUS", message: "Cannot edit non-pending RMA" }
+      - { status: 404, code: "NOT_FOUND", message: "RMA not found" }
+      - { status: 403, code: "FORBIDDEN", message: "Insufficient permissions" }
+
+  - method: "DELETE"
+    path: "/api/shipping/rma/:id"
+    description: "Delete RMA (pending status only, cascade deletes lines)"
+    file: "apps/frontend/app/api/shipping/rma/[id]/route.ts"
+    auth: "required"
+    roles: ["SHIPPER", "MANAGER", "ADMIN"]
+
+    response:
+      status: 204
+      schema: "No content"
+
+    errors:
+      - { status: 400, code: "INVALID_STATUS", message: "Cannot delete non-pending RMA" }
+      - { status: 404, code: "NOT_FOUND", message: "RMA not found" }
+      - { status: 403, code: "FORBIDDEN", message: "Insufficient permissions" }
+
+  - method: "POST"
+    path: "/api/shipping/rma/:id/lines"
+    description: "Add line to RMA (pending status only)"
+    file: "apps/frontend/app/api/shipping/rma/[id]/lines/route.ts"
+    auth: "required"
+    roles: ["SHIPPER", "MANAGER", "ADMIN"]
+
+    request:
+      type: "RMALineInput"
+      schema:
+        product_id:
+          type: "UUID"
+          required: true
+        quantity_expected:
+          type: "decimal"
+          required: true
+          min: 0.0001
+        lot_number:
+          type: "string"
+          max_length: 100
+          required: false
+        reason_notes:
+          type: "string"
+          max_length: 500
+          required: false
+        disposition:
+          type: "enum"
+          required: false
+
+    response:
+      status: 201
+      type: "RMALineWithProduct"
+      schema:
+        id: "UUID"
+        product_id: "UUID"
+        product_name: "string"
+        quantity_expected: "decimal"
+        quantity_received: "decimal"
+        lot_number: "string | null"
+        reason_notes: "string | null"
+        disposition: "enum | null"
+
+    errors:
+      - { status: 400, code: "INVALID_STATUS", message: "Cannot modify non-pending RMA" }
+      - { status: 404, code: "RMA_NOT_FOUND", message: "RMA not found" }
+      - { status: 404, code: "PRODUCT_NOT_FOUND", message: "Product not found" }
+
+  - method: "PUT"
+    path: "/api/shipping/rma/:id/lines/:lineId"
+    description: "Update RMA line (pending RMA only)"
+    file: "apps/frontend/app/api/shipping/rma/[id]/lines/[lineId]/route.ts"
+    auth: "required"
+    roles: ["SHIPPER", "MANAGER", "ADMIN"]
+
+    request:
+      type: "UpdateRMALineInput"
+      schema:
+        quantity_expected:
+          type: "decimal"
+          required: false
+        lot_number:
+          type: "string"
+          required: false
+        reason_notes:
+          type: "string"
+          required: false
+        disposition:
+          type: "enum"
+          required: false
+
+    response:
+      status: 200
+      type: "RMALineWithProduct"
+
+    errors:
+      - { status: 400, code: "INVALID_STATUS", message: "Cannot modify non-pending RMA" }
+
+  - method: "DELETE"
+    path: "/api/shipping/rma/:id/lines/:lineId"
+    description: "Delete RMA line (pending RMA only)"
+    file: "apps/frontend/app/api/shipping/rma/[id]/lines/[lineId]/route.ts"
+    auth: "required"
+    roles: ["SHIPPER", "MANAGER", "ADMIN"]
+
+    response:
+      status: 204
+      schema: "No content"
+
+    errors:
+      - { status: 400, code: "INVALID_STATUS", message: "Cannot modify non-pending RMA" }
+
+  - method: "POST"
+    path: "/api/shipping/rma/:id/approve"
+    description: "Approve RMA (pending → approved, MANAGER+ only)"
+    file: "apps/frontend/app/api/shipping/rma/[id]/approve/route.ts"
+    auth: "required"
+    roles: ["MANAGER", "ADMIN"]
+
+    request:
+      type: "ApproveRMARequest"
+      schema:
+        confirmation:
+          type: "boolean"
+          required: true
+          description: "Must be true to proceed"
+
+    response:
+      status: 200
+      type: "RMADetailResponse"
+      schema:
+        rma:
+          status: "approved"
+          approved_at: "ISO-8601 (current timestamp)"
+          approved_by_id: "UUID (current user)"
+          approved_by_name: "string (current user)"
+
+    errors:
+      - { status: 400, code: "INVALID_STATUS", message: "RMA is not pending" }
+      - { status: 400, code: "NO_LINES", message: "RMA must have at least one line" }
+      - { status: 404, code: "NOT_FOUND", message: "RMA not found" }
+      - { status: 403, code: "FORBIDDEN", message: "Only MANAGER+ can approve" }
+
+  - method: "POST"
+    path: "/api/shipping/rma/:id/close"
+    description: "Close RMA (final status, MANAGER+ only)"
+    file: "apps/frontend/app/api/shipping/rma/[id]/close/route.ts"
+    auth: "required"
+    roles: ["MANAGER", "ADMIN"]
+
+    request:
+      type: "CloseRMARequest"
+      schema:
+        confirmation:
+          type: "boolean"
+          required: true
+          description: "Must be true to proceed"
+
+    response:
+      status: 200
+      type: "RMADetailResponse"
+      schema:
+        rma:
+          status: "closed"
+
+    errors:
+      - { status: 400, code: "INVALID_STATUS", message: "RMA cannot be closed from current status" }
+      - { status: 404, code: "NOT_FOUND", message: "RMA not found" }
+      - { status: 403, code: "FORBIDDEN", message: "Only MANAGER+ can close" }
+
+# Request/Response Schemas (Zod)
+schemas:
+  CreateRMARequest:
+    - "customer_id: UUID (required)"
+    - "sales_order_id: UUID (optional)"
+    - "reason_code: enum (required)"
+    - "disposition: enum (optional)"
+    - "notes: string (optional, max 2000)"
+    - "lines: RMALineInput[] (required, min 1)"
+
+  RMALineInput:
+    - "product_id: UUID (required)"
+    - "quantity_expected: decimal (required, > 0)"
+    - "lot_number: string (optional, max 100)"
+    - "reason_notes: string (optional, max 500)"
+    - "disposition: enum (optional)"
+
+  RMADetailResponse:
+    - "rma: Full RMA object"
+    - "lines: Array of RMA lines with product info"
+    - "permissions: User action permissions"
+
+# Error Response Format
+error_response:
+  schema:
+    success: "boolean (false)"
+    error:
+      code: "string (VALIDATION_ERROR, NOT_FOUND, FORBIDDEN, etc.)"
+      message: "string (human-readable)"
+      details: "object (field-level errors if applicable)"
+    timestamp: "ISO-8601"
+    path: "string (request path)"
+
+# Status Codes
+status_codes:
+  2xx_success:
+    - "200: Successful GET/PUT"
+    - "201: Successful POST (create)"
+    - "204: Successful DELETE"
+  4xx_client_error:
+    - "400: Validation error or invalid state"
+    - "401: Unauthorized (missing/invalid auth)"
+    - "403: Forbidden (insufficient permissions)"
+    - "404: Resource not found"
+  5xx_server_error:
+    - "500: Internal server error"
+
+# Rate Limiting
+rate_limiting:
+  list_endpoint: "100 requests per minute"
+  write_endpoints: "30 requests per minute"
+  reason: "Prevent abuse while allowing normal operations"
+
+# Performance Requirements
+performance:
+  list_response_time: "< 500ms (20 items)"
+  detail_response_time: "< 300ms"
+  create_response_time: "< 1s"
+  approval_response_time: "< 500ms"
+  delete_response_time: "< 500ms"
+
+# Authentication & Authorization
+auth:
+  pattern: "Supabase JWT + RLS"
+  required: true
+  roles_required:
+    GET: "any authenticated user"
+    POST: "SHIPPER, MANAGER, ADMIN"
+    PUT: "SHIPPER, MANAGER, ADMIN (pending only)"
+    DELETE: "SHIPPER, MANAGER, ADMIN (pending only)"
+    approve: "MANAGER, ADMIN"
+    close: "MANAGER, ADMIN"
+
+# Validation Rules
+validation:
+  rma_number:
+    - "Auto-generated, read-only"
+  customer_id:
+    - "Required, must exist and belong to org"
+  reason_code:
+    - "Required, must be valid enum"
+  disposition:
+    - "Optional, if null will be suggested based on reason_code"
+  lines:
+    - "Minimum 1 line required"
+    - "No duplicate products in single RMA"
+    - "quantity_expected must be > 0"
+  status:
+    - "pending: Draft, fully editable"
+    - "approved: Locked, cannot edit"
+    - "Can only approve pending RMA with at least 1 line"

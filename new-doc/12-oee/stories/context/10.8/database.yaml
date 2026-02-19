@@ -1,0 +1,49 @@
+# Story 10.8 - Database Schema
+# Energy Consumption Tracking
+
+migrations:
+  - path: "supabase/migrations/XXX_create_energy_tracking.sql"
+
+tables:
+  - name: "energy_readings"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id)" }
+      - { name: "machine_id", type: "UUID", constraints: "REFERENCES machines(id)" }
+      - { name: "line_id", type: "UUID", constraints: "REFERENCES production_lines(id)" }
+      - { name: "reading_time", type: "TIMESTAMPTZ", constraints: "NOT NULL" }
+      - { name: "kwh_consumed", type: "DECIMAL(10,2)", constraints: "NOT NULL" }
+      - { name: "meter_reading", type: "DECIMAL(12,2)", constraints: "" }
+      - { name: "work_order_id", type: "UUID", constraints: "REFERENCES work_orders(id)" }
+      - { name: "reading_type", type: "TEXT", constraints: "CHECK (reading_type IN ('manual', 'auto', 'calculated'))" }
+      - { name: "source", type: "TEXT", constraints: "" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT now()" }
+    rls: true
+    indexes:
+      - "idx_energy_org_time ON energy_readings(org_id, reading_time DESC)"
+      - "idx_energy_machine ON energy_readings(machine_id, reading_time DESC)"
+
+  - name: "energy_baselines"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL" }
+      - { name: "machine_id", type: "UUID", constraints: "REFERENCES machines(id)" }
+      - { name: "product_id", type: "UUID", constraints: "REFERENCES products(id)" }
+      - { name: "baseline_kwh_per_unit", type: "DECIMAL(10,4)", constraints: "" }
+      - { name: "baseline_kwh_per_hour", type: "DECIMAL(10,2)", constraints: "" }
+      - { name: "effective_date", type: "DATE", constraints: "NOT NULL" }
+      - { name: "notes", type: "TEXT", constraints: "" }
+    rls: true
+
+  - name: "energy_costs"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL" }
+      - { name: "rate_per_kwh", type: "DECIMAL(8,4)", constraints: "NOT NULL" }
+      - { name: "effective_date", type: "DATE", constraints: "NOT NULL" }
+      - { name: "time_of_day_rate", type: "JSONB", constraints: "" }
+      - { name: "rate_type", type: "TEXT", constraints: "CHECK (rate_type IN ('flat', 'peak_offpeak', 'tiered'))" }
+    rls: true
+
+rls_policies:
+  pattern: "ADR-013"

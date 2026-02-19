@@ -1,0 +1,63 @@
+# Story 10.13 - Frontend Specification
+# Purpose: Report builder UI components
+# Agent: FRONTEND-DEV
+
+components:
+  - path: "apps/frontend/components/oee/reports/ReportBuilder.tsx"
+    description: "Main report builder interface"
+    features:
+      - "Drag-and-drop metric selection"
+      - "Dimension selector"
+      - "Filter configuration panel"
+      - "Chart type picker"
+      - "Preview button"
+
+  - path: "apps/frontend/components/oee/reports/MetricSelector.tsx"
+    description: "Draggable metric selection panel"
+    metrics:
+      - { id: "oee", label: "OEE %" }
+      - { id: "availability", label: "Availability %" }
+      - { id: "performance", label: "Performance %" }
+      - { id: "quality", label: "Quality %" }
+      - { id: "downtime", label: "Downtime (min)" }
+      - { id: "output", label: "Output (units)" }
+      - { id: "energy", label: "Energy (kWh)" }
+
+  - path: "apps/frontend/components/oee/reports/DimensionSelector.tsx"
+    description: "Dimension selection panel"
+    dimensions:
+      - { id: "machine", label: "Machine" }
+      - { id: "line", label: "Production Line" }
+      - { id: "shift", label: "Shift" }
+      - { id: "product", label: "Product" }
+      - { id: "date", label: "Date" }
+
+  - path: "apps/frontend/components/oee/reports/ReportPreview.tsx"
+    description: "Report preview with selected chart type"
+
+  - path: "apps/frontend/components/oee/reports/TemplateLibrary.tsx"
+    description: "List of saved templates"
+
+  - path: "apps/frontend/components/oee/reports/SaveTemplateModal.tsx"
+    description: "Modal to save report as template"
+
+pages:
+  - path: "apps/frontend/app/(authenticated)/oee/reports/builder/page.tsx"
+    route: "/oee/reports/builder"
+    title: "Report Builder"
+
+  - path: "apps/frontend/app/(authenticated)/oee/reports/templates/page.tsx"
+    route: "/oee/reports/templates"
+    title: "My Report Templates"
+
+hooks:
+  - path: "apps/frontend/lib/hooks/use-report-builder.ts"
+    exports:
+      - "useReportTemplates"
+      - "useCreateTemplate"
+      - "useGenerateReport"
+
+ux:
+  patterns:
+    drag_drop: "React DnD or similar"
+    chart: "Recharts for preview"

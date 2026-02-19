@@ -1,0 +1,527 @@
+# Story 06.5 - Testing Specification
+# Purpose: Acceptance criteria, test scenarios, E2E test steps
+# Agent: QA-AGENT (testing focus)
+
+# Acceptance Criteria (Given/When/Then format)
+acceptance_criteria:
+  - id: "AC-1"
+    title: "Inspection Table Creation"
+    description: "quality_inspections table exists with all required columns"
+    gherkin: |
+      Scenario: quality_inspections table schema
+        Given database migration runs
+        When schema is inspected
+        Then quality_inspections table has all required columns
+        And UNIQUE constraint exists on (org_id, inspection_number)
+        And FK constraints exist for all references
+        And RLS policies enforce org isolation
+
+  - id: "AC-2"
+    title: "Inspection Number Auto-Generation"
+    description: "Generate unique inspection numbers with type-specific prefix"
+    gherkin: |
+      Scenario: Generate inspection number
+        Given organization exists
+        When incoming inspection created
+        Then inspection_number format is 'INS-INC-2025-00001'
+        And next incoming inspection gets 'INS-INC-2025-00002'
+        And year resets sequence (first 2026 = 'INS-INC-2026-00001')
+
+      Scenario: Inspection number uniqueness
+        Given inspection 'INS-INC-2025-00001' exists in org A
+        When creating another with same number in org A
+        Then system returns 409 Conflict error
+
+  - id: "AC-3"
+    title: "Manual Inspection Creation"
+    description: "Create inspection manually with validation"
+    gherkin: |
+      Scenario: Create inspection manually
+        Given user navigates to incoming inspection queue
+        When user selects Product, LP, Specification, Priority
+        And clicks [Create]
+        Then inspection created with status = 'scheduled'
+        And inspection_number auto-generated
+        And success toast shown
+
+      Scenario: Validation - LP already has active inspection
+        Given LP00000001 has inspection with status = 'scheduled'
+        When attempting to create another inspection for same LP
+        Then warning shown: "LP already has a pending inspection"
+        And user can choose to proceed or cancel
+
+  - id: "AC-4"
+    title: "Inspection Queue Display"
+    description: "Incoming inspection queue loads with filters"
+    gherkin: |
+      Scenario: Incoming inspection queue loads
+        Given user navigates to Quality > Inspections > Incoming
+        When page loads
+        Then DataTable displays inspections with columns:
+          | Inspection # | LP Number | Product | Batch | Status | Priority | Inspector | Actions |
+        And list loads within 500ms
+        And pagination available (20 per page)
+
+      Scenario: Filter by status
+        Given inspections exist with various statuses
+        When user filters by status = 'scheduled'
+        Then only scheduled inspections display
+        And URL updates with filter state
+
+  - id: "AC-5"
+    title: "Inspector Assignment"
+    description: "Assign inspector to inspection"
+    gherkin: |
+      Scenario: Assign inspector to scheduled inspection
+        Given inspection with status = 'scheduled' and inspector_id = NULL
+        When QA Manager clicks [Assign]
+        Then modal shows list of QA_INSPECTOR and QA_MANAGER users
+        And user selects inspector and clicks [Assign]
+        Then inspection.inspector_id updated
+        And inspection.assigned_at = now
+        And notification sent to assigned inspector
+
+      Scenario: Cannot assign completed inspection
+        Given inspection with status = 'completed'
+        Then [Assign] button disabled
+        And tooltip shows "Cannot reassign completed inspection"
+
+  - id: "AC-6"
+    title: "Start Inspection Workflow"
+    description: "Start inspection (scheduled → in_progress)"
+    gherkin: |
+      Scenario: Start inspection
+        Given inspection with status = 'scheduled'
+        And inspector_id = current user
+        When user clicks [Start Inspection]
+        Then status changes to 'in_progress'
+        And started_at = now
+        And user redirected to inspection detail page
+
+      Scenario: Cannot start without inspector
+        Given inspection with inspector_id = NULL
+        When viewing inspection
+        Then [Start] disabled
+        And message "Assign inspector before starting"
+
+  - id: "AC-7"
+    title: "Inspection Detail Page"
+    description: "View inspection details with test results"
+    gherkin: |
+      Scenario: View inspection detail
+        Given inspection INS-INC-2025-00001 exists
+        When user navigates to /quality/inspections/INS-INC-2025-00001
+        Then page displays:
+          | Section | Content |
+          | Header | Inspection #, Status badge, Priority badge |
+          | Source | GRN link, PO link, Supplier |
+          | Product | Product name, code, LP number with link |
+          | Test Results | Grid of parameters and results |
+          | Actions | Based on status and permissions |
+
+  - id: "AC-8"
+    title: "Complete Inspection - Pass"
+    description: "Complete inspection with pass result"
+    gherkin: |
+      Scenario: Complete inspection with pass result
+        Given inspection in_progress with all tests recorded
+        And all test results status = 'pass'
+        When user clicks [Complete Inspection]
+        Then result determination modal shows:
+          | Suggested Result | PASS |
+        And user confirms with result = 'pass'
+        Then inspection.status = 'completed'
+        And inspection.result = 'pass'
+        And LP.qa_status updated to 'passed'
+        And success toast shown
+
+  - id: "AC-9"
+    title: "Complete Inspection - Fail"
+    description: "Complete inspection with fail result"
+    gherkin: |
+      Scenario: Complete inspection with fail result
+        Given inspection in_progress
+        And some test results status = 'fail'
+        When user clicks [Complete Inspection]
+        Then suggested result = 'FAIL'
+        And user confirms with result = 'fail'
+        Then inspection.result = 'fail'
+        And LP.qa_status updated to 'failed'
+        And LP blocked from consumption
+        And prompt: "Create NCR for failed inspection?"
+
+  - id: "AC-10"
+    title: "Complete Inspection - Conditional"
+    description: "Complete inspection with conditional result"
+    gherkin: |
+      Scenario: Complete inspection with conditional result
+        Given inspection in_progress
+        When user clicks [Complete Inspection]
+        And selects result = 'conditional'
+        Then additional fields appear:
+          | Conditional Reason | required |
+          | Usage Restrictions | required |
+          | Expires At | optional |
+        And user fills conditional details
+        Then inspection.result = 'conditional'
+        And LP.qa_status = 'conditional'
+
+  - id: "AC-11"
+    title: "Permission Enforcement"
+    description: "Role-based access control"
+    gherkin: |
+      Scenario: Viewer can view but not create
+        Given user with VIEWER role
+        When viewing inspection queue
+        Then [+ New Inspection] button hidden
+        And can click to view inspection detail
+        And [Start], [Complete], [Assign] buttons hidden
+
+      Scenario: QA Inspector can inspect
+        Given user with QA_INSPECTOR role
+        When viewing inspection queue
+        Then can create, start, record results, complete (pass/fail)
+        And cannot approve conditional without QA_MANAGER
+
+  - id: "AC-12"
+    title: "RLS Policy Enforcement"
+    description: "Multi-tenancy isolation"
+    gherkin: |
+      Scenario: Org isolation on inspection list
+        Given User A from Org A and User B from Org B
+        When User A requests GET /api/quality/inspections
+        Then only Org A inspections returned
+
+      Scenario: Cannot view inspection from different org
+        Given inspection belongs to Org B
+        When User A (Org A) requests GET /api/quality/inspections/:id
+        Then 404 Not Found returned
+
+  - id: "AC-13"
+    title: "Performance Requirements"
+    description: "Response times and scalability"
+    gherkin: |
+      Scenario: Inspection queue performance
+        Given 1000 inspections in organization
+        When listing incoming inspections with pagination
+        Then response time < 500ms
+
+      Scenario: Inspection detail performance
+        Given inspection with 50 test results
+        When loading inspection detail page
+        Then response time < 500ms
+
+      Scenario: Inspection creation performance
+        Given valid inspection data
+        When creating inspection
+        Then operation completes < 300ms
+
+# Unit Test Specifications
+unit_tests:
+  - file: "apps/frontend/lib/services/__tests__/inspection-service.test.ts"
+    description: "InspectionService unit tests"
+    test_cases:
+      - name: "list() - returns paginated inspections"
+        given: "valid params"
+        when: "called"
+        then: "returns PaginatedResult with inspections array"
+
+      - name: "list() - applies filters"
+        given: "inspection_type='incoming' filter"
+        when: "called"
+        then: "only returns incoming inspections"
+
+      - name: "create() - generates inspection number"
+        given: "valid CreateInspectionInput"
+        when: "called"
+        then: "inspection_number has format INS-INC-2025-NNNNN"
+
+      - name: "create() - validates product exists"
+        given: "invalid product_id"
+        when: "called"
+        then: "throws error"
+
+      - name: "assign() - assigns inspector"
+        given: "inspection and inspector_id"
+        when: "called"
+        then: "updates inspector_id, assigned_at, assigned_by"
+
+      - name: "start() - changes status to in_progress"
+        given: "scheduled inspection"
+        when: "called"
+        then: "status='in_progress', started_at=now"
+
+      - name: "complete() - updates LP QA status on pass"
+        given: "inspection with result=pass and lp_id"
+        when: "called"
+        then: "LP.qa_status updated to 'passed'"
+
+      - name: "complete() - updates LP QA status on fail"
+        given: "inspection with result=fail and lp_id"
+        when: "called"
+        then: "LP.qa_status updated to 'failed'"
+
+      - name: "getSuggestedResult() - suggests pass when all tests pass"
+        given: "inspection with all passed test results"
+        when: "called"
+        then: "returns { suggested: 'pass', reason: 'All parameters passed' }"
+
+      - name: "getSuggestedResult() - suggests fail on critical defect"
+        given: "critical_defects > 0"
+        when: "called"
+        then: "returns { suggested: 'fail', reason: 'Critical defect detected' }"
+
+      - name: "canComplete() - validates all tests recorded"
+        given: "inspection with spec but no test results"
+        when: "called"
+        then: "returns { canComplete: false, missingTests: [...] }"
+
+      - name: "hasActiveInspection() - detects active inspection"
+        given: "LP with scheduled inspection"
+        when: "called with lp_id"
+        then: "returns { has: true, inspectionId: '...' }"
+
+  - file: "apps/frontend/lib/validation/__tests__/inspection.test.ts"
+    description: "Zod schema validation tests"
+    test_cases:
+      - name: "createInspectionSchema - validates product_id"
+        given: "missing product_id"
+        when: "schema.parse() called"
+        then: "throws validation error"
+
+      - name: "createInspectionSchema - requires at least one reference"
+        given: "no lp_id, grn_id, or po_id"
+        when: "schema.parse() called"
+        then: "throws validation error"
+
+      - name: "completeInspectionSchema - requires conditional fields"
+        given: "result='conditional' but no conditional_reason"
+        when: "schema.parse() called"
+        then: "throws validation error"
+
+      - name: "completeInspectionSchema - validates defect counts"
+        given: "negative defect_found"
+        when: "schema.parse() called"
+        then: "throws validation error"
+
+# Integration Test Specifications
+integration_tests:
+  - file: "apps/frontend/app/api/quality/inspections/__tests__/route.test.ts"
+    description: "API endpoint integration tests"
+    test_cases:
+      - name: "GET /api/quality/inspections - returns list"
+        setup: "Create 5 test inspections in org"
+        when: "GET request with valid auth"
+        then: "Returns 200 with inspection array"
+
+      - name: "GET /api/quality/inspections - applies filters"
+        setup: "Create 3 scheduled and 2 in_progress inspections"
+        when: "GET request with status=scheduled filter"
+        then: "Returns only scheduled inspections"
+
+      - name: "POST /api/quality/inspections - creates inspection"
+        setup: "Valid product and LP exist"
+        when: "POST with valid CreateInspectionInput"
+        then: "Returns 201 with created inspection"
+
+      - name: "POST /api/quality/inspections/:id/assign - assigns inspector"
+        setup: "Inspection and inspector user exist"
+        when: "POST with inspector_id"
+        then: "Returns 200 with updated inspection"
+
+      - name: "POST /api/quality/inspections/:id/start - starts inspection"
+        setup: "Inspection with status=scheduled, assigned inspector"
+        when: "POST request"
+        then: "Returns 200 with status=in_progress, started_at=now"
+
+      - name: "POST /api/quality/inspections/:id/complete - completes inspection"
+        setup: "Inspection with status=in_progress, test results recorded"
+        when: "POST with result=pass"
+        then: "Returns 200, LP.qa_status updated to 'passed'"
+
+      - name: "RLS enforcement - cannot access other org's inspection"
+        setup: "Inspection in Org B, user in Org A"
+        when: "GET /api/quality/inspections/:id"
+        then: "Returns 404"
+
+      - name: "Permission enforcement - QA_INSPECTOR can create"
+        setup: "User with QA_INSPECTOR role"
+        when: "POST /api/quality/inspections"
+        then: "Returns 201"
+
+      - name: "Permission enforcement - VIEWER cannot create"
+        setup: "User with VIEWER role"
+        when: "POST /api/quality/inspections"
+        then: "Returns 403"
+
+  - file: "supabase/migrations/__tests__/triggers.test.ts"
+    description: "Database trigger tests"
+    test_cases:
+      - name: "generate_inspection_number() - creates unique number"
+        when: "function called twice with same org/year/type"
+        then: "Returns incrementing numbers (00001, 00002)"
+
+      - name: "update_lp_qa_status_on_inspection() - updates on pass"
+        given: "Inspection with result='pass' and lp_id"
+        when: "inspection update completes"
+        then: "LP.qa_status = 'passed'"
+
+      - name: "update_lp_qa_status_on_inspection() - updates on fail"
+        given: "Inspection with result='fail' and lp_id"
+        when: "inspection update completes"
+        then: "LP.qa_status = 'failed'"
+
+# E2E Test Scenarios
+e2e_tests:
+  - file: "apps/frontend/e2e/__tests__/inspection.e2e.ts"
+    description: "End-to-end inspection workflows"
+    test_cases:
+      - name: "Complete inspection workflow: create → assign → start → complete (pass)"
+        steps:
+          1: "Navigate to Quality > Inspections > Incoming"
+          2: "Click [+ Create Inspection]"
+          3: "Select Product (Flour), LP (LP-001), Priority (High)"
+          4: "Click [Create Inspection]"
+          5: "Verify inspection appears in queue with status=scheduled"
+          6: "Click [Assign] button"
+          7: "Select inspector (John Smith)"
+          8: "Click [Assign]"
+          9: "Verify assigned inspector shown"
+          10: "Click [Start Inspection]"
+          11: "Verify page navigates to detail, status=in_progress"
+          12: "Complete Step 1 (Overview) - click [Next]"
+          13: "Complete Step 2 (Visual Inspection) - fill form - click [Next]"
+          14: "Complete Step 3 (Test Parameters) - enter values for 8 parameters - click [Next]"
+          15: "Complete Step 4 (CoA) - verify results match CoA - click [Complete Inspection]"
+          16: "Select result=pass in modal"
+          17: "Click [Confirm]"
+          18: "Verify toast: 'Inspection Completed - PASS'"
+          19: "Navigate back to list"
+          20: "Verify inspection status=completed, result=pass"
+          21: "Verify LP qa_status updated (check via Warehouse module)"
+
+        expectations:
+          - "Inspection created with auto-generated number (INS-INC-2025-00001)"
+          - "All 4 wizard steps complete without errors"
+          - "Test results recorded and validated"
+          - "LP QA status updated to 'passed'"
+          - "Inspection immutable (cannot edit after completion)"
+          - "Audit log entries created for all state changes"
+
+      - name: "Failed inspection workflow: create → start → fail → hold created"
+        steps:
+          1: "Navigate to Quality > Inspections > Incoming"
+          2: "Click [+ Create Inspection]"
+          3: "Select Product (Flour), LP (LP-002)"
+          4: "Click [Create Inspection]"
+          5: "Assign inspector and click [Start]"
+          6: "Complete Steps 1-2 (Overview, Visual)"
+          7: "At Step 3 (Test Parameters), enter values that fail spec:"
+          8: "  - Protein: 10.5% (spec: 11.5-13.5%) - FAIL"
+          9: "  - Gluten: 25.0% (spec: 26.0-30.0%) - FAIL"
+          10: "Click [Next] to proceed to CoA step"
+          11: "Complete CoA validation"
+          12: "Click [Complete Inspection]"
+          13: "Observe suggested result = FAIL (with explanation)"
+          14: "Confirm result=fail"
+          15: "Click [Confirm]"
+          16: "Verify alert: 'FAILED - Quality Hold Created: H-00125'"
+          17: "Verify NCR creation option available"
+          18: "Check Warehouse module: LP qa_status = 'failed', cannot consume"
+
+        expectations:
+          - "Inspection completed with result=fail"
+          - "Quality hold auto-created for LP (reference_id → inspection)"
+          - "LP blocked from consumption"
+          - "QA Manager notification sent (simulate via test email)"
+          - "NCR can be created from failed inspection"
+          - "Audit log shows failure details"
+
+      - name: "Conditional inspection workflow"
+        steps:
+          1: "Create inspection as above"
+          2: "Record test results: some marginal (within 5% of limit)"
+          3: "Click [Complete Inspection]"
+          4: "Suggested result = CONDITIONAL"
+          5: "Confirm result=conditional"
+          6: "Fill conditional fields:"
+          7: "  - Reason: 'Slightly below spec, acceptable for grade B'"
+          8: "  - Restrictions: 'Use only for domestic market, not export'"
+          9: "  - Expires: 7 days from now"
+          10: "Click [Confirm]"
+          11: "Verify inspection completed with result=conditional"
+          12: "Verify LP qa_status = 'conditional'"
+
+        expectations:
+          - "Conditional result requires QA_MANAGER role"
+          - "Conditional fields captured"
+          - "LP available with restrictions noted"
+          - "Expiry date enforced"
+
+      - name: "Filter and search functionality"
+        steps:
+          1: "Navigate to Quality > Inspections > Incoming"
+          2: "Create 5 test inspections with various statuses"
+          3: "Click [Status] filter, select 'scheduled'"
+          4: "Verify only scheduled inspections shown"
+          5: "Clear filter, search for 'Flour' in search bar"
+          6: "Verify only Flour product inspections shown"
+          7: "Set date range filter (last 7 days)"
+          8: "Verify filtered results"
+          9: "Sort by Priority (ascending)"
+          10: "Verify order: low → normal → high → urgent"
+
+        expectations:
+          - "Filters applied correctly"
+          - "Search works with product name, code, inspection#"
+          - "URL updates with filter state"
+          - "Pagination maintains filter context"
+
+# Test Data / Fixtures
+test_data:
+  products:
+    - code: "SKU-001"
+      name: "Wheat Flour"
+      spec: "8 parameters (Flour Analysis)"
+
+    - code: "SKU-012"
+      name: "Whole Milk"
+      spec: "6 parameters (Dairy Analysis)"
+
+  inspectors:
+    - name: "John Smith"
+      role: "QA_INSPECTOR"
+
+    - name: "Jane Doe"
+      role: "QA_MANAGER"
+
+  license_plates:
+    - code: "LP-001"
+      product: "Wheat Flour"
+      quantity: "500 kg"
+      status: "pending"
+
+    - code: "LP-002"
+      product: "Whole Milk"
+      quantity: "1000 L"
+      status: "pending"
+
+# Test Coverage Goals
+coverage:
+  services: "80%+ coverage on inspection-service.ts"
+  api: "80%+ coverage on all endpoints"
+  components: "70%+ coverage on major components"
+  integration: "100% coverage of happy path + error paths"
+  e2e: "All major workflows (create, assign, start, complete)"
+
+# Known Issues / Limitations
+known_issues: []
+
+# Deferred Tests (for future stories)
+deferred_tests:
+  - "Test results recording (Story 06.6)"
+  - "Sampling plan integration (Story 06.7)"
+  - "Scanner QA workflow (Story 06.8)"
+  - "NCR auto-creation (Story 06.9)"
+  - "In-process inspection (Story 06.10)"
+  - "Final inspection (Story 06.11)"

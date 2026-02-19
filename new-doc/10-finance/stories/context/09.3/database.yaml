@@ -1,0 +1,32 @@
+tables:
+  material_consumption_costs:
+    columns:
+      - "id UUID PRIMARY KEY"
+      - "org_id UUID"
+      - "consumption_id UUID REFERENCES material_consumption"
+      - "work_order_id UUID REFERENCES work_orders"
+      - "product_id UUID REFERENCES products"
+      - "quantity NUMERIC(15,4)"
+      - "unit_cost NUMERIC(15,4)"
+      - "total_cost NUMERIC(15,4)"
+      - "cost_method TEXT (fifo, weighted_average, standard)"
+      - "transaction_date TIMESTAMPTZ"
+    constraints:
+      - "CHECK (total_cost = quantity * unit_cost)"
+
+  inventory_cost_layers:
+    columns:
+      - "id UUID PRIMARY KEY"
+      - "org_id UUID"
+      - "product_id UUID"
+      - "quantity_received NUMERIC(15,4)"
+      - "quantity_remaining NUMERIC(15,4)"
+      - "unit_cost NUMERIC(15,4)"
+      - "receipt_date TIMESTAMPTZ"
+    constraints:
+      - "CHECK (quantity_remaining >= 0 AND quantity_remaining <= quantity_received)"
+
+functions:
+  - "calculate_material_consumption_cost() - calc cost on consumption"
+  - "calculate_fifo_cost() - FIFO cost layer selection"
+  - "calculate_weighted_average_cost() - WAC calculation"

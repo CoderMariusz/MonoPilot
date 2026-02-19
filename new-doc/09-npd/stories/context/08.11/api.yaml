@@ -1,0 +1,48 @@
+# Story 08.11 - API Specification
+# Purpose: Handoff wizard validation and execution endpoints
+# Agent: BACKEND-DEV
+# SEE: docs/2-MANAGEMENT/epics/current/08-npd/08.11.handoff-wizard.md (lines 595-679)
+
+endpoints:
+  - method: "POST"
+    path: "/api/npd/projects/:projectId/handoff/validate"
+    description: "Pre-handoff validation checklist"
+    auth: "required"
+    roles: ["NPD_LEAD", "ADMIN"]
+    returns: "HandoffValidationResponse"
+    validation_checks:
+      - "Gate G4 complete"
+      - "Formulation locked"
+      - "Costing approved"
+      - "Compliance docs uploaded (HACCP, Label)"
+      - "Allergen declaration (if 08.5 available)"
+
+  - method: "POST"
+    path: "/api/npd/projects/:projectId/handoff/execute"
+    description: "Execute handoff transactionally"
+    auth: "required"
+    roles: ["NPD_LEAD", "ADMIN"]
+    request: "ExecuteHandoffRequest (8-step wizard data)"
+    response: "ExecuteHandoffResponse | HandoffErrorResponse"
+    transaction_steps:
+      - "Lock formulation"
+      - "Create/update product"
+      - "Create BOM"
+      - "Copy formulation_items to bom_items (batch)"
+      - "Create pilot WO (optional)"
+      - "Update project status to 'launched'"
+      - "Log handoff event"
+      - "COMMIT (or ROLLBACK)"
+
+services:
+  - name: "HandoffService"
+    path: "lib/services/handoff-service.ts"
+    methods:
+      - "validateHandoff(projectId): HandoffValidationResponse"
+      - "executeHandoff(projectId, data, userId): ExecuteHandoffResponse"
+      - "checkGateComplete(projectId, gate): boolean"
+      - "copyFormulationItemsToBOM(formulationId, bomId): number"
+      - "createProduct(data, userId): Product"
+      - "createBOM(data, userId): BOM"
+      - "createPilotWO(data, userId): WorkOrder"
+      - "logHandoffEvent(data): Event"

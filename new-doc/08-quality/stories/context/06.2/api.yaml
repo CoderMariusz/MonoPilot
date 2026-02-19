@@ -1,0 +1,228 @@
+# Story 06.2 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  # ==================== LIST HOLDS ====================
+  - method: "GET"
+    path: "/api/v1/quality/holds"
+    description: "Returns paginated list of holds with filters"
+    file: "apps/frontend/app/api/v1/quality/holds/route.ts"
+    auth: "required"
+    roles: ["qa_inspector", "qa_manager", "quality_director", "production_lead", "admin", "owner"]
+    query_parameters:
+      status: "string (optional) - active|released|disposed"
+      priority: "string (optional) - low|medium|high|critical"
+      hold_type: "string (optional) - qa_pending|investigation|recall|quarantine"
+      search: "string (optional) - searches hold_number, reason"
+      page: "number (default: 1)"
+      limit: "number (default: 20, max: 100)"
+      sort: "string (default: held_at)"
+      order: "string (default: desc)"
+    response:
+      status: 200
+      schema:
+        holds: "QualityHoldSummary[]"
+        pagination: "{ total, page, limit, total_pages }"
+        filters_applied: "object"
+    errors:
+      - { status: 401, code: "UNAUTHORIZED" }
+
+  # ==================== GET HOLD DETAIL ====================
+  - method: "GET"
+    path: "/api/v1/quality/holds/:id"
+    description: "Returns hold detail with items and NCR info"
+    file: "apps/frontend/app/api/v1/quality/holds/[id]/route.ts"
+    auth: "required"
+    roles: ["qa_inspector", "qa_manager", "quality_director", "production_lead", "admin", "owner"]
+    path_parameters:
+      id: "UUID - Hold ID"
+    response:
+      status: 200
+      schema:
+        hold: "QualityHold"
+        items: "QualityHoldItem[]"
+        ncr: "{ id, ncr_number, title, status } | null"
+    errors:
+      - { status: 401, code: "UNAUTHORIZED" }
+      - { status: 404, code: "NOT_FOUND", when: "Hold does not exist or belongs to different org" }
+
+  # ==================== CREATE HOLD ====================
+  - method: "POST"
+    path: "/api/v1/quality/holds"
+    description: "Creates new hold with items, updates LP qa_status to 'hold'"
+    file: "apps/frontend/app/api/v1/quality/holds/route.ts"
+    auth: "required"
+    roles: ["qa_inspector", "qa_manager", "quality_director", "admin", "owner"]
+    request_body:
+      reason: "string (required, 10-500 chars)"
+      hold_type: "string (required) - qa_pending|investigation|recall|quarantine"
+      priority: "string (optional, default: medium) - low|medium|high|critical"
+      items: "array (required, min 1) - { reference_type, reference_id, quantity_held?, uom?, notes? }[]"
+      inspection_type: "string (optional) - receiving|in_process|final|other"
+      ncr_id: "UUID (optional) - link to existing NCR"
+      notify_qa_manager: "boolean (default: false)"
+      auto_create_ncr: "boolean (default: false for low/medium, true for high/critical)"
+    response:
+      status: 201
+      schema:
+        hold: "QualityHold"
+        items: "QualityHoldItem[]"
+        lp_updates: "{ lp_id, lp_number, previous_status, new_status }[] | null"
+        ncr_created: "{ id, ncr_number, title } | null"
+    errors:
+      - { status: 400, code: "VALIDATION_ERROR", message: "Reason must be 10-500 characters" }
+      - { status: 400, code: "VALIDATION_ERROR", message: "At least one item must be added" }
+      - { status: 401, code: "UNAUTHORIZED" }
+      - { status: 403, code: "FORBIDDEN", message: "Insufficient permissions to create holds" }
+
+  # ==================== RELEASE HOLD ====================
+  - method: "PATCH"
+    path: "/api/v1/quality/holds/:id/release"
+    description: "Releases hold with disposition, updates LP qa_status based on disposition"
+    file: "apps/frontend/app/api/v1/quality/holds/[id]/release/route.ts"
+    auth: "required"
+    roles: ["qa_manager", "quality_director", "admin", "owner"]
+    path_parameters:
+      id: "UUID - Hold ID"
+    request_body:
+      disposition: "string (required) - release|rework|scrap|return"
+      release_notes: "string (required, 10-1000 chars)"
+      close_linked_ncr: "boolean (optional, default: false)"
+      notify_requester: "boolean (optional, default: false)"
+    response:
+      status: 200
+      schema:
+        hold: "QualityHold (with released_by, released_at, disposition)"
+        lp_updates: "{ lp_id, lp_number, previous_status, new_status, disposition_action }[] | null"
+        actions_taken: "{ lp_status_updated, ncr_closed, notifications_sent }"
+    errors:
+      - { status: 400, code: "VALIDATION_ERROR", message: "Disposition decision is required" }
+      - { status: 400, code: "VALIDATION_ERROR", message: "Release notes must be 10-1000 characters" }
+      - { status: 400, code: "INVALID_STATUS", message: "Cannot release hold with status: {status}" }
+      - { status: 401, code: "UNAUTHORIZED" }
+      - { status: 403, code: "FORBIDDEN", message: "Only QA Managers can release holds" }
+      - { status: 404, code: "NOT_FOUND" }
+
+  # ==================== DELETE HOLD ====================
+  - method: "DELETE"
+    path: "/api/v1/quality/holds/:id"
+    description: "Soft delete hold (only if status = active and no releases)"
+    file: "apps/frontend/app/api/v1/quality/holds/[id]/route.ts"
+    auth: "required"
+    roles: ["qa_manager", "quality_director", "admin", "owner"]
+    path_parameters:
+      id: "UUID - Hold ID"
+    response:
+      status: 204
+    errors:
+      - { status: 401, code: "UNAUTHORIZED" }
+      - { status: 403, code: "FORBIDDEN" }
+      - { status: 404, code: "NOT_FOUND" }
+      - { status: 400, code: "INVALID_STATUS", message: "Cannot delete released or disposed holds" }
+
+  # ==================== GET ACTIVE HOLDS ====================
+  - method: "GET"
+    path: "/api/v1/quality/holds/active"
+    description: "Returns active holds only with aging summary"
+    file: "apps/frontend/app/api/v1/quality/holds/active/route.ts"
+    auth: "required"
+    roles: ["qa_inspector", "qa_manager", "quality_director", "production_lead", "admin", "owner"]
+    response:
+      status: 200
+      schema:
+        holds: "QualityHoldSummary[]"
+        aging_summary: "{ normal, warning, critical }"
+    errors:
+      - { status: 401, code: "UNAUTHORIZED" }
+
+  # ==================== GET HOLD STATS ====================
+  - method: "GET"
+    path: "/api/v1/quality/holds/stats"
+    description: "Returns hold statistics for dashboard"
+    file: "apps/frontend/app/api/v1/quality/holds/stats/route.ts"
+    auth: "required"
+    roles: ["qa_inspector", "qa_manager", "quality_director", "admin", "owner"]
+    response:
+      status: 200
+      schema:
+        active_count: "number"
+        released_today_count: "number"
+        critical_active_count: "number"
+        avg_hold_time_days: "number (decimal)"
+        critical_percentage: "number (0-100)"
+        by_priority: "{ low, medium, high, critical }"
+        by_type: "{ qa_pending, investigation, recall, quarantine }"
+    errors:
+      - { status: 401, code: "UNAUTHORIZED" }
+
+  # ==================== BULK RELEASE ====================
+  - method: "POST"
+    path: "/api/v1/quality/holds/bulk-release"
+    description: "Releases multiple holds with same disposition"
+    file: "apps/frontend/app/api/v1/quality/holds/bulk-release/route.ts"
+    auth: "required"
+    roles: ["qa_manager", "quality_director", "admin", "owner"]
+    request_body:
+      hold_ids: "UUID[] (required, min 1)"
+      disposition: "string (required) - release|rework|scrap|return"
+      release_notes: "string (required, 10-1000 chars)"
+      notify_requesters: "boolean (optional, default: false)"
+    response:
+      status: 200
+      schema:
+        released_count: "number"
+        failed_count: "number"
+        results: "{ id, hold_number, status }[]"
+    errors:
+      - { status: 401, code: "UNAUTHORIZED" }
+      - { status: 403, code: "FORBIDDEN" }
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/quality-hold-service.ts"
+    description: "Quality hold business logic"
+    exports:
+      - name: "QualityHoldService"
+        methods:
+          - "list(params: HoldListParams): Promise<PaginatedResult<QualityHold>>"
+          - "getById(id: string): Promise<QualityHold | null>"
+          - "create(data: CreateHoldInput): Promise<QualityHold>"
+          - "release(id: string, data: ReleaseHoldInput): Promise<QualityHold>"
+          - "delete(id: string): Promise<void>"
+          - "getActive(): Promise<QualityHold[]>"
+          - "getStats(): Promise<HoldStatsResponse>"
+          - "blockLPConsumption(lpId: string): Promise<boolean>"
+          - "getActiveLPHold(lpId: string): Promise<QualityHold | null>"
+
+# Validation Schemas
+validation:
+  - path: "apps/frontend/lib/validation/quality-hold.ts"
+    description: "Zod schemas for hold validation"
+    exports:
+      - name: "createHoldSchema"
+        fields:
+          reason: "z.string().min(10).max(500)"
+          hold_type: "z.enum(['qa_pending', 'investigation', 'recall', 'quarantine'])"
+          priority: "z.enum(['low', 'medium', 'high', 'critical']).default('medium')"
+          items: "z.array(z.object({ ... })).min(1)"
+      - name: "releaseHoldSchema"
+        fields:
+          disposition: "z.enum(['release', 'rework', 'scrap', 'return'])"
+          release_notes: "z.string().min(10).max(1000)"
+
+# Type Definitions
+types:
+  - path: "apps/frontend/lib/types/quality-hold.ts"
+    exports:
+      - "type HoldStatus = 'active' | 'released' | 'disposed'"
+      - "type HoldPriority = 'low' | 'medium' | 'high' | 'critical'"
+      - "type HoldType = 'qa_pending' | 'investigation' | 'recall' | 'quarantine'"
+      - "type Disposition = 'release' | 'rework' | 'scrap' | 'return'"
+      - "type ReferenceType = 'lp' | 'wo' | 'batch'"
+      - "interface QualityHold { ... }"
+      - "interface QualityHoldSummary { ... }"
+      - "interface QualityHoldItem { ... }"
+      - "interface CreateHoldInput { ... }"
+      - "interface ReleaseHoldInput { ... }"
+      - "interface HoldStatsResponse { ... }"

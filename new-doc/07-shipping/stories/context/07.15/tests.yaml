@@ -1,0 +1,662 @@
+# Story 07.15 - Testing Specification
+# Purpose: Acceptance criteria, unit tests, integration tests, e2e tests
+# Agent: QA-ENGINEER + BACKEND-DEV + FRONTEND-DEV
+
+# Acceptance Criteria (From Story MD)
+acceptance_criteria:
+  ac_1_dashboard_page_load:
+    given: "A shipping clerk navigates to /shipping or /shipping/dashboard"
+    when: "The page loads"
+    then:
+      - "Dashboard displays within 500ms"
+      - "4 KPI cards visible"
+      - "2 charts visible"
+      - "Alerts section visible"
+      - "Recent activity timeline visible"
+    acceptance_tests:
+      - "Load dashboard and measure time to interactive"
+      - "Verify all sections render"
+      - "Verify skeleton loaders during fetch"
+      - "Verify cached data displays immediately if available"
+
+  ac_2_kpi_cards:
+    given: "Dashboard loads for date range Last 30 days"
+    when: "KPI cards render"
+    then:
+      - "4 cards display with correct data"
+      - "Card 1: Orders (total, status breakdown, trend)"
+      - "Card 2: Pick Lists (total, status breakdown, trend)"
+      - "Card 3: Shipments (total, status breakdown, trend)"
+      - "Card 4: Backorders (count, total value)"
+    acceptance_tests:
+      - "Verify order count matches database"
+      - "Verify status breakdown percentages add to 100%"
+      - "Verify trend calculation (current vs previous period)"
+      - "Verify background color matches status (green/yellow/red)"
+
+  ac_3_orders_by_status_chart:
+    given: "Sales orders exist with various statuses"
+    when: "Orders by Status pie chart renders"
+    then:
+      - "Pie chart displays segments for each status"
+      - "Color-coded segments (draft: gray, confirmed: blue, etc)"
+      - "Percentage labels on each segment"
+      - "Legend below chart"
+      - "Hover tooltip shows count and percentage"
+    acceptance_tests:
+      - "Verify chart renders with correct data"
+      - "Verify colors match design spec"
+      - "Verify clicking segment navigates to filtered list"
+      - "Verify empty state when no orders"
+
+  ac_4_shipments_by_date_chart:
+    given: "Shipments exist over last 30 days"
+    when: "Shipments by Date line chart renders"
+    then:
+      - "Line chart displays with daily granularity"
+      - "X-axis: Dates, Y-axis: Shipment count"
+      - "Grid lines for readability"
+      - "Hover tooltip with exact date and count"
+    acceptance_tests:
+      - "Verify chart data matches database query"
+      - "Verify daily aggregation correct"
+      - "Verify responsive sizing"
+      - "Verify empty state when no data"
+
+  ac_5_alerts_section:
+    given: "Dashboard loads"
+    when: "Alerts section renders"
+    then:
+      - "4 alert types display"
+      - "Each alert has: icon, count, color-coded badge"
+      - "Backorders (red), Delayed Shipments (orange), Pending Picks >24h (yellow), Allergen Conflicts (purple)"
+    acceptance_tests:
+      - "Verify correct count for each alert type"
+      - "Verify colors match design"
+      - "Verify clicking alert navigates to filtered list"
+      - "Verify success message when no alerts"
+
+  ac_6_recent_activity_timeline:
+    given: "Dashboard loads"
+    when: "Recent Activity section renders"
+    then:
+      - "Last 10 activities display"
+      - "Reverse chronological order (newest first)"
+      - "Each activity shows: icon, description, relative timestamp, entity link"
+    acceptance_tests:
+      - "Verify 10 most recent activities"
+      - "Verify timestamps are relative (2 min ago, 1 hour ago)"
+      - "Verify clicking entity link navigates to detail page"
+      - "Verify pagination/load more works"
+
+  ac_7_quick_actions_panel:
+    given: "Dashboard loads"
+    when: "Quick Actions panel renders"
+    then:
+      - "3 action buttons display"
+      - "Button 1: Create Sales Order"
+      - "Button 2: Create Pick List"
+      - "Button 3: View Backorders"
+    acceptance_tests:
+      - "Verify buttons visible for ADMIN/SALES roles"
+      - "Verify buttons disabled for VIEWER role"
+      - "Verify navigation on click"
+      - "Verify tooltip on disabled buttons"
+
+  ac_8_date_range_filter:
+    given: "Dashboard loads"
+    when: "Date range filter displays"
+    then:
+      - "4 preset options available (Today, Last 7, Last 30, Custom)"
+      - "Default: Last 30 days"
+    acceptance_tests:
+      - "Verify selecting preset filters all data correctly"
+      - "Verify custom range picker opens"
+      - "Verify max 365 days validation"
+      - "Verify URL params update"
+
+  ac_9_redis_caching:
+    given: "Dashboard loads first time"
+    when: "API endpoints called"
+    then:
+      - "Data cached in Redis with 1min TTL"
+      - "Cache keys: dashboard:kpis:{org_id}:{date_range_hash}"
+    acceptance_tests:
+      - "Verify cache hit within 100ms"
+      - "Verify cache miss triggers database query"
+      - "Verify cache expires after 1 minute"
+      - "Verify fallback to database if Redis unavailable"
+
+  ac_10_performance:
+    given: "1000 orders, 500 pick lists, 300 shipments in date range"
+    when: "Dashboard loads"
+    then:
+      - "Total load time < 500ms (p95)"
+      - "KPI API < 200ms (p95)"
+      - "Chart rendering < 100ms"
+    acceptance_tests:
+      - "Load test with performance profiler"
+      - "Measure time to interactive"
+      - "Verify no layout shifts"
+      - "Verify smooth auto-refresh transitions"
+
+  ac_11_multi_tenant_isolation:
+    given: "Org A has 50 orders, Org B has 30 orders"
+    when: "User from Org A loads dashboard"
+    then:
+      - "Only Org A's 50 orders included in KPIs"
+      - "RLS enforced on all queries"
+    acceptance_tests:
+      - "Verify RLS blocks cross-org access"
+      - "Verify user sees only org data"
+      - "Verify API returns 403 for unauthorized org access"
+
+  ac_12_error_handling:
+    given: "Database timeout or network error"
+    when: "Dashboard loads"
+    then:
+      - "Error message displays"
+      - "Fallback to cached data if available"
+      - "Retry button provided"
+    acceptance_tests:
+      - "Simulate API timeout"
+      - "Verify error message displays"
+      - "Verify retry button works"
+      - "Verify cached data shown when available"
+
+  ac_13_responsive_design:
+    given: "User views dashboard on mobile/tablet/desktop"
+    when: "Page renders"
+    then:
+      - "Mobile: KPI cards stack 1 column"
+      - "Tablet: KPI cards 2 columns"
+      - "Desktop: KPI cards 4 columns"
+    acceptance_tests:
+      - "Test viewport 375px (mobile)"
+      - "Test viewport 768px (tablet)"
+      - "Test viewport 1920px (desktop)"
+      - "Verify no horizontal scroll"
+      - "Verify touch targets >= 48x48dp"
+
+# Unit Tests (Vitest)
+unit_tests:
+  test_file: "apps/frontend/lib/services/__tests__/dashboard-service.test.ts"
+  framework: "Vitest"
+  coverage_target: "> 80%"
+
+  test_suites:
+    - name: "DashboardService.calculateTrend"
+      tests:
+        - name: "should calculate positive trend correctly"
+          given: "current=100, previous=80"
+          expect: "percentage=25, direction=up"
+
+        - name: "should calculate negative trend correctly"
+          given: "current=80, previous=100"
+          expect: "percentage=20, direction=down"
+
+        - name: "should handle zero previous value"
+          given: "current=50, previous=0"
+          expect: "percentage=100, direction=up"
+
+    - name: "DashboardService.generateCacheKey"
+      tests:
+        - name: "should generate cache key with correct format"
+          given: "org_id=uuid, dateFrom=2025-12-01, dateTo=2025-12-31"
+          expect: "dashboard:kpis:uuid:2025-12-01_2025-12-31"
+
+        - name: "should handle same day range"
+          given: "dateFrom=2025-12-15, dateTo=2025-12-15"
+          expect: "dashboard:kpis:uuid:2025-12-15_2025-12-15"
+
+    - name: "KPI Card Calculations"
+      tests:
+        - name: "should calculate order status breakdown"
+          given: "50 orders with status distribution"
+          expect: "Correct percentages per status"
+
+        - name: "should identify backorders correctly"
+          given: "qty_allocated < qty_ordered"
+          expect: "Counted as backorder"
+
+        - name: "should filter by status correctly"
+          given: "Order status = shipped"
+          expect: "Counted in shipments metric"
+
+# Component Tests (Vitest + React Testing Library)
+component_tests:
+  test_file: "apps/frontend/components/shipping/dashboard/__tests__/DashboardKPIs.test.tsx"
+  framework: "Vitest + React Testing Library"
+
+  test_suites:
+    - name: "DashboardKPIs Component"
+      tests:
+        - name: "should render 4 KPI cards"
+          given: "KPI data loaded"
+          expect: "4 KPI cards in DOM"
+
+        - name: "should display loading skeleton when isLoading=true"
+          given: "isLoading=true"
+          expect: "Skeleton loaders visible, no data displayed"
+
+        - name: "should display correct metric values"
+          given: "KPI data: orders={total: 50}"
+          expect: "Orders card shows 50"
+
+        - name: "should show trend indicator"
+          given: "trend={percentage: 25, direction: up}"
+          expect: "Green up arrow with +25%"
+
+    - name: "KPICard Component"
+      tests:
+        - name: "should render card with title and value"
+          given: "title=Orders, value=50"
+          expect: "Card displays Orders: 50"
+
+        - name: "should apply correct status color"
+          given: "status=good"
+          expect: "Card background is green"
+
+        - name: "should show breakdown tooltip on hover"
+          given: "breakdown provided"
+          expect: "Tooltip shows status breakdown"
+
+    - name: "Chart Components"
+      tests:
+        - name: "OrdersByStatusChart should render pie chart"
+          given: "data with statuses"
+          expect: "Pie chart renders with segments"
+
+        - name: "ShipmentsByDateChart should render line chart"
+          given: "data with dates"
+          expect: "Line chart renders with daily points"
+
+        - name: "Should show empty state when no data"
+          given: "data=[]"
+          expect: "Empty state message displays"
+
+    - name: "DateRangeFilter Component"
+      tests:
+        - name: "should render 4 preset buttons"
+          given: "Component mounts"
+          expect: "Today, Last 7, Last 30, Custom buttons visible"
+
+        - name: "should update date range on preset click"
+          given: "Click Last 7 Days button"
+          expect: "onChange called with last 7 days range"
+
+        - name: "should open date picker on Custom click"
+          given: "Click Custom Range button"
+          expect: "Date picker modal opens"
+
+# Integration Tests (Playwright)
+integration_tests:
+  test_file: "e2e/dashboard.spec.ts"
+  framework: "Playwright"
+  browser: ["chromium", "firefox", "webkit"]
+
+  test_scenarios:
+    - name: "User loads dashboard for first time"
+      steps:
+        - "Navigate to /shipping/dashboard"
+        - "Wait for KPI cards to load"
+        - "Wait for charts to render"
+        - "Verify all sections loaded"
+      verifications:
+        - "Dashboard displays within 500ms"
+        - "No console errors"
+        - "All metrics have values"
+
+    - name: "User changes date range"
+      steps:
+        - "Load dashboard"
+        - "Click Last 7 Days preset"
+        - "Wait for data to refresh"
+      verifications:
+        - "KPI values update"
+        - "Charts update"
+        - "URL includes new date params"
+
+    - name: "User clicks alert badge"
+      steps:
+        - "Load dashboard"
+        - "Click Backorders alert"
+      verifications:
+        - "Navigate to /shipping/sales-orders?filter=backorders"
+        - "Order list filters to backorders only"
+
+    - name: "User clicks chart segment"
+      steps:
+        - "Load dashboard"
+        - "Click Shipped segment in Orders pie chart"
+      verifications:
+        - "Navigate to /shipping/sales-orders?status=shipped"
+        - "Activity feed filters to shipped orders"
+
+    - name: "User clicks quick action button"
+      steps:
+        - "Load dashboard"
+        - "Click Create Sales Order button"
+      verifications:
+        - "Navigate to /shipping/sales-orders/new"
+        - "Form ready for input"
+
+    - name: "Auto-refresh toggle"
+      steps:
+        - "Load dashboard"
+        - "Toggle auto-refresh OFF"
+        - "Wait 40 seconds"
+      verifications:
+        - "Data does not auto-refresh"
+        - "Timer stops counting"
+
+    - name: "Manual refresh"
+      steps:
+        - "Load dashboard"
+        - "Click Manual Refresh button"
+      verifications:
+        - "Data refreshes within 500ms"
+        - "Spinner shows while refreshing"
+
+    - name: "Mobile responsive layout"
+      steps:
+        - "Set viewport to 375px (mobile)"
+        - "Load dashboard"
+      verifications:
+        - "KPI cards stack 1 column"
+        - "Charts full width"
+        - "Quick actions in footer"
+        - "No horizontal scroll"
+
+    - name: "Tablet responsive layout"
+      steps:
+        - "Set viewport to 768px (tablet)"
+        - "Load dashboard"
+      verifications:
+        - "KPI cards 2 columns"
+        - "Charts side-by-side if space"
+        - "Alerts 2 columns"
+
+    - name: "Error handling - API timeout"
+      steps:
+        - "Simulate API timeout (network throttle)"
+        - "Load dashboard"
+      verifications:
+        - "Error message displays"
+        - "Retry button available"
+        - "Fallback to cached data shows"
+
+    - name: "Error handling - Server 500"
+      steps:
+        - "Mock API to return 500 error"
+        - "Load dashboard"
+      verifications:
+        - "Error message displays"
+        - "Retry works"
+        - "Previous data shows if cached"
+
+# Performance Tests
+performance_tests:
+  test_file: "e2e/dashboard-performance.spec.ts"
+  framework: "Playwright"
+  metrics:
+    - "First Contentful Paint (FCP)"
+    - "Largest Contentful Paint (LCP)"
+    - "Time to Interactive (TTI)"
+    - "Cumulative Layout Shift (CLS)"
+
+  test_scenarios:
+    - name: "Dashboard initial load performance"
+      target: "< 500ms to interactive"
+      steps:
+        - "Navigate to /shipping/dashboard"
+        - "Measure time to all sections visible"
+      verification: "LCP < 500ms"
+
+    - name: "Chart rendering performance"
+      target: "< 100ms"
+      steps:
+        - "Load dashboard"
+        - "Measure chart render time"
+      verification: "Charts render in < 100ms"
+
+    - name: "Auto-refresh performance"
+      target: "< 500ms"
+      steps:
+        - "Enable auto-refresh"
+        - "Wait 30s for refresh"
+        - "Measure time to update UI"
+      verification: "Data updates in < 500ms"
+
+    - name: "Cache hit performance"
+      target: "< 100ms"
+      steps:
+        - "Load dashboard (primes cache)"
+        - "Navigate away and back"
+        - "Measure response time"
+      verification: "Cache hit within 100ms"
+
+# Accessibility Tests (axe-core)
+accessibility_tests:
+  test_file: "e2e/dashboard-accessibility.spec.ts"
+  framework: "Playwright + axe-core"
+  wcag_level: "2.1 AA"
+
+  test_scenarios:
+    - name: "Color contrast"
+      verifications:
+        - "KPI status colors meet 4.5:1 ratio"
+        - "Chart colors accessible"
+        - "Alert badges have sufficient contrast"
+
+    - name: "Keyboard navigation"
+      verifications:
+        - "Tab through all interactive elements"
+        - "Focus visible on all buttons"
+        - "Can activate buttons with Enter"
+        - "Can select chart with keyboard"
+
+    - name: "Screen reader support"
+      verifications:
+        - "KPI cards have aria-labels"
+        - "Chart has description text"
+        - "Buttons have accessible names"
+        - "Status indicators announced"
+
+    - name: "Form accessibility (date picker)"
+      verifications:
+        - "Date inputs properly labeled"
+        - "Error messages associated with fields"
+        - "Calendar keyboard navigable"
+
+# Load Testing
+load_tests:
+  test_file: "load/dashboard-load.js"
+  framework: "k6"
+  target_rps: "1000 requests per second"
+
+  scenarios:
+    - name: "Normal load (500 users)"
+      duration: "5 minutes"
+      rps: 100
+      target_p95: "< 500ms"
+      target_p99: "< 1000ms"
+
+    - name: "Peak load (2000 users)"
+      duration: "2 minutes"
+      rps: 400
+      target_p95: "< 1000ms"
+      target_p99: "< 2000ms"
+
+    - name: "Cache effectiveness (spike)"
+      duration: "30 seconds"
+      description: "Spike from 100 to 2000 users to test cache"
+      target_p95: "< 200ms (cache hits)"
+
+# Security Tests
+security_tests:
+  test_file: "e2e/dashboard-security.spec.ts"
+  framework: "Playwright"
+
+  test_scenarios:
+    - name: "Cross-org data isolation"
+      steps:
+        - "Login as Org A user"
+        - "Load dashboard"
+        - "Manipulate API call with Org B ID"
+      verification: "API returns 403 Forbidden"
+
+    - name: "Authentication required"
+      steps:
+        - "Without auth token, call /api/shipping/dashboard"
+      verification: "API returns 401 Unauthorized"
+
+    - name: "Role-based access"
+      steps:
+        - "Login as VIEWER user"
+        - "Try to click Create SO button"
+      verification: "Button disabled with tooltip"
+
+    - name: "XSS prevention"
+      steps:
+        - "Inject script in activity description"
+      verification: "Script is escaped/sanitized"
+
+# Test Data & Fixtures
+test_data:
+  seed_database:
+    - description: "Create test org and users"
+      roles: ["ADMIN", "SALES", "WAREHOUSE", "VIEWER"]
+
+    - description: "Create sample sales orders"
+      count: 100
+      statuses: ["draft", "confirmed", "allocated", "picking", "packing", "shipped"]
+
+    - description: "Create sample pick lists"
+      count: 50
+      statuses: ["pending", "assigned", "in_progress", "completed"]
+
+    - description: "Create sample shipments"
+      count: 30
+      dates: "last 30 days"
+      statuses: ["pending", "packed", "shipped"]
+
+    - description: "Create activity log entries"
+      count: 20
+      types: ["so_created", "so_confirmed", "so_shipped", "pick_completed"]
+
+  mocking:
+    - description: "Mock Redis for testing"
+      behavior: "Can set/get cache keys"
+    - description: "Mock API responses"
+      endpoints:
+        - "/api/shipping/dashboard"
+        - "/api/shipping/dashboard/alerts"
+        - "/api/shipping/dashboard/recent-activity"
+
+# Test Execution & Reporting
+test_execution:
+  ci_pipeline: "GitHub Actions"
+  triggers: ["Push to newDoc", "PR", "Manual trigger"]
+
+  stages:
+    - name: "Unit Tests"
+      command: "npm run test:unit -- --coverage"
+      target_coverage: "> 80%"
+      artifacts: "coverage/lcov.html"
+
+    - name: "Component Tests"
+      command: "npm run test:components"
+      artifacts: "test-results.json"
+
+    - name: "Integration Tests"
+      command: "npm run test:integration"
+      browsers: ["chromium", "firefox"]
+      artifacts: "test-results/"
+
+    - name: "Accessibility Tests"
+      command: "npm run test:a11y"
+      artifacts: "a11y-report.html"
+
+    - name: "Performance Tests"
+      command: "npm run test:performance"
+      artifacts: "performance-report.json"
+
+  reporting:
+    - "Coverage report in PR"
+    - "Failed tests as PR comments"
+    - "Performance regression alerts"
+    - "Dashboard link to full reports"
+
+# Definition of Done (DoD)
+definition_of_done:
+  functionality:
+    - "[ ] All 3 API endpoints functional"
+    - "[ ] Dashboard page loads within 500ms"
+    - "[ ] 4 KPI cards display correct data"
+    - "[ ] Orders by Status pie chart renders"
+    - "[ ] Shipments by Date line chart renders"
+    - "[ ] Alerts section displays 4 alert types"
+    - "[ ] Recent activity timeline shows last 10 activities"
+    - "[ ] Quick actions navigate correctly"
+    - "[ ] Date range filter works for all presets and custom"
+    - "[ ] Redis caching functional with 1min TTL"
+    - "[ ] Cache hit rate > 90%"
+
+  testing:
+    - "[ ] Unit tests pass (>80% coverage)"
+    - "[ ] Component tests pass"
+    - "[ ] Integration tests pass all browsers"
+    - "[ ] E2E tests pass"
+    - "[ ] Accessibility tests pass (WCAG 2.1 AA)"
+    - "[ ] Performance tests pass (< 500ms load)"
+    - "[ ] Load test passes (1000 RPS)"
+    - "[ ] Security tests pass (RLS, CORS, XSS)"
+
+  design:
+    - "[ ] Mobile responsive (< 768px)"
+    - "[ ] Tablet responsive (768-1024px)"
+    - "[ ] Desktop responsive (> 1024px)"
+    - "[ ] No horizontal scroll"
+    - "[ ] Touch targets >= 48x48dp"
+    - "[ ] Matches wireframe SHIP-022"
+
+  code_quality:
+    - "[ ] All unit tests pass"
+    - "[ ] Code coverage > 80%"
+    - "[ ] ESLint warnings: 0"
+    - "[ ] TypeScript strict mode: 0 errors"
+    - "[ ] No console errors/warnings in prod build"
+
+  documentation:
+    - "[ ] API endpoints documented"
+    - "[ ] Component props documented"
+    - "[ ] Cache strategy documented"
+    - "[ ] Performance targets documented"
+    - "[ ] Error handling documented"
+
+  security:
+    - "[ ] RLS policies enforced on all queries"
+    - "[ ] Cross-org access blocked (403)"
+    - "[ ] XSS prevention in activity feed"
+    - "[ ] CSRF protection on all POST actions"
+    - "[ ] Rate limiting enforced"
+
+  performance:
+    - "[ ] Dashboard load < 500ms (p95)"
+    - "[ ] KPI API < 200ms (p95)"
+    - "[ ] Alerts API < 150ms (p95)"
+    - "[ ] Activity API < 100ms (p95)"
+    - "[ ] Chart render < 100ms"
+    - "[ ] Cache hit rate > 90%"
+
+  multi_tenancy:
+    - "[ ] Org-scoped data verified"
+    - "[ ] RLS blocks cross-org access"
+    - "[ ] Cache keys include org_id"
+    - "[ ] Multi-tenant isolation tests pass"
+
+  reviewed:
+    - "[ ] Code review approved"
+    - "[ ] Design review approved"
+    - "[ ] QA sign-off"

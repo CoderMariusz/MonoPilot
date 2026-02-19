@@ -1,0 +1,141 @@
+# Story 06.7 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata, dependencies, high-level overview
+# Quality Module - Sampling Plans with AQL-based statistical acceptance
+
+story:
+  id: "06.7"
+  name: "Sampling Plans (AQL)"
+  slug: "sampling-plans-aql"
+  epic: "06-quality"
+  phase: "1B"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "fullstack"
+  state: "ready"
+  priority: "P0"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies, overview
+  - database.yaml    # Tables (sampling_plans, sampling_records), RLS, seed (ISO 2859 table)
+  - api.yaml         # Endpoints (CRUD, records, helper), schemas, validation
+  - frontend.yaml    # Components (list, form, modal, record), pages, services, types
+  - tests.yaml       # Acceptance criteria, unit/integration/E2E test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["org_id context", "RLS patterns", "users table lookup"]
+    - story: "06.3"
+      name: "Product Specifications"
+      provides: ["quality_specifications table", "product validation"]
+  blocked_by: []
+  blocks:
+    - story: "06.5"
+      name: "Incoming Inspection"
+      reason: "Sampling plans assigned to inspections during incoming QA"
+    - story: "06.6"
+      name: "In-Process Inspection"
+      reason: "Sampling plans available for in-process quality checks"
+    - story: "06.8"
+      name: "Final Inspection"
+      reason: "Sampling plans available for final product QA"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/quality.md"
+    sections: ["FR-QA-008: Sampling Plans (AQL-Based)", "Section 12: Sampling Plans"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/quality.md"
+    sections: ["sampling_plans table", "sampling_records table", "Database Schema"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/06-quality/06.7.sampling-plans-aql.md"
+  wireframes:
+    path: "docs/3-ARCHITECTURE/ux/wireframes/QA-008-sampling-plans.md"
+    sections: ["Sampling Plans List", "Create/Edit Modal", "ISO 2859 Table Helper", "Sampling Record"]
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for sampling_plans and sampling_records tables"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 3
+    description: |
+      1. sampling_plans table with RLS
+      2. sampling_records table with RLS
+      3. iso_2859_reference seed table (General Inspection Levels I, II, III, 15 lot size ranges)
+  - type: "service"
+    count: 2
+    description: |
+      1. sampling-plan-service.ts (CRUD, validation, plan lookup)
+      2. iso-2859-service.ts (table queries, AQL calculations)
+  - type: "api"
+    count: 8
+    description: |
+      GET /api/quality/sampling-plans (list)
+      POST /api/quality/sampling-plans (create)
+      GET /api/quality/sampling-plans/:id (detail)
+      PUT /api/quality/sampling-plans/:id (update)
+      DELETE /api/quality/sampling-plans/:id (soft delete)
+      POST /api/quality/sampling-records (record sample)
+      GET /api/quality/sampling-records/inspection/:inspectionId (list samples)
+      GET /api/quality/iso-2859-reference (table query)
+  - type: "validation"
+    count: 2
+    description: "Zod schemas for sampling plan creation and sampling record entry"
+  - type: "pages"
+    count: 2
+    description: |
+      1. /quality/sampling-plans (list page)
+      2. /quality/sampling-plans/:id (detail/edit page)
+  - type: "components"
+    count: 8
+    description: |
+      1. SamplingPlansList (data table with filters)
+      2. SamplingPlanForm (create/edit modal)
+      3. ISO2859TableModal (AQL calculator and helper)
+      4. SamplingPlanSelector (dropdown in inspection form)
+      5. SampleRecordingForm (modal for recording individual samples)
+      6. SamplesList (embedded in inspection detail)
+      7. SamplingProgressBar (progress indicator)
+      8. SamplingDecisionPanel (accept/reject summary)
+  - type: "test"
+    count: 3
+    description: |
+      1. Unit tests for sampling-plan-service (CRUD, validation)
+      2. Unit tests for iso-2859-service (AQL calculations)
+      3. Integration tests for API endpoints
+      4. E2E tests for sampling plan creation and sample recording workflow
+
+# Technical notes
+technical_notes:
+  - "ISO 2859-1 / ANSI Z1.4 standard for statistical acceptance sampling"
+  - "General Inspection Levels only in MVP: I (Normal), II (Standard), III (Tightened)"
+  - "Special Levels S-1 to S-4 deferred to Phase 2 (hidden in UI)"
+  - "Sampling method in MVP: AQL-based (ISO table lookup)"
+  - "Use ADR-013 RLS pattern: (SELECT org_id FROM users WHERE id = auth.uid())"
+  - "Lot size ranges from 2-8 up to 3201-10000 units (11 ranges total)"
+  - "AQL values: 0.65, 1.0, 1.5, 2.5, 4.0, 6.5, 10.0 (most common: 2.5)"
+  - "Sample size varies by lot size within a plan's range"
+  - "Sample records immutable after inspection completed"
+  - "Sampling plan deletion blocked if used by active/recent inspections"
+  - "Auto-detection of active plan during inspection creation (product + type + lot size match)"
+  - "Auto-generate sample identifiers (S-001, S-002, etc.)"
+  - "Lot decision auto-calculated: defects <= acceptance -> accept, defects >= rejection -> reject"
+  - "Rejected lots trigger automatic quality hold"
+  - "Optional NCR creation on lot rejection with sampling details auto-populated"
+
+# Phase 2+ Features (Hidden in MVP)
+deferred_features:
+  - "Special Inspection Levels (S-1, S-2, S-3, S-4)"
+  - "Switching Rules (Normal/Tightened/Reduced based on quality history)"
+  - "Multiple Sampling types (Single, Double, Multiple)"
+  - "Sequential Sampling (accept/reject during sampling)"
+  - "Sample Location Stratification (top/middle/bottom sampling)"
+  - "Sampling Plan Templates (reusable by product category)"
+  - "Plan effectiveness analytics (historical analysis)"

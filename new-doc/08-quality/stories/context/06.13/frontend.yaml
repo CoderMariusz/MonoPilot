@@ -1,0 +1,451 @@
+# Story 06.13 - Frontend Context
+# Generated: 2026-01-15
+# Purpose: Components, pages, hooks, types for NCR Workflow State Machine
+
+# =============================================================================
+# PAGES
+# =============================================================================
+
+pages:
+  - path: app/(authenticated)/quality/ncrs/[id]/page.tsx
+    name: NCRDetailPage
+    description: "NCR detail page with workflow timeline (extends 06.9)"
+    components:
+      - NCRWorkflowTimeline
+      - NCRTransitionButton
+      - NCRAvailableTransitions
+      - NCROverdueIndicator
+    data_fetching:
+      - hook: useNCR
+        endpoint: GET /api/quality/ncrs/:id
+      - hook: useNCRWorkflow
+        endpoint: GET /api/quality/ncrs/:id/workflow
+      - hook: useAvailableTransitions
+        endpoint: GET /api/quality/ncrs/:id/available-transitions
+    layout:
+      - "Header: NCR number, status badge, overdue indicator"
+      - "Sidebar: Workflow timeline (vertical stepper)"
+      - "Main: NCR details tabs"
+      - "Footer: Available transition buttons"
+
+  - path: app/(authenticated)/quality/ncrs/[id]/workflow/page.tsx
+    name: NCRWorkflowHistoryPage
+    description: "Full workflow history page (optional)"
+    components:
+      - NCRWorkflowHistory
+    data_fetching:
+      - hook: useNCRWorkflow
+
+# =============================================================================
+# COMPONENTS
+# =============================================================================
+
+components:
+  # ---------------------------------------------------------------------------
+  # Timeline Components
+  # ---------------------------------------------------------------------------
+  - name: NCRWorkflowTimeline
+    path: components/quality/ncr/NCRWorkflowTimeline.tsx
+    description: "Vertical stepper showing all workflow states with progress"
+    props:
+      - name: ncrId
+        type: string
+      - name: currentState
+        type: NCRWorkflowState
+      - name: stateEnteredAt
+        type: string
+      - name: stateDueAt
+        type: string | null
+        optional: true
+      - name: currentOwner
+        type: User | null
+        optional: true
+    features:
+      - "8 states: draft -> open -> investigation -> root_cause -> corrective_action -> verification -> closed"
+      - "Completed states: green checkmark"
+      - "Current state: blue highlighted"
+      - "Future states: gray"
+      - "Reopened state: orange branching indicator"
+      - "Overdue state: red warning icon"
+      - "SLA countdown for current state"
+      - "Owner name display on current state"
+    ui_pattern: "Vertical Stepper (ShadCN Steps pattern)"
+
+  - name: NCRWorkflowProgress
+    path: components/quality/ncr/NCRWorkflowProgress.tsx
+    description: "Compact horizontal progress bar for list view"
+    props:
+      - name: currentState
+        type: NCRWorkflowState
+      - name: isOverdue
+        type: boolean
+        optional: true
+        default: false
+    features:
+      - "8 segments for 8 states"
+      - "Filled segments = completed"
+      - "Current segment = pulsing"
+      - "Overdue: red color override"
+    ui_pattern: "Progress bar with 8 steps"
+
+  # ---------------------------------------------------------------------------
+  # Transition Components
+  # ---------------------------------------------------------------------------
+  - name: NCRTransitionModal
+    path: components/quality/ncr/NCRTransitionModal.tsx
+    description: "Modal for executing state transition"
+    props:
+      - name: ncrId
+        type: string
+      - name: transition
+        type: AvailableTransition
+      - name: open
+        type: boolean
+      - name: onOpenChange
+        type: "(open: boolean) => void"
+      - name: onSuccess
+        type: "() => void"
+    features:
+      - "Title: transition button_label"
+      - "From/To state display"
+      - "Notes textarea (required if requires_notes=true)"
+      - "Character counter for min_notes_length"
+      - "Confirmation checkbox (if confirmation_required)"
+      - "SLA info: 'Target SLA: X hours'"
+      - "Loading state during API call"
+      - "Error handling with toast"
+    validation:
+      - "Notes required if requires_notes=true"
+      - "Notes length >= min_notes_length"
+      - "Confirmation checked if confirmation_required"
+    ui_pattern: "ShadCN Dialog with form"
+
+  - name: NCRTransitionButton
+    path: components/quality/ncr/NCRTransitionButton.tsx
+    description: "Button that opens transition modal"
+    props:
+      - name: ncrId
+        type: string
+      - name: transition
+        type: AvailableTransition
+      - name: onSuccess
+        type: "() => void"
+        optional: true
+    features:
+      - "Button label from transition.button_label"
+      - "Button variant from transition.button_variant"
+      - "Disabled if !transition.user_can_execute"
+      - "Tooltip with blocked_reason if blocked"
+      - "Opens NCRTransitionModal on click"
+    ui_pattern: "ShadCN Button"
+
+  - name: NCRAvailableTransitions
+    path: components/quality/ncr/NCRAvailableTransitions.tsx
+    description: "List of available transition buttons"
+    props:
+      - name: ncrId
+        type: string
+      - name: currentState
+        type: NCRWorkflowState
+    data_fetching:
+      - hook: useAvailableTransitions
+        endpoint: GET /api/quality/ncrs/:id/available-transitions
+    features:
+      - "Auto-refresh on workflow update"
+      - "Grouped by can_execute status"
+      - "Horizontal button group"
+      - "Empty state: 'No actions available'"
+    ui_pattern: "Button group (ShadCN)"
+
+  # ---------------------------------------------------------------------------
+  # History Components
+  # ---------------------------------------------------------------------------
+  - name: NCRWorkflowHistory
+    path: components/quality/ncr/NCRWorkflowHistory.tsx
+    description: "Table of all workflow transitions"
+    props:
+      - name: ncrId
+        type: string
+    data_fetching:
+      - hook: useNCRWorkflow
+    columns:
+      - "Transition"
+      - "From → To"
+      - "Transitioned By"
+      - "Date"
+      - "Time in State"
+      - "Overdue?"
+      - "Notes"
+    features:
+      - "Sorted by transitioned_at DESC"
+      - "Overdue badge if was_overdue=true"
+      - "Notes in expandable row"
+      - "Time in state calculated (hours)"
+    ui_pattern: "ShadCN DataTable"
+
+  - name: NCRStateHistoryCard
+    path: components/quality/ncr/NCRStateHistoryCard.tsx
+    description: "Card for single history entry"
+    props:
+      - name: entry
+        type: NCRStateHistoryEntry
+    features:
+      - "Timeline style with left border"
+      - "State badges for from/to"
+      - "User avatar + name"
+      - "Timestamp (relative)"
+      - "Notes in collapsed section"
+      - "Overdue warning if applicable"
+    ui_pattern: "Card with timeline connector"
+
+  # ---------------------------------------------------------------------------
+  # Badge Components
+  # ---------------------------------------------------------------------------
+  - name: NCRStateBadge
+    path: components/quality/ncr/NCRStateBadge.tsx
+    description: "Badge with state-specific colors (8 states)"
+    props:
+      - name: state
+        type: NCRWorkflowState
+      - name: size
+        type: "'sm' | 'md' | 'lg'"
+        optional: true
+        default: md
+    colors:
+      draft: "bg-gray-200 text-gray-700"
+      open: "bg-blue-500 text-white"
+      investigation: "bg-purple-500 text-white"
+      root_cause: "bg-indigo-500 text-white"
+      corrective_action: "bg-yellow-500 text-black"
+      verification: "bg-orange-500 text-white"
+      closed: "bg-green-500 text-white"
+      reopened: "bg-red-500 text-white"
+    icons:
+      draft: "FileText"
+      open: "AlertCircle"
+      investigation: "Search"
+      root_cause: "GitBranch"
+      corrective_action: "Tool"
+      verification: "CheckCircle"
+      closed: "Check"
+      reopened: "RefreshCw"
+
+  - name: NCROverdueIndicator
+    path: components/quality/ncr/NCROverdueIndicator.tsx
+    description: "Badge/indicator for overdue state"
+    props:
+      - name: stateDueAt
+        type: string | null
+      - name: currentState
+        type: NCRWorkflowState
+    features:
+      - "Shows days overdue if past due date"
+      - "Shows countdown if within 24h"
+      - "Red for overdue, yellow for <24h"
+      - "Hidden if no SLA or closed/draft"
+    ui_pattern: "Badge with icon"
+
+  # ---------------------------------------------------------------------------
+  # Config Components (Admin)
+  # ---------------------------------------------------------------------------
+  - name: NCRWorkflowConfig
+    path: components/quality/ncr/NCRWorkflowConfig.tsx
+    description: "Admin page for workflow configuration"
+    props:
+      - name: orgId
+        type: string
+    features:
+      - "List of transitions (from/to, roles, SLA)"
+      - "Edit transition settings"
+      - "Enable/disable transitions"
+      - "Auto-assign configuration"
+      - "Notification routing"
+    roles: ["SUPER_ADMIN", "ADMIN"]
+    ui_pattern: "DataTable with inline edit"
+
+# =============================================================================
+# HOOKS
+# =============================================================================
+
+hooks:
+  - name: useNCRWorkflow
+    path: lib/hooks/use-ncr-workflow.ts
+    description: "Fetch NCR workflow history"
+    params:
+      - name: ncrId
+        type: string
+    returns:
+      type: "{ ncr_id, ncr_number, current_state, state_entered_at, state_due_at, is_overdue, current_owner, history: NCRStateHistoryEntry[], isLoading, error }"
+    swr_key: "['/api/quality/ncrs/:id/workflow', ncrId]"
+
+  - name: useAvailableTransitions
+    path: lib/hooks/use-available-transitions.ts
+    description: "Fetch available transitions for current state"
+    params:
+      - name: ncrId
+        type: string
+    returns:
+      type: "{ current_state, transitions: AvailableTransition[], isLoading, error }"
+    swr_config:
+      refreshInterval: 60000
+      revalidateOnFocus: true
+
+  - name: useExecuteTransition
+    path: lib/hooks/use-execute-transition.ts
+    description: "Mutation hook for transition execution"
+    returns:
+      type: |
+        {
+          executeTransition: (input: TransitionNCRRequest) => Promise<void>,
+          isLoading: boolean,
+          error: Error
+        }
+    features:
+      - "Calls POST /api/quality/ncrs/:id/transition"
+      - "Revalidates workflow and available transitions"
+      - "Shows success/error toast"
+
+# =============================================================================
+# TYPES
+# =============================================================================
+
+types:
+  - name: NCRWorkflowState
+    path: lib/types/ncr-workflow.ts
+    definition: |
+      type NCRWorkflowState =
+        | 'draft'
+        | 'open'
+        | 'investigation'
+        | 'root_cause'
+        | 'corrective_action'
+        | 'verification'
+        | 'closed'
+        | 'reopened';
+
+  - name: NCRStateHistoryEntry
+    path: lib/types/ncr-workflow.ts
+    definition: |
+      interface NCRStateHistoryEntry {
+        id: string;
+        transition_code: string;
+        from_state: NCRWorkflowState;
+        to_state: NCRWorkflowState;
+        transitioned_by: string;
+        transitioned_by_name: string;
+        transitioned_at: string;
+        transition_notes: string | null;
+        was_overdue: boolean;
+        time_in_state_hours: number | null;
+      }
+
+  - name: AvailableTransition
+    path: lib/types/ncr-workflow.ts
+    definition: |
+      interface AvailableTransition {
+        transition_code: string;
+        from_state: NCRWorkflowState;
+        to_state: NCRWorkflowState;
+        button_label: string;
+        button_variant: 'default' | 'primary' | 'destructive' | 'outline';
+        requires_notes: boolean;
+        min_notes_length: number;
+        confirmation_required: boolean;
+        confirmation_message: string | null;
+        user_can_execute: boolean;
+        blocked_reason: string | null;
+        target_sla_hours: number | null;
+      }
+
+  - name: TransitionNCRRequest
+    path: lib/types/ncr-workflow.ts
+    definition: |
+      interface TransitionNCRRequest {
+        transition_code: string;
+        notes?: string;
+        confirmed?: boolean;
+      }
+
+  - name: NCRWorkflowResponse
+    path: lib/types/ncr-workflow.ts
+    definition: |
+      interface NCRWorkflowResponse {
+        ncr_id: string;
+        ncr_number: string;
+        current_state: NCRWorkflowState;
+        state_entered_at: string;
+        state_due_at: string | null;
+        is_overdue: boolean;
+        current_owner_id: string | null;
+        current_owner_name: string | null;
+        history: NCRStateHistoryEntry[];
+      }
+
+# =============================================================================
+# UTILITIES
+# =============================================================================
+
+utilities:
+  - name: getStateColor
+    path: lib/utils/ncr-workflow-utils.ts
+    description: "Get Tailwind color class for state"
+    example: "getStateColor('investigation') => 'purple'"
+
+  - name: getStateLabel
+    path: lib/utils/ncr-workflow-utils.ts
+    description: "Get human-readable state label"
+    example: "getStateLabel('root_cause') => 'Root Cause Analysis'"
+
+  - name: getStateIcon
+    path: lib/utils/ncr-workflow-utils.ts
+    description: "Get Lucide icon component for state"
+    example: "getStateIcon('verification') => CheckCircle"
+
+  - name: calculateTimeInState
+    path: lib/utils/ncr-workflow-utils.ts
+    description: "Calculate hours in state from timestamps"
+    example: "calculateTimeInState(start, end) => 48.5"
+
+  - name: formatTimeInState
+    path: lib/utils/ncr-workflow-utils.ts
+    description: "Format hours as human-readable duration"
+    example: "formatTimeInState(48.5) => '2 days 30 min'"
+
+  - name: isOverdue
+    path: lib/utils/ncr-workflow-utils.ts
+    description: "Check if NCR is overdue"
+    example: "isOverdue(state_due_at) => boolean"
+
+# =============================================================================
+# UI PATTERNS
+# =============================================================================
+
+ui_patterns:
+  workflow_timeline:
+    - "Position: Left sidebar on NCR detail page"
+    - "Width: 240px"
+    - "Vertical steps with connectors"
+    - "Step indicator: circle with icon"
+    - "Completed: green fill + checkmark"
+    - "Current: blue fill + pulsing ring"
+    - "Future: gray outline"
+    - "Overdue: red fill + warning icon"
+    - "Connector lines: solid for completed, dashed for future"
+
+  transition_modal:
+    - "Width: 500px"
+    - "Header: Transition label + current state → new state"
+    - "Body: Notes textarea (if required)"
+    - "Footer: Cancel + Confirm (variant from transition)"
+    - "Confirmation: Checkbox if confirmation_required"
+    - "Loading: Disabled buttons + spinner"
+
+  state_badges:
+    draft: { bg: "gray-200", text: "gray-700", icon: "FileText" }
+    open: { bg: "blue-500", text: "white", icon: "AlertCircle" }
+    investigation: { bg: "purple-500", text: "white", icon: "Search" }
+    root_cause: { bg: "indigo-500", text: "white", icon: "GitBranch" }
+    corrective_action: { bg: "yellow-500", text: "black", icon: "Tool" }
+    verification: { bg: "orange-500", text: "white", icon: "CheckCircle" }
+    closed: { bg: "green-500", text: "white", icon: "Check" }
+    reopened: { bg: "red-500", text: "white", icon: "RefreshCw" }

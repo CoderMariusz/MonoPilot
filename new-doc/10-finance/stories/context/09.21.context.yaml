@@ -1,0 +1,188 @@
+story:
+  id: "09.21"
+  name: "Margin Analysis"
+  epic: "09-finance"
+  phase: "3"
+  complexity: "L"
+  estimate_days: 4-5
+  type: "fullstack"
+
+dependencies:
+  required:
+    - story: "02.1"
+      provides: ["products", "selling_price"]
+    - story: "02.2"
+      provides: ["product_categories", "product families"]
+    - story: "09.6"
+      provides: ["work_order_costs", "actual costs"]
+  optional:
+    - story: "09.13"
+      provides: ["material_variance"]
+    - story: "09.14"
+      provides: ["labor_variance"]
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/finance.md"
+  prd_sections: ["FR-9.7.1", "FR-9.7.2", "FR-9.7.3", "FR-9.7.4", "FR-9.7.5", "FR-9.7.6", "FR-9.7.7", "FR-FIN-057"]
+  story: "docs/2-MANAGEMENT/epics/current/09-finance/09.21.margin-analysis.md"
+  patterns:
+    - "apps/frontend/components/finance/reports/CostByProductTable.tsx"
+
+files_to_create:
+  database:
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_create_product_margins.sql"
+      type: "migration"
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_create_margin_alerts.sql"
+      type: "migration"
+  api:
+    - path: "apps/frontend/app/api/finance/margin-analysis/by-product/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/finance/margin-analysis/by-family/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/finance/margin-analysis/by-customer/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/finance/margin-analysis/trends/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/finance/margin-analysis/targets/route.ts"
+      methods: ["POST"]
+    - path: "apps/frontend/app/api/finance/margin-analysis/alerts/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/finance/margin-analysis/alerts/[id]/acknowledge/route.ts"
+      methods: ["POST"]
+  services:
+    - path: "apps/frontend/lib/services/margin-analysis-service.ts"
+  validation:
+    - path: "apps/frontend/lib/validation/margin.ts"
+  pages:
+    - path: "apps/frontend/app/(authenticated)/finance/margin-analysis/by-product/page.tsx"
+    - path: "apps/frontend/app/(authenticated)/finance/margin-analysis/by-family/page.tsx"
+    - path: "apps/frontend/app/(authenticated)/finance/margin-analysis/by-customer/page.tsx"
+    - path: "apps/frontend/app/(authenticated)/finance/margin-analysis/trends/page.tsx"
+  components:
+    - path: "apps/frontend/components/finance/margin/MarginByProductTable.tsx"
+    - path: "apps/frontend/components/finance/margin/MarginByFamilyPage.tsx"
+    - path: "apps/frontend/components/finance/margin/MarginTrendsChart.tsx"
+    - path: "apps/frontend/components/finance/margin/SetTargetMarginModal.tsx"
+    - path: "apps/frontend/components/finance/margin/MarginSummaryCards.tsx"
+
+database:
+  tables:
+    - name: "product_margins"
+      columns:
+        - "id"
+        - "org_id"
+        - "product_id"
+        - "product_family_id"
+        - "effective_date"
+        - "selling_price"
+        - "total_cost"
+        - "variable_cost"
+        - "fixed_cost"
+        - "margin_amount"
+        - "margin_percent"
+        - "contribution_margin_amount"
+        - "contribution_margin_percent"
+        - "target_margin_percent"
+        - "variance_to_target"
+        - "units_sold"
+        - "total_revenue"
+        - "total_margin"
+        - "currency_id"
+      rls: true
+      indexes:
+        - "product_id"
+        - "product_family_id"
+        - "org_id, effective_date DESC"
+    - name: "margin_alerts"
+      columns:
+        - "id"
+        - "org_id"
+        - "product_id"
+        - "product_family_id"
+        - "alert_type"
+        - "severity"
+        - "actual_margin_percent"
+        - "target_margin_percent"
+        - "variance_percent"
+        - "contributing_factors"
+        - "status"
+        - "acknowledged_by"
+        - "acknowledged_at"
+        - "acknowledged_notes"
+      rls: true
+      indexes:
+        - "product_id"
+        - "org_id, status"
+
+api_endpoints:
+  - method: "GET"
+    path: "/api/finance/margin-analysis/by-product"
+    auth: true
+    roles: ["finance_manager", "cfo", "product_manager"]
+  - method: "GET"
+    path: "/api/finance/margin-analysis/by-family"
+    auth: true
+    roles: ["finance_manager", "cfo"]
+  - method: "GET"
+    path: "/api/finance/margin-analysis/by-customer"
+    auth: true
+    roles: ["finance_manager", "cfo", "sales_director"]
+  - method: "GET"
+    path: "/api/finance/margin-analysis/trends"
+    auth: true
+    roles: ["finance_manager", "cfo"]
+  - method: "POST"
+    path: "/api/finance/margin-analysis/targets"
+    auth: true
+    roles: ["finance_manager"]
+
+ux:
+  wireframes:
+    - id: "FIN-021"
+      description: "Margin Analysis Dashboard"
+      components:
+        - "Summary KPI cards"
+        - "Margin by product table"
+        - "Product family drill-down"
+        - "Margin trend chart"
+  patterns:
+    table: "ShadCN DataTable with sorting"
+    chart: "Recharts LineChart/BarChart"
+    modal: "ShadCN Dialog"
+
+validation_rules:
+  target_margin_percent: "Range 0-100%"
+  margin_calculation: "Margin = (Selling Price - Total Cost) / Selling Price × 100"
+  contribution_margin: "Contribution Margin = Selling Price - Variable Costs"
+
+patterns:
+  rls: "ADR-013"
+  api: "REST with org_id filter"
+  service: "class-based with static methods"
+  validation: "zod schemas"
+  charts: "Recharts"
+
+acceptance_checklist:
+  - "product_margins table created with RLS"
+  - "margin_alerts table created"
+  - "Margin by product report works"
+  - "Margin by family report works"
+  - "Margin by customer report works"
+  - "Margin trends chart displays"
+  - "Target margin setting works"
+  - "Margin alerts triggered correctly"
+  - "Alert acknowledgment works"
+  - "Export to Excel/CSV works"
+  - "All tests pass (unit, integration, E2E)"
+
+output_artifacts:
+  - "Migration: product_margins table"
+  - "Migration: margin_alerts table"
+  - "API: 7 margin analysis endpoints"
+  - "Service: MarginAnalysisService"
+  - "Component: MarginByProductTable"
+  - "Component: MarginByFamilyPage"
+  - "Component: MarginTrendsChart"
+  - "Component: SetTargetMarginModal"
+  - "Page: 4 margin analysis pages"
+  - "Tests: Unit, integration, E2E"

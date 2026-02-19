@@ -1,0 +1,443 @@
+# Story 01.16 - GAP Analysis vs Codebase
+# Generated: 2025-12-16
+# Purpose: What exists vs what needs to be built/refactored
+# Story: User Invitations (Email)
+
+gap_summary:
+  overall_readiness: "5%"
+  critical_blockers: 3
+  components_done: 0
+  components_partial: 1
+  components_missing: 16
+
+# =============================================================================
+# DATABASE GAPS
+# =============================================================================
+database_gaps:
+  - component: "user_invitations table"
+    expected: "supabase/migrations/XXX_user_invitations.sql"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      No user_invitations table exists.
+      Required columns: id, org_id, email, role_id, token, expires_at,
+      invited_by, status, accepted_at, cancelled_at, created_at, updated_at
+      Required constraints: UNIQUE(org_id, email, status), CHECK(status IN (...))
+    refactor_action: "Create migration XXX_user_invitations.sql"
+    priority: "P0-BLOCKER"
+
+  - component: "RLS policies for user_invitations"
+    expected: "Org isolation, admin read/write"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      No RLS policies for user_invitations table.
+      Required:
+      - SELECT: Users can read own org invitations
+      - INSERT/UPDATE/DELETE: Only admins can manage invitations
+    refactor_action: "Include in XXX_user_invitations.sql migration"
+    priority: "P0-BLOCKER"
+
+  - component: "user_invitations indexes"
+    expected: "Indexes on token, org_id+status, email, expires_at"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No indexes for performance optimization"
+    refactor_action: "Include in XXX_user_invitations.sql migration"
+    priority: "P1"
+
+# =============================================================================
+# SERVICE GAPS
+# =============================================================================
+service_gaps:
+  - component: "invitation-service.ts"
+    expected: "apps/frontend/lib/services/invitation-service.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      No invitation service exists.
+      Required methods:
+      - createInvitation(orgId, invitedBy, email, role_id)
+      - getInvitationByToken(token)
+      - acceptInvitation(token, password)
+      - resendInvitation(invitationId, orgId)
+      - cancelInvitation(invitationId, orgId)
+      - getOrgInvitations(orgId, status)
+    refactor_action: "Create new service"
+    priority: "P0-BLOCKER"
+
+  - component: "email-service.ts"
+    expected: "apps/frontend/lib/services/email-service.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      No email service exists.
+      Required methods:
+      - sendInvitationEmail(to, orgName, inviterName, roleName, inviteUrl, expiresAt)
+      - renderInvitationTemplate(params)
+    refactor_action: "Create new service with Resend integration"
+    priority: "P0-BLOCKER"
+
+  - component: "Resend API integration"
+    expected: "Resend npm package installed and configured"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No email provider integration"
+    refactor_action: "Install resend package, add RESEND_API_KEY to env"
+    priority: "P0"
+
+# =============================================================================
+# VALIDATION GAPS
+# =============================================================================
+validation_gaps:
+  - component: "invitation-schemas.ts"
+    expected: "apps/frontend/lib/validation/invitation-schemas.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      No Zod schemas for invitation operations.
+      Required: inviteUserSchema, acceptInvitationSchema
+    refactor_action: "Create validation schemas"
+    priority: "P0"
+
+# =============================================================================
+# COMPONENT GAPS
+# =============================================================================
+component_gaps:
+  - component: "InviteUserModal.tsx"
+    expected: "apps/frontend/components/settings/users/InviteUserModal.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Modal for sending user invitations (email + role)"
+    refactor_action: "Create component"
+    priority: "P0"
+
+  - component: "PendingInvitationsTable.tsx"
+    expected: "apps/frontend/components/settings/users/PendingInvitationsTable.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Table listing pending invitations with resend/cancel"
+    refactor_action: "Create component"
+    priority: "P0"
+
+  - component: "InvitationRow.tsx"
+    expected: "apps/frontend/components/settings/users/InvitationRow.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Single invitation row with actions"
+    refactor_action: "Create component"
+    priority: "P1"
+
+  - component: "InvitationStatusBadge.tsx"
+    expected: "apps/frontend/components/settings/users/InvitationStatusBadge.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Status badge (pending, accepted, expired, cancelled)"
+    refactor_action: "Create component"
+    priority: "P2"
+
+  - component: "ResendConfirmDialog.tsx"
+    expected: "apps/frontend/components/settings/users/ResendConfirmDialog.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Confirmation dialog for resending invitation"
+    refactor_action: "Create component"
+    priority: "P1"
+
+  - component: "CancelInvitationDialog.tsx"
+    expected: "apps/frontend/components/settings/users/CancelInvitationDialog.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Confirmation dialog for cancelling invitation"
+    refactor_action: "Create component"
+    priority: "P1"
+
+  - component: "AcceptInvitationForm.tsx"
+    expected: "apps/frontend/components/auth/AcceptInvitationForm.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Password setup form for invitation acceptance"
+    refactor_action: "Create component"
+    priority: "P0"
+
+  - component: "InvitationExpiredPage.tsx"
+    expected: "apps/frontend/components/auth/InvitationExpiredPage.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Error page for expired/invalid invitations"
+    refactor_action: "Create component"
+    priority: "P1"
+
+# =============================================================================
+# PAGE GAPS
+# =============================================================================
+page_gaps:
+  - component: "Accept invitation page (public)"
+    expected: "apps/frontend/app/(public)/invite/[token]/page.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Public page for accepting invitation"
+    refactor_action: "Create page"
+    priority: "P0"
+
+# =============================================================================
+# API GAPS
+# =============================================================================
+api_gaps:
+  - component: "POST /api/v1/settings/users/invite"
+    expected: "Send new invitation"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Invitation creation endpoint"
+    refactor_action: "Create route.ts"
+    priority: "P0"
+
+  - component: "GET /api/v1/settings/users/invitations"
+    expected: "List pending invitations"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Invitation list endpoint"
+    refactor_action: "Create route.ts"
+    priority: "P0"
+
+  - component: "DELETE /api/v1/settings/users/invitations/:id"
+    expected: "Cancel invitation"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Invitation cancellation endpoint"
+    refactor_action: "Create route.ts"
+    priority: "P0"
+
+  - component: "POST /api/v1/settings/users/invitations/:id/resend"
+    expected: "Resend invitation"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Invitation resend endpoint"
+    refactor_action: "Create route.ts"
+    priority: "P0"
+
+  - component: "GET /api/auth/invitation/:token"
+    expected: "Get invitation details (public)"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Public endpoint for invitation details"
+    refactor_action: "Create route.ts"
+    priority: "P0"
+
+  - component: "POST /api/auth/accept-invitation"
+    expected: "Accept invitation and create account (public)"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Public endpoint for invitation acceptance"
+    refactor_action: "Create route.ts"
+    priority: "P0"
+
+# =============================================================================
+# EDGE FUNCTION GAPS
+# =============================================================================
+edge_function_gaps:
+  - component: "expire-invitations cron job"
+    expected: "supabase/functions/expire-invitations/index.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Daily cron to mark expired invitations"
+    refactor_action: "Create Edge Function with cron schedule"
+    priority: "P2"
+
+# =============================================================================
+# ENVIRONMENT GAPS
+# =============================================================================
+environment_gaps:
+  - component: "RESEND_API_KEY"
+    expected: "Environment variable for Resend API key"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No Resend API key configured"
+    refactor_action: "Add to .env and deployment environment"
+    priority: "P0"
+
+  - component: "INVITATION_BASE_URL"
+    expected: "Base URL for invitation links"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No base URL configured for invitation links"
+    refactor_action: "Add to .env (e.g., https://app.monopilot.io/invite)"
+    priority: "P1"
+
+  - component: "INVITATION_EXPIRY_DAYS"
+    expected: "Configurable expiry (default 7)"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No expiry configuration"
+    refactor_action: "Add to .env (default 7)"
+    priority: "P2"
+
+# =============================================================================
+# CRITICAL BLOCKERS (Must fix before story can be implemented)
+# =============================================================================
+critical_blockers:
+  - blocker: "No user_invitations table"
+    description: "Cannot track invitations without database table"
+    migration: "XXX_user_invitations.sql"
+    risk: "HIGH - blocks all invitation features"
+
+  - blocker: "No invitation-service.ts"
+    description: "All invitation endpoints need this service"
+    file: "lib/services/invitation-service.ts"
+    risk: "HIGH - blocks API development"
+
+  - blocker: "No email-service.ts"
+    description: "Cannot send invitation emails without email service"
+    file: "lib/services/email-service.ts"
+    risk: "HIGH - blocks core feature"
+
+  - blocker: "No Resend integration"
+    description: "Cannot send emails without provider"
+    dependency: "Resend npm package + API key"
+    risk: "HIGH - blocks email sending"
+
+# =============================================================================
+# IMPLEMENTATION ORDER (for this story)
+# =============================================================================
+implementation_order:
+  phase_1_database:
+    - "XXX_user_invitations.sql"
+
+  phase_2_external_deps:
+    - "Install resend npm package"
+    - "Add RESEND_API_KEY to environment"
+
+  phase_3_validation:
+    - "lib/validation/invitation-schemas.ts"
+
+  phase_4_services:
+    - "lib/services/email-service.ts"
+    - "lib/services/invitation-service.ts"
+
+  phase_5_api_admin:
+    - "app/api/v1/settings/users/invite/route.ts"
+    - "app/api/v1/settings/users/invitations/route.ts"
+    - "app/api/v1/settings/users/invitations/[id]/route.ts"
+    - "app/api/v1/settings/users/invitations/[id]/resend/route.ts"
+
+  phase_6_api_public:
+    - "app/api/auth/invitation/[token]/route.ts"
+    - "app/api/auth/accept-invitation/route.ts"
+
+  phase_7_components_admin:
+    - "components/settings/users/InviteUserModal.tsx"
+    - "components/settings/users/ResendConfirmDialog.tsx"
+    - "components/settings/users/CancelInvitationDialog.tsx"
+    - "components/settings/users/InvitationRow.tsx"
+    - "components/settings/users/PendingInvitationsTable.tsx"
+
+  phase_8_components_public:
+    - "components/auth/AcceptInvitationForm.tsx"
+    - "components/auth/InvitationExpiredPage.tsx"
+
+  phase_9_pages:
+    - "app/(public)/invite/[token]/page.tsx"
+
+  phase_10_cron:
+    - "supabase/functions/expire-invitations/index.ts"
+
+  phase_11_tests:
+    - "All test files per tests.yaml"
+
+# =============================================================================
+# VALIDATION AFTER IMPLEMENTATION
+# =============================================================================
+validation_checklist:
+  - "[ ] user_invitations table created with indexes and RLS"
+  - "[ ] Resend npm package installed"
+  - "[ ] RESEND_API_KEY environment variable set"
+  - "[ ] Email service sends invitation emails successfully"
+  - "[ ] POST /invite creates invitation and sends email"
+  - "[ ] GET /invitations returns org invitations only"
+  - "[ ] POST /invitations/:id/resend works correctly"
+  - "[ ] DELETE /invitations/:id cancels invitation"
+  - "[ ] GET /auth/invitation/:token returns details (public)"
+  - "[ ] POST /auth/accept-invitation creates user and logs in"
+  - "[ ] InviteUserModal works with role selection"
+  - "[ ] PendingInvitationsTable shows all pending invitations"
+  - "[ ] AcceptInvitationForm creates account successfully"
+  - "[ ] Duplicate email validation works (users + pending)"
+  - "[ ] Expiry handling works (7 days default)"
+  - "[ ] Super Admin invitation restricted to Super Admins"
+  - "[ ] Cron job expires old invitations"
+  - "[ ] All tests passing (unit >= 80%, integration >= 85%)"
+
+# =============================================================================
+# DEPENDENCY GAPS (Story Dependencies)
+# =============================================================================
+dependency_gaps:
+  - component: "Story 01.1 - Org Context + Base RLS"
+    expected: "Organizations table, users table, RLS policies"
+    found: "COMPLETED (assumed)"
+    status: "OK"
+    gap_description: "Required for org_id context and RLS"
+    refactor_action: "Verify 01.1 completed"
+    priority: "P0"
+
+  - component: "Story 01.5a - Users CRUD"
+    expected: "Users table, user creation patterns"
+    found: "UNKNOWN - depends on 01.5a completion"
+    status: "DEPENDENCY"
+    gap_description: "Accept invitation creates user using existing patterns"
+    refactor_action: "Verify 01.5a completed"
+    priority: "P0"
+
+  - component: "Story 01.6 - Role-Based Permissions"
+    expected: "Roles table, role dropdown, admin checks"
+    found: "UNKNOWN - depends on 01.6 completion"
+    status: "DEPENDENCY"
+    gap_description: "Invitation modal uses role dropdown, admin permission checks"
+    refactor_action: "Verify 01.6 completed"
+    priority: "P0"
+
+  - component: "Password validation from Story 01.15"
+    expected: "Password requirements (8 chars, uppercase, etc.)"
+    found: "UNKNOWN - depends on 01.15 completion"
+    status: "DEPENDENCY"
+    gap_description: "Accept invitation form uses same password validation"
+    refactor_action: "Verify 01.15 completed or reuse validation schema"
+    priority: "P1"
+
+# =============================================================================
+# EXTERNAL DEPENDENCIES
+# =============================================================================
+external_dependencies:
+  - dependency: "Resend API"
+    provider: "Resend (resend.com)"
+    free_tier: "3,000 emails/month"
+    cost_estimate: "$0/month (free tier sufficient for MVP)"
+    setup_required:
+      - "Create Resend account"
+      - "Verify domain (monopilot.io)"
+      - "Get API key"
+      - "Configure SPF/DKIM records"
+    priority: "P0"
+    status: "NOT STARTED"
+
+# =============================================================================
+# INTEGRATION NOTES
+# =============================================================================
+integration_notes:
+  users_page:
+    description: "Invitation features need to be integrated into Users page"
+    current_state: "Users page may or may not exist from story 01.5a"
+    integration_required:
+      - "'Invite User' button on Users page"
+      - "'Pending Invitations' tab on Users page"
+      - "Integration with PendingInvitationsTable component"
+    priority: "P0"
+
+  auth_flow:
+    description: "Invitation acceptance needs to integrate with auth flow"
+    current_state: "Supabase Auth used for authentication"
+    integration_required:
+      - "Create Supabase Auth user on acceptance"
+      - "Create users table record with role_id"
+      - "Log in user automatically after acceptance"
+      - "Redirect to dashboard"
+    priority: "P0"

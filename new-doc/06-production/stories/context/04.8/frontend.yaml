@@ -1,0 +1,222 @@
+# Story 04.8 - Material Reservations
+# Frontend components specification
+# Generated: 2026-01-14
+
+components:
+  - name: "WOReservationsPanel"
+    file: "apps/frontend/components/production/reservations/WOReservationsPanel.tsx"
+    wireframe: "WH-RES-003"
+    description: "Panel on WO detail page showing all material reservations"
+    location: "/production/work-orders/[id] - Materials tab"
+    props:
+      woId: "string"
+      woNumber: "string"
+      woStatus: "WOStatus"
+      onReservationsChange: "() => void"
+    state:
+      reservations: "ReservationWithDetails[]"
+      isLoading: "boolean"
+      error: "string | null"
+      filters: "ReservationFilters"
+    features:
+      - "DataTable with Material, LP Number, Batch, Qty, Consumed, Remaining, Status"
+      - "Row details: location icon, expiry date"
+      - "Summary bar: Total reserved, consumed, remaining"
+      - "[+ Reserve Materials] button opens ReserveLPModal"
+      - "[Release] button per active reservation"
+      - "Filter by status, material, location"
+    states:
+      loading: "Skeleton table with 5 shimmer rows"
+      empty: "Empty box icon with 'No Material Reservations' message and CTA"
+      error: "Warning icon with error message and retry button"
+      success: "Full DataTable with reservations"
+
+  - name: "ReserveLPModal"
+    file: "apps/frontend/components/production/reservations/ReserveLPModal.tsx"
+    wireframe: "WH-RES-001, WH-RES-002"
+    description: "Modal for selecting and reserving LPs for a WO material"
+    props:
+      open: "boolean"
+      woId: "string"
+      woNumber: "string"
+      woMaterialId: "string"
+      productId: "string"
+      productName: "string"
+      productCode: "string"
+      requiredQty: "number"
+      currentlyReservedQty: "number"
+      uom: "string"
+      warehouseId: "string"
+      warehouseName: "string"
+      defaultAlgorithm: "'fifo' | 'fefo'"
+      onReserve: "(selections: LPSelection[]) => Promise<void>"
+      onCancel: "() => void"
+    state:
+      availableLPs: "AvailableLP[]"
+      selectedLPs: "Map<string, number>"
+      sortOrder: "'fifo' | 'fefo'"
+      isLoading: "boolean"
+      isSubmitting: "boolean"
+      error: "string | null"
+      showOverWarning: "boolean"
+      acknowledgeOver: "boolean"
+    features:
+      - "Progress indicator: Reserved X / Required Y kg with percentage bar"
+      - "FIFO/FEFO toggle with auto-select checkbox"
+      - "Filters: location, lot number"
+      - "AvailableLPsTable for LP selection"
+      - "Selected LPs summary panel with remove action"
+      - "Quantity input per LP (defaults to full qty)"
+      - "Over-reservation warning with acknowledgment checkbox"
+    states:
+      loading: "Spinner with 'Loading available LPs...' message"
+      empty: "Empty box with 'No Available License Plates' and reasons list"
+      error: "Warning icon with error message and retry button"
+      success: "Full modal with LP table and selection UI"
+
+  - name: "AvailableLPsTable"
+    file: "apps/frontend/components/production/reservations/AvailableLPsTable.tsx"
+    wireframe: "WH-RES-001"
+    description: "Reusable table for selecting available LPs with FIFO/FEFO sorting"
+    props:
+      lps: "AvailableLP[]"
+      selectedLPs: "Map<string, number>"
+      sortOrder: "'fifo' | 'fefo'"
+      isLoading: "boolean"
+      onSelect: "(lpId: string, selected: boolean) => void"
+      onQuantityChange: "(lpId: string, quantity: number) => void"
+      onSortChange: "(order: 'fifo' | 'fefo') => void"
+    columns:
+      - header: "Checkbox"
+        width: "40px"
+        accessor: "selection checkbox"
+      - header: "LP Number"
+        width: "120px"
+        accessor: "lp_number"
+        sortable: true
+      - header: "Lot"
+        width: "100px"
+        accessor: "lot_number"
+      - header: "Expiry"
+        width: "100px"
+        accessor: "expiry_date"
+        sortable: true
+      - header: "Location"
+        width: "100px"
+        accessor: "location"
+      - header: "Avail Qty"
+        width: "100px"
+        accessor: "available_qty"
+      - header: "Shelf Life"
+        width: "80px"
+        accessor: "calculated days/months until expiry"
+      - header: "Reserve"
+        width: "100px"
+        accessor: "quantity input"
+    row_states:
+      normal: "Default row styling"
+      selected: "Light blue background highlight"
+      suggested: "Star badge (FIFO Oldest / FEFO First Expiry)"
+      warning: "Other WO reservations shown in tooltip"
+      near_expiry: "Yellow highlight if < 30 days to expiry"
+
+  - name: "ReservationStatusBadge"
+    file: "apps/frontend/components/production/reservations/ReservationStatusBadge.tsx"
+    wireframe: "PLAN-026"
+    description: "Visual indicator of reservation coverage status"
+    props:
+      requiredQty: "number"
+      reservedQty: "number"
+      uom: "string"
+      size: "'default' | 'large'"
+      showTooltip: "boolean"
+    variants:
+      full:
+        condition: "reserved >= required AND reserved == required"
+        color: "bg-green-100 text-green-800"
+        icon: "CheckCircle"
+        label: "Full 100%"
+      partial:
+        condition: "0 < reserved < required"
+        color: "bg-yellow-100 text-yellow-800"
+        icon: "AlertTriangle"
+        label: "Partial {percent}%"
+        tooltip: "{shortfall} kg short of required {required} kg"
+      none:
+        condition: "reserved == 0"
+        color: "bg-gray-100 text-gray-800"
+        icon: "Circle"
+        label: "None 0%"
+        tooltip: "No LPs reserved yet"
+      over:
+        condition: "reserved > required"
+        color: "bg-blue-100 text-blue-800"
+        icon: "PlusCircle"
+        label: "Over {percent}%"
+        tooltip: "{excess} kg over required quantity"
+
+types:
+  file: "apps/frontend/types/reservations.ts"
+  interfaces:
+    - name: "AvailableLP"
+      fields:
+        id: "string"
+        lpNumber: "string"
+        lotNumber: "string | null"
+        expiryDate: "string | null"
+        location: "string | null"
+        availableQty: "number"
+        totalQty: "number"
+        uom: "string"
+        createdAt: "string"
+        otherReservations: "{ woNumber: string; quantity: number }[]"
+    - name: "LPSelection"
+      fields:
+        lpId: "string"
+        lpNumber: "string"
+        quantity: "number"
+        lotNumber: "string | null"
+        expiryDate: "string | null"
+    - name: "ReservationWithDetails"
+      fields:
+        id: "string"
+        lpId: "string"
+        lpNumber: "string"
+        woMaterialId: "string"
+        materialName: "string"
+        productCode: "string"
+        lotNumber: "string | null"
+        expiryDate: "string | null"
+        location: "string"
+        reservedQty: "number"
+        consumedQty: "number"
+        remainingQty: "number"
+        status: "'active' | 'released' | 'consumed'"
+        reservedAt: "string"
+        reservedBy: "string"
+
+hooks:
+  - name: "useWOReservations"
+    file: "apps/frontend/hooks/useWOReservations.ts"
+    params: ["woId"]
+    returns: "{ reservations, isLoading, error, refetch, summary }"
+  - name: "useAvailableLPs"
+    file: "apps/frontend/hooks/useAvailableLPs.ts"
+    params: ["woId", "materialId", "sortOrder", "filters"]
+    returns: "{ lps, isLoading, error, refetch, totalAvailable }"
+
+accessibility:
+  keyboard:
+    - "Tab through checkboxes, inputs, buttons"
+    - "Enter to toggle checkbox"
+    - "Escape to close modal"
+  aria:
+    - "aria-expanded on expandable rows"
+    - "aria-labelledby on modal"
+    - "aria-valuenow/min/max on progress bar"
+    - "aria-live='polite' for over-reservation warning"
+  focus:
+    - "2px blue outline on focus"
+    - "Focus trap within modal"
+  touch:
+    - "48x48dp minimum touch targets"

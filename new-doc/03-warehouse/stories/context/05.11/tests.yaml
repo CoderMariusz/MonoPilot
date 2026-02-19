@@ -1,0 +1,628 @@
+# Story 05.11 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# ============================================================================
+# Test Files to Create
+# ============================================================================
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/grn-service.test.ts"
+    type: "unit"
+    description: "Unit tests for GRN service methods"
+  - path: "apps/frontend/lib/validation/__tests__/grn.test.ts"
+    type: "unit"
+    description: "Unit tests for GRN Zod schemas"
+  - path: "__tests__/integration/api/warehouse/grns.test.ts"
+    type: "integration"
+    description: "Integration tests for GRN API endpoints"
+  - path: "__tests__/integration/api/warehouse/grns-from-po.test.ts"
+    type: "integration"
+    description: "Integration tests for GRN from PO workflow"
+  - path: "__tests__/e2e/warehouse/receive-po.spec.ts"
+    type: "e2e"
+    description: "E2E tests for receiving wizard flow"
+
+# ============================================================================
+# Acceptance Criteria (from story)
+# ============================================================================
+acceptance_criteria:
+  # Database / Table Structure
+  - id: "AC-01"
+    title: "GRNs table exists with all required columns"
+    given: "Database migration runs"
+    when: "Schema is inspected"
+    then: "grns table has all columns as specified (id, org_id, grn_number, source_type, po_id, etc.)"
+    test_type: "integration"
+    priority: "P0"
+    reference: "Story AC-1"
+
+  - id: "AC-02"
+    title: "GRN items table exists with LP reference"
+    given: "Database migration runs"
+    when: "Schema is inspected"
+    then: "grn_items table has lp_id FK to license_plates"
+    test_type: "integration"
+    priority: "P0"
+    reference: "Story AC-2"
+
+  # GRN Number Generation
+  - id: "AC-03"
+    title: "GRN number auto-generation"
+    given: "GRN is created"
+    when: "System generates GRN number"
+    then: "Number follows format GRN-YYYY-NNNNN and increments correctly"
+    test_type: "unit"
+    priority: "P0"
+    reference: "Story AC-3"
+
+  - id: "AC-04"
+    title: "GRN number uniqueness"
+    given: "GRN with number exists"
+    when: "Creating another GRN with same number in same org"
+    then: "System returns 409 Conflict error"
+    test_type: "integration"
+    priority: "P0"
+    reference: "Story AC-3"
+
+  # Create GRN from PO - Happy Path
+  - id: "AC-05"
+    title: "Full receipt of PO creates GRN and LPs"
+    given: "PO with status 'confirmed' and 3 lines"
+    when: "POST /api/warehouse/grns/from-po/:poId with all lines"
+    then: |
+      - Response status = 201
+      - GRN created with source_type = 'po'
+      - 3 GRN items created with lp_id populated
+      - 3 License Plates created with correct values
+      - PO lines received_qty updated
+      - PO status = 'closed'
+      - Response time < 500ms
+    test_type: "integration"
+    priority: "P0"
+    reference: "Story AC-4"
+
+  # Partial Receipt
+  - id: "AC-06"
+    title: "Partial receipt updates PO to 'partial' status"
+    given: "PO with status 'confirmed'"
+    when: "Receiving partial quantity on one line"
+    then: "PO status = 'partial', line received_qty updated"
+    test_type: "integration"
+    priority: "P0"
+    reference: "Story AC-5"
+
+  - id: "AC-07"
+    title: "Multiple partial receipts accumulate"
+    given: "PO line with received_qty = 400 of ordered 1000"
+    when: "Receiving additional 300"
+    then: "PO line received_qty = 700"
+    test_type: "integration"
+    priority: "P0"
+    reference: "Story AC-5"
+
+  - id: "AC-08"
+    title: "Final partial receipt closes PO"
+    given: "PO line with received_qty = 700 of ordered 1000"
+    when: "Receiving remaining 300"
+    then: "PO status = 'closed'"
+    test_type: "integration"
+    priority: "P0"
+    reference: "Story AC-5"
+
+  # PO Status Validation
+  - id: "AC-09"
+    title: "Cannot receive from draft PO"
+    given: "PO with status = 'draft'"
+    when: "POST /api/warehouse/grns/from-po/:poId"
+    then: "Response 400 with message about invalid status"
+    test_type: "integration"
+    priority: "P0"
+    reference: "Story AC-6"
+
+  - id: "AC-10"
+    title: "Cannot receive from cancelled PO"
+    given: "PO with status = 'cancelled'"
+    when: "POST /api/warehouse/grns/from-po/:poId"
+    then: "Response 400 with message about cancelled PO"
+    test_type: "integration"
+    priority: "P0"
+    reference: "Story AC-6"
+
+  - id: "AC-11"
+    title: "Can receive from approved PO"
+    given: "PO with status = 'approved'"
+    when: "POST /api/warehouse/grns/from-po/:poId with valid items"
+    then: "GRN created successfully"
+    test_type: "integration"
+    priority: "P0"
+    reference: "Story AC-6"
+
+  # Over-Receipt Validation
+  - id: "AC-12"
+    title: "Over-receipt blocked when setting is false"
+    given: "warehouse_settings.allow_over_receipt = false, PO line ordered=100"
+    when: "Receiving 120 units"
+    then: "Response 400 with over-receipt error"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+    reference: "Story AC-7"
+
+  - id: "AC-13"
+    title: "Over-receipt within tolerance allowed"
+    given: "allow_over_receipt = true, tolerance = 10%, ordered = 100"
+    when: "Receiving 108 units (8% over)"
+    then: "GRN created successfully, audit logs over_receipt_flag"
+    test_type: "integration"
+    priority: "P0"
+    reference: "Story AC-8"
+
+  - id: "AC-14"
+    title: "Over-receipt exceeds tolerance blocked"
+    given: "allow_over_receipt = true, tolerance = 10%, ordered = 100"
+    when: "Receiving 115 units (15% over)"
+    then: "Response 400 with exceeds tolerance error"
+    test_type: "integration"
+    priority: "P0"
+    reference: "Story AC-8"
+
+  - id: "AC-15"
+    title: "Over-receipt tolerance with partial receipt"
+    given: "tolerance = 10%, ordered = 100, already received = 50"
+    when: "Receiving 60 (total = 110, exactly 10% over)"
+    then: "GRN created successfully"
+    test_type: "integration"
+    priority: "P0"
+    reference: "Story AC-8"
+
+  # Batch/Expiry Validation
+  - id: "AC-16"
+    title: "Batch required when setting enabled"
+    given: "warehouse_settings.require_batch_on_receipt = true"
+    when: "Receiving without batch_number"
+    then: "Response 400 with batch required error"
+    test_type: "integration"
+    priority: "P0"
+    reference: "Story AC-9"
+
+  - id: "AC-17"
+    title: "Batch optional when setting disabled"
+    given: "warehouse_settings.require_batch_on_receipt = false"
+    when: "Receiving without batch_number"
+    then: "GRN and LP created with batch_number = NULL"
+    test_type: "integration"
+    priority: "P0"
+    reference: "Story AC-9"
+
+  - id: "AC-18"
+    title: "Expiry required when setting enabled"
+    given: "warehouse_settings.require_expiry_on_receipt = true"
+    when: "Receiving without expiry_date"
+    then: "Response 400 with expiry required error"
+    test_type: "integration"
+    priority: "P0"
+    reference: "Story AC-10"
+
+  # LP Creation
+  - id: "AC-19"
+    title: "LP inherits correct values from GRN"
+    given: "GRN receipt with product, qty, batch, expiry, location"
+    when: "GRN completed"
+    then: "LP created with all inherited values and source = 'receipt'"
+    test_type: "integration"
+    priority: "P0"
+    reference: "Story AC-11"
+
+  - id: "AC-20"
+    title: "LP auto-generates number"
+    given: "warehouse_settings.auto_generate_lp_number = true"
+    when: "LP created via GRN"
+    then: "LP.lp_number follows configured format"
+    test_type: "integration"
+    priority: "P0"
+    reference: "Story AC-11"
+
+  # RLS / Multi-tenancy
+  - id: "AC-21"
+    title: "Org isolation on GRN list"
+    given: "User A from Org A, GRNs exist in Org A and Org B"
+    when: "User A requests /api/warehouse/grns"
+    then: "Only Org A GRNs returned"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+    reference: "Story AC-16"
+
+  - id: "AC-22"
+    title: "Cannot receive PO from different org"
+    given: "User A from Org A, PO belongs to Org B"
+    when: "POST /api/warehouse/grns/from-po/:orgB_po_id"
+    then: "Response 404 Not Found (not 403)"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+    reference: "Story AC-16"
+
+  # Transaction Atomicity
+  - id: "AC-23"
+    title: "Failed LP creation rolls back GRN"
+    given: "Valid PO and receipt data, LP creation fails"
+    when: "Attempting to create GRN"
+    then: "No GRN created, no GRN items, PO lines not updated"
+    test_type: "integration"
+    priority: "P0"
+    reference: "Story AC-17"
+
+  # Performance
+  - id: "AC-24"
+    title: "GRN creation performance"
+    given: "PO with 10 lines"
+    when: "Creating GRN for all 10 lines"
+    then: "Operation completes in < 500ms"
+    test_type: "integration"
+    priority: "P1"
+    reference: "Story AC-18"
+
+  - id: "AC-25"
+    title: "GRN list performance"
+    given: "1000 GRNs in organization"
+    when: "Listing with pagination"
+    then: "Response time < 500ms"
+    test_type: "integration"
+    priority: "P1"
+    reference: "Story AC-18"
+
+  # QA Status
+  - id: "AC-26"
+    title: "LP QA status from settings"
+    given: "warehouse_settings.default_qa_status = 'pending'"
+    when: "LP created via GRN"
+    then: "LP.qa_status = 'pending'"
+    test_type: "integration"
+    priority: "P0"
+    reference: "Story AC-20"
+
+# ============================================================================
+# Unit Test Cases
+# ============================================================================
+unit_tests:
+  grn_service:
+    - name: "createFromPO() creates GRN with correct fields"
+      setup: "Mock PO data, settings, Supabase client"
+      action: "Call GRNService.createFromPO()"
+      expected: "Returns GRN with all fields populated correctly"
+
+    - name: "createFromPO() creates LP for each item"
+      setup: "3 line items in request"
+      action: "Call GRNService.createFromPO()"
+      expected: "3 LPs created, each linked to GRN item"
+
+    - name: "createFromPO() updates PO line received_qty"
+      setup: "PO line with received_qty = 0"
+      action: "Receive 500 units"
+      expected: "PO line received_qty = 500"
+
+    - name: "createFromPO() updates PO status to partial"
+      setup: "PO with 2 lines, receive only 1"
+      action: "Call GRNService.createFromPO()"
+      expected: "PO status = 'partial'"
+
+    - name: "createFromPO() updates PO status to closed"
+      setup: "PO with all lines fully received"
+      action: "Call GRNService.createFromPO()"
+      expected: "PO status = 'closed'"
+
+    - name: "createFromPO() blocks draft PO"
+      setup: "PO with status = 'draft'"
+      action: "Call GRNService.createFromPO()"
+      expected: "Throws error with PO_INVALID_STATUS code"
+
+    - name: "createFromPO() blocks cancelled PO"
+      setup: "PO with status = 'cancelled'"
+      action: "Call GRNService.createFromPO()"
+      expected: "Throws error with PO_INVALID_STATUS code"
+
+    - name: "validateReceipt() returns batch required error"
+      setup: "require_batch_on_receipt = true, no batch in request"
+      action: "Call GRNService.validateReceipt()"
+      expected: "Returns { valid: false, errors: [{ field: 'batch_number', message: '...' }] }"
+
+    - name: "validateReceipt() returns expiry required error"
+      setup: "require_expiry_on_receipt = true, no expiry in request"
+      action: "Call GRNService.validateReceipt()"
+      expected: "Returns { valid: false, errors: [{ field: 'expiry_date', message: '...' }] }"
+
+    - name: "validateReceipt() returns over-receipt warning within tolerance"
+      setup: "allow_over_receipt = true, tolerance = 10%, receiving 105%"
+      action: "Call GRNService.validateReceipt()"
+      expected: "Returns { valid: true, warnings: [{ field: 'received_qty', ... }] }"
+
+    - name: "validateReceipt() returns over-receipt error exceeds tolerance"
+      setup: "allow_over_receipt = true, tolerance = 10%, receiving 115%"
+      action: "Call GRNService.validateReceipt()"
+      expected: "Returns { valid: false, errors: [{ field: 'received_qty', ... }] }"
+
+    - name: "calculateOverReceipt() returns correct values"
+      setup: "ordered = 100, received = 50, attempting = 60"
+      action: "Call GRNService.calculateOverReceipt()"
+      expected: "Returns { totalAfterReceipt: 110, overReceiptPct: 10, isWithinTolerance: depends on settings }"
+
+    - name: "calculateOverReceipt() accounts for partial receipts"
+      setup: "ordered = 100, previously received = 80, attempting = 25"
+      action: "Call GRNService.calculateOverReceipt()"
+      expected: "Returns { totalAfterReceipt: 105, overReceiptQty: 5 }"
+
+    - name: "generateGRNNumber() increments sequence"
+      setup: "Current year, existing sequence at 5"
+      action: "Call GRNService.generateGRNNumber() twice"
+      expected: "Returns GRN-YYYY-00006, GRN-YYYY-00007"
+
+    - name: "generateGRNNumber() resets per year"
+      setup: "New year, no sequence record"
+      action: "Call GRNService.generateGRNNumber()"
+      expected: "Returns GRN-{NEW_YEAR}-00001"
+
+  validation_schemas:
+    - name: "createGRNFromPOSchema validates warehouse_id required"
+      input: "{ location_id: 'uuid', items: [...] }"
+      expected: "Fails with warehouse_id required error"
+
+    - name: "createGRNFromPOSchema validates items min length"
+      input: "{ warehouse_id: 'uuid', location_id: 'uuid', items: [] }"
+      expected: "Fails with at least one item required error"
+
+    - name: "createGRNItemSchema validates received_qty positive"
+      input: "{ po_line_id: 'uuid', received_qty: -5 }"
+      expected: "Fails with quantity must be positive error"
+
+    - name: "createGRNItemSchema validates expiry_date format"
+      input: "{ ..., expiry_date: '12/25/2025' }"
+      expected: "Fails with invalid date format error"
+
+# ============================================================================
+# Integration Test Cases
+# ============================================================================
+integration_tests:
+  api_grns_from_po:
+    - name: "POST /grns/from-po/:poId creates GRN successfully"
+      setup: |
+        - Create org with warehouse_settings
+        - Create PO with 2 lines, status = 'confirmed'
+        - Create user with warehouse permissions
+      action: "POST /api/warehouse/grns/from-po/:poId with valid items"
+      expected: "201 Created, GRN returned with items and LPs"
+
+    - name: "POST /grns/from-po/:poId creates LPs"
+      setup: "As above"
+      action: "POST with 2 items"
+      expected: "2 LP records exist in database with correct values"
+
+    - name: "POST /grns/from-po/:poId updates PO received quantities"
+      setup: "PO line with ordered = 100, received = 0"
+      action: "Receive 50 units"
+      expected: "PO line received_qty = 50"
+
+    - name: "POST /grns/from-po/:poId with invalid PO returns 404"
+      setup: "Non-existent PO ID"
+      action: "POST /api/warehouse/grns/from-po/:invalidId"
+      expected: "404 Not Found"
+
+    - name: "POST /grns/from-po/:poId with wrong org returns 404"
+      setup: "PO from Org B, user from Org A"
+      action: "POST as user from Org A"
+      expected: "404 Not Found (RLS enforced)"
+
+    - name: "POST /grns/from-po/:poId with over-receipt blocked"
+      setup: "allow_over_receipt = false, receiving > ordered"
+      action: "POST with over-receipt quantity"
+      expected: "400 Bad Request with OVER_RECEIPT_NOT_ALLOWED"
+
+    - name: "POST /grns/from-po/:poId with over-receipt allowed within tolerance"
+      setup: "allow_over_receipt = true, tolerance = 10%"
+      action: "Receive 108 of 100 ordered"
+      expected: "201 Created, over_receipt_warnings in response"
+
+    - name: "POST /grns/from-po/:poId closes PO when fully received"
+      setup: "PO with 1 line, ordered = 100, received = 0"
+      action: "Receive 100 units"
+      expected: "PO status = 'closed'"
+
+  api_grns_list:
+    - name: "GET /grns returns paginated list"
+      setup: "10 GRNs in org"
+      action: "GET /api/warehouse/grns?limit=5"
+      expected: "5 GRNs returned, pagination metadata correct"
+
+    - name: "GET /grns filters by status"
+      setup: "5 completed, 3 cancelled GRNs"
+      action: "GET /api/warehouse/grns?status=completed"
+      expected: "5 GRNs returned"
+
+    - name: "GET /grns filters by source_type"
+      setup: "3 PO-based, 2 TO-based GRNs"
+      action: "GET /api/warehouse/grns?source_type=po"
+      expected: "3 GRNs returned"
+
+    - name: "GET /grns/:id returns GRN with items"
+      setup: "GRN with 3 items"
+      action: "GET /api/warehouse/grns/:id"
+      expected: "GRN returned with items array populated, LP links included"
+
+  api_receiving:
+    - name: "GET /receiving/pending-pos returns receivable POs"
+      setup: "2 approved, 1 partial, 1 draft, 1 cancelled POs"
+      action: "GET /api/warehouse/receiving/pending-pos"
+      expected: "3 POs returned (approved, partial, confirmed)"
+
+    - name: "GET /receiving/po/:poId/lines returns PO lines with settings"
+      setup: "PO with 3 lines"
+      action: "GET /api/warehouse/receiving/po/:poId/lines"
+      expected: "PO data with lines and warehouse_settings"
+
+  rls_isolation:
+    - name: "GRN list only shows own org GRNs"
+      setup: "GRNs in Org A and Org B"
+      action: "User A queries GRNs"
+      expected: "Only Org A GRNs returned"
+
+    - name: "Cannot access GRN from different org"
+      setup: "GRN in Org B"
+      action: "User A requests GRN by ID"
+      expected: "404 Not Found"
+
+    - name: "GRN created with correct org_id"
+      setup: "User A creates GRN"
+      action: "Check GRN record"
+      expected: "GRN.org_id = User A's org_id"
+
+  performance:
+    - name: "GRN creation under 500ms for single line"
+      action: "Create GRN with 1 item, measure time"
+      expected: "< 500ms"
+
+    - name: "GRN creation under 1000ms for 10 lines"
+      action: "Create GRN with 10 items, measure time"
+      expected: "< 1000ms"
+
+    - name: "GRN list under 500ms with 1000 records"
+      setup: "Seed 1000 GRNs"
+      action: "GET /grns with pagination"
+      expected: "< 500ms"
+
+# ============================================================================
+# E2E Test Cases
+# ============================================================================
+e2e_tests:
+  wizard_flow:
+    - name: "Complete receive wizard flow"
+      steps:
+        - "Navigate to /warehouse/receiving"
+        - "Select PO from list"
+        - "Review PO lines"
+        - "Enter receipt details (qty, batch, expiry)"
+        - "Review and confirm"
+        - "Verify success modal with GRN number and LP numbers"
+      expected: "GRN created, LPs visible, PO status updated"
+
+    - name: "Partial receipt flow"
+      steps:
+        - "Select PO with 2 lines"
+        - "Receive only 1 line partially"
+        - "Confirm"
+      expected: "GRN created, PO status = 'partial'"
+
+    - name: "Over-receipt blocked displays error"
+      setup: "allow_over_receipt = false"
+      steps:
+        - "Enter quantity exceeding ordered"
+        - "Try to proceed"
+      expected: "Error message displayed inline, cannot submit"
+
+    - name: "Validation errors shown inline"
+      setup: "require_batch_on_receipt = true"
+      steps:
+        - "Leave batch number empty"
+        - "Try to proceed"
+      expected: "Error message on batch field"
+
+    - name: "Success modal shows LP numbers"
+      steps:
+        - "Complete successful receipt"
+      expected: "Modal shows GRN number and created LP numbers"
+
+    - name: "Navigation from success modal"
+      steps:
+        - "Complete receipt"
+        - "Click 'View GRN Details'"
+      expected: "Navigates to GRN detail page"
+
+# ============================================================================
+# Definition of Done
+# ============================================================================
+definition_of_done:
+  database:
+    - "GRN tables have correct schema (verify against 05.10)"
+    - "Indexes created for performance"
+    - "RLS policies enforce org isolation"
+
+  api:
+    - "All endpoints return correct HTTP status codes"
+    - "Validation errors return 400 with detailed messages"
+    - "Over-receipt validation works correctly"
+    - "Cross-tenant access returns 404 (not 403)"
+    - "Transaction atomicity verified (rollback on failure)"
+    - "Response times meet targets"
+
+  service:
+    - "createFromPO() creates GRN, items, LPs atomically"
+    - "LP creation uses LicensePlateService from 05.1"
+    - "PO line updates are correct (cumulative received_qty)"
+    - "PO status transitions correctly"
+    - "Over-receipt validation works with tolerance"
+    - "Rollback on any failure"
+
+  frontend:
+    - "Receive wizard navigates all 5 steps"
+    - "Validation errors displayed inline"
+    - "Over-receipt warnings shown clearly"
+    - "Success page shows LP numbers"
+    - "GRN list page with filtering works"
+    - "GRN detail page with LP links works"
+
+  testing:
+    - "Unit test coverage >= 80% on GRNService"
+    - "Integration tests cover all endpoints"
+    - "Over-receipt scenarios fully tested"
+    - "RLS isolation verified"
+    - "E2E wizard flow passing"
+
+# ============================================================================
+# Coverage Requirements
+# ============================================================================
+coverage:
+  unit:
+    target: 80
+    files:
+      - "lib/services/grn-service.ts: 80%"
+      - "lib/validation/grn.ts: 90%"
+  integration:
+    target: 80
+    areas:
+      - "All API endpoints"
+      - "Over-receipt scenarios"
+      - "RLS isolation"
+      - "Transaction rollback"
+  e2e:
+    target: 70
+    flows:
+      - "Complete wizard flow"
+      - "Partial receipt"
+      - "Validation errors"
+
+# ============================================================================
+# Risks
+# ============================================================================
+risks:
+  - id: "RISK-01"
+    description: "Transaction complexity with multiple table updates may cause partial failures"
+    mitigation: "Use database transactions, test rollback scenarios explicitly"
+    severity: "high"
+    test_coverage: "integration_tests.api_grns_from_po"
+
+  - id: "RISK-02"
+    description: "Over-receipt tolerance calculations edge cases"
+    mitigation: "Comprehensive unit tests for all boundary conditions"
+    severity: "medium"
+    test_coverage: "unit_tests.grn_service"
+
+  - id: "RISK-03"
+    description: "RLS not properly enforced could leak data"
+    mitigation: "Integration tests with multi-org fixtures"
+    severity: "high"
+    test_coverage: "integration_tests.rls_isolation"
+
+  - id: "RISK-04"
+    description: "Performance degradation with large POs"
+    mitigation: "Performance tests with 50+ line POs"
+    severity: "medium"
+    test_coverage: "integration_tests.performance"

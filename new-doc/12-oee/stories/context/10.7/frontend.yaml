@@ -1,0 +1,40 @@
+# Story 10.7 - Frontend Specification
+# Shift Report Generation
+
+types:
+  - path: "apps/frontend/lib/types/shift-report.ts"
+    exports: ["ShiftReport", "ShiftHandoverNote", "ReportStatus"]
+
+components:
+  - path: "apps/frontend/components/oee/shifts/ShiftReportsDataTable.tsx"
+    description: "DataTable for shift reports"
+    columns: ["Date", "Shift", "Line", "OEE Avg", "Downtime", "Output", "Status", "Actions"]
+
+  - path: "apps/frontend/components/oee/shifts/ShiftReportCard.tsx"
+    description: "Detailed shift report card with sections"
+    sections:
+      - "Performance Metrics (OEE, Availability, Performance, Quality)"
+      - "Production Output (WOs completed, quantities)"
+      - "Downtime Summary (total, by reason)"
+      - "Quality Events (scrap, rework)"
+      - "Handover Notes"
+      - "Approval Section"
+
+  - path: "apps/frontend/components/oee/shifts/HandoverNotesPanel.tsx"
+    description: "Panel for creating/viewing handover notes"
+
+pages:
+  - path: "apps/frontend/app/(authenticated)/oee/shifts/page.tsx"
+    route: "/oee/shifts"
+    title: "Shift Reports"
+
+hooks:
+  - name: "useShiftReports"
+    queryKey: "['shift-reports']"
+  - name: "useApproveReport"
+    type: "mutation"
+
+ux:
+  wireframes:
+    - id: "OEE-SHIFTS-001"
+      title: "Shift Reports Page"

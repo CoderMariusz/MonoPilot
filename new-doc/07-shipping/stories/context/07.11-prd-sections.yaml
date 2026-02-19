@@ -1,0 +1,259 @@
+prd_reference:
+  story_id: "07.11"
+  story_name: "Packing & Shipment Creation"
+  prd_location: "docs/1-BASELINE/product/modules/shipping.md"
+
+functional_requirements:
+  - id: "FR-7.34"
+    name: "Packing Station Workflow"
+    priority: "P0"
+    phase: "1"
+    description: |
+      Packing station UI showing:
+      - Picked items list (from completed pick lists)
+      - Active carton/box builder
+      - License plate assignment to cartons
+      - Weight and dimensions capture
+      - Carton label preview with SSCC (deferred to 07.13)
+      - Carton status transitions (packing → packed)
+    status: "Ready for implementation"
+    scope_in_07_11: true
+    scope_out_07_11: false
+
+  - id: "FR-7.35"
+    name: "Pack Confirmation (Desktop)"
+    priority: "P0"
+    phase: "1"
+    description: |
+      Pack confirmation workflow:
+      - Scan or manually select picked LP
+      - Confirm quantity to pack
+      - Allergen separation warnings (customer restrictions)
+      - Carton weight capacity check
+      - Add to active carton or create new
+      - Partial pack handling (if qty available < qty required)
+    status: "Ready for implementation"
+    scope_in_07_11: true
+    scope_out_07_11: false
+
+  - id: "FR-7.37"
+    name: "Multi-Box Shipments"
+    priority: "P1"
+    phase: "1"
+    description: |
+      Support packing single SO into multiple boxes:
+      - Auto-increment box_number per shipment (1, 2, 3, ...)
+      - Distribute picked LPs across boxes
+      - Track weight and dimensions per box
+      - Total weight and box count on shipment
+    status: "Ready for implementation"
+    scope_in_07_11: true
+    scope_out_07_11: false
+
+  - id: "FR-7.40"
+    name: "Packing Slip Generation"
+    priority: "P0"
+    phase: "1"
+    description: |
+      Packing slip generation and management:
+      - Generate PDF with line items, carton summary, special instructions
+      - Print packing slip to thermal or standard printer
+      - Email packing slip to customer with attachments
+      - Download PDF to local device
+      - Include SSCC barcodes (Story 07.13)
+      - Include tracking numbers
+      - Include lot numbers for traceability
+    status: "Ready for implementation (07.13 generates SSCC, 07.11 creates structure)"
+    scope_in_07_11: false
+    scope_out_07_11: true
+    note: "Packing slip generation deferred to Story 07.13, but table structure created here"
+
+  - id: "FR-7.42"
+    name: "Weight/Dimensions Capture"
+    priority: "P1"
+    phase: "1"
+    description: |
+      Capture and validate box weight and dimensions:
+      - Weight entry (kg, required for packing completion)
+      - Dimensions entry (L x W x H in cm, optional)
+      - Weight validation (> 0, <= 25kg carton capacity)
+      - Dimension validation (10-200 cm range for each)
+      - Calculate total weight on shipment
+      - Validate all boxes have weight before completion
+    status: "Ready for implementation"
+    scope_in_07_11: true
+    scope_out_07_11: false
+
+acceptance_criteria_mapping:
+  shipment_creation:
+    ac_number: "AC-1, AC-2"
+    fr_mapping: ["FR-7.34"]
+    implementation_focus: |
+      - Auto-generate shipment_number: SH-YYYY-NNNNN (per-org, annual reset)
+      - Create shipment from sales order with status='pending'
+      - Update sales_order.status to 'packing'
+      - Capture customer_id, shipping_address_id from SO
+
+  available_lps:
+    ac_number: "AC-3"
+    fr_mapping: ["FR-7.34"]
+    implementation_focus: |
+      - List picked license plates from pick_list_lines where status='picked'
+      - Group by product (collapsible)
+      - Display: LP#, product, lot, qty picked, location
+      - Show pack progress: Total LPs, Packed count, Remaining count
+
+  box_management:
+    ac_number: "AC-4"
+    fr_mapping: ["FR-7.37"]
+    implementation_focus: |
+      - Auto-increment box_number per shipment (1, 2, 3, ...)
+      - Create shipment_box with NULL values for optional fields
+      - Update shipment status to 'packing' if pending
+
+  lp_assignment:
+    ac_number: "AC-5"
+    fr_mapping: ["FR-7.35"]
+    implementation_focus: |
+      - Assign picked LP to box
+      - Create shipment_box_contents record
+      - Capture lot_number from license_plate for traceability
+      - Remove LP from available list
+      - Update pack progress
+
+  weight_dimensions:
+    ac_number: "AC-6"
+    fr_mapping: ["FR-7.42"]
+    implementation_focus: |
+      - Validate weight > 0
+      - Validate dimensions > 0 if provided (range 10-200 cm)
+      - Update shipment_box record
+      - Display dimensions in box summary
+
+  allergen_warning:
+    ac_number: "AC-7"
+    fr_mapping: ["FR-7.35"]
+    implementation_focus: |
+      - Check products in box for allergens
+      - Compare with customer.allergen_restrictions
+      - Display non-blocking warning modal
+      - Allow packer to continue anyway
+      - Log warning in shipment notes
+
+  complete_packing:
+    ac_number: "AC-8"
+    fr_mapping: ["FR-7.34"]
+    implementation_focus: |
+      - Validate all picked LPs assigned to boxes (or marked exception)
+      - Validate all boxes have weight entered
+      - Update shipment status to 'packed'
+      - Calculate total_boxes and total_weight
+      - Set packed_at, packed_by
+      - Redirect to shipment detail
+
+  shipment_list:
+    ac_number: "AC-9"
+    fr_mapping: ["FR-7.34"]
+    implementation_focus: |
+      - Display ShipmentsTable with columns
+      - Support filters: status, customer, date range
+      - Support sorting by any column
+      - Support pagination (20 per page)
+
+  shipment_detail:
+    ac_number: "AC-10"
+    fr_mapping: ["FR-7.34"]
+    implementation_focus: |
+      - Display shipment header (ID, SO#, customer, address)
+      - Display BoxesTable with collapsible contents
+      - Show shipment timeline (created, packing started, packed)
+
+  rls_enforcement:
+    ac_number: "AC-11"
+    fr_mapping: ["All FRs"]
+    implementation_focus: |
+      - Enable RLS on shipments, shipment_boxes, shipment_box_contents
+      - Filter by org_id in all queries
+      - Auto-populate org_id on INSERT
+
+  cascade_delete:
+    ac_number: "AC-12"
+    fr_mapping: ["FR-7.34"]
+    implementation_focus: |
+      - Delete SO deletes associated pending/packing shipments
+      - Cascade delete shipment → boxes → contents
+      - Block delete if shipment.status = 'packed'
+
+food_safety_rules:
+  allergen_separation:
+    rule: |
+      Check products in box for multiple allergens.
+      Display warning if box contains products with different allergens.
+      Cross-reference with customer.allergen_restrictions.
+      Warning is non-blocking (packer can continue).
+      Log allergen warnings in shipment notes for audit trail.
+      Recommendation: Pack allergen products in separate boxes.
+    implementation: |
+      - Query shipment_box_contents for box_id
+      - Get products and their allergens
+      - Query customers.allergen_restrictions
+      - Check if any product allergen in customer restrictions
+      - Display warning modal with list of allergens in box
+
+  lot_number_traceability:
+    rule: |
+      Capture lot_number from license_plate in shipment_box_contents.
+      Enables full traceability: shipment → box → LP → lot → production.
+      Required for food safety recalls.
+      Lot number displayed in box contents list.
+    implementation: |
+      - Store lot_number in shipment_box_contents when adding LP to box
+      - Query from license_plates table
+      - Display in box contents table and packing slip
+
+gs1_compliance:
+  sscc_preparation:
+    rule: |
+      This story creates database structure for SSCC.
+      Columns exist but remain NULL until Story 07.13 generates SSCCs.
+      Preparation: shipments.sscc, shipment_boxes.sscc columns with UNIQUE constraints.
+    implementation: |
+      - Create sscc columns in both tables as TEXT, nullable
+      - Add UNIQUE constraints (enforced in 07.13)
+      - Create placeholder for SSCC generation function (to be populated in 07.13)
+
+design_patterns:
+  multi_tenancy: "org_id isolation on all tables"
+  api_style: "REST with filters via query parameters"
+  status_workflow: "pending → packing → packed → manifested → shipped → delivered"
+  numbering: "Database function with LPAD and SUBSTRING for sequential formatting"
+  traceability: "lot_number and license_plate_id preserved at pack time"
+  validation: "Zod schemas for all request bodies and query parameters"
+  cascade_delete: "PostgreSQL ON DELETE CASCADE for referential integrity"
+
+implementation_priority:
+  must_have:
+    - Shipment creation with auto-numbered shipment_number
+    - Box management (add, update weight/dimensions)
+    - LP assignment to boxes with lot_number capture
+    - Complete packing with validation
+    - Allergen separation warnings
+    - RLS policies
+
+  should_have:
+    - Partial pack handling
+    - Pack progress tracking
+    - Shipment list with filters
+    - Shipment detail view with timeline
+    - Allergen warnings logging
+
+  nice_to_have:
+    - SSCC preview (generated in 07.13, displayed in 07.11)
+    - Carton label preview (generated in 07.13, displayed in 07.11)
+    - Advanced analytics on packing efficiency
+
+version_history:
+  - version: "1.0"
+    date: "2025-12-18"
+    description: "PRD sections mapping and acceptance criteria for Story 07.11"
+    author: "TECH-WRITER"

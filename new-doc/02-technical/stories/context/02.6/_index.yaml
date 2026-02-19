@@ -1,0 +1,176 @@
+# Story 02.6 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "02.6"
+  name: "BOM Alternatives + Clone"
+  slug: "bom-alternatives-clone"
+  epic: "02-technical"
+  phase: "MVP"
+  complexity: "M"
+  estimate_days: 3
+  type: "full-stack"
+  state: "ready"
+  priority: "P0"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables (bom_alternatives), RLS, constraints
+  - api.yaml         # Endpoints (clone, alternatives CRUD), schemas
+  - frontend.yaml    # Components, services, modals
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["org_id filter", "RLS pattern", "auth context"]
+      rationale: "bom_alternatives requires org_id for multi-tenancy; RLS follows ADR-013"
+    - story: "02.4"
+      name: "BOMs CRUD"
+      provides: ["boms table", "bom_id FK", "BOM service", "version auto-increment"]
+      rationale: "Clone creates new BOM record; alternatives reference existing BOMs"
+    - story: "02.5a"
+      name: "BOM Items Core"
+      provides: ["bom_items table", "bom_item_id FK", "BOM Items service"]
+      rationale: "Alternatives are linked to specific BOM items; clone copies all items"
+  blocked_by: []
+  blocks:
+    - story: "02.9"
+      name: "BOM Costing"
+      reason: "Costing may need to consider alternative ingredient costs"
+    - story: "02.14"
+      name: "BOM Comparison/Diff View"
+      reason: "Diff view may need to compare alternatives"
+
+# External Dependencies
+external_dependencies:
+  migrations:
+    - migration: "bom_alternatives table"
+      description: "bom_alternatives table with preference_order constraint (PRD Section 3.1)"
+      status: "schema exists"
+  wireframes:
+    - id: "TEC-005"
+      description: "BOMs List - clone action button in row actions"
+    - id: "TEC-006a"
+      description: "BOM Items Detail - alternatives section with sub-rows"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/technical.md"
+    sections: ["FR-2.24", "FR-2.30"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/technical.md"
+    sections: ["Database Schema - bom_alternatives", "API Design - BOMs Endpoints", "Business Rules - BOMs"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/02-technical/02.6.bom-alternatives-clone.md"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for bom_alternatives table"
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-002-bom-snapshot-pattern.md"
+      relevance: "BOM snapshot pattern - clone respects versioning"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-005-boms-list.md"
+      relevance: "Clone action in row actions menu"
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-006a-bom-items-detail.md"
+      relevance: "Alternatives sub-row display, Add Alternative modal"
+  patterns:
+    - path: "apps/frontend/lib/services/bom-service.ts"
+      relevance: "Existing BOM service pattern to extend"
+    - path: "apps/frontend/components/technical/bom/BOMItemsTable.tsx"
+      relevance: "Table pattern for alternatives sub-rows"
+
+# High-level deliverables
+deliverables:
+  - type: "api"
+    count: 6
+    description: |
+      POST /api/v1/technical/boms/:id/clone
+      GET /api/v1/technical/boms/:id/items/:itemId/alternatives
+      POST /api/v1/technical/boms/:id/items/:itemId/alternatives
+      PUT /api/v1/technical/boms/:id/items/:itemId/alternatives/:altId
+      DELETE /api/v1/technical/boms/:id/items/:itemId/alternatives/:altId
+      GET /api/v1/technical/products/next-version (helper)
+  - type: "service"
+    count: 2
+    description: "bom-clone-service.ts, bom-alternatives-service.ts"
+  - type: "component"
+    count: 4
+    description: "BOMCloneModal, BOMAlternativeModal, BOMAlternativesManager, AlternativeRow"
+  - type: "validation"
+    count: 2
+    description: "Zod schemas for clone request, alternative create/update"
+  - type: "test"
+    count: 4
+    description: "Unit tests for services, integration tests for APIs, validation tests"
+
+# Scope Boundaries
+scope:
+  in_scope:
+    - "POST /api/technical/boms/:id/clone (clone BOM to same or different product)"
+    - "BOM clone modal with target product selector"
+    - "Clone copies: all BOM items, routing_id, notes"
+    - "Version auto-increment when cloning to same product"
+    - "Alternative ingredients CRUD (bom_alternatives table)"
+    - "Alternative preference ordering (priority 1=primary, 2+=fallbacks)"
+    - "Alternative substitution rules validation (same type required)"
+    - "Circular reference prevention (cannot add BOM product as its own component)"
+    - "Clone action button in BOM list row actions and BOM detail header"
+    - "Alternative ingredients display in BOM items sub-row"
+    - "Permission enforcement for clone and alternatives"
+  out_of_scope:
+    - "Clone with alternatives copied (Phase 1 - MVP copies items only)"
+    - "Clone with byproducts copied (Phase 1 - after 02.5b)"
+    - "Substitution ratio (Phase 1 - 1:1 assumed in MVP)"
+    - "BOM version comparison/diff view (02.14)"
+    - "BOM scaling/batch size adjustment (02.14)"
+    - "Multi-level BOM explosion (02.14)"
+    - "BOM cost calculation (02.9)"
+    - "Import/export BOM to CSV"
+
+# Technical notes
+technical_notes:
+  - "Clone creates draft BOM regardless of source status"
+  - "Clone effective_from defaults to today's date"
+  - "Version auto-increment: next available version for target product"
+  - "MVP clone scope: items only, no alternatives or byproducts copied"
+  - "Alternative must have same product type as primary item (RM->RM, ING->ING)"
+  - "Preference order must be >= 2 (1 is reserved for primary)"
+  - "No duplicate alternatives per item (UNIQUE constraint)"
+  - "Circular reference: BOM product cannot be its own component"
+  - "UoM class mismatch shows warning (not error)"
+
+# PRD Requirements Coverage
+prd_coverage:
+  - fr_id: "FR-2.24"
+    description: "BOM clone/copy version"
+    priority: "P1"
+    status: "covered"
+    implementation: "POST /api/technical/boms/:id/clone endpoint, BOMCloneModal component"
+  - fr_id: "FR-2.30"
+    description: "Alternative ingredients (substitution)"
+    priority: "P1"
+    status: "covered"
+    implementation: "bom_alternatives table CRUD, validation rules, preference ordering"
+
+# Handoff to DEV Agents
+handoff:
+  story: "02.6.bom-alternatives-clone"
+  story_file: "docs/2-MANAGEMENT/epics/current/02-technical/02.6.bom-alternatives-clone.md"
+  epic_folder: "docs/2-MANAGEMENT/epics/current/02-technical/"
+  adrs:
+    - "docs/1-BASELINE/architecture/decisions/ADR-002-bom-snapshot-pattern.md"
+    - "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+  technical_notes: |
+    - Clone is a transaction: create BOM header -> copy items
+    - Alternative validation: same type, not same as primary, no duplicates
+    - Preference order >= 2 (database constraint)
+    - Show alternatives as expandable sub-rows in items table
+  dependencies:
+    - "02.4 BOMs CRUD must be complete"
+    - "02.5a BOM Items Core must be complete"
+    - "01.1 Org Context + RLS must be complete"

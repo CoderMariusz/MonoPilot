@@ -1,0 +1,125 @@
+# Story 05.5 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "05.5"
+  name: "LP Search + Advanced Filters"
+  slug: "lp-search-filters"
+  epic: "05-warehouse"
+  phase: "0"
+  complexity: "M"
+  estimate_days: 3
+  type: "backend+frontend"
+  state: "ready"
+  model: "SONNET"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Indexes, performance optimization
+  - api.yaml         # Query parameters, endpoint enhancements
+  - frontend.yaml    # Components, hooks, state management
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "05.1"
+      name: "LP Table + CRUD"
+      provides:
+        - "license_plates table"
+        - "LicensePlateService"
+        - "base list endpoint"
+        - "lpQuerySchema"
+    - story: "01.8"
+      name: "Warehouses CRUD"
+      provides:
+        - "warehouses table"
+        - "warehouse dropdown data"
+    - story: "01.9"
+      name: "Locations CRUD"
+      provides:
+        - "locations table"
+        - "location dropdown data"
+    - story: "02.1"
+      name: "Products CRUD"
+      provides:
+        - "products table"
+        - "product dropdown data"
+  blocked_by: []
+  blocks:
+    - story: "04.6a-e"
+      name: "Material Consumption"
+      reason: "Find LPs by product for consumption"
+    - story: "04.7a-d"
+      name: "Output Registration"
+      reason: "Find destination location"
+    - story: "05.4"
+      name: "FIFO/FEFO Pick"
+      reason: "Uses filtered queries"
+    - story: "05.8"
+      name: "GRN from PO"
+      reason: "Search existing LPs"
+    - story: "05.36"
+      name: "Inventory Browser"
+      reason: "Advanced UI uses this foundation"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/warehouse.md"
+    sections:
+      - "WH-FR-002"
+      - "WH-FR-009"
+      - "WH-FR-010"
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/warehouse.md"
+    sections:
+      - "Performance Optimization"
+      - "Query Patterns"
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/05-warehouse/05.5.lp-search-filters.md"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/WH-002-license-plates-list.md"
+      sections:
+        - "Filters Bar"
+        - "Search LP Number"
+        - "Filtered Empty State"
+  base_story:
+    path: "docs/2-MANAGEMENT/epics/current/05-warehouse/05.1.lp-table-crud.md"
+    relevance: "Extends LP list service and validation"
+  adrs: []
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "Additional composite indexes for filter combinations"
+  - type: "api"
+    count: 1
+    description: "Enhanced GET /api/warehouse/license-plates with advanced query params"
+  - type: "service"
+    count: 1
+    description: "Extended LicensePlateService.list() with new filters"
+  - type: "validation"
+    count: 1
+    description: "Extended lpQuerySchema with array filters and date ranges"
+  - type: "components"
+    count: 6
+    description: "LPAdvancedFilters, LPFilterChips, LPSearchInput, LPFilterPresets, LPFilterDateRange, LPFilterMultiSelect"
+  - type: "test"
+    count: 3
+    description: "Unit + integration + E2E filter tests"
+
+# Technical notes
+technical_notes:
+  - "Extends 05.1 base implementation - do not rewrite, enhance"
+  - "All filters use AND logic, multiple values in same filter use OR"
+  - "Search minimum 2 characters, prefix match, case-insensitive"
+  - "Batch number search is exact match, case-insensitive"
+  - "Maximum page size enforced at 200 items"
+  - "Performance: simple filter < 500ms, complex filter (5+) < 500ms, search < 300ms"
+  - "Filter state persisted in URL query params for bookmarking"
+  - "NULL expiry dates excluded from expiry date filters"
+  - "CRITICAL: Supports Epic 04 Phase 1 material consumption workflows"

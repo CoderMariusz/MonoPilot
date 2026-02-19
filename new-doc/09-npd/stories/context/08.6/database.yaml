@@ -1,0 +1,123 @@
+# Story 08.6 - Database Context
+# NPD Gate Approvals & History - Database Schema
+
+tables:
+  npd_approvals:
+    purpose: "Audit trail for gate approvals and rejections"
+    schema:
+      id: "SERIAL PRIMARY KEY"
+      org_id: "UUID NOT NULL REFERENCES organizations(id)"
+      project_id: "INTEGER NOT NULL REFERENCES npd_projects(id)"
+
+      # Gate transition info
+      gate: "VARCHAR(10) NOT NULL -- Current gate (G0-G4)"
+      target_gate: "VARCHAR(10) NOT NULL -- Target gate (G1-Launched)"
+
+      # Approval data
+      result: "VARCHAR(20) NOT NULL -- approved | rejected"
+      approved_by: "UUID NOT NULL REFERENCES auth.users(id)"
+      approved_at: "TIMESTAMPTZ NOT NULL DEFAULT NOW()"
+      notes: "TEXT -- approval notes or rejection reason"
+      e_signature: "BOOLEAN DEFAULT false -- password confirmed"
+
+      created_at: "TIMESTAMPTZ DEFAULT NOW()"
+      updated_at: "TIMESTAMPTZ DEFAULT NOW()"
+
+    constraints:
+      - "CONSTRAINT valid_result CHECK (result IN ('approved', 'rejected'))"
+      - "CONSTRAINT valid_gate CHECK (gate IN ('G0', 'G1', 'G2', 'G3', 'G4'))"
+      - "CONSTRAINT valid_target_gate CHECK (target_gate IN ('G1', 'G2', 'G3', 'G4', 'Launched'))"
+
+    indexes:
+      - "idx_npd_approvals_project ON (project_id)"
+      - "idx_npd_approvals_org ON (org_id)"
+      - "idx_npd_approvals_gate ON (gate, result)"
+      - "idx_npd_approvals_approved_by ON (approved_by)"
+
+    rls:
+      enabled: true
+      policies:
+        - name: "npd_approvals_org_isolation"
+          for: "ALL"
+          using: "org_id = current_setting('app.current_org_id')::uuid"
+
+# Migration file path
+migration:
+  file: "supabase/migrations/XXX_create_npd_approvals.sql"
+  sequence: "After npd_gate_checklists migration"
+
+# Seed data (none - approvals created via workflow)
+seed_data: []
+
+# Business rules enforced at DB level
+business_rules:
+  - rule: "Valid result values"
+    enforcement: "CHECK constraint"
+
+  - rule: "Valid gate values"
+    enforcement: "CHECK constraint"
+
+  - rule: "Org isolation"
+    enforcement: "RLS policy"
+
+  - rule: "Immutable records"
+    enforcement: "No DELETE policy, application-level (no edit UI)"
+
+# Related tables
+related_tables:
+  - table: "npd_projects"
+    relationship: "Many approvals per project"
+    fk: "project_id"
+
+  - table: "auth.users"
+    relationship: "Many approvals per user"
+    fk: "approved_by"
+
+  - table: "organizations"
+    relationship: "All approvals belong to org"
+    fk: "org_id"
+
+# Performance considerations
+performance:
+  indexes:
+    - "project_id: Most common query pattern (get approvals for project)"
+    - "org_id: RLS enforcement and org-wide queries"
+    - "gate + result: Analytics and reporting"
+    - "approved_by: User activity tracking"
+
+  expected_volume:
+    - "~5-20 approvals per project"
+    - "~100-500 approvals per org per year"
+    - "Low write volume, high read volume (history display)"
+
+# Query patterns
+common_queries:
+  - name: "Get approval history for project"
+    sql: |
+      SELECT a.*, u.name as approver_name, u.email as approver_email
+      FROM npd_approvals a
+      JOIN auth.users u ON a.approved_by = u.id
+      WHERE a.project_id = $1
+      ORDER BY a.approved_at DESC;
+
+  - name: "Get latest approval for gate"
+    sql: |
+      SELECT *
+      FROM npd_approvals
+      WHERE project_id = $1 AND gate = $2
+      ORDER BY approved_at DESC
+      LIMIT 1;
+
+  - name: "Check if gate already approved"
+    sql: |
+      SELECT COUNT(*) > 0 as is_approved
+      FROM npd_approvals
+      WHERE project_id = $1
+        AND gate = $2
+        AND result = 'approved';
+
+# Data retention
+data_retention:
+  policy: "Permanent retention (compliance/audit)"
+  archival: "None - all approvals kept indefinitely"
+  backup: "Standard org-wide backup policy"

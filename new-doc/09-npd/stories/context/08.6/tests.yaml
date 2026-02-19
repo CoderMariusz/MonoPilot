@@ -1,0 +1,521 @@
+# Story 08.6 - Test Context
+# NPD Gate Approvals & History - Test Specifications
+
+unit_tests:
+  service_tests:
+    file: "lib/services/npd-approval-service.test.ts"
+    coverage_target: 85
+
+    test_cases:
+      - name: "canApproveGate - G0-G2 requires NPD_LEAD"
+        scenarios:
+          - input: "(NPD_LEAD, G0)"
+            expected: "true"
+          - input: "(QA_MANAGER, G0)"
+            expected: "false"
+          - input: "(NPD_LEAD, G2)"
+            expected: "true"
+
+      - name: "canApproveGate - G3 requires QA_MANAGER"
+        scenarios:
+          - input: "(QA_MANAGER, G3)"
+            expected: "true"
+          - input: "(NPD_LEAD, G3)"
+            expected: "false"
+          - input: "(DIRECTOR, G3)"
+            expected: "false"
+
+      - name: "canApproveGate - G4 requires DIRECTOR"
+        scenarios:
+          - input: "(DIRECTOR, G4)"
+            expected: "true"
+          - input: "(QA_MANAGER, G4)"
+            expected: "false"
+          - input: "(NPD_LEAD, G4)"
+            expected: "false"
+
+      - name: "approveGate - Success scenario"
+        setup:
+          - "Mock project at G0 with complete checklist"
+          - "Mock user with NPD_LEAD role"
+          - "Mock API POST /approve returns success"
+        assertions:
+          - "API called with correct projectId, gate, notes"
+          - "Returns updated project with current_gate=G1"
+          - "Returns approval record with result=approved"
+
+      - name: "approveGate - Checklist incomplete"
+        setup:
+          - "Mock project at G1 with 3/5 checklist items complete"
+          - "Mock user with NPD_LEAD role"
+        assertions:
+          - "Throws error: CHECKLIST_INCOMPLETE"
+          - "API not called"
+
+      - name: "rejectGate - Success scenario"
+        setup:
+          - "Mock project at G2"
+          - "Mock user with NPD_LEAD role"
+          - "Mock API POST /reject returns success"
+        assertions:
+          - "API called with correct projectId, gate, reason"
+          - "Returns project with unchanged current_gate=G2"
+          - "Returns approval record with result=rejected"
+
+      - name: "rejectGate - Reason too short"
+        setup:
+          - "Mock project at G1"
+          - "Reason: 'No' (2 chars)"
+        assertions:
+          - "Throws validation error: min 10 characters"
+          - "API not called"
+
+  validation_tests:
+    file: "lib/validation/npd-approval-schema.test.ts"
+    coverage_target: 90
+
+    test_cases:
+      - name: "gateApprovalSchema - Valid notes"
+        scenarios:
+          - input: "{notes: 'Approved for launch'}"
+            expected: "valid"
+          - input: "{notes: ''}"
+            expected: "valid (optional)"
+          - input: "{notes: null}"
+            expected: "valid (optional)"
+
+      - name: "gateApprovalSchema - Notes too long"
+        scenarios:
+          - input: "{notes: '...[1001 chars]...'}"
+            expected: "invalid: max 1000 characters"
+
+      - name: "gateRejectionSchema - Valid reason"
+        scenarios:
+          - input: "{reason: 'Cost analysis incomplete'}"
+            expected: "valid (24 chars)"
+          - input: "{reason: 'Ten chars!'}"
+            expected: "valid (exactly 10 chars)"
+
+      - name: "gateRejectionSchema - Reason too short"
+        scenarios:
+          - input: "{reason: 'No'}"
+            expected: "invalid: min 10 characters"
+          - input: "{reason: ''}"
+            expected: "invalid: required"
+
+      - name: "gateRejectionSchema - Reason too long"
+        scenarios:
+          - input: "{reason: '...[1001 chars]...'}"
+            expected: "invalid: max 1000 characters"
+
+integration_tests:
+  api_tests:
+    file: "tests/api/npd-approvals-api.test.ts"
+    coverage_target: 80
+
+    test_cases:
+      - name: "GET /api/npd/projects/:id/approvals - Success"
+        setup:
+          - "Create test project with 3 approvals"
+          - "Login as NPD_LEAD"
+        steps:
+          - "GET /api/npd/projects/123/approvals"
+        assertions:
+          - "Status 200"
+          - "Returns 3 approvals sorted DESC by approved_at"
+          - "Each approval has all required fields"
+          - "Approver details included (name, email, role)"
+
+      - name: "GET /api/npd/projects/:id/approvals - Filter by gate"
+        setup:
+          - "Create test project with approvals for G0, G1, G2"
+          - "Login as NPD_LEAD"
+        steps:
+          - "GET /api/npd/projects/123/approvals?gate=G0"
+        assertions:
+          - "Status 200"
+          - "Returns only G0 approvals"
+
+      - name: "GET /api/npd/projects/:id/approvals - RLS enforcement"
+        setup:
+          - "Create project in Org A with approvals"
+          - "Login as user from Org B"
+        steps:
+          - "GET /api/npd/projects/123/approvals"
+        assertions:
+          - "Status 403 or 404"
+          - "Cannot access Org A's approvals"
+
+      - name: "POST /api/npd/projects/:id/gates/:gate/approve - Success"
+        setup:
+          - "Create project at G0 with complete checklist"
+          - "Login as user with NPD_LEAD role"
+        steps:
+          - "POST /api/npd/projects/123/gates/G0/approve"
+          - "Body: {notes: 'Approved for feasibility'}"
+        assertions:
+          - "Status 200"
+          - "project.current_gate updated to G1"
+          - "project.status updated to 'feasibility'"
+          - "Approval record created with result=approved"
+          - "Email sent to project owner"
+
+      - name: "POST .../approve - Checklist incomplete"
+        setup:
+          - "Create project at G1 with 3/5 checklist items complete"
+          - "Login as NPD_LEAD"
+        steps:
+          - "POST /api/npd/projects/123/gates/G1/approve"
+        assertions:
+          - "Status 400"
+          - "Error: CHECKLIST_INCOMPLETE"
+          - "Message includes count of incomplete items"
+          - "Project unchanged"
+
+      - name: "POST .../approve - Permission denied"
+        setup:
+          - "Create project at G3"
+          - "Login as user with NPD_LEAD role (not authorized for G3)"
+        steps:
+          - "POST /api/npd/projects/123/gates/G3/approve"
+        assertions:
+          - "Status 403"
+          - "Error: PERMISSION_DENIED"
+          - "Message: 'Only QA Managers can approve this gate'"
+
+      - name: "POST .../approve - Concurrent approval"
+        setup:
+          - "Create project at G0"
+          - "User A approves gate"
+        steps:
+          - "User B attempts to approve same gate"
+        assertions:
+          - "Status 409"
+          - "Error: ALREADY_APPROVED"
+          - "Message includes User A's name"
+
+      - name: "POST .../reject - Success"
+        setup:
+          - "Create project at G2"
+          - "Login as NPD_LEAD"
+        steps:
+          - "POST /api/npd/projects/123/gates/G2/reject"
+          - "Body: {reason: 'Cost analysis needs revision'}"
+        assertions:
+          - "Status 200"
+          - "project.current_gate unchanged (still G2)"
+          - "project.status unchanged"
+          - "Approval record created with result=rejected"
+          - "Email sent to project owner with reason"
+
+      - name: "POST .../reject - Reason too short"
+        setup:
+          - "Create project at G1"
+          - "Login as NPD_LEAD"
+        steps:
+          - "POST /api/npd/projects/123/gates/G1/reject"
+          - "Body: {reason: 'No'}"
+        assertions:
+          - "Status 400"
+          - "Error: REASON_TOO_SHORT"
+          - "Message: 'min 10 characters'"
+
+      - name: "POST .../approve - E-signature success"
+        setup:
+          - "Enable e-signature in org settings"
+          - "Create project at G0 with complete checklist"
+          - "Login as NPD_LEAD with password 'test123'"
+        steps:
+          - "POST /api/npd/projects/123/gates/G0/approve"
+          - "Body: {notes: 'Approved', password: 'test123'}"
+        assertions:
+          - "Status 200"
+          - "Approval record has e_signature=true"
+
+      - name: "POST .../approve - E-signature invalid password"
+        setup:
+          - "Enable e-signature in org settings"
+          - "Create project at G0"
+          - "Login as NPD_LEAD"
+        steps:
+          - "POST /api/npd/projects/123/gates/G0/approve"
+          - "Body: {password: 'wrongpassword'}"
+        assertions:
+          - "Status 400"
+          - "Error: INVALID_PASSWORD"
+          - "Approval not created"
+
+component_tests:
+  ui_tests:
+    file: "components/npd/GateApprovalModal.test.tsx"
+    coverage_target: 75
+
+    test_cases:
+      - name: "GateApprovalModal - Approve mode render"
+        setup:
+          - "Mock project at G0"
+          - "Mock user with NPD_LEAD role"
+          - "Mock complete checklist"
+        steps:
+          - "Render modal in approve mode"
+        assertions:
+          - "Shows project number and name"
+          - "Shows gate transition: G0 → G1"
+          - "Shows checklist status: 5/5 complete"
+          - "Shows optional notes field"
+          - "Shows Approve button (enabled)"
+
+      - name: "GateApprovalModal - Reject mode render"
+        setup:
+          - "Mock project at G2"
+          - "Mock user with NPD_LEAD role"
+        steps:
+          - "Render modal in reject mode"
+        assertions:
+          - "Shows required reason field"
+          - "Shows Reject button (disabled until reason entered)"
+
+      - name: "GateApprovalModal - Checklist incomplete"
+        setup:
+          - "Mock project with 3/5 checklist items complete"
+        steps:
+          - "Render modal in approve mode"
+        assertions:
+          - "Shows warning: '2 required items incomplete'"
+          - "Shows list of incomplete items"
+          - "Approve button disabled"
+
+      - name: "GateApprovalModal - Submit approve"
+        setup:
+          - "Mock project at G1"
+          - "Mock approveGate service returns success"
+        steps:
+          - "Enter notes: 'Looks good'"
+          - "Click Approve button"
+          - "Confirm in confirmation dialog"
+        assertions:
+          - "approveGate called with correct params"
+          - "Shows success message"
+          - "Calls onSuccess callback"
+          - "Modal closes"
+
+      - name: "GateApprovalModal - Submit reject with validation"
+        setup:
+          - "Mock project at G0"
+        steps:
+          - "Click Reject button"
+          - "Enter reason: 'No' (too short)"
+          - "Click Submit"
+        assertions:
+          - "Shows validation error: 'min 10 characters'"
+          - "Submit button disabled"
+          - "Modal stays open"
+        steps:
+          - "Update reason: 'Cost analysis incomplete'"
+          - "Click Submit"
+        assertions:
+          - "Validation passes"
+          - "rejectGate called"
+
+      - name: "ApprovalHistoryTimeline - Render history"
+        setup:
+          - "Mock 3 approvals: 2 approved, 1 rejected"
+        steps:
+          - "Render timeline"
+        assertions:
+          - "Shows 3 timeline items"
+          - "Sorted DESC (newest first)"
+          - "Shows green checkmark for approved"
+          - "Shows red X for rejected"
+          - "Shows approver name and timestamp"
+
+      - name: "ApprovalHistoryTimeline - Empty state"
+        setup:
+          - "Mock empty approvals array"
+        steps:
+          - "Render timeline"
+        assertions:
+          - "Shows empty state message: 'No approvals yet'"
+
+      - name: "ESignatureModal - Success flow"
+        setup:
+          - "Mock onConfirm returns success"
+        steps:
+          - "Enter password: 'test123'"
+          - "Click Confirm"
+        assertions:
+          - "onConfirm called with 'test123'"
+          - "Modal closes on success"
+
+      - name: "ESignatureModal - Invalid password"
+        setup:
+          - "Mock onConfirm throws error"
+        steps:
+          - "Enter password: 'wrong'"
+          - "Click Confirm"
+        assertions:
+          - "Shows error: 'Invalid password'"
+          - "Password field cleared"
+          - "Modal stays open for retry"
+
+      - name: "GateApprovalButton - Permission check"
+        setup:
+          - "Mock project at G3"
+          - "Mock user with NPD_LEAD role (not authorized)"
+        steps:
+          - "Render button"
+        assertions:
+          - "Button is hidden or disabled"
+          - "Tooltip: 'Only QA Managers can approve this gate'"
+
+      - name: "GateApprovalButton - Checklist incomplete"
+        setup:
+          - "Mock project at G0 with incomplete checklist"
+          - "Mock user with NPD_LEAD role"
+        steps:
+          - "Render button"
+        assertions:
+          - "Button is disabled"
+          - "Tooltip: 'Complete 2 checklist items first'"
+
+e2e_tests:
+  playwright_tests:
+    file: "tests/e2e/npd-approvals.spec.ts"
+
+    test_cases:
+      - name: "Full approval flow - NPD Lead approves G0"
+        steps:
+          - "Login as NPD Lead"
+          - "Navigate to NPD project at G0"
+          - "Click 'Request Approval' button"
+          - "Approval modal opens"
+          - "Verify checklist shows 5/5 complete"
+          - "Enter notes: 'Approved for feasibility study'"
+          - "Click Approve button"
+          - "Confirmation dialog appears"
+          - "Click Confirm"
+          - "Success message displayed"
+          - "Modal closes"
+          - "Project detail page refreshed"
+          - "Project now at G1, status 'feasibility'"
+          - "Approval history shows new approval"
+        assertions:
+          - "All steps complete without error"
+          - "Database record created in npd_approvals"
+          - "Email sent to project owner"
+
+      - name: "Full rejection flow - NPD Lead rejects G2"
+        steps:
+          - "Login as NPD Lead"
+          - "Navigate to NPD project at G2"
+          - "Click 'Request Approval' button"
+          - "Click 'Reject' tab in modal"
+          - "Enter reason: 'Cost analysis needs more detail'"
+          - "Click Reject button"
+          - "Confirmation dialog appears"
+          - "Click Confirm"
+          - "Warning message displayed"
+          - "Modal closes"
+          - "Project still at G2"
+          - "Approval history shows rejection"
+        assertions:
+          - "Project unchanged (gate, status)"
+          - "Rejection record created"
+          - "Email sent with reason"
+
+      - name: "Permission enforcement - QA Manager cannot approve G1"
+        steps:
+          - "Login as QA Manager"
+          - "Navigate to NPD project at G1"
+          - "Verify approval button is hidden or disabled"
+          - "Tooltip shows: 'Only NPD Leads can approve this gate'"
+        assertions:
+          - "User cannot access approval action"
+
+      - name: "E-signature flow - Director approves G4 with password"
+        setup:
+          - "Enable e-signature in org settings"
+        steps:
+          - "Login as Director"
+          - "Navigate to NPD project at G4"
+          - "Click 'Request Approval' button"
+          - "Enter notes: 'Approved for launch'"
+          - "Click Approve button"
+          - "E-signature modal appears"
+          - "Enter password"
+          - "Click Confirm"
+          - "Password verified"
+          - "Approval completed"
+          - "Approval history shows e-signature badge"
+        assertions:
+          - "Approval has e_signature=true"
+
+      - name: "Mobile responsive - Approval modal on mobile"
+        device: "iPhone 12"
+        steps:
+          - "Login as NPD Lead"
+          - "Navigate to project at G0"
+          - "Tap 'Request Approval' button"
+          - "Modal opens full-screen"
+          - "All sections stacked vertically"
+          - "Action buttons full-width"
+          - "Touch targets ≥48dp"
+        assertions:
+          - "Modal usable on mobile"
+          - "No horizontal scroll"
+          - "All actions accessible"
+
+# Test data fixtures
+fixtures:
+  projects:
+    - id: 1001
+      project_number: "NPD-2024-001"
+      current_gate: "G0"
+      status: "idea"
+      checklist_complete: true
+
+    - id: 1002
+      project_number: "NPD-2024-002"
+      current_gate: "G3"
+      status: "development"
+      checklist_complete: false
+
+  approvals:
+    - id: 2001
+      project_id: 1001
+      gate: "G0"
+      target_gate: "G1"
+      result: "approved"
+      approved_by: "user-npd-lead"
+      notes: "Concept approved"
+      e_signature: false
+
+    - id: 2002
+      project_id: 1001
+      gate: "G1"
+      target_gate: "G2"
+      result: "rejected"
+      approved_by: "user-npd-lead"
+      notes: "Cost analysis incomplete"
+      e_signature: false
+
+# Coverage targets
+coverage:
+  unit_tests: 85
+  integration_tests: 80
+  component_tests: 75
+  e2e_tests: "Critical paths only (4 scenarios)"
+
+# Performance benchmarks
+performance_benchmarks:
+  - metric: "Approval history load time"
+    target: "<300ms for 20 approvals"
+    measurement: "API response + render"
+
+  - metric: "Approval submit time"
+    target: "<500ms"
+    measurement: "Button click to success message"
+
+  - metric: "Modal open time"
+    target: "<200ms"
+    measurement: "Button click to modal visible"

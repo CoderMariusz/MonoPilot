@@ -1,0 +1,181 @@
+# Story 06.22 - CCP Definition Context (Entry Point)
+# Generated: 2025-01-15
+# Purpose: Story metadata, dependencies, and overview - read this first
+# Phase: 3 (HACCP)
+
+story:
+  id: "06.22"
+  name: "CCP Definition"
+  slug: "ccp-definition"
+  epic: "06-quality"
+  phase: "3"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "full-stack"
+  state: "ready"
+  priority: "P0"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies, overview
+  - database.yaml    # Tables, RLS, migrations, triggers, indexes
+  - api.yaml         # Endpoints, request/response schemas, services
+  - frontend.yaml    # Components, pages, types, hooks, UX
+  - tests.yaml       # Acceptance criteria, test specifications, E2E scenarios
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["org_id context", "RLS pattern", "users table"]
+    - story: "02.1"
+      name: "Products CRUD"
+      provides: ["products table", "product reference for HACCP"]
+    - story: "04.1"
+      name: "Routings CRUD"
+      provides: ["routings table", "routing_operations table"]
+    - story: "06.21"
+      name: "HACCP Plan Setup"
+      provides: ["haccp_plans table", "HACCP plan context"]
+
+  blocked_by: []
+
+  blocks:
+    - story: "06.23"
+      name: "CCP Monitoring Desktop"
+      reason: "CCP must be defined before monitoring data can be recorded"
+    - story: "06.24"
+      name: "CCP Monitoring Scanner"
+      reason: "CCP critical limits needed for mobile validation"
+    - story: "06.25"
+      name: "CCP Deviation Handling"
+      reason: "CCP definition needed for deviation rules"
+    - story: "06.26"
+      name: "CCP Deviation Alerts"
+      reason: "CCP escalation rules defined here"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/quality.md"
+    sections: ["FR-QA-014", "Section 6.2 - CCP Monitoring Workflow", "Section 6.3 - Common CCPs"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/quality.md"
+    sections: ["haccp_ccp", "API Design"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/06-quality/06.22.ccp-definition.md"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "PRIMARY - RLS policy pattern for haccp_ccp table"
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-001-multi-tenancy-isolation.md"
+      relevance: "Multi-tenancy isolation across all quality tables"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "haccp_ccp table + validation trigger + RLS"
+  - type: "trigger/function"
+    count: 1
+    description: "validate_ccp_before_activation()"
+  - type: "service"
+    count: 1
+    description: "haccp-ccp-service.ts with list, create, update, activate, deactivate, createVersion"
+  - type: "validation"
+    count: 5
+    description: "createCCPSchema, updateCCPSchema, activateCCPSchema, deactivateCCPSchema, ccpListQuerySchema"
+  - type: "api"
+    count: 8
+    description: "GET/POST ccp, GET detail, PUT update, DELETE delete, POST activate/deactivate/version"
+  - type: "components"
+    count: 20
+    description: "DataTable, Wizard (decision tree + 4-step), Modals, Badges, Forms"
+  - type: "page"
+    count: 3
+    description: "/quality/haccp/ccp (list), /quality/haccp/ccp/[id] (detail), /quality/haccp/ccp/new (create wizard)"
+  - type: "test"
+    count: 3
+    description: "Unit tests (service), Integration tests (API), E2E tests (workflow)"
+
+# Technical notes
+technical_notes:
+  - "CCP number format: CCP-N (e.g., CCP-1, CCP-2)"
+  - "CCP number unique per HACCP plan (can repeat across different plans/products)"
+  - "CCP status workflow: draft → active → inactive (or superseded)"
+  - "Critical limits: min/max with unit validation (min < max)"
+  - "Versioning: editing active CCP creates new draft version"
+  - "Activation requires: critical limits, routing link, QA Manager approval"
+  - "Decision tree: 7-question HACCP CCP determination wizard (optional)"
+  - "Routing link: CCP must link to routing operation where monitoring occurs"
+  - "Hazard types: biological (red), chemical (orange), physical (blue)"
+  - "Audit trail required for all CCP changes (quality_audit_log)"
+  - "Return 404 (not 403) for cross-tenant access per ADR-013"
+
+# Business Rules
+business_rules:
+  - rule: "CCP Number Uniqueness per HACCP Plan"
+    description: "CCP number must be unique within HACCP plan, can repeat across plans"
+    enforcement: "UNIQUE constraint on (org_id, haccp_plan_id, ccp_number)"
+  - rule: "Critical Limits Validation"
+    description: "Min must be less than max; at least one limit required for activation"
+    enforcement: "CHECK constraint + activation validation trigger"
+  - rule: "Activation Requirements"
+    description: "CCP needs critical limits, routing link, QA Manager approval before activation"
+    enforcement: "validate_ccp_before_activation() trigger function"
+  - rule: "Versioning on Edit Active CCP"
+    description: "Editing active CCP creates new draft version; old remains active until new activated"
+    enforcement: "Application logic in createVersion() service method"
+  - rule: "Delete Draft Only"
+    description: "Only draft CCPs can be deleted; active/inactive must be deactivated first"
+    enforcement: "RLS policy: DELETE WHERE status = 'draft'"
+  - rule: "Routing Link Required for Activation"
+    description: "CCP must link to routing operation (where monitoring occurs in production)"
+    enforcement: "Activation validation checks routing_id IS NOT NULL"
+  - rule: "QA Manager Approval for Activation"
+    description: "Only QA_MANAGER role can approve and activate CCPs"
+    enforcement: "RLS policy + role check in activate() service"
+  - rule: "Audit Trail Required"
+    description: "All CCP changes logged to quality_audit_log"
+    enforcement: "Application layer creates audit_log entries on every state change"
+  - rule: "Decision Tree Optional"
+    description: "HACCP decision tree wizard is optional; can create CCP directly"
+    enforcement: "decision_tree_answers is nullable JSONB field"
+  - rule: "Supersede on New Version Activation"
+    description: "Activating new version sets old version status to 'superseded' and expiry_date"
+    enforcement: "Application logic in activate() when new version exists"
+
+# Context Summary
+summary: |
+  Story 06.22 implements Critical Control Point (CCP) definition and management within HACCP plans.
+
+  MVP SCOPE (This Story):
+  - haccp_ccp table with CCP definition fields
+  - CCP CRUD operations (Create, Read, Update, Delete)
+  - CCP attributes: number, name, hazard type, critical limits (min/max), unit, monitoring frequency
+  - CCP decision tree wizard (7-question HACCP decision tree - optional)
+  - Link CCP to routing operation (where monitored in production)
+  - Critical limits validation rules (min < max, numeric validation)
+  - CCP versioning (effective_date, expiry_date)
+  - CCP status workflow (draft → active → inactive → superseded)
+  - CCP list page with search and filters
+  - CCP detail page with version history and linked operations
+  - CCP creation wizard (4 steps + optional decision tree)
+  - CCP edit modal (draft only; active requires versioning)
+  - Integration with routing operations (Epic 04)
+
+  DEFERRED (Phase 3+/Story 06.22b):
+  - CCP Templates for common hazards
+  - Auto-create from industry standards (BRC/SQF)
+  - Photo attachments for visual aids
+  - Multi-language CCP descriptions
+  - CCP risk assessment integration
+  - E-signature integration (FDA 21 CFR Part 11)
+
+  KEY INTEGRATION POINTS:
+  - Links to HACCP plans (Story 06.21)
+  - Links to routing operations (Epic 04)
+  - Feeds into CCP monitoring (Stories 06.23, 06.24)
+  - CCP limits used for deviation detection (Stories 06.25, 06.26)
+  - CCP monitoring records reference this table
+  - Audit trail for regulatory compliance

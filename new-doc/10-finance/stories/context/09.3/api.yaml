@@ -1,0 +1,11 @@
+endpoints:
+  get_material_costs:
+    method: GET
+    path: "/api/finance/work-order-costs/:workOrderId/material"
+    response:
+      status: 200
+      body:
+        costs: "Array of MaterialConsumptionCost"
+        summary:
+          total_material_cost: "number"
+          items_count: "number"

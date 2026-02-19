@@ -1,0 +1,509 @@
+# Story 06.12 - Frontend Context
+# Generated: 2026-01-15
+# Purpose: Frontend components, pages, hooks for Batch Release Approval
+
+# =============================================================================
+# PAGES
+# =============================================================================
+
+pages:
+  - path: app/(authenticated)/quality/release-approvals/page.tsx
+    name: PendingApprovalsPage
+    description: "QA Manager queue for pending batch release approvals"
+    components:
+      - PendingApprovalsDataTable
+      - ApprovalQueueSummary
+      - PendingApprovalsFilters
+    data_fetching:
+      - hook: usePendingReleases
+        endpoint: GET /api/quality/releases/pending
+    features:
+      - "Queue of batches awaiting approval"
+      - "Filter by product, priority, date range"
+      - "Summary stats: total pending, high priority, oldest waiting"
+      - "Quick view/approve from list"
+    layout:
+      - "Header: Release Approvals"
+      - "Summary cards: Total Pending, High Priority, Oldest Waiting"
+      - "Filter panel: Product, Priority, Date Range"
+      - "DataTable: pending releases"
+      - "Row actions: View, Approve, Reject"
+
+  - path: app/(authenticated)/quality/release-approvals/[id]/page.tsx
+    name: ReleaseApprovalDetailPage
+    description: "Release approval detail with conditions validation and e-signature"
+    components:
+      - ReleaseConditionsPanel
+      - ESignatureModal
+      - ReleaseCertificatePreview
+      - ApprovalHistoryTimeline
+    data_fetching:
+      - hook: useRelease
+        endpoint: GET /api/quality/releases/:id
+      - hook: useReleaseConditions
+        endpoint: GET /api/quality/releases/:id/conditions
+    features:
+      - "Release conditions validation display"
+      - "E-signature modal for approval/rejection"
+      - "Conditional approval workflow"
+      - "Certificate preview/download"
+      - "Approval history timeline"
+    layout:
+      - "Header: Release # , Batch # , Status"
+      - "Conditions panel: 7 conditions with pass/fail"
+      - "Approval panel: Approve/Reject/Conditional buttons"
+      - "E-signature modal: Password, PIN, or Email"
+      - "Certificate preview"
+      - "History timeline"
+
+# =============================================================================
+# COMPONENTS
+# =============================================================================
+
+components:
+  # ---------------------------------------------------------------------------
+  # Approval Queue Components
+  # ---------------------------------------------------------------------------
+  - name: PendingApprovalsDataTable
+    path: components/quality/release-approval/PendingApprovalsDataTable.tsx
+    description: "DataTable for pending approvals queue"
+    props:
+      - name: releases
+        type: BatchReleaseRecord[]
+      - name: onApprove
+        type: "(releaseId: string) => void"
+      - name: onReject
+        type: "(releaseId: string) => void"
+      - name: onView
+        type: "(releaseId: string) => void"
+    columns:
+      - "Release #"
+      - "Batch #"
+      - "Product"
+      - "Quantity"
+      - "Submitted By"
+      - "Submitted At"
+      - "Conditions (Pass/Fail count)"
+      - "Priority"
+      - "Actions"
+    features:
+      - "Sorting by submitted_at (oldest first)"
+      - "Priority highlighting"
+      - "Conditions summary (7/7 pass, 2/7 fail)"
+      - "Quick actions: View, Approve, Reject"
+    ui_pattern: "ShadCN DataTable with row actions"
+
+  - name: ApprovalQueueSummary
+    path: components/quality/release-approval/ApprovalQueueSummary.tsx
+    description: "Summary statistics cards for approval queue"
+    props:
+      - name: summary
+        type: ApprovalQueueSummary
+    features:
+      - "Total pending count"
+      - "High priority count"
+      - "Oldest waiting hours"
+      - "Color coding for urgency"
+    ui_pattern: "Grid of 3 cards with icons and numbers"
+
+  - name: PendingApprovalsFilters
+    path: components/quality/release-approval/PendingApprovalsFilters.tsx
+    description: "Filter panel for approval queue"
+    props:
+      - name: filters
+        type: PendingReleasesParams
+      - name: onChange
+        type: "(filters: PendingReleasesParams) => void"
+    filters:
+      - "Product selector"
+      - "Priority filter (high, normal, urgent)"
+      - "Date range (submitted from/to)"
+    ui_pattern: "Horizontal filter bar with dropdowns"
+
+  # ---------------------------------------------------------------------------
+  # Conditions Validation Components
+  # ---------------------------------------------------------------------------
+  - name: ReleaseConditionsPanel
+    path: components/quality/release-approval/ReleaseConditionsPanel.tsx
+    description: "Conditions validation display with expand/collapse"
+    props:
+      - name: releaseId
+        type: string
+    data_fetching:
+      - hook: useReleaseConditions
+    features:
+      - "7 condition rows with pass/fail/warning/N/A icons"
+      - "Expandable details per condition"
+      - "Links to source records (inspection, NCR, etc.)"
+      - "Overall status banner (All Pass / Blockers / Warnings)"
+      - "Refresh button to re-validate"
+      - "Timestamp of last validation"
+    ui_pattern: "Vertical list with expandable sections"
+
+  - name: ConditionCheckRow
+    path: components/quality/release-approval/ConditionCheckRow.tsx
+    description: "Single condition check row"
+    props:
+      - name: condition
+        type: ConditionCheck
+      - name: onExpand
+        type: "() => void"
+      - name: isExpanded
+        type: boolean
+    features:
+      - "Condition type label"
+      - "Result icon (pass=green check, fail=red X, warning=yellow !, N/A=gray)"
+      - "Expandable details section"
+      - "Link to source (e.g., inspection)"
+    ui_pattern: "Row with icon, text, expand button"
+
+  # ---------------------------------------------------------------------------
+  # E-Signature Components
+  # ---------------------------------------------------------------------------
+  - name: ESignatureModal
+    path: components/quality/release-approval/ESignatureModal.tsx
+    description: "E-signature capture modal for approval/rejection"
+    props:
+      - name: open
+        type: boolean
+      - name: onOpenChange
+        type: "(open: boolean) => void"
+      - name: signatureMeaning
+        type: string
+      - name: action
+        type: "'approve' | 'reject' | 'conditional'"
+      - name: onConfirm
+        type: "(credential: string, method: string) => Promise<void>"
+    features:
+      - "Signature meaning prominently displayed"
+      - "Signature method selector (Password, PIN, Email)"
+      - "Credential input (password/PIN with show/hide)"
+      - "'I understand' checkbox (required)"
+      - "Sign and Approve / Sign and Reject button"
+      - "Loading state during validation"
+      - "Error display for invalid credentials"
+      - "Attempt counter (lock after 3 failed)"
+    validation:
+      - "Credential required"
+      - "Checkbox must be checked"
+      - "Method must be selected"
+    ui_pattern: "ShadCN Dialog with form"
+
+  - name: ESignatureMethodSelector
+    path: components/quality/release-approval/ESignatureMethodSelector.tsx
+    description: "Selector for signature method"
+    props:
+      - name: method
+        type: "'password' | 'pin' | 'email_confirm'"
+      - name: onChange
+        type: "(method: string) => void"
+    features:
+      - "Radio buttons for each method"
+      - "Icons for each option"
+      - "Description per method"
+    methods:
+      password: "Enter your password"
+      pin: "Enter 4-6 digit PIN"
+      email_confirm: "Confirmation code sent to email"
+
+  # ---------------------------------------------------------------------------
+  # Approval Action Components
+  # ---------------------------------------------------------------------------
+  - name: ApprovalConfirmationModal
+    path: components/quality/release-approval/ApprovalConfirmationModal.tsx
+    description: "Final confirmation before signing"
+    props:
+      - name: release
+        type: BatchReleaseRecord
+      - name: conditions
+        type: ConditionCheck[]
+      - name: onConfirm
+        type: "() => void"
+      - name: onCancel
+        type: "() => void"
+    features:
+      - "Release summary"
+      - "Conditions summary (all pass)"
+      - "Warning if any conditions warning"
+      - "Confirm checkbox"
+      - "Proceed to E-signature button"
+    ui_pattern: "ShadCN AlertDialog"
+
+  - name: RejectionModal
+    path: components/quality/release-approval/RejectionModal.tsx
+    description: "Rejection with reason and e-signature"
+    props:
+      - name: releaseId
+        type: string
+      - name: open
+        type: boolean
+      - name: onOpenChange
+        type: "(open: boolean) => void"
+      - name: onSuccess
+        type: "() => void"
+    features:
+      - "Rejection reason textarea (min 20 chars)"
+      - "Create NCR checkbox"
+      - "E-signature capture"
+      - "Submit button"
+    validation:
+      - "Rejection reason required (min 20 chars)"
+      - "E-signature required"
+    ui_pattern: "ShadCN Dialog with multi-step form"
+
+  - name: ConditionalApprovalForm
+    path: components/quality/release-approval/ConditionalApprovalForm.tsx
+    description: "Conditional approval details input"
+    props:
+      - name: onSubmit
+        type: "(data: ConditionalApprovalData) => void"
+      - name: onCancel
+        type: "() => void"
+    features:
+      - "Conditional reason textarea (required)"
+      - "Usage restrictions textarea (required)"
+      - "Expiry date picker (optional)"
+      - "E-signature capture"
+    validation:
+      - "Conditional reason required"
+      - "Usage restrictions required"
+      - "E-signature required"
+
+  # ---------------------------------------------------------------------------
+  # Certificate Components
+  # ---------------------------------------------------------------------------
+  - name: ReleaseCertificatePreview
+    path: components/quality/release-approval/ReleaseCertificatePreview.tsx
+    description: "Preview of release certificate"
+    props:
+      - name: releaseId
+        type: string
+    features:
+      - "Certificate header (company logo, title)"
+      - "Batch information"
+      - "Inspection summary"
+      - "Conditions checklist"
+      - "Approval signature details"
+      - "Document ID and timestamp"
+    ui_pattern: "Preview container with PDF-like styling"
+
+  - name: ReleaseCertificateButton
+    path: components/quality/release-approval/ReleaseCertificateButton.tsx
+    description: "Button to print/download certificate"
+    props:
+      - name: releaseId
+        type: string
+      - name: disabled
+        type: boolean
+        optional: true
+    features:
+      - "Print icon"
+      - "Click: opens PDF in new tab or downloads"
+      - "Disabled if release not approved"
+      - "Tooltip: 'Certificate available after approval'"
+    ui_pattern: "ShadCN Button with icon"
+
+  # ---------------------------------------------------------------------------
+  # History Components
+  # ---------------------------------------------------------------------------
+  - name: ApprovalHistoryTimeline
+    path: components/quality/release-approval/ApprovalHistoryTimeline.tsx
+    description: "Vertical timeline of all approval actions"
+    props:
+      - name: releaseId
+        type: string
+    data_fetching:
+      - hook: useApprovalHistory
+        endpoint: GET /api/quality/releases/:id/history
+    features:
+      - "Vertical timeline"
+      - "Each entry: user avatar, action, timestamp"
+      - "Expandable details per entry"
+      - "E-signature indicator for approval/rejection"
+      - "Color-coded by action type"
+    ui_pattern: "Vertical timeline with entries"
+
+  - name: ApprovalDecisionBadge
+    path: components/quality/release-approval/ApprovalDecisionBadge.tsx
+    description: "Badge for approval decision status"
+    props:
+      - name: decision
+        type: "'pending' | 'pending_release' | 'approved' | 'rejected' | 'conditional'"
+    colors:
+      pending: "bg-gray-100 text-gray-800"
+      pending_release: "bg-yellow-100 text-yellow-800"
+      approved: "bg-green-100 text-green-800"
+      rejected: "bg-red-100 text-red-800"
+      conditional: "bg-orange-100 text-orange-800"
+
+# =============================================================================
+# HOOKS
+# =============================================================================
+
+hooks:
+  - name: usePendingReleases
+    path: lib/hooks/use-pending-releases.ts
+    description: "Fetch pending releases for approval queue"
+    params:
+      - name: params
+        type: PendingReleasesParams
+    returns:
+      type: "{ releases: BatchReleaseRecord[], summary: ApprovalQueueSummary, isLoading: boolean, error: Error }"
+    swr_config:
+      refreshInterval: 30000
+      revalidateOnFocus: true
+
+  - name: useRelease
+    path: lib/hooks/use-release.ts
+    description: "Fetch single release"
+    params:
+      - name: releaseId
+        type: string
+    returns:
+      type: "{ release: BatchReleaseRecord, isLoading: boolean, error: Error }"
+
+  - name: useReleaseConditions
+    path: lib/hooks/use-release-conditions.ts
+    description: "Fetch and validate release conditions"
+    params:
+      - name: releaseId
+        type: string
+    returns:
+      type: "{ conditions: ConditionCheck[], allMet: boolean, canApprove: boolean, blockers: string[], isLoading: boolean }"
+    swr_config:
+      refreshInterval: 0  # Only fetch on mount, refresh button
+      revalidateOnFocus: false
+
+  - name: useApproveRelease
+    path: lib/hooks/use-approve-release.ts
+    description: "Mutation hook for approving release"
+    returns:
+      type: |
+        {
+          approve: (releaseId: string, signature: SignatureInput) => Promise<void>,
+          isLoading: boolean,
+          error: Error
+        }
+
+  - name: useRejectRelease
+    path: lib/hooks/use-reject-release.ts
+    description: "Mutation hook for rejecting release"
+    returns:
+      type: |
+        {
+          reject: (releaseId: string, reason: string, signature: SignatureInput) => Promise<void>,
+          isLoading: boolean,
+          error: Error
+        }
+
+  - name: useApprovalHistory
+    path: lib/hooks/use-approval-history.ts
+    description: "Fetch approval history for release"
+    params:
+      - name: releaseId
+        type: string
+    returns:
+      type: "{ history: AuditLogEntry[], isLoading: boolean }"
+
+# =============================================================================
+# TYPES
+# =============================================================================
+
+types:
+  - name: BatchReleaseRecord
+    path: lib/types/batch-release.ts
+    definition: |
+      interface BatchReleaseRecord {
+        id: string;
+        release_number: string;
+        batch_number: string;
+        wo_id: string;
+        product_id: string;
+        product_name: string;
+        quantity: number;
+        release_decision: 'pending' | 'pending_release' | 'approved' | 'rejected' | 'conditional';
+        signature_user_id?: string;
+        signature_meaning?: string;
+        signature_timestamp?: string;
+        signature_method?: 'password' | 'pin' | 'email_confirm';
+        signature_intent?: 'approve' | 'reject';
+        rejection_reason?: string;
+        rejected_by?: string;
+        rejected_at?: string;
+        submitted_at?: string;
+        submitted_by?: string;
+        created_at: string;
+      }
+
+  - name: ConditionCheck
+    path: lib/types/batch-release.ts
+    definition: |
+      interface ConditionCheck {
+        type: 'final_inspection' | 'ccp_records' | 'in_process_inspections' | 'operation_checkpoints' | 'quality_holds' | 'ncr_review' | 'specification_compliance';
+        result: 'pass' | 'fail' | 'warning' | 'not_applicable';
+        details?: any;
+        blocking: boolean;
+      }
+
+  - name: SignatureInput
+    path: lib/types/batch-release.ts
+    definition: |
+      interface SignatureInput {
+        method: 'password' | 'pin' | 'email_confirm';
+        credential: string;
+        meaning?: string;
+      }
+
+  - name: ApprovalQueueSummary
+    path: lib/types/batch-release.ts
+    definition: |
+      interface ApprovalQueueSummary {
+        total_pending: number;
+        high_priority: number;
+        oldest_waiting_hours: number;
+      }
+
+# =============================================================================
+# UTILITIES
+# =============================================================================
+
+utilities:
+  - name: validateSignatureCredential
+    path: lib/utils/signature-utils.ts
+    description: "Validate signature credential (password, PIN)"
+    example: "validateSignatureCredential(userId, 'password', credential) => boolean"
+
+  - name: formatReleaseCertificate
+    path: lib/utils/certificate-utils.ts
+    description: "Format release certificate for PDF generation"
+    example: "formatReleaseCertificate(release, conditions) => CertificateData"
+
+# =============================================================================
+# UI PATTERNS
+# =============================================================================
+
+ui_patterns:
+  e_signature_modal:
+    - "Width: 500px max"
+    - "Signature meaning: large, bold, prominently displayed"
+    - "Method selector: radio buttons"
+    - "Credential input: large, clear, with show/hide toggle"
+    - "Checkbox: 'I understand and confirm this signature'"
+    - "Buttons: Cancel (secondary), Sign and Approve (primary)"
+    - "Loading: spinner + disabled inputs"
+    - "Error: inline below credential input"
+
+  conditions_panel:
+    - "Header: 'Release Conditions Validation'"
+    - "Refresh button: top-right"
+    - "Last validated: timestamp"
+    - "7 rows: condition name, icon, result"
+    - "Expand: shows details + source link"
+    - "Overall status banner: green (all pass), yellow (warnings), red (blockers)"
+
+  approval_queue:
+    - "Summary cards: grid of 3, large numbers, icons"
+    - "Filters: horizontal bar above table"
+    - "Table: zebra striping, row hover"
+    - "Priority: high=red badge, normal=no badge, urgent=red + icon"
+    - "Actions: icons (eye, check, X)"

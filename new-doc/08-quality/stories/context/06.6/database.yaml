@@ -1,0 +1,212 @@
+# Story 06.6 - Database Specification
+# Purpose: Schema design, migrations, seed data, RLS policies
+# Agent: BACKEND-DEV
+
+# Migration File
+migration:
+  filename: "supabase/migrations/20XX_create_quality_test_results.sql"
+  description: "Create quality_test_results table with RLS policies and indexes"
+
+# Tables
+tables:
+  - name: "quality_test_results"
+    description: "Test result records for quality inspections with pass/fail/marginal status"
+    columns:
+      - name: "id"
+        type: "UUID"
+        constraints: "PRIMARY KEY DEFAULT gen_random_uuid()"
+        description: "Unique test result identifier"
+      - name: "org_id"
+        type: "UUID"
+        constraints: "NOT NULL REFERENCES organizations(id)"
+        description: "Organization for multi-tenancy"
+      - name: "inspection_id"
+        type: "UUID"
+        constraints: "NOT NULL REFERENCES quality_inspections(id) ON DELETE CASCADE"
+        description: "Link to parent inspection"
+      - name: "parameter_id"
+        type: "UUID"
+        constraints: "NOT NULL REFERENCES quality_spec_parameters(id)"
+        description: "Link to specification parameter"
+      - name: "measured_value"
+        type: "TEXT"
+        constraints: "NOT NULL"
+        description: "String representation supporting all parameter types (numeric, text, boolean)"
+      - name: "numeric_value"
+        type: "DECIMAL(15,6)"
+        constraints: "NULL"
+        description: "Parsed numeric value for calculations and trending (null if non-numeric)"
+      - name: "result_status"
+        type: "TEXT"
+        constraints: "NOT NULL CHECK (result_status IN ('pass', 'fail', 'marginal'))"
+        description: "Validation result: pass (meets spec), fail (out of spec), marginal (within 5% of limit)"
+      - name: "deviation_pct"
+        type: "DECIMAL(5,2)"
+        constraints: "NULL"
+        description: "Percentage deviation from limit for marginal/fail results (0-100%)"
+      - name: "tested_by"
+        type: "UUID"
+        constraints: "NOT NULL REFERENCES users(id)"
+        description: "Inspector who recorded the result"
+      - name: "tested_at"
+        type: "TIMESTAMPTZ"
+        constraints: "NOT NULL DEFAULT now()"
+        description: "Timestamp when test was performed"
+      - name: "equipment_id"
+        type: "UUID"
+        constraints: "NULL REFERENCES machines(id)"
+        description: "Optional reference to equipment used (Story 01.10)"
+      - name: "calibration_date"
+        type: "DATE"
+        constraints: "NULL"
+        description: "Equipment calibration date (for compliance tracking)"
+      - name: "notes"
+        type: "TEXT"
+        constraints: "NULL"
+        description: "Inspector observations or comments (max 1000 chars)"
+      - name: "attachment_url"
+        type: "TEXT"
+        constraints: "NULL"
+        description: "URL to photo/document evidence (uploaded to Supabase Storage)"
+      - name: "created_at"
+        type: "TIMESTAMPTZ"
+        constraints: "NOT NULL DEFAULT now()"
+        description: "Record creation timestamp"
+      - name: "created_by"
+        type: "UUID"
+        constraints: "NULL REFERENCES users(id)"
+        description: "User who created record (audit trail)"
+      - name: "updated_at"
+        type: "TIMESTAMPTZ"
+        constraints: "NULL"
+        description: "Last update timestamp (immutable after creation)"
+    indexes:
+      - name: "idx_test_results_inspection"
+        columns: ["inspection_id"]
+        description: "Fast lookup by inspection for results list"
+      - name: "idx_test_results_parameter"
+        columns: ["parameter_id"]
+        description: "Fast lookup by parameter for trending"
+      - name: "idx_test_results_org_status"
+        columns: ["org_id", "result_status"]
+        description: "Filter by org and result status (dashboard queries)"
+      - name: "idx_test_results_tested_at"
+        columns: ["tested_at DESC"]
+        description: "Sort by test date for trending (most recent first)"
+    rls:
+      enabled: true
+      policies:
+        - name: "Quality test results org isolation"
+          description: "Restrict access to results within same organization"
+          operations: ["SELECT", "INSERT", "UPDATE", "DELETE"]
+          using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+          checking: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    comments:
+      table: "Test result records for quality inspections with auto-calculated pass/fail/marginal status"
+      measured_value: "String value to support numeric, text, boolean, and range parameter types"
+      numeric_value: "Numeric value extracted for calculations, trending, and SPC analysis"
+      result_status: "Determined by comparing measured_value against parameter acceptance criteria"
+      deviation_pct: "Calculated as percentage from spec limit; used to identify marginal results (5% rule)"
+
+# Relationships
+relationships:
+  - from: "quality_test_results"
+    to: "quality_inspections"
+    type: "many_to_one"
+    via: "inspection_id"
+    cascade: "delete"
+    description: "Test results belong to an inspection; deleted when inspection is deleted"
+  - from: "quality_test_results"
+    to: "quality_spec_parameters"
+    type: "many_to_one"
+    via: "parameter_id"
+    cascade: "restrict"
+    description: "Each result references a spec parameter; parameter cannot be deleted if results exist"
+  - from: "quality_test_results"
+    to: "users"
+    type: "many_to_one"
+    via: "tested_by"
+    cascade: "restrict"
+    description: "Test result created by a user (inspector)"
+  - from: "quality_test_results"
+    to: "machines"
+    type: "many_to_one"
+    via: "equipment_id"
+    cascade: "set_null"
+    description: "Optional equipment reference; nulled if equipment deleted"
+
+# Migration SQL Template
+migration_sql: |
+  -- Create quality_test_results table
+  CREATE TABLE quality_test_results (
+    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id              UUID NOT NULL REFERENCES organizations(id),
+    inspection_id       UUID NOT NULL REFERENCES quality_inspections(id) ON DELETE CASCADE,
+    parameter_id        UUID NOT NULL REFERENCES quality_spec_parameters(id),
+
+    -- Test Values
+    measured_value      TEXT NOT NULL,                    -- String to support all types
+    numeric_value       DECIMAL(15,6),                    -- Numeric value for calculations
+
+    -- Result Determination
+    result_status       TEXT NOT NULL,                    -- pass, fail, marginal
+    deviation_pct       DECIMAL(5,2),                     -- % deviation from limit (marginal detection)
+
+    -- Test Metadata
+    tested_by           UUID NOT NULL REFERENCES users(id),
+    tested_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+    -- Equipment (Optional - Epic 01.10)
+    equipment_id        UUID REFERENCES machines(id),
+    calibration_date    DATE,                             -- Equipment calibration date
+
+    -- Additional Info
+    notes               TEXT,                             -- Inspector notes (max 1000)
+    attachment_url      TEXT,                             -- Photo/document evidence URL
+
+    -- Audit Fields
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    created_by          UUID REFERENCES users(id),
+    updated_at          TIMESTAMPTZ,
+
+    -- Constraints
+    CHECK (result_status IN ('pass', 'fail', 'marginal')),
+    CHECK (char_length(notes) <= 1000)
+  );
+
+  -- Indexes for performance
+  CREATE INDEX idx_test_results_inspection ON quality_test_results(inspection_id);
+  CREATE INDEX idx_test_results_parameter ON quality_test_results(parameter_id);
+  CREATE INDEX idx_test_results_org_status ON quality_test_results(org_id, result_status);
+  CREATE INDEX idx_test_results_tested_at ON quality_test_results(tested_at DESC);
+
+  -- Row Level Security
+  ALTER TABLE quality_test_results ENABLE ROW LEVEL SECURITY;
+
+  CREATE POLICY "Quality test results org isolation"
+  ON quality_test_results FOR ALL
+  USING (org_id = (SELECT org_id FROM users WHERE id = auth.uid()))
+  WITH CHECK (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+
+  -- Comments
+  COMMENT ON TABLE quality_test_results IS 'Test result records for quality inspections with auto-calculated status';
+  COMMENT ON COLUMN quality_test_results.measured_value IS 'String value to support all parameter types (numeric, text, boolean)';
+  COMMENT ON COLUMN quality_test_results.numeric_value IS 'Numeric value for calculations and trending (null if non-numeric)';
+  COMMENT ON COLUMN quality_test_results.result_status IS 'Pass/Fail/Marginal based on parameter acceptance criteria';
+  COMMENT ON COLUMN quality_test_results.deviation_pct IS 'Percentage deviation from limit for marginal detection (5% rule)';
+
+# Seed Data (if any)
+seed_data: []  # No seed data needed; results created via API
+
+# Data Integrity Rules
+data_integrity:
+  - rule: "measured_value is required for all test results"
+  - rule: "numeric_value is auto-populated from measured_value if parameter_type is numeric/range"
+  - rule: "result_status is auto-calculated; cannot be manually set"
+  - rule: "deviation_pct is auto-calculated for fail/marginal results"
+  - rule: "tested_by must be a valid user (inspector)"
+  - rule: "inspection_id must reference an active inspection"
+  - rule: "parameter_id must reference a parameter in the inspection's specification"
+  - rule: "Notes cannot exceed 1000 characters"
+  - rule: "attachment_url must be valid HTTPS URL to Supabase Storage"
+  - rule: "Test results are immutable after creation (no updates allowed)"

@@ -1,0 +1,595 @@
+# Story 02.2 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  # GET /api/v1/technical/products/:id/versions
+  - method: "GET"
+    path: "/api/v1/technical/products/:id/versions"
+    description: "Returns list of versions for a product (summary view)"
+    file: "apps/frontend/app/api/v1/technical/products/[id]/versions/route.ts"
+    auth: "required"
+    roles: ["*"]  # All authenticated users with org access
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        id:
+          type: "UUID"
+          required: true
+          description: "Product ID"
+      query:
+        page:
+          type: "integer"
+          required: false
+          default: 1
+          min: 1
+          description: "Page number"
+        limit:
+          type: "integer"
+          required: false
+          default: 20
+          min: 1
+          max: 100
+          description: "Items per page"
+
+    response:
+      status: 200
+      type: "VersionsListResponse"
+      schema:
+        versions:
+          type: "array"
+          items:
+            version: "integer"
+            changed_at: "string (ISO 8601)"
+            changed_by: "string (user display name)"
+        total: "integer"
+        page: "integer"
+        limit: "integer"
+        has_more: "boolean"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token provided"
+      - status: 404
+        code: "PRODUCT_NOT_FOUND"
+        message: "Product not found"
+        when: "Product ID does not exist or not in user's org"
+      - status: 400
+        code: "INVALID_PARAMS"
+        message: "Invalid query parameters"
+        when: "page or limit outside valid range"
+
+  # GET /api/v1/technical/products/:id/history
+  - method: "GET"
+    path: "/api/v1/technical/products/:id/history"
+    description: "Returns detailed change log for a product"
+    file: "apps/frontend/app/api/v1/technical/products/[id]/history/route.ts"
+    auth: "required"
+    roles: ["*"]  # All authenticated users with org access
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        id:
+          type: "UUID"
+          required: true
+          description: "Product ID"
+      query:
+        page:
+          type: "integer"
+          required: false
+          default: 1
+          min: 1
+        limit:
+          type: "integer"
+          required: false
+          default: 20
+          min: 1
+          max: 100
+        from_date:
+          type: "string (ISO 8601)"
+          required: false
+          description: "Filter changes from this date"
+        to_date:
+          type: "string (ISO 8601)"
+          required: false
+          description: "Filter changes until this date"
+
+    response:
+      status: 200
+      type: "HistoryResponse"
+      schema:
+        history:
+          type: "array"
+          items:
+            id: "UUID"
+            version: "integer"
+            changed_fields: "Record<string, {old: any, new: any}>"
+            changed_by:
+              id: "UUID"
+              name: "string"
+              email: "string"
+            changed_at: "string (ISO 8601)"
+            is_initial: "boolean"
+        total: "integer"
+        page: "integer"
+        limit: "integer"
+        has_more: "boolean"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token provided"
+      - status: 404
+        code: "PRODUCT_NOT_FOUND"
+        message: "Product not found"
+        when: "Product ID does not exist or not in user's org"
+      - status: 400
+        code: "INVALID_DATE_RANGE"
+        message: "from_date must be before to_date"
+        when: "Date range is invalid"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/product-history-service.ts"
+    description: "Product version history service"
+    exports:
+      - name: "ProductHistoryService"
+        type: "class"
+        methods:
+          - name: "getVersionsList"
+            params:
+              - "productId: string"
+              - "pagination: PaginationParams"
+            returns: "Promise<VersionsListResponse>"
+            description: "Get paginated list of versions (summary)"
+
+          - name: "getVersionHistory"
+            params:
+              - "productId: string"
+              - "pagination: PaginationParams"
+              - "filters?: HistoryFilters"
+            returns: "Promise<HistoryResponse>"
+            description: "Get detailed change history with optional date filters"
+
+          - name: "detectChangedFields"
+            params:
+              - "oldProduct: Product"
+              - "newProduct: Partial<Product>"
+            returns: "ChangedFields"
+            description: "Compare two product states and return changed fields JSONB"
+
+          - name: "formatChangeSummary"
+            params:
+              - "changedFields: ChangedFields"
+            returns: "string"
+            description: "Format changed fields into human-readable summary"
+
+      - name: "VersionsListResponse"
+        type: "interface"
+        fields:
+          - "versions: VersionSummary[]"
+          - "total: number"
+          - "page: number"
+          - "limit: number"
+          - "has_more: boolean"
+
+      - name: "HistoryResponse"
+        type: "interface"
+        fields:
+          - "history: VersionHistoryItem[]"
+          - "total: number"
+          - "page: number"
+          - "limit: number"
+          - "has_more: boolean"
+
+      - name: "VersionSummary"
+        type: "interface"
+        fields:
+          - "version: number"
+          - "changed_at: string"
+          - "changed_by: string"
+
+      - name: "VersionHistoryItem"
+        type: "interface"
+        fields:
+          - "id: string"
+          - "version: number"
+          - "changed_fields: Record<string, {old: any, new: any}>"
+          - "changed_by: {id: string, name: string, email: string}"
+          - "changed_at: string"
+          - "is_initial: boolean"
+
+      - name: "ChangedFields"
+        type: "type"
+        definition: "Record<string, {old: any, new: any}>"
+
+      - name: "HistoryFilters"
+        type: "interface"
+        fields:
+          - "from_date?: string"
+          - "to_date?: string"
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/product-history.ts"
+    description: "Product version history TypeScript interfaces"
+    content: |
+      export interface VersionSummary {
+        version: number;
+        changed_at: string;
+        changed_by: string;
+      }
+
+      export interface VersionHistoryItem {
+        id: string;
+        version: number;
+        changed_fields: ChangedFields;
+        changed_by: {
+          id: string;
+          name: string;
+          email: string;
+        };
+        changed_at: string;
+        is_initial: boolean;
+      }
+
+      export type ChangedFields = Record<string, {
+        old: unknown;
+        new: unknown;
+      }>;
+
+      export interface VersionsListResponse {
+        versions: VersionSummary[];
+        total: number;
+        page: number;
+        limit: number;
+        has_more: boolean;
+      }
+
+      export interface HistoryResponse {
+        history: VersionHistoryItem[];
+        total: number;
+        page: number;
+        limit: number;
+        has_more: boolean;
+      }
+
+      export interface HistoryFilters {
+        from_date?: string;
+        to_date?: string;
+      }
+
+# Validation Schemas (Zod)
+validation:
+  - path: "apps/frontend/lib/validation/product-history.ts"
+    description: "Zod schemas for history endpoints"
+    schemas:
+      - name: "versionsQuerySchema"
+        content: |
+          export const versionsQuerySchema = z.object({
+            page: z.coerce.number().int().min(1).default(1),
+            limit: z.coerce.number().int().min(1).max(100).default(20),
+          });
+
+      - name: "historyQuerySchema"
+        content: |
+          export const historyQuerySchema = z.object({
+            page: z.coerce.number().int().min(1).default(1),
+            limit: z.coerce.number().int().min(1).max(100).default(20),
+            from_date: z.string().datetime().optional(),
+            to_date: z.string().datetime().optional(),
+          }).refine(
+            (data) => {
+              if (data.from_date && data.to_date) {
+                return new Date(data.from_date) < new Date(data.to_date);
+              }
+              return true;
+            },
+            { message: "from_date must be before to_date" }
+          );
+
+      - name: "changedFieldsSchema"
+        content: |
+          export const changedFieldsSchema = z.record(
+            z.string(),
+            z.object({
+              old: z.any(),
+              new: z.any(),
+            })
+          );
+
+# Implementation Patterns
+patterns:
+  api_route_versions: |
+    // apps/frontend/app/api/v1/technical/products/[id]/versions/route.ts
+    import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+    import { cookies } from 'next/headers';
+    import { NextResponse } from 'next/server';
+    import { versionsQuerySchema } from '@/lib/validation/product-history';
+
+    export async function GET(
+      request: Request,
+      { params }: { params: { id: string } }
+    ) {
+      const supabase = createRouteHandlerClient({ cookies });
+
+      // Auth check
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      // Parse query params
+      const { searchParams } = new URL(request.url);
+      const queryResult = versionsQuerySchema.safeParse({
+        page: searchParams.get('page'),
+        limit: searchParams.get('limit'),
+      });
+
+      if (!queryResult.success) {
+        return NextResponse.json(
+          { error: 'Invalid query parameters', details: queryResult.error },
+          { status: 400 }
+        );
+      }
+
+      const { page, limit } = queryResult.data;
+      const offset = (page - 1) * limit;
+
+      // Check product exists and belongs to user's org (RLS handles this)
+      const { data: product, error: productError } = await supabase
+        .from('products')
+        .select('id')
+        .eq('id', params.id)
+        .single();
+
+      if (productError || !product) {
+        return NextResponse.json({ error: 'Product not found' }, { status: 404 });
+      }
+
+      // Get versions with user info
+      const { data: versions, error: versionsError, count } = await supabase
+        .from('product_version_history')
+        .select(`
+          version,
+          changed_at,
+          changed_by:users(first_name, last_name)
+        `, { count: 'exact' })
+        .eq('product_id', params.id)
+        .order('version', { ascending: false })
+        .range(offset, offset + limit - 1);
+
+      if (versionsError) {
+        return NextResponse.json(
+          { error: 'Failed to fetch versions' },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json({
+        versions: versions.map(v => ({
+          version: v.version,
+          changed_at: v.changed_at,
+          changed_by: `${v.changed_by.first_name} ${v.changed_by.last_name}`,
+        })),
+        total: count ?? 0,
+        page,
+        limit,
+        has_more: offset + limit < (count ?? 0),
+      });
+    }
+
+  api_route_history: |
+    // apps/frontend/app/api/v1/technical/products/[id]/history/route.ts
+    import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+    import { cookies } from 'next/headers';
+    import { NextResponse } from 'next/server';
+    import { historyQuerySchema } from '@/lib/validation/product-history';
+
+    export async function GET(
+      request: Request,
+      { params }: { params: { id: string } }
+    ) {
+      const supabase = createRouteHandlerClient({ cookies });
+
+      // Auth check
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      // Parse query params
+      const { searchParams } = new URL(request.url);
+      const queryResult = historyQuerySchema.safeParse({
+        page: searchParams.get('page'),
+        limit: searchParams.get('limit'),
+        from_date: searchParams.get('from_date'),
+        to_date: searchParams.get('to_date'),
+      });
+
+      if (!queryResult.success) {
+        return NextResponse.json(
+          { error: queryResult.error.errors[0]?.message ?? 'Invalid query parameters' },
+          { status: 400 }
+        );
+      }
+
+      const { page, limit, from_date, to_date } = queryResult.data;
+      const offset = (page - 1) * limit;
+
+      // Check product exists
+      const { data: product, error: productError } = await supabase
+        .from('products')
+        .select('id')
+        .eq('id', params.id)
+        .single();
+
+      if (productError || !product) {
+        return NextResponse.json({ error: 'Product not found' }, { status: 404 });
+      }
+
+      // Build query
+      let query = supabase
+        .from('product_version_history')
+        .select(`
+          id,
+          version,
+          changed_fields,
+          changed_at,
+          changed_by:users(id, first_name, last_name, email)
+        `, { count: 'exact' })
+        .eq('product_id', params.id)
+        .order('version', { ascending: false });
+
+      // Apply date filters
+      if (from_date) {
+        query = query.gte('changed_at', from_date);
+      }
+      if (to_date) {
+        query = query.lte('changed_at', to_date);
+      }
+
+      // Apply pagination
+      const { data: history, error: historyError, count } = await query
+        .range(offset, offset + limit - 1);
+
+      if (historyError) {
+        return NextResponse.json(
+          { error: 'Failed to fetch history' },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json({
+        history: history.map(h => ({
+          id: h.id,
+          version: h.version,
+          changed_fields: h.changed_fields,
+          changed_by: {
+            id: h.changed_by.id,
+            name: `${h.changed_by.first_name} ${h.changed_by.last_name}`,
+            email: h.changed_by.email,
+          },
+          changed_at: h.changed_at,
+          is_initial: h.changed_fields._initial === true,
+        })),
+        total: count ?? 0,
+        page,
+        limit,
+        has_more: offset + limit < (count ?? 0),
+      });
+    }
+
+  service_pattern: |
+    // apps/frontend/lib/services/product-history-service.ts
+    import type {
+      VersionsListResponse,
+      HistoryResponse,
+      HistoryFilters,
+      ChangedFields,
+    } from '@/lib/types/product-history';
+    import type { Product } from '@/lib/types/product';
+
+    export class ProductHistoryService {
+      /**
+       * Get paginated list of versions (summary view)
+       */
+      static async getVersionsList(
+        productId: string,
+        pagination: { page?: number; limit?: number } = {}
+      ): Promise<VersionsListResponse> {
+        const params = new URLSearchParams();
+        if (pagination.page) params.set('page', String(pagination.page));
+        if (pagination.limit) params.set('limit', String(pagination.limit));
+
+        const response = await fetch(
+          `/api/v1/technical/products/${productId}/versions?${params}`
+        );
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch versions');
+        }
+
+        return response.json();
+      }
+
+      /**
+       * Get detailed change history with optional date filters
+       */
+      static async getVersionHistory(
+        productId: string,
+        pagination: { page?: number; limit?: number } = {},
+        filters?: HistoryFilters
+      ): Promise<HistoryResponse> {
+        const params = new URLSearchParams();
+        if (pagination.page) params.set('page', String(pagination.page));
+        if (pagination.limit) params.set('limit', String(pagination.limit));
+        if (filters?.from_date) params.set('from_date', filters.from_date);
+        if (filters?.to_date) params.set('to_date', filters.to_date);
+
+        const response = await fetch(
+          `/api/v1/technical/products/${productId}/history?${params}`
+        );
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch history');
+        }
+
+        return response.json();
+      }
+
+      /**
+       * Compare two product states and return changed fields
+       */
+      static detectChangedFields(
+        oldProduct: Product,
+        newProduct: Partial<Product>
+      ): ChangedFields {
+        const trackableFields = [
+          'name', 'description', 'base_uom', 'status', 'barcode', 'gtin',
+          'category_id', 'lead_time_days', 'moq', 'expiry_policy',
+          'shelf_life_days', 'std_price', 'cost_per_unit', 'min_stock',
+          'max_stock', 'storage_conditions', 'is_perishable'
+        ] as const;
+
+        const changedFields: ChangedFields = {};
+
+        for (const field of trackableFields) {
+          if (field in newProduct) {
+            const oldValue = oldProduct[field];
+            const newValue = newProduct[field];
+
+            // Deep comparison for objects, simple comparison otherwise
+            if (JSON.stringify(oldValue) !== JSON.stringify(newValue)) {
+              changedFields[field] = { old: oldValue, new: newValue };
+            }
+          }
+        }
+
+        return changedFields;
+      }
+
+      /**
+       * Format changed fields into human-readable summary
+       */
+      static formatChangeSummary(changedFields: ChangedFields): string {
+        if ('_initial' in changedFields) {
+          return 'Initial creation';
+        }
+
+        const changes = Object.entries(changedFields).map(([field, change]) => {
+          const oldStr = change.old === null ? 'empty' : String(change.old);
+          const newStr = change.new === null ? 'empty' : String(change.new);
+          return `${field}: ${oldStr} -> ${newStr}`;
+        });
+
+        return changes.join(', ');
+      }
+    }

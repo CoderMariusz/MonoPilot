@@ -1,0 +1,629 @@
+# Story 06.17 - Frontend Context
+# Generated: 2026-01-15
+# Purpose: Components, pages, hooks, types for Quality Alerts
+
+# =============================================================================
+# PAGES
+# =============================================================================
+
+pages:
+  - path: app/(authenticated)/settings/notifications/page.tsx
+    name: NotificationSettingsPage
+    description: "Alert preferences configuration page"
+    components:
+      - AlertPreferencesForm
+    data_fetching:
+      - hook: useAlertPreferences
+        endpoint: GET /api/quality/alerts/preferences
+    features:
+      - "Channel toggles (email, SMS, push)"
+      - "Quiet hours configuration"
+      - "Per-severity preferences"
+      - "Per-alert-type preferences"
+      - "Test notification button"
+    layout:
+      - "Header: Notification Settings"
+      - "Section: Global Settings (alerts enabled)"
+      - "Section: Channels (email, SMS with phone, push)"
+      - "Section: Quiet Hours (enable, start, end, timezone)"
+      - "Section: Severity Preferences (table)"
+      - "Section: Alert Type Preferences (table)"
+      - "Footer: Save button, Test button"
+
+  - path: app/(authenticated)/quality/alerts/page.tsx
+    name: AlertsListPage
+    description: "Full alerts list page (optional - alerts mainly in dropdown)"
+    components:
+      - AlertList
+      - AlertFilters
+    data_fetching:
+      - hook: useAlerts
+        endpoint: GET /api/quality/alerts
+    features:
+      - "DataTable with pagination"
+      - "Filter by severity, status, type, date"
+      - "Click to view detail"
+      - "Bulk acknowledge (future)"
+
+# =============================================================================
+# COMPONENTS
+# =============================================================================
+
+components:
+  # ---------------------------------------------------------------------------
+  # Header Components
+  # ---------------------------------------------------------------------------
+  - name: AlertBell
+    path: components/quality/alerts/AlertBell.tsx
+    description: "Alert bell icon with unread count badge in header"
+    props:
+      - name: className
+        type: string
+        optional: true
+    state:
+      - name: unreadCount
+        type: UnreadCount
+        source: useAlertUnreadCount hook
+      - name: isOpen
+        type: boolean
+        description: "Dropdown open state"
+    behavior:
+      - "Fetch unread count on mount and every 30 seconds"
+      - "Badge color: red for critical, orange for high, gray otherwise"
+      - "Click opens AlertDropdown"
+      - "WebSocket subscription for real-time updates"
+    ui_pattern: "ShadCN DropdownMenu with Bell icon trigger"
+
+  - name: AlertDropdown
+    path: components/quality/alerts/AlertDropdown.tsx
+    description: "Dropdown showing recent 10 alerts"
+    props:
+      - name: onClose
+        type: "() => void"
+    data_fetching:
+      - hook: useRecentAlerts
+        endpoint: "GET /api/quality/alerts?limit=10"
+    features:
+      - "List of AlertItem components"
+      - "Unread items highlighted"
+      - "Click item to mark as read and navigate"
+      - "Quick acknowledge on hover"
+      - "'View All' link at bottom"
+      - "Empty state: 'No alerts'"
+    ui_pattern: "ShadCN DropdownMenuContent"
+
+  - name: AlertItem
+    path: components/quality/alerts/AlertItem.tsx
+    description: "Single alert row in dropdown or list"
+    props:
+      - name: alert
+        type: QualityAlert
+      - name: compact
+        type: boolean
+        optional: true
+        default: false
+      - name: onAcknowledge
+        type: "(alertId: string) => void"
+        optional: true
+    features:
+      - "Severity badge (icon + color)"
+      - "Subject (truncated)"
+      - "Time ago (e.g., '5 min ago')"
+      - "Unread indicator (bold/dot)"
+      - "Hover: show acknowledge button"
+      - "Click: navigate to source if available"
+    ui_pattern: "Horizontal flex with severity icon, text, actions"
+
+  # ---------------------------------------------------------------------------
+  # Badge Components
+  # ---------------------------------------------------------------------------
+  - name: AlertSeverityBadge
+    path: components/quality/alerts/AlertSeverityBadge.tsx
+    description: "Severity badge with icon and color"
+    props:
+      - name: severity
+        type: "'critical' | 'high' | 'medium' | 'low'"
+      - name: showLabel
+        type: boolean
+        optional: true
+        default: true
+    colors:
+      critical: "bg-red-500 text-white"
+      high: "bg-orange-500 text-white"
+      medium: "bg-yellow-500 text-black"
+      low: "bg-gray-500 text-white"
+    icons:
+      critical: "AlertCircle"
+      high: "AlertTriangle"
+      medium: "Bell"
+      low: "Info"
+
+  - name: AlertStatusBadge
+    path: components/quality/alerts/AlertStatusBadge.tsx
+    description: "Status badge"
+    props:
+      - name: status
+        type: "'pending' | 'delivered' | 'read' | 'acknowledged' | 'expired'"
+    colors:
+      pending: "bg-yellow-100 text-yellow-800"
+      delivered: "bg-blue-100 text-blue-800"
+      read: "bg-gray-100 text-gray-800"
+      acknowledged: "bg-green-100 text-green-800"
+      expired: "bg-red-100 text-red-800"
+
+  # ---------------------------------------------------------------------------
+  # Detail Components
+  # ---------------------------------------------------------------------------
+  - name: AlertDetail
+    path: components/quality/alerts/AlertDetail.tsx
+    description: "Alert detail modal or page"
+    props:
+      - name: alertId
+        type: string
+      - name: onClose
+        type: "() => void"
+    data_fetching:
+      - hook: useAlert
+        endpoint: "GET /api/quality/alerts/:id"
+    sections:
+      - "Header: Subject, Severity badge, Status badge"
+      - "Body: Full message content"
+      - "Source: Link to NCR/Inspection/Hold/etc."
+      - "Recipients: List with status (admin only)"
+      - "Actions: Acknowledge button (if not acknowledged)"
+      - "Timeline: Created, Read, Acknowledged timestamps"
+
+  - name: AcknowledgeAlertDialog
+    path: components/quality/alerts/AcknowledgeAlertDialog.tsx
+    description: "Confirmation dialog for acknowledging alert"
+    props:
+      - name: alertId
+        type: string
+      - name: alertNumber
+        type: string
+      - name: open
+        type: boolean
+      - name: onOpenChange
+        type: "(open: boolean) => void"
+      - name: onConfirm
+        type: "(notes?: string) => void"
+    features:
+      - "Title: 'Acknowledge Alert QA-2025-00001?'"
+      - "Optional notes textarea"
+      - "Confirm/Cancel buttons"
+      - "Loading state during API call"
+    ui_pattern: "ShadCN AlertDialog"
+
+  # ---------------------------------------------------------------------------
+  # List Components
+  # ---------------------------------------------------------------------------
+  - name: AlertList
+    path: components/quality/alerts/AlertList.tsx
+    description: "Full alert list with DataTable"
+    props:
+      - name: filters
+        type: AlertFilters
+        optional: true
+    data_fetching:
+      - hook: useAlerts
+    columns:
+      - "Alert #"
+      - "Type"
+      - "Severity (badge)"
+      - "Subject"
+      - "Status (badge)"
+      - "Source"
+      - "Created At"
+      - "Actions"
+    features:
+      - "Pagination"
+      - "Sorting"
+      - "Row click to detail"
+      - "Inline acknowledge"
+    ui_pattern: "ShadCN DataTable"
+
+  - name: AlertFilters
+    path: components/quality/alerts/AlertFilters.tsx
+    description: "Filter panel for alert list"
+    props:
+      - name: filters
+        type: AlertListParams
+      - name: onChange
+        type: "(filters: AlertListParams) => void"
+    filters:
+      - "Severity (multi-select)"
+      - "Status (multi-select)"
+      - "Alert Type (multi-select)"
+      - "Date Range (date picker)"
+      - "Unread Only (toggle)"
+    ui_pattern: "Horizontal filter bar with dropdowns"
+
+  # ---------------------------------------------------------------------------
+  # Preferences Components
+  # ---------------------------------------------------------------------------
+  - name: AlertPreferencesForm
+    path: components/quality/alerts/AlertPreferencesForm.tsx
+    description: "Full preferences form"
+    props:
+      - name: preferences
+        type: UserAlertPreferences
+      - name: onSave
+        type: "(prefs: Partial<UserAlertPreferences>) => Promise<void>"
+    sections:
+      - "Global: Alerts enabled toggle"
+      - "Channels: ChannelToggle for each"
+      - "Quiet Hours: QuietHoursConfig"
+      - "Severity: SeverityPreferencesTable"
+      - "Alert Types: AlertTypePreferencesTable"
+    validation:
+      - "Phone required if SMS enabled"
+      - "Valid E.164 phone format"
+      - "Valid time format for quiet hours"
+
+  - name: ChannelToggle
+    path: components/quality/alerts/ChannelToggle.tsx
+    description: "Toggle for a single channel"
+    props:
+      - name: channel
+        type: "'email' | 'sms' | 'push'"
+      - name: enabled
+        type: boolean
+      - name: onChange
+        type: "(enabled: boolean) => void"
+      - name: extra
+        type: ReactNode
+        optional: true
+        description: "For SMS phone input"
+    icons:
+      email: "Mail"
+      sms: "Smartphone"
+      push: "Bell"
+
+  - name: QuietHoursConfig
+    path: components/quality/alerts/QuietHoursConfig.tsx
+    description: "Quiet hours configuration"
+    props:
+      - name: enabled
+        type: boolean
+      - name: startTime
+        type: string
+      - name: endTime
+        type: string
+      - name: timezone
+        type: string
+      - name: onChange
+        type: "(config: QuietHoursConfig) => void"
+    features:
+      - "Enable toggle"
+      - "Start time picker"
+      - "End time picker"
+      - "Timezone selector"
+      - "Preview: 'Quiet from 10:00 PM to 7:00 AM EST'"
+
+  - name: SeverityPreferencesTable
+    path: components/quality/alerts/SeverityPreferencesTable.tsx
+    description: "Per-severity channel matrix"
+    props:
+      - name: preferences
+        type: Record<string, ChannelConfig>
+      - name: onChange
+        type: "(prefs: Record<string, ChannelConfig>) => void"
+    features:
+      - "Table with severity rows, channel columns"
+      - "Checkbox for each cell"
+      - "Header: Severity | WebSocket | Email | SMS | Push"
+      - "Rows: Critical, High, Medium, Low"
+      - "Note: Critical WebSocket always enabled (visual indicator)"
+
+  - name: AlertTypePreferencesTable
+    path: components/quality/alerts/AlertTypePreferencesTable.tsx
+    description: "Per-alert-type channel overrides"
+    props:
+      - name: preferences
+        type: Record<string, ChannelConfig>
+      - name: onChange
+        type: "(prefs: Record<string, ChannelConfig>) => void"
+    features:
+      - "Table with alert type rows, channel columns"
+      - "Checkbox for each cell"
+      - "Types: CCP Deviation, NCR Critical, Failed Inspection, etc."
+      - "Reset to default button"
+
+  # ---------------------------------------------------------------------------
+  # Admin Components
+  # ---------------------------------------------------------------------------
+  - name: SendAlertModal
+    path: components/quality/alerts/SendAlertModal.tsx
+    description: "Admin modal to send manual alert"
+    props:
+      - name: open
+        type: boolean
+      - name: onOpenChange
+        type: "(open: boolean) => void"
+      - name: onSuccess
+        type: "(alert: QualityAlert) => void"
+    features:
+      - "Template selector (optional)"
+      - "Severity selector"
+      - "Subject input"
+      - "Body textarea (rich text optional)"
+      - "SMS body (short version)"
+      - "Recipient selector (multi-user)"
+      - "Preview before send"
+    roles: ["SUPER_ADMIN", "ADMIN", "QA_MANAGER"]
+
+  - name: TestAlertButton
+    path: components/quality/alerts/TestAlertButton.tsx
+    description: "Button to send test notification"
+    props:
+      - name: className
+        type: string
+        optional: true
+    behavior:
+      - "Click: POST /api/quality/alerts/test"
+      - "Show loading spinner"
+      - "Success toast: 'Test alert sent! Check your notifications.'"
+      - "Error toast if failed"
+
+# =============================================================================
+# HOOKS
+# =============================================================================
+
+hooks:
+  - name: useAlertUnreadCount
+    path: lib/hooks/use-alert-unread-count.ts
+    description: "Fetch and subscribe to unread count"
+    returns:
+      type: UnreadCount
+    features:
+      - "Initial fetch on mount"
+      - "Polling every 30 seconds"
+      - "WebSocket subscription for real-time updates"
+      - "Refetch on window focus"
+    swr_config:
+      refreshInterval: 30000
+      revalidateOnFocus: true
+
+  - name: useAlerts
+    path: lib/hooks/use-alerts.ts
+    description: "Fetch alerts with pagination and filters"
+    params:
+      - name: params
+        type: AlertListParams
+    returns:
+      type: "{ alerts: QualityAlert[], pagination: Pagination, isLoading: boolean, error: Error }"
+    swr_key: "['/api/quality/alerts', params]"
+
+  - name: useAlert
+    path: lib/hooks/use-alert.ts
+    description: "Fetch single alert"
+    params:
+      - name: alertId
+        type: string
+    returns:
+      type: "{ alert: QualityAlert, isLoading: boolean, error: Error }"
+
+  - name: useRecentAlerts
+    path: lib/hooks/use-recent-alerts.ts
+    description: "Fetch recent 10 alerts for dropdown"
+    returns:
+      type: "{ alerts: QualityAlert[], isLoading: boolean }"
+    swr_config:
+      refreshInterval: 60000
+
+  - name: useAlertPreferences
+    path: lib/hooks/use-alert-preferences.ts
+    description: "Fetch and update user preferences"
+    returns:
+      type: |
+        {
+          preferences: UserAlertPreferences,
+          isLoading: boolean,
+          updatePreferences: (prefs: Partial<UserAlertPreferences>) => Promise<void>,
+          isSaving: boolean
+        }
+
+  - name: useAcknowledgeAlert
+    path: lib/hooks/use-acknowledge-alert.ts
+    description: "Mutation hook for acknowledging"
+    returns:
+      type: |
+        {
+          acknowledge: (alertId: string, notes?: string) => Promise<void>,
+          isLoading: boolean,
+          error: Error
+        }
+
+  - name: useAlertWebSocket
+    path: lib/hooks/use-alert-websocket.ts
+    description: "WebSocket subscription for real-time alerts"
+    behavior:
+      - "Subscribe to user:{userId}:alerts channel"
+      - "On quality_alert event: show toast, update unread count"
+      - "On alert_acknowledged event: update alert status"
+    dependencies: ["useWebSocket", "useToast"]
+
+# =============================================================================
+# TYPES
+# =============================================================================
+
+types:
+  - name: QualityAlert
+    path: lib/types/alert.ts
+    definition: |
+      interface QualityAlert {
+        id: string;
+        alert_number: string;
+        alert_type: string;
+        severity: AlertSeverity;
+        subject: string;
+        body: string;
+        sms_body?: string;
+        source_type?: string;
+        source_id?: string;
+        source_reference?: string;
+        status: AlertStatus;
+        created_at: string;
+        read_at?: string;
+        acknowledged_at?: string;
+        acknowledged_by?: string;
+        escalation_level: number;
+      }
+
+  - name: AlertSeverity
+    path: lib/types/alert.ts
+    definition: "type AlertSeverity = 'critical' | 'high' | 'medium' | 'low';"
+
+  - name: AlertStatus
+    path: lib/types/alert.ts
+    definition: "type AlertStatus = 'pending' | 'delivered' | 'read' | 'acknowledged' | 'expired';"
+
+  - name: AlertChannel
+    path: lib/types/alert.ts
+    definition: "type AlertChannel = 'websocket' | 'email' | 'sms' | 'push';"
+
+  - name: UnreadCount
+    path: lib/types/alert.ts
+    definition: |
+      interface UnreadCount {
+        total: number;
+        critical: number;
+        high: number;
+        medium: number;
+        low: number;
+      }
+
+  - name: UserAlertPreferences
+    path: lib/types/alert.ts
+    definition: |
+      interface UserAlertPreferences {
+        alerts_enabled: boolean;
+        websocket_enabled: boolean;
+        email_enabled: boolean;
+        sms_enabled: boolean;
+        sms_phone_number?: string;
+        push_enabled: boolean;
+        quiet_hours_enabled: boolean;
+        quiet_hours_start?: string;
+        quiet_hours_end?: string;
+        quiet_hours_timezone: string;
+        severity_preferences?: Record<AlertSeverity, ChannelConfig>;
+        alert_type_preferences?: Record<string, Partial<ChannelConfig>>;
+      }
+
+  - name: ChannelConfig
+    path: lib/types/alert.ts
+    definition: |
+      interface ChannelConfig {
+        websocket: boolean;
+        email: boolean;
+        sms: boolean;
+        push: boolean;
+      }
+
+  - name: AlertListParams
+    path: lib/types/alert.ts
+    definition: |
+      interface AlertListParams {
+        severity?: AlertSeverity;
+        status?: AlertStatus;
+        alert_type?: string;
+        unread_only?: boolean;
+        date_from?: string;
+        date_to?: string;
+        page?: number;
+        limit?: number;
+      }
+
+# =============================================================================
+# UTILITIES
+# =============================================================================
+
+utilities:
+  - name: formatAlertTime
+    path: lib/utils/alert-utils.ts
+    description: "Format alert timestamp as relative time"
+    example: "formatAlertTime('2026-01-15T10:30:00Z') => '5 min ago'"
+
+  - name: getAlertSeverityColor
+    path: lib/utils/alert-utils.ts
+    description: "Get tailwind color class for severity"
+    example: "getAlertSeverityColor('critical') => 'text-red-500'"
+
+  - name: getAlertSeverityIcon
+    path: lib/utils/alert-utils.ts
+    description: "Get icon component for severity"
+    example: "getAlertSeverityIcon('critical') => AlertCircle"
+
+  - name: formatPhoneNumber
+    path: lib/utils/alert-utils.ts
+    description: "Format E.164 phone for display"
+    example: "formatPhoneNumber('+12025551234') => '(202) 555-1234'"
+
+  - name: validatePhoneNumber
+    path: lib/utils/alert-utils.ts
+    description: "Validate E.164 phone number"
+    example: "validatePhoneNumber('+12025551234') => true"
+
+# =============================================================================
+# UI PATTERNS
+# =============================================================================
+
+ui_patterns:
+  alert_bell:
+    - "Position: Header, right side, before user menu"
+    - "Icon: Bell (Lucide)"
+    - "Badge: Absolute positioned, top-right, -2px offset"
+    - "Badge size: w-5 h-5 min"
+    - "Badge color: red-500 for critical, orange-500 for high, gray-500 default"
+    - "Click: Opens dropdown below"
+
+  alert_dropdown:
+    - "Width: 400px (or 360px on mobile)"
+    - "Max height: 70vh with scroll"
+    - "Header: 'Notifications' with unread count"
+    - "Items: Hover effect, dividers between"
+    - "Unread: Left border accent or dot indicator"
+    - "Footer: 'View All Alerts' link"
+
+  severity_colors:
+    critical:
+      background: "bg-red-500"
+      text: "text-white"
+      border: "border-red-500"
+      light_bg: "bg-red-100"
+      light_text: "text-red-800"
+    high:
+      background: "bg-orange-500"
+      text: "text-white"
+      border: "border-orange-500"
+      light_bg: "bg-orange-100"
+      light_text: "text-orange-800"
+    medium:
+      background: "bg-yellow-500"
+      text: "text-black"
+      border: "border-yellow-500"
+      light_bg: "bg-yellow-100"
+      light_text: "text-yellow-800"
+    low:
+      background: "bg-gray-500"
+      text: "text-white"
+      border: "border-gray-500"
+      light_bg: "bg-gray-100"
+      light_text: "text-gray-800"
+
+  toast_notifications:
+    critical:
+      variant: "destructive"
+      duration: 10000  # 10 seconds, don't auto-dismiss
+      action: "View"
+    high:
+      variant: "warning"
+      duration: 8000
+      action: "View"
+    medium:
+      variant: "default"
+      duration: 5000
+    low:
+      variant: "default"
+      duration: 3000

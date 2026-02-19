@@ -1,0 +1,485 @@
+# Story 06.14 - Database Schema
+# Generated: 2025-01-15
+# Purpose: Tables, RLS policies, seed data, migrations
+
+tables:
+  # =============================================================================
+  # NCR Root Causes Table
+  # =============================================================================
+  ncr_root_causes:
+    description: "Root cause analysis data including 5-Why, classification, impact assessment"
+    columns:
+      - name: id
+        type: UUID
+        primary_key: true
+        default: gen_random_uuid()
+      - name: org_id
+        type: UUID
+        not_null: true
+        foreign_key: organizations(id)
+      - name: ncr_id
+        type: UUID
+        not_null: true
+        foreign_key: ncr_reports(id)
+        on_delete: CASCADE
+        unique: true
+        comment: "1:1 relationship with ncr_reports"
+
+      # 5-Why Analysis
+      - name: why_1
+        type: TEXT
+        comment: "First why question"
+      - name: why_1_answer
+        type: TEXT
+        comment: "Answer to first why"
+      - name: why_2
+        type: TEXT
+      - name: why_2_answer
+        type: TEXT
+      - name: why_3
+        type: TEXT
+      - name: why_3_answer
+        type: TEXT
+      - name: why_4
+        type: TEXT
+      - name: why_4_answer
+        type: TEXT
+      - name: why_5
+        type: TEXT
+      - name: why_5_answer
+        type: TEXT
+      - name: why_levels_used
+        type: INTEGER
+        default: 0
+        check: "why_levels_used >= 0 AND why_levels_used <= 5"
+        comment: "Number of why levels completed"
+
+      # Root Cause Statement
+      - name: root_cause_statement
+        type: TEXT
+        comment: "Final root cause statement (min 20 chars for submission)"
+      - name: root_cause_summary
+        type: TEXT
+        comment: "Brief summary of root cause"
+
+      # Classification
+      - name: classification
+        type: TEXT
+        not_null: true
+        default: "'unknown'"
+        check: "classification IN ('systemic', 'random', 'procedural', 'human_error', 'equipment', 'material', 'environmental', 'unknown')"
+      - name: is_recurring
+        type: BOOLEAN
+        default: false
+      - name: recurrence_count
+        type: INTEGER
+        default: 0
+      - name: related_ncr_ids
+        type: "UUID[]"
+        comment: "Array of related NCR IDs for recurring issues"
+
+      # Impact Assessment
+      - name: impact_cost
+        type: "DECIMAL(12,2)"
+      - name: impact_cost_currency
+        type: TEXT
+        default: "'USD'"
+      - name: impact_customer
+        type: TEXT
+        check: "impact_customer IN ('none', 'minor', 'moderate', 'major', 'critical')"
+      - name: impact_customer_notes
+        type: TEXT
+      - name: impact_regulatory
+        type: TEXT
+        check: "impact_regulatory IN ('none', 'notification_required', 'audit_finding', 'violation', 'recall_potential')"
+      - name: impact_regulatory_notes
+        type: TEXT
+      - name: impact_production
+        type: TEXT
+        check: "impact_production IN ('none', 'minor_delay', 'significant_delay', 'batch_loss', 'line_shutdown')"
+      - name: impact_production_notes
+        type: TEXT
+
+      # Approval Workflow
+      - name: status
+        type: TEXT
+        not_null: true
+        default: "'draft'"
+        check: "status IN ('draft', 'submitted', 'approved', 'rejected', 'revision_required')"
+      - name: submitted_at
+        type: TIMESTAMPTZ
+      - name: submitted_by
+        type: UUID
+        foreign_key: users(id)
+      - name: approved_at
+        type: TIMESTAMPTZ
+      - name: approved_by
+        type: UUID
+        foreign_key: users(id)
+      - name: approval_notes
+        type: TEXT
+      - name: rejection_reason
+        type: TEXT
+
+      # Investigator
+      - name: investigator_id
+        type: UUID
+        foreign_key: users(id)
+      - name: investigation_started
+        type: TIMESTAMPTZ
+      - name: investigation_completed
+        type: TIMESTAMPTZ
+
+      # Audit
+      - name: created_at
+        type: TIMESTAMPTZ
+        not_null: true
+        default: now()
+      - name: created_by
+        type: UUID
+        foreign_key: users(id)
+      - name: updated_at
+        type: TIMESTAMPTZ
+        not_null: true
+        default: now()
+      - name: updated_by
+        type: UUID
+        foreign_key: users(id)
+
+    constraints:
+      - name: uq_ncr_root_cause
+        type: UNIQUE
+        columns: [ncr_id]
+      - name: check_approval_fields
+        type: CHECK
+        expression: "(status = 'approved' AND approved_at IS NOT NULL AND approved_by IS NOT NULL) OR (status != 'approved')"
+      - name: check_rejection_fields
+        type: CHECK
+        expression: "(status = 'rejected' AND rejection_reason IS NOT NULL) OR (status != 'rejected')"
+
+    indexes:
+      - name: idx_root_cause_ncr
+        columns: [ncr_id]
+      - name: idx_root_cause_org
+        columns: [org_id]
+      - name: idx_root_cause_status
+        columns: [org_id, status]
+      - name: idx_root_cause_classification
+        columns: [org_id, classification]
+      - name: idx_root_cause_investigator
+        columns: [investigator_id]
+        where: "investigator_id IS NOT NULL"
+
+  # =============================================================================
+  # NCR Root Cause Factors Table (Fishbone Categories)
+  # =============================================================================
+  ncr_root_cause_factors:
+    description: "Fishbone (Ishikawa) diagram factors - 6 M categories"
+    columns:
+      - name: id
+        type: UUID
+        primary_key: true
+        default: gen_random_uuid()
+      - name: org_id
+        type: UUID
+        not_null: true
+        foreign_key: organizations(id)
+      - name: root_cause_id
+        type: UUID
+        not_null: true
+        foreign_key: ncr_root_causes(id)
+        on_delete: CASCADE
+
+      # Fishbone Category
+      - name: category
+        type: TEXT
+        not_null: true
+        check: "category IN ('man', 'machine', 'material', 'method', 'measurement', 'mother_nature')"
+        comment: "6 M: Man, Machine, Material, Method, Measurement, Mother Nature"
+
+      # Factor Details
+      - name: factor_description
+        type: TEXT
+        not_null: true
+        comment: "Description of the contributing factor"
+      - name: is_contributing
+        type: BOOLEAN
+        default: true
+        comment: "Whether this factor contributes to root cause"
+      - name: is_primary
+        type: BOOLEAN
+        default: false
+        comment: "Whether this is the primary cause (only one per analysis)"
+      - name: evidence_notes
+        type: TEXT
+        comment: "Notes about evidence supporting this factor"
+      - name: sequence
+        type: INTEGER
+        default: 0
+        comment: "Order of factor within category"
+
+      # Audit
+      - name: created_at
+        type: TIMESTAMPTZ
+        not_null: true
+        default: now()
+      - name: created_by
+        type: UUID
+        foreign_key: users(id)
+      - name: updated_at
+        type: TIMESTAMPTZ
+        not_null: true
+        default: now()
+      - name: updated_by
+        type: UUID
+        foreign_key: users(id)
+
+    indexes:
+      - name: idx_root_cause_factors_root
+        columns: [root_cause_id]
+      - name: idx_root_cause_factors_category
+        columns: [root_cause_id, category]
+
+  # =============================================================================
+  # NCR Evidence Attachments Table
+  # =============================================================================
+  ncr_evidence_attachments:
+    description: "Supporting evidence uploads for NCR investigation"
+    columns:
+      - name: id
+        type: UUID
+        primary_key: true
+        default: gen_random_uuid()
+      - name: org_id
+        type: UUID
+        not_null: true
+        foreign_key: organizations(id)
+      - name: ncr_id
+        type: UUID
+        not_null: true
+        foreign_key: ncr_reports(id)
+        on_delete: CASCADE
+      - name: root_cause_id
+        type: UUID
+        foreign_key: ncr_root_causes(id)
+        on_delete: SET NULL
+        comment: "Link to specific root cause analysis (optional)"
+
+      # File Information
+      - name: file_name
+        type: TEXT
+        not_null: true
+      - name: file_type
+        type: TEXT
+        not_null: true
+        comment: "MIME type of file"
+      - name: file_size
+        type: INTEGER
+        not_null: true
+        comment: "File size in bytes"
+      - name: file_path
+        type: TEXT
+        not_null: true
+        comment: "Path in Supabase Storage"
+      - name: storage_bucket
+        type: TEXT
+        default: "'ncr-evidence'"
+        comment: "Supabase Storage bucket name"
+
+      # Metadata
+      - name: description
+        type: TEXT
+      - name: attachment_type
+        type: TEXT
+        not_null: true
+        default: "'other'"
+        check: "attachment_type IN ('photo', 'document', 'video', 'test_result', 'coa', 'inspection_record', 'other')"
+      - name: is_primary_evidence
+        type: BOOLEAN
+        default: false
+
+      # Upload Details
+      - name: uploaded_at
+        type: TIMESTAMPTZ
+        not_null: true
+        default: now()
+      - name: uploaded_by
+        type: UUID
+        not_null: true
+        foreign_key: users(id)
+
+      # Audit
+      - name: created_at
+        type: TIMESTAMPTZ
+        not_null: true
+        default: now()
+      - name: updated_at
+        type: TIMESTAMPTZ
+        not_null: true
+        default: now()
+
+    indexes:
+      - name: idx_evidence_ncr
+        columns: [ncr_id]
+      - name: idx_evidence_root_cause
+        columns: [root_cause_id]
+        where: "root_cause_id IS NOT NULL"
+      - name: idx_evidence_org
+        columns: [org_id]
+      - name: idx_evidence_type
+        columns: [org_id, attachment_type]
+
+# =============================================================================
+# RLS Policies
+# =============================================================================
+rls_policies:
+  ncr_root_causes:
+    - name: root_cause_select
+      operation: SELECT
+      expression: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - name: root_cause_insert
+      operation: INSERT
+      check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - name: root_cause_update
+      operation: UPDATE
+      expression: "org_id = (SELECT org_id FROM users WHERE id = auth.uid()) AND (status IN ('draft', 'revision_required') OR approved_by = auth.uid())"
+    - name: root_cause_delete
+      operation: DELETE
+      expression: "org_id = (SELECT org_id FROM users WHERE id = auth.uid()) AND status = 'draft'"
+
+  ncr_root_cause_factors:
+    - name: factors_select
+      operation: SELECT
+      expression: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - name: factors_insert
+      operation: INSERT
+      check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - name: factors_update
+      operation: UPDATE
+      expression: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - name: factors_delete
+      operation: DELETE
+      expression: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+  ncr_evidence_attachments:
+    - name: evidence_select
+      operation: SELECT
+      expression: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - name: evidence_insert
+      operation: INSERT
+      check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - name: evidence_delete
+      operation: DELETE
+      expression: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+# =============================================================================
+# Triggers
+# =============================================================================
+triggers:
+  - name: update_ncr_root_causes_updated_at
+    table: ncr_root_causes
+    timing: BEFORE UPDATE
+    function: update_updated_at_column()
+
+  - name: update_ncr_root_cause_factors_updated_at
+    table: ncr_root_cause_factors
+    timing: BEFORE UPDATE
+    function: update_updated_at_column()
+
+  - name: update_ncr_evidence_attachments_updated_at
+    table: ncr_evidence_attachments
+    timing: BEFORE UPDATE
+    function: update_updated_at_column()
+
+# =============================================================================
+# Supabase Storage
+# =============================================================================
+storage:
+  buckets:
+    - name: ncr-evidence
+      public: false
+      file_size_limit: 26214400  # 25MB in bytes
+      allowed_mime_types:
+        - image/jpeg
+        - image/png
+        - image/gif
+        - image/webp
+        - application/pdf
+        - application/msword
+        - application/vnd.openxmlformats-officedocument.wordprocessingml.document
+        - application/vnd.ms-excel
+        - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+        - video/mp4
+        - video/quicktime
+
+# =============================================================================
+# Enums Reference
+# =============================================================================
+enums:
+  root_cause_classification:
+    - systemic       # Recurring organizational/process issue
+    - random         # One-time occurrence, no pattern
+    - procedural     # SOP not followed or SOP inadequate
+    - human_error    # Individual mistake (training issue)
+    - equipment      # Equipment failure or malfunction
+    - material       # Raw material or input defect
+    - environmental  # External conditions (temp, humidity)
+    - unknown        # Unable to determine
+
+  fishbone_category:
+    - man            # People/Personnel
+    - machine        # Equipment
+    - material       # Inputs/Raw materials
+    - method         # Process/Procedures
+    - measurement    # Data/Metrics
+    - mother_nature  # Environment
+
+  root_cause_status:
+    - draft
+    - submitted
+    - approved
+    - rejected
+    - revision_required
+
+  impact_customer:
+    - none
+    - minor
+    - moderate
+    - major
+    - critical
+
+  impact_regulatory:
+    - none
+    - notification_required
+    - audit_finding
+    - violation
+    - recall_potential
+
+  impact_production:
+    - none
+    - minor_delay
+    - significant_delay
+    - batch_loss
+    - line_shutdown
+
+  attachment_type:
+    - photo
+    - document
+    - video
+    - test_result
+    - coa
+    - inspection_record
+    - other
+
+# =============================================================================
+# Migration Notes
+# =============================================================================
+migration_notes:
+  - "Creates ncr_root_causes table with 1:1 relationship to ncr_reports"
+  - "Creates ncr_root_cause_factors for Fishbone diagram (6 M categories)"
+  - "Creates ncr_evidence_attachments for file uploads"
+  - "Requires ncr_reports table from story 06.9"
+  - "Uses existing update_updated_at_column() function"
+  - "Storage bucket 'ncr-evidence' must be created in Supabase"
+  - "Max file size: 25MB per file"
+  - "RLS policies enforce org isolation for all tables"

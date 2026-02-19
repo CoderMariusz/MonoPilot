@@ -1,0 +1,453 @@
+# Story 04.6e - Frontend Specification
+# Purpose: Components, UI patterns for over-consumption control
+# Agent: FRONTEND-DEV (UI focus)
+
+# Page (existing - no new page)
+pages:
+  - path: "apps/frontend/app/(authenticated)/production/consumption/[woId]/page.tsx"
+    description: "Material Consumption page - already exists from 04.6a"
+    changes:
+      - "Add variance indicator to materials table"
+      - "Integrate over-consumption approval modal"
+      - "Show pending approval status"
+    existing: true
+
+# Components
+components:
+  - path: "apps/frontend/components/production/consumption/OverConsumptionApprovalModal.tsx"
+    description: "Modal showing over-consumption detected and approval workflow"
+    type: "modal"
+    props:
+      - name: "overConsumptionData"
+        type: "OverConsumptionDetection"
+        required: true
+        description: "Data about the over-consumption attempt"
+      - name: "open"
+        type: "boolean"
+        required: true
+      - name: "onOpenChange"
+        type: "(open: boolean) => void"
+        required: true
+      - name: "onApproved"
+        type: "(result: OverConsumptionApprovalResult) => void"
+        required: true
+      - name: "onRejected"
+        type: "(result: OverConsumptionRejectionResult) => void"
+        required: true
+      - name: "onRequestSubmitted"
+        type: "(result: OverConsumptionRequestResult) => void"
+        required: true
+      - name: "isManager"
+        type: "boolean"
+        required: true
+        description: "Determines which view to show (Manager or Operator)"
+    state:
+      - name: "approvalReason"
+        type: "string"
+        initial: "''"
+      - name: "rejectionReason"
+        type: "string"
+        initial: "''"
+      - name: "isSubmitting"
+        type: "boolean"
+        initial: "false"
+    sections:
+      - name: "Over-Consumption Summary"
+        description: "Shows the over-consumption details"
+        fields:
+          - "Material name + product code"
+          - "WO Number"
+          - "BOM Requirement"
+          - "Already Consumed"
+          - "Attempting to consume"
+          - "Total After"
+          - "Over-consumption amount"
+          - "Variance percentage"
+      - name: "Manager Approval Controls"
+        condition: "isManager === true"
+        description: "Approve/Reject buttons for manager"
+        fields:
+          - "Reason for Approval (optional textarea)"
+          - "Approve button"
+          - "Reject button (opens rejection reason modal)"
+      - name: "Operator Waiting View"
+        condition: "isManager === false"
+        description: "Status display for operator"
+        fields:
+          - "Status: Awaiting Manager Approval"
+          - "Notification info (managers notified)"
+          - "Request ID"
+          - "Close button"
+          - "Cancel Request button"
+    wireframe_ref: "PROD-003 - Over-Consumption Approval Modal"
+
+  - path: "apps/frontend/components/production/consumption/OverConsumptionApprovedModal.tsx"
+    description: "Success modal after manager approves"
+    type: "modal"
+    props:
+      - name: "result"
+        type: "OverConsumptionApprovalResult"
+        required: true
+      - name: "onClose"
+        type: "() => void"
+        required: true
+    sections:
+      - name: "Approval Granted"
+        description: "Green check with approval info"
+        fields:
+          - "Manager name"
+          - "Approved at timestamp"
+          - "Approval reason (if provided)"
+          - "Audit trail confirmation"
+    wireframe_ref: "PROD-003 - Over-Consumption Approval - Manager Approves"
+
+  - path: "apps/frontend/components/production/consumption/OverConsumptionRejectedModal.tsx"
+    description: "Modal showing rejection to operator"
+    type: "modal"
+    props:
+      - name: "result"
+        type: "OverConsumptionRejectionResult"
+        required: true
+      - name: "onClose"
+        type: "() => void"
+        required: true
+    sections:
+      - name: "Approval Rejected"
+        description: "Red X with rejection info"
+        fields:
+          - "Manager name"
+          - "Rejected at timestamp"
+          - "Rejection reason"
+          - "Consumption blocked message"
+    wireframe_ref: "PROD-003 - Over-Consumption Approval - Manager Rejects"
+
+  - path: "apps/frontend/components/production/consumption/VarianceIndicator.tsx"
+    description: "Visual indicator for material variance in table"
+    type: "component"
+    props:
+      - name: "variancePercent"
+        type: "number"
+        required: true
+      - name: "size"
+        type: "'sm' | 'md'"
+        default: "'md'"
+    rendering:
+      - condition: "variancePercent === 0"
+        color: "green"
+        text: "0%"
+        icon: "CheckCircle"
+      - condition: "variancePercent > 0 && variancePercent <= 10"
+        color: "yellow"
+        text: "+{variancePercent}%"
+        icon: "AlertTriangle"
+      - condition: "variancePercent > 10"
+        color: "red"
+        text: "+{variancePercent}%"
+        icon: "XCircle"
+
+  - path: "apps/frontend/components/production/consumption/MaterialsTable.tsx"
+    description: "Required materials table - UPDATE to add variance column"
+    existing: true
+    changes:
+      - "Add Variance column after Progress column"
+      - "Use VarianceIndicator component"
+      - "Add 'Over-consumed' warning badge on row"
+      - "Show pending approval status indicator"
+
+# Services (frontend hooks)
+services:
+  - path: "apps/frontend/lib/hooks/use-over-consumption.ts"
+    description: "React hook for over-consumption workflow"
+    exports:
+      - name: "useOverConsumption"
+        type: "hook"
+        params: []
+        returns:
+          - "checkOverConsumption: (woMaterialId, qty) => Promise<OverConsumptionCheck>"
+          - "requestApproval: (data) => Promise<OverConsumptionRequestResult>"
+          - "approveRequest: (requestId, reason?) => Promise<OverConsumptionApprovalResult>"
+          - "rejectRequest: (requestId, reason) => Promise<OverConsumptionRejectionResult>"
+          - "isChecking: boolean"
+          - "error: string | null"
+
+  - path: "apps/frontend/lib/hooks/use-material-variance.ts"
+    description: "Hook to calculate and display material variance"
+    exports:
+      - name: "useMaterialVariance"
+        type: "hook"
+        params:
+          - "woMaterialId: string"
+        returns:
+          - "variance: VarianceIndicator"
+          - "isLoading: boolean"
+
+# UI Patterns
+ui_patterns:
+  over_consumption_modal_operator:
+    description: "What operator sees when over-consumption detected"
+    pattern: |
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-yellow-600">
+              <AlertTriangle className="h-5 w-5" />
+              Over-Consumption Approval Required
+            </DialogTitle>
+          </DialogHeader>
+
+          {/* Over-Consumption Summary */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Over-Consumption Detected</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <span className="text-muted-foreground">Material:</span>
+                <span>{productCode} - {productName}</span>
+                <span className="text-muted-foreground">BOM Requirement:</span>
+                <span>{requiredQty} {uom}</span>
+                <span className="text-muted-foreground">Already Consumed:</span>
+                <span>{currentConsumedQty} {uom}</span>
+                <span className="text-muted-foreground">Attempting:</span>
+                <span>+{requestedQty} {uom}</span>
+                <span className="text-muted-foreground">Total After:</span>
+                <span className="font-medium">{totalAfterQty} {uom}</span>
+                <span className="text-muted-foreground">Over-consumption:</span>
+                <span className="text-red-600 font-medium">+{overConsumptionQty} {uom} (+{variancePercent}%)</span>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Operator Waiting View */}
+          <Alert>
+            <Clock className="h-4 w-4" />
+            <AlertTitle>Awaiting Manager Approval</AlertTitle>
+            <AlertDescription>
+              <p>Your consumption request is pending manager approval.</p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Notification sent to: Sarah Lee (Production Manager)
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Request ID: {requestId}
+              </p>
+            </AlertDescription>
+          </Alert>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={handleClose}>Close</Button>
+            <Button variant="ghost" onClick={handleCancel}>Cancel Request</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+  over_consumption_modal_manager:
+    description: "What manager sees (approval controls)"
+    pattern: |
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-yellow-600">
+              <AlertTriangle className="h-5 w-5" />
+              Over-Consumption Approval Required
+            </DialogTitle>
+          </DialogHeader>
+
+          {/* Same Over-Consumption Summary */}
+
+          {/* Manager Approval Controls */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Manager Approval Controls</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Reason for Over-Consumption (Optional)</Label>
+                <Textarea
+                  value={approvalReason}
+                  onChange={(e) => setApprovalReason(e.target.value)}
+                  placeholder="Additional material needed due to..."
+                  maxLength={500}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={handleReject}
+              disabled={isSubmitting}
+            >
+              Reject
+            </Button>
+            <Button
+              onClick={handleApprove}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Approve Over-Consumption
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+  variance_indicator:
+    pattern: |
+      export function VarianceIndicator({ variancePercent, size = 'md' }: VarianceIndicatorProps) {
+        const getVarianceStatus = (percent: number) => {
+          if (percent === 0) return { color: 'green', icon: CheckCircle2, label: '0%' };
+          if (percent <= 10) return { color: 'yellow', icon: AlertTriangle, label: `+${percent.toFixed(1)}%` };
+          return { color: 'red', icon: XCircle, label: `+${percent.toFixed(1)}%` };
+        };
+
+        const status = getVarianceStatus(variancePercent);
+        const Icon = status.icon;
+        const sizeClass = size === 'sm' ? 'h-3 w-3' : 'h-4 w-4';
+        const textClass = size === 'sm' ? 'text-xs' : 'text-sm';
+
+        const colorClasses = {
+          green: 'text-green-600',
+          yellow: 'text-yellow-600',
+          red: 'text-red-600'
+        };
+
+        return (
+          <div className={cn('flex items-center gap-1', colorClasses[status.color])}>
+            <Icon className={sizeClass} />
+            <span className={textClass}>{status.label}</span>
+          </div>
+        );
+      }
+
+  materials_table_row:
+    description: "Updated materials table row with variance"
+    pattern: |
+      <TableRow>
+        <TableCell>{sequence}</TableCell>
+        <TableCell>
+          <div>
+            <span className="font-medium">{productCode}</span>
+            <span className="text-muted-foreground"> - {productName}</span>
+          </div>
+          {consumeWholeLp && (
+            <Badge variant="outline" className="mt-1">
+              <Lock className="h-3 w-3 mr-1" />
+              Full LP Required
+            </Badge>
+          )}
+          {consumedQty > requiredQty && (
+            <Badge variant="destructive" className="mt-1">
+              <AlertTriangle className="h-3 w-3 mr-1" />
+              Over-consumed
+            </Badge>
+          )}
+        </TableCell>
+        <TableCell>{requiredQty} {uom}</TableCell>
+        <TableCell>{consumedQty} {uom}</TableCell>
+        <TableCell>{remainingQty} {uom}</TableCell>
+        <TableCell>
+          <Progress value={progressPercent} />
+          <span className="text-xs text-muted-foreground">{progressPercent}%</span>
+        </TableCell>
+        <TableCell>
+          <VarianceIndicator variancePercent={variancePercent} />
+        </TableCell>
+        <TableCell>
+          <Button size="sm" onClick={() => handleConsume(material)}>
+            <Plus className="h-4 w-4" />
+          </Button>
+        </TableCell>
+      </TableRow>
+
+# States
+states:
+  - name: "no_over_consumption"
+    description: "Normal consumption, no over-consumption detected"
+    ui: "Standard consumption modal"
+
+  - name: "over_consumption_detected"
+    description: "System detected over-consumption"
+    ui:
+      - "If allow_over_consumption = true: Proceed with variance tracking"
+      - "If allow_over_consumption = false: Show approval modal"
+
+  - name: "approval_pending"
+    description: "Operator waiting for manager decision"
+    ui:
+      - "Operator: 'Awaiting approval' status"
+      - "Manager: Approval controls visible"
+
+  - name: "approved"
+    description: "Manager approved over-consumption"
+    ui:
+      - "Success modal"
+      - "Consumption proceeds"
+      - "Materials table updates"
+
+  - name: "rejected"
+    description: "Manager rejected over-consumption"
+    ui:
+      - "Rejection modal with reason"
+      - "Consumption blocked"
+      - "Operator must adjust or request different qty"
+
+# Accessibility
+accessibility:
+  touch_targets:
+    - "Approve/Reject buttons: 48x48dp minimum"
+    - "Variance indicator clickable area: 44x44dp"
+  contrast:
+    - "Green variance (0%): 4.5:1 on white"
+    - "Yellow variance (1-10%): 4.5:1 on white"
+    - "Red variance (>10%): 4.5:1 on white"
+  screen_reader:
+    - "Variance indicator: aria-label='Variance {percent}%, status {exact/acceptable/high}'"
+    - "Over-consumed badge: aria-label='Material is over-consumed'"
+    - "Approval modal: role='dialog' aria-labelledby"
+  keyboard:
+    - "Tab: Navigate through form and buttons"
+    - "Enter: Submit approval/rejection"
+    - "Escape: Close modal"
+
+# Toast Notifications
+toasts:
+  - type: "success"
+    trigger: "Manager approves"
+    message: "Over-consumption approved"
+    description: "Consumption proceeding for {qty} {uom}"
+    duration: 5000
+  - type: "error"
+    trigger: "Manager rejects"
+    message: "Over-consumption rejected"
+    description: "{rejection_reason}"
+    duration: 7000
+  - type: "info"
+    trigger: "Operator request submitted"
+    message: "Approval request submitted"
+    description: "Manager has been notified"
+    duration: 5000
+
+# Integration with Consumption Flow
+consumption_integration:
+  description: "How over-consumption check integrates with consumption flow"
+  flow:
+    - step: 1
+      action: "User clicks Confirm Consumption"
+    - step: 2
+      action: "System calls checkOverConsumption()"
+      check: "total_after > required"
+    - step: 3a
+      condition: "No over-consumption"
+      action: "Proceed with normal consumption"
+    - step: 3b
+      condition: "Over-consumption && allow_over_consumption = true"
+      action: "Proceed with consumption, track variance"
+    - step: 3c
+      condition: "Over-consumption && allow_over_consumption = false"
+      action: "Show OverConsumptionApprovalModal"
+    - step: 4
+      condition: "Manager approves"
+      action: "Execute consumption, close modal, refresh table"
+    - step: 5
+      condition: "Manager rejects"
+      action: "Close modal, show rejection reason, do NOT consume"

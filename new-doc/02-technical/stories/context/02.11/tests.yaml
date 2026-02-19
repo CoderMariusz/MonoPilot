@@ -1,0 +1,479 @@
+# Story 02.11 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/shelf-life-service.test.ts"
+    type: "unit"
+    description: "Unit tests for shelf life calculation and service methods"
+  - path: "apps/frontend/lib/validation/__tests__/shelf-life.test.ts"
+    type: "unit"
+    description: "Unit tests for Zod validation schemas"
+  - path: "apps/frontend/app/api/technical/shelf-life/__tests__/route.test.ts"
+    type: "integration"
+    description: "Integration tests for shelf life API endpoints"
+  - path: "supabase/tests/shelf-life-rls.test.sql"
+    type: "integration"
+    description: "Integration tests for RLS policies on shelf life tables"
+  - path: "tests/e2e/shelf-life-config.spec.ts"
+    type: "e2e"
+    description: "E2E tests for shelf life configuration modal flow"
+
+# Acceptance Criteria from Story
+acceptance_criteria:
+  # Shelf Life Calculation from Ingredients (FR-2.90, FR-2.91)
+  - id: "AC-11.01"
+    given: "a product with active BOM containing ingredients [Flour 180 days, Yeast 14 days, Butter 60 days]"
+    when: "shelf life is calculated"
+    then: "calculated_days = 14 (minimum ingredient shelf life)"
+    test_type: "unit"
+    priority: "P0"
+    prd_ref: "FR-2.91"
+
+  - id: "AC-11.02"
+    given: "calculated_days = 14 and safety_buffer_percent = 20"
+    when: "final calculation runs"
+    then: "safety_buffer_days = 3 (rounded up from 2.8) and final_days = 11"
+    test_type: "unit"
+    priority: "P0"
+    prd_ref: "FR-2.91"
+
+  - id: "AC-11.03"
+    given: "processing_impact_days = -2 (heat treatment)"
+    when: "calculation runs"
+    then: "final_days = 14 - 2 - 3 = 9 days"
+    test_type: "unit"
+    priority: "P0"
+    prd_ref: "FR-2.90"
+
+  - id: "AC-11.04"
+    given: "a product has no active BOM"
+    when: "calculation is attempted"
+    then: "error 'No active BOM found. Set shelf life manually or create BOM first.' is returned"
+    test_type: "unit"
+    priority: "P0"
+    prd_ref: "FR-2.90"
+
+  - id: "AC-11.05"
+    given: "an ingredient has no shelf_life_days configured"
+    when: "calculation runs"
+    then: "error 'Missing shelf life for ingredient: {name}' with ingredient list"
+    test_type: "unit"
+    priority: "P1"
+    prd_ref: "FR-2.90"
+
+  # Manual Override (FR-2.92)
+  - id: "AC-11.06"
+    given: "calculated_days = 10"
+    when: "user enables manual override and enters 7 days with reason"
+    then: "override_days = 7 and final_days = 7"
+    test_type: "integration"
+    priority: "P0"
+    prd_ref: "FR-2.92"
+
+  - id: "AC-11.07"
+    given: "manual override selected"
+    when: "override_reason is empty"
+    then: "validation error 'Override reason is required for audit trail'"
+    test_type: "unit"
+    priority: "P0"
+    prd_ref: "FR-2.92"
+
+  - id: "AC-11.08"
+    given: "override_days > calculated_days"
+    when: "save attempted"
+    then: "warning 'Override ({x} days) exceeds calculated shelf life ({y} days). Ensure this is backed by testing.'"
+    test_type: "integration"
+    priority: "P1"
+    prd_ref: "FR-2.92"
+
+  - id: "AC-11.09"
+    given: "override saved successfully"
+    when: "audit log is checked"
+    then: "entry includes: user, timestamp, old_value, new_value, reason"
+    test_type: "integration"
+    priority: "P0"
+    prd_ref: "FR-2.92"
+
+  # Best Before Date Calculation
+  - id: "AC-11.10"
+    given: "shelf_life_mode = 'fixed' and final_days = 7"
+    when: "lot is produced on 2025-12-11"
+    then: "best_before_date = 2025-12-18"
+    test_type: "unit"
+    priority: "P0"
+    prd_ref: "FR-2.90"
+
+  - id: "AC-11.11"
+    given: "shelf_life_mode = 'rolling' and processing_buffer_days = 2"
+    when: "lot is produced with earliest ingredient expiry = 2025-12-20"
+    then: "best_before_date = 2025-12-18 (2025-12-20 - 2 days)"
+    test_type: "unit"
+    priority: "P1"
+    prd_ref: "FR-2.90"
+
+  # Storage Conditions
+  - id: "AC-11.12"
+    given: "user configures storage temp_min = 18, temp_max = 25"
+    when: "temp_min > temp_max (e.g., temp_min = 35)"
+    then: "validation error 'Minimum cannot exceed maximum temperature'"
+    test_type: "unit"
+    priority: "P0"
+    prd_ref: "FR-2.93"
+
+  # FEFO Settings
+  - id: "AC-11.13"
+    given: "min_remaining_for_shipment = 5 days and enforcement_level = 'block'"
+    when: "lot has 3 days remaining"
+    then: "shipment blocked with message 'Lot has 3 days remaining (minimum: 5 days)'"
+    test_type: "unit"
+    priority: "P0"
+    prd_ref: "FR-2.90"
+
+  - id: "AC-11.14"
+    given: "enforcement_level = 'suggest'"
+    when: "lot fails minimum check"
+    then: "warning shown but eligible = true, requires_confirmation = false"
+    test_type: "unit"
+    priority: "P1"
+    prd_ref: "FR-2.90"
+
+  - id: "AC-11.15"
+    given: "enforcement_level = 'warn'"
+    when: "lot fails minimum check"
+    then: "requires_confirmation = true"
+    test_type: "unit"
+    priority: "P1"
+    prd_ref: "FR-2.90"
+
+  # Recalculation Triggers
+  - id: "AC-11.16"
+    given: "ingredient Yeast shelf_life_days changes from 14 to 10"
+    when: "change is saved"
+    then: "all products using Yeast in their BOM are flagged for shelf life recalculation (needs_recalculation = true)"
+    test_type: "integration"
+    priority: "P0"
+    prd_ref: "FR-2.91"
+
+  - id: "AC-11.17"
+    given: "user clicks 'Recalculate from Ingredients' button"
+    when: "calculation completes"
+    then: "calculated_days updates and needs_recalculation = false"
+    test_type: "integration"
+    priority: "P0"
+    prd_ref: "FR-2.91"
+
+  # Multi-tenancy
+  - id: "AC-11.18"
+    given: "User A from Org A"
+    when: "they configure shelf life for Product X"
+    then: "only Org A can view/edit this configuration"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+    prd_ref: "FR-2.90"
+
+  - id: "AC-11.19"
+    given: "User A attempts to access Org B product shelf life config"
+    when: "API is called"
+    then: "404 Not Found is returned (not 403)"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+    prd_ref: "FR-2.90"
+
+# Unit Test Cases
+unit_tests:
+  shelf_life_calculation:
+    - name: "calculateShelfLife returns minimum ingredient shelf life"
+      setup: "Mock BOM with ingredients [180, 14, 60] days"
+      expected: "calculated_days = 14"
+      covers: "AC-11.01"
+
+    - name: "calculateShelfLife applies safety buffer correctly"
+      setup: "shortest = 14 days, safety_buffer_percent = 20"
+      expected: "safety_buffer_days = 3, final = 11"
+      covers: "AC-11.02"
+
+    - name: "calculateShelfLife applies processing impact"
+      setup: "shortest = 14, processing_impact_days = 2, safety = 20%"
+      expected: "final_days = 14 - 2 - 3 = 9"
+      covers: "AC-11.03"
+
+    - name: "calculateShelfLife throws error when no active BOM"
+      setup: "Product with no active BOM"
+      expected: "Error: 'No active BOM found...'"
+      covers: "AC-11.04"
+
+    - name: "calculateShelfLife throws error for missing ingredient shelf life"
+      setup: "BOM with ingredient having null shelf_life_days"
+      expected: "Error: 'Missing shelf life for ingredient: {name}'"
+      covers: "AC-11.05"
+
+    - name: "calculateShelfLife returns minimum 1 day"
+      setup: "Calculated result would be 0 or negative"
+      expected: "final_days = 1"
+
+  best_before_calculation:
+    - name: "calculateBestBeforeDate fixed mode adds days"
+      setup: "production = 2025-12-11, final_days = 7"
+      expected: "best_before = 2025-12-18"
+      covers: "AC-11.10"
+
+    - name: "calculateBestBeforeDate rolling mode subtracts buffer"
+      setup: "earliest_ingredient_expiry = 2025-12-20, buffer = 2"
+      expected: "best_before = 2025-12-18"
+      covers: "AC-11.11"
+
+  shipment_eligibility:
+    - name: "checkShipmentEligibility blocks when remaining < min and level = block"
+      setup: "expiry in 3 days, min = 5, enforcement = 'block'"
+      expected: "blocked = true, eligible = false"
+      covers: "AC-11.13"
+
+    - name: "checkShipmentEligibility allows with warning when level = suggest"
+      setup: "expiry in 3 days, min = 5, enforcement = 'suggest'"
+      expected: "eligible = true, requires_confirmation = false"
+      covers: "AC-11.14"
+
+    - name: "checkShipmentEligibility requires confirmation when level = warn"
+      setup: "expiry in 3 days, min = 5, enforcement = 'warn'"
+      expected: "requires_confirmation = true"
+      covers: "AC-11.15"
+
+  validation_schemas:
+    - name: "shelfLifeConfigSchema requires override_reason when use_override"
+      setup: "{ use_override: true, override_days: 7, override_reason: null }"
+      expected: "Validation error on override_reason"
+      covers: "AC-11.07"
+
+    - name: "shelfLifeConfigSchema validates temperature range"
+      setup: "{ storage_temp_min: 35, storage_temp_max: 25 }"
+      expected: "Validation error: 'Minimum cannot exceed maximum'"
+      covers: "AC-11.12"
+
+    - name: "shelfLifeConfigSchema validates expiry thresholds"
+      setup: "{ expiry_warning_days: 5, expiry_critical_days: 10 }"
+      expected: "Validation error: 'Critical must be <= warning'"
+
+    - name: "ingredientShelfLifeSchema requires quarantine_duration when quarantine_required"
+      setup: "{ quarantine_required: true, quarantine_duration_days: null }"
+      expected: "Validation error on quarantine_duration_days"
+
+# Integration Test Cases
+integration_tests:
+  api_endpoints:
+    - name: "GET /api/technical/shelf-life/products/:id returns config"
+      setup: "Create product with shelf life config"
+      action: "GET request"
+      expected: "200 with ShelfLifeConfigResponse"
+      covers: "AC-11.01"
+
+    - name: "GET /api/technical/shelf-life/products/:id returns 404 for other org"
+      setup: "Create product in Org B, request as Org A user"
+      action: "GET request"
+      expected: "404 Not Found"
+      covers: "AC-11.19"
+
+    - name: "POST /api/technical/shelf-life/products/:id/calculate returns calculation"
+      setup: "Product with active BOM"
+      action: "POST request"
+      expected: "200 with CalculateShelfLifeResponse"
+      covers: "AC-11.01"
+
+    - name: "PUT /api/technical/shelf-life/products/:id updates config"
+      setup: "Existing shelf life config"
+      action: "PUT with override_days = 7, override_reason = 'Testing'"
+      expected: "200 with updated config"
+      covers: "AC-11.06"
+
+    - name: "PUT /api/technical/shelf-life/products/:id rejects missing override_reason"
+      setup: "Existing shelf life config"
+      action: "PUT with use_override = true, no override_reason"
+      expected: "400 OVERRIDE_REASON_REQUIRED"
+      covers: "AC-11.07"
+
+    - name: "POST /api/technical/shelf-life/ingredients/:id triggers recalculation"
+      setup: "Ingredient used in 3 products"
+      action: "Update ingredient shelf_life_days"
+      expected: "200 + 3 products flagged for recalculation"
+      covers: "AC-11.16"
+
+  rls_isolation:
+    - name: "User can only read shelf life config from own org"
+      setup: "Create config in Org A and Org B"
+      action: "User A queries product_shelf_life table"
+      expected: "Only Org A config returned"
+      covers: "AC-11.18"
+
+    - name: "User can only write shelf life config to own org"
+      setup: "User A tries to insert config with Org B org_id"
+      action: "INSERT into product_shelf_life"
+      expected: "RLS blocks write"
+      covers: "AC-11.18"
+
+    - name: "Audit log is org-isolated"
+      setup: "Audit entries in Org A and Org B"
+      action: "User A queries shelf_life_audit_log"
+      expected: "Only Org A entries returned"
+      covers: "AC-11.18"
+
+  trigger_tests:
+    - name: "flag_products_for_shelf_life_recalc trigger fires on ingredient change"
+      setup: "Ingredient used in 2 products with auto calculation"
+      action: "UPDATE products SET shelf_life_days = 10 WHERE id = ingredient_id"
+      expected: "Both product_shelf_life records have needs_recalculation = true"
+      covers: "AC-11.16"
+
+    - name: "Trigger only flags products with auto_min_ingredients method"
+      setup: "Product A with auto calculation, Product B with manual"
+      action: "Update shared ingredient shelf_life_days"
+      expected: "Only Product A flagged"
+
+  audit_logging:
+    - name: "Override creates audit log entry"
+      setup: "Product with existing config"
+      action: "Save override"
+      expected: "New entry in shelf_life_audit_log with action_type = 'override'"
+      covers: "AC-11.09"
+
+    - name: "Audit log captures old and new values"
+      setup: "Product with final_days = 10"
+      action: "Override to 7 days"
+      expected: "old_value.final_days = 10, new_value.final_days = 7"
+      covers: "AC-11.09"
+
+# E2E Test Cases
+e2e_tests:
+  - name: "Full shelf life configuration flow"
+    steps:
+      - "Navigate to product detail page"
+      - "Click 'Configure Shelf Life' button"
+      - "Modal opens with loading state"
+      - "Modal displays calculated shelf life"
+      - "Enable manual override"
+      - "Enter override days and reason"
+      - "Configure storage conditions"
+      - "Set FEFO settings"
+      - "Save configuration"
+      - "Toast shows success"
+      - "Modal closes"
+      - "Product detail shows updated shelf life"
+    expected: "Configuration saved and displayed correctly"
+    covers: ["AC-11.06", "AC-11.09"]
+
+  - name: "Recalculation from ingredients flow"
+    steps:
+      - "Open shelf life config modal"
+      - "Click 'Recalculate from Ingredients'"
+      - "Loading spinner shows"
+      - "Calculated value updates"
+      - "Change is highlighted"
+    expected: "Calculated days updated correctly"
+    covers: ["AC-11.01", "AC-11.17"]
+
+  - name: "Validation error display"
+    steps:
+      - "Open shelf life config modal"
+      - "Enable manual override"
+      - "Leave override reason empty"
+      - "Click Save"
+      - "Error message shows for override_reason"
+      - "Enter temperature min > max"
+      - "Error message shows for temperature"
+    expected: "All validation errors displayed inline"
+    covers: ["AC-11.07", "AC-11.12"]
+
+  - name: "Empty state flow"
+    steps:
+      - "Navigate to product without shelf life config"
+      - "Open shelf life config modal"
+      - "Empty state displayed"
+      - "Click 'Calculate from Ingredients'"
+      - "Calculation runs"
+      - "Form populated with calculated values"
+    expected: "Empty state handled correctly"
+
+  - name: "Ingredient missing shelf life error"
+    steps:
+      - "Product with BOM containing ingredient without shelf_life_days"
+      - "Open shelf life config modal"
+      - "Click 'Calculate from Ingredients'"
+      - "Error displayed with missing ingredient name"
+      - "Link to configure ingredient shown"
+    expected: "Error state with actionable message"
+    covers: "AC-11.05"
+
+# Definition of Done
+definition_of_done:
+  - "Shelf life calculated correctly using minimum ingredient rule"
+  - "Processing impact and safety buffer applied correctly"
+  - "Manual override saves with required reason"
+  - "Override reason required validation works"
+  - "Storage condition temperature validation (min <= max)"
+  - "Best Before date calculated correctly (fixed mode)"
+  - "FEFO settings saved and retrievable"
+  - "Shipment eligibility check works for all enforcement levels"
+  - "Recalculation trigger fires on ingredient shelf life change"
+  - "'Needs recalculation' badge appears on affected products"
+  - "Recalculate button updates calculated_days"
+  - "Ingredient reference table displays correct data"
+  - "Missing ingredient shelf life shows warning with link"
+  - "Audit log captures all changes with user, timestamp, old/new values"
+  - "RLS enforces org isolation on all queries"
+  - "Cross-tenant access returns 404"
+  - "API response times <500ms for single product operations"
+  - "Loading states displayed during operations"
+  - "Error states handled with meaningful messages"
+  - "Toast notifications on success/error"
+  - "Accessibility: keyboard navigation, ARIA labels, form error announcements"
+  - "Unit tests pass with >= 80% coverage"
+  - "Integration tests cover all API endpoints"
+  - "E2E test covers full configuration flow"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    reason: "Business logic critical for food safety"
+    files:
+      - "lib/services/shelf-life-service.ts: 80%"
+      - "lib/validation/shelf-life.ts: 90%"
+  integration:
+    target: 80
+    reason: "API endpoints must be thoroughly tested"
+    files:
+      - "API routes: 80%"
+      - "RLS policies: 100%"
+  e2e:
+    target: 1
+    reason: "At least 1 full flow test"
+    files:
+      - "Shelf life configuration flow"
+
+# Risks
+risks:
+  - id: "RISK-11.01"
+    description: "Incorrect shelf life calculation could affect food safety"
+    mitigation: "Comprehensive unit tests for calculation logic with edge cases"
+    severity: "high"
+    test_coverage: "unit_tests.shelf_life_calculation"
+
+  - id: "RISK-11.02"
+    description: "Missing audit trail could violate compliance"
+    mitigation: "Verify audit logging in integration tests"
+    severity: "high"
+    test_coverage: "integration_tests.audit_logging"
+
+  - id: "RISK-11.03"
+    description: "Recalculation trigger could miss products"
+    mitigation: "Test trigger with various BOM configurations"
+    severity: "medium"
+    test_coverage: "integration_tests.trigger_tests"
+
+  - id: "RISK-11.04"
+    description: "Cross-tenant data leakage"
+    mitigation: "RLS policy tests with multi-org fixtures"
+    severity: "high"
+    test_coverage: "integration_tests.rls_isolation"

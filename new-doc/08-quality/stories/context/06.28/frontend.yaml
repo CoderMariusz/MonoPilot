@@ -1,0 +1,122 @@
+# Story 06.28 - CoA Generation Engine Frontend
+
+pages:
+  - path: /quality/coas
+    file: app/(authenticated)/quality/coas/page.tsx
+    description: "CoAs list with filters"
+    components:
+      - CoADataTable
+      - CoAFilters
+
+  - path: /quality/coas/[id]
+    file: app/(authenticated)/quality/coas/[id]/page.tsx
+    description: "CoA detail page"
+    components:
+      - CoADetail
+      - CoAParametersTable
+      - CoAActions
+
+components:
+  CoADataTable:
+    file: components/quality/coa/CoADataTable.tsx
+    description: "ShadCN DataTable with CoAs"
+    columns:
+      - CoA #
+      - Batch
+      - Product
+      - Issue Date
+      - Status (badge)
+      - Approved By
+      - Approved At
+      - Actions (View, Approve, Download, Void)
+
+  CoADetail:
+    file: components/quality/coa/CoADetail.tsx
+    description: "CoA detail view"
+    sections:
+      - Header (CoA #, Status, Issue date)
+      - Batch Info (Batch #, Product, Manufactured, Expiry, Quantity)
+      - Specification (Spec name/version)
+      - Test Results Table
+      - Compliance Statements
+      - Approval Info (Approved by, At, Signature, Meaning)
+      - Actions
+
+  CoAParametersTable:
+    file: components/quality/coa/CoAParametersTable.tsx
+    description: "Test results table"
+    columns:
+      - Parameter Name
+      - Specification
+      - Result
+      - Test Method
+      - Pass/Fail (badge)
+
+  GenerateCoAModal:
+    file: components/quality/coa/GenerateCoAModal.tsx
+    description: "Generate CoA from batch"
+    fields:
+      - Batch (dropdown)
+      - Template (optional override)
+      - Issue Date (optional, default today)
+
+  ApproveCoAModal:
+    file: components/quality/coa/ApproveCoAModal.tsx
+    description: "E-signature approval modal"
+    fields:
+      - Username (read-only)
+      - Password (for e-signature)
+      - Approval Meaning (required, min 10 chars)
+      - Approval Notes (optional)
+    validation:
+      - Password must match user password
+      - Meaning required for FDA 21 CFR Part 11
+
+  VoidCoAModal:
+    file: components/quality/coa/VoidCoAModal.tsx
+    description: "Void approved CoA"
+    fields:
+      - Void Reason (required, min 10 chars)
+    warning: "Voiding is permanent and cannot be undone"
+
+  CoAStatusBadge:
+    file: components/quality/coa/CoAStatusBadge.tsx
+    colors:
+      draft: yellow
+      pending_approval: blue
+      approved: green
+      void: red (strikethrough)
+
+  RegenerateCoADialog:
+    file: components/quality/coa/RegenerateCoADialog.tsx
+    description: "Regenerate parameters confirmation"
+    warning: "This will replace all test results with latest data. Continue?"
+
+ux_patterns:
+  list:
+    - ShadCN DataTable with filters
+    - Search by CoA# or batch
+    - Status badges with colors
+    - Quick actions in row
+
+  detail:
+    - Read-only view for approved CoAs
+    - Editable for drafts
+    - Actions based on status and role
+
+  approval:
+    - E-signature modal with password
+    - Approval meaning required
+    - Success toast with CoA #
+
+  generation:
+    - Modal to select batch
+    - Auto-populate from final inspection
+    - Preview before save
+
+states:
+  - loading: "Shimmer skeleton"
+  - empty: "No CoAs generated. [Generate CoA] CTA"
+  - error: "Error loading CoAs. [Retry]"
+  - locked: "CoA is locked (approved). Cannot edit."
+  - void: "CoA is void. Displayed with strikethrough."

@@ -1,0 +1,86 @@
+# Story 05.10 - GRN CRUD Items
+# Type: fullstack
+# Epic: 05-warehouse
+# Status: COMPLETE
+
+audit:
+  code_exists: true
+  files_found:
+    - path: "supabase/migrations/097_create_grns_table.sql"
+      type: migration
+      status: complete
+    - path: "supabase/migrations/098_create_grn_items_table.sql"
+      type: migration
+      status: complete
+    - path: "apps/frontend/lib/services/grn-service.ts"
+      type: service
+      status: complete
+      methods: [list, getById, create, update, addItem, updateItem, removeItem, complete, cancel, validateForCompletion, validateForCancellation, generateGRNNumber, exists, getByPOId, getByTOId]
+    - path: "apps/frontend/lib/validation/grn-schemas.ts"
+      type: validation
+      status: complete
+    - path: "apps/frontend/app/api/warehouse/grns/route.ts"
+      type: api
+      status: complete
+    - path: "apps/frontend/app/api/warehouse/grns/[id]/route.ts"
+      type: api
+      status: complete
+    - path: "apps/frontend/app/api/warehouse/grns/[id]/complete/route.ts"
+      type: api
+      status: complete
+    - path: "apps/frontend/app/api/warehouse/grns/[id]/cancel/route.ts"
+      type: api
+      status: complete
+    - path: "apps/frontend/app/api/warehouse/grns/[id]/items/route.ts"
+      type: api
+      status: complete
+    - path: "apps/frontend/app/api/warehouse/grns/[id]/items/[itemId]/route.ts"
+      type: api
+      status: complete
+  tests_exist: true
+  test_files:
+    - path: "apps/frontend/lib/validation/__tests__/grn-schemas.test.ts"
+      tests: 46
+      status: pass
+    - path: "apps/frontend/lib/services/__tests__/grn-service.test.ts"
+      tests: 27
+      status: pass
+  estimated_completion: 100%
+
+status: COMPLETE
+
+implementation_summary:
+  validation_schemas:
+    - createGRNSchema (with PO/TO source type refinements)
+    - updateGRNSchema
+    - createGRNItemSchema
+    - updateGRNItemSchema
+    - cancelGRNSchema
+    - grnQuerySchema (pagination, filters, sorting)
+  service_methods:
+    crud:
+      - list (paginated with filters)
+      - getById (with items)
+      - create (with items and GRN number generation)
+      - update (draft only)
+    items:
+      - addItem (with line number auto-increment)
+      - updateItem (with totals recalc)
+      - removeItem (with totals recalc)
+    workflow:
+      - complete (creates LPs for all items)
+      - cancel (validates LP status, consumes if needed)
+    validation:
+      - validateForCompletion
+      - validateForCancellation
+  api_routes:
+    - GET/POST /api/warehouse/grns
+    - GET/PUT /api/warehouse/grns/:id
+    - POST /api/warehouse/grns/:id/complete
+    - POST /api/warehouse/grns/:id/cancel
+    - POST /api/warehouse/grns/:id/items
+    - PUT/DELETE /api/warehouse/grns/:id/items/:itemId
+
+P3: BACKEND-DEV 21:36 files:9 tests:73/73 status:green
+P5: self-review 21:36 issues:0 decision:approved
+P6: self-qa 21:36 ac:16/16 bugs:0 decision:pass

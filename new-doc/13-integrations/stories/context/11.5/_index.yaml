@@ -1,0 +1,104 @@
+story:
+  id: "11.5"
+  name: "Data Export (CSV/JSON)"
+  epic: "11-integrations"
+  phase: "1"
+  complexity: "M"
+  estimate_days: 2-3
+
+dependencies:
+  required:
+    - story: "01.1"
+      provides: ["organizations", "users", "roles"]
+    - story: "11.1"
+      provides: ["dashboard nav"]
+    - story: "11.3"
+      provides: ["integration_logs for export logging"]
+  soft:
+    - story: "02.1"
+      provides: ["products, boms data"]
+    - story: "03.x"
+      provides: ["purchase_orders, work_orders data"]
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/integrations.md"
+  prd_sections: ["FR-INT-008"]
+  story: "docs/2-MANAGEMENT/epics/current/11-integrations/11.5.data-export-csv-json.md"
+
+files_to_create:
+  database:
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_create_export_jobs.sql"
+      type: "migration"
+  api:
+    - path: "apps/frontend/app/api/integrations/export/route.ts"
+      methods: ["POST"]
+    - path: "apps/frontend/app/api/integrations/export/jobs/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/integrations/export/jobs/[id]/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/integrations/export/jobs/[id]/retry/route.ts"
+      methods: ["POST"]
+  services:
+    - path: "apps/frontend/lib/services/export-service.ts"
+  validation:
+    - path: "apps/frontend/lib/validation/export.ts"
+  pages:
+    - path: "apps/frontend/app/(authenticated)/integrations/export/page.tsx"
+    - path: "apps/frontend/app/(authenticated)/integrations/export/jobs/page.tsx"
+    - path: "apps/frontend/app/(authenticated)/integrations/export/jobs/[id]/page.tsx"
+  components:
+    - path: "apps/frontend/components/integrations/export/ExportConfigForm.tsx"
+    - path: "apps/frontend/components/integrations/export/EntitySelector.tsx"
+    - path: "apps/frontend/components/integrations/export/FormatSelector.tsx"
+    - path: "apps/frontend/components/integrations/export/ExportJobsList.tsx"
+    - path: "apps/frontend/components/integrations/export/ExportJobStatus.tsx"
+
+database:
+  tables:
+    - name: "export_jobs"
+      columns: ["id", "org_id", "entity_type", "format", "filters", "status", "progress", "total_rows", "processed_rows", "file_url", "file_size_bytes", "expires_at", "error_message"]
+      rls: true
+      indexes: ["org_id + created_at DESC", "status + created_at", "created_by + created_at DESC"]
+
+api_endpoints:
+  - method: "POST"
+    path: "/api/integrations/export"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN", "USER"]
+  - method: "GET"
+    path: "/api/integrations/export/jobs"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN", "USER"]
+
+patterns:
+  rls: "ADR-013"
+  async: "Jobs >1000 rows processed in background"
+  storage: "S3 with presigned URLs (24h expiry)"
+  formats: "CSV (UTF-8 BOM), JSON (pretty-printed, ISO 8601)"
+  retention: "Files expire after 24h, cleanup via cron"
+
+acceptance_checklist:
+  - "Entity selector shows products/BOMs/POs/WOs/inventory/shipments"
+  - "Format selector: CSV or JSON"
+  - "Filters: date range, status, include_archived"
+  - "Small exports (<1000 rows) synchronous download"
+  - "Large exports (>1000 rows) async job with progress"
+  - "CSV exports UTF-8 with BOM (Excel compatible)"
+  - "JSON exports pretty-printed with metadata"
+  - "S3 presigned URLs valid for 24 hours"
+  - "Email notification on completion/failure"
+  - "Export jobs list shows status/progress"
+  - "Download button functional"
+  - "Re-export button creates new job with same filters"
+  - "RLS enforces org isolation"
+  - "Unit tests >80% coverage"
+
+output_artifacts:
+  - "export_jobs table with RLS"
+  - "cleanup_expired_exports() function"
+  - "API endpoints for export creation, job status"
+  - "ExportService with CSV/JSON generation, S3 upload"
+  - "Background job for async processing"
+  - "Frontend export config form and jobs list"
+  - "Email notification service integration"
+  - "Unit + integration tests"

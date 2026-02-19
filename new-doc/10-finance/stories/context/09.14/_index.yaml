@@ -1,0 +1,139 @@
+story:
+  id: "09.14"
+  name: "Labor Variance (Rate vs Efficiency)"
+  epic: "09-finance"
+  phase: "2"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "fullstack"
+
+dependencies:
+  required:
+    - story: "01.1"
+      provides: ["organizations", "users"]
+    - story: "02.3"
+      provides: ["routings", "routing_operations"]
+    - story: "04.3"
+      provides: ["operation_labor"]
+    - story: "09.1"
+      provides: ["finance_settings"]
+    - story: "09.4"
+      provides: ["labor_costs"]
+    - story: "09.6"
+      provides: ["work_order_costs"]
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/finance.md"
+  prd_sections: ["FR-9.4.3", "FR-9.4.4", "FR-FIN-053"]
+  story: "docs/2-MANAGEMENT/epics/current/09-finance/09.14.labor-variance.md"
+  patterns:
+    - "apps/frontend/lib/services/work-order-cost-service.ts"
+
+files_to_create:
+  database:
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_create_labor_variance.sql"
+      type: "migration"
+  api:
+    - path: "apps/frontend/app/api/finance/work-order-costs/[id]/labor-breakdown/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/finance/variances/labor/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/finance/reports/labor-variance/route.ts"
+      methods: ["GET"]
+  services:
+    - path: "apps/frontend/lib/services/labor-variance-service.ts"
+  validation:
+    - path: "apps/frontend/lib/validation/finance.ts"
+      note: "Extend existing"
+  components:
+    - path: "apps/frontend/components/finance/LaborVarianceBreakdownCard.tsx"
+    - path: "apps/frontend/components/finance/VarianceOperationsTable.tsx"
+
+database:
+  tables:
+    - name: "cost_variances"
+      new_columns: ["operation_id", "user_id", "shift", "standard_rate", "actual_rate", "standard_hours", "actual_hours", "rate_variance_amount", "efficiency_variance_amount"]
+      indexes: ["operation_id", "user_id", "org_id+shift"]
+  functions:
+    - name: "calculate_labor_rate_variance"
+      type: "calculation"
+      formula: "(actual_rate - standard_rate) × actual_hours"
+    - name: "calculate_labor_efficiency_variance"
+      type: "calculation"
+      formula: "(actual_hours - standard_hours) × standard_rate"
+    - name: "calculate_work_order_labor_variance"
+      type: "aggregation"
+      returns: "table (per operation breakdown)"
+  triggers:
+    - name: "wo_labor_variance"
+      on: "work_orders UPDATE"
+      event: "status = 'completed'"
+
+api_endpoints:
+  - method: "GET"
+    path: "/api/finance/work-order-costs/:id/labor-breakdown"
+    auth: true
+    roles: ["viewer", "finance_manager"]
+  - method: "GET"
+    path: "/api/finance/variances/labor"
+    auth: true
+    roles: ["viewer", "finance_manager"]
+  - method: "GET"
+    path: "/api/finance/reports/labor-variance"
+    auth: true
+    roles: ["viewer", "finance_manager"]
+
+ux:
+  wireframes:
+    - id: "FIN-008"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/FIN-008-labor-variance-report.md"
+      relevance: "Labor variance breakdown card on WO detail page with summary card showing total/rate/efficiency variances, operations table with variance breakdown, shift and worker details, and status badges"
+  patterns:
+    card: "ShadCN Card pattern"
+    table: "ShadCN DataTable pattern"
+    badge: "ShadCN Badge with color variants"
+  states:
+    - "loading"
+    - "no_variance"
+    - "favorable"
+    - "unfavorable"
+    - "error"
+
+validation_rules:
+  standard_rate: "numeric >= 0"
+  actual_rate: "numeric >= 0"
+  standard_hours: "numeric >= 0"
+  actual_hours: "numeric >= 0"
+  variance_type: "enum: labor_rate, labor_efficiency"
+  shift: "enum: day, night, weekend"
+
+patterns:
+  rls: "ADR-013"
+  api: "REST with org_id filter"
+  service: "class-based with static methods"
+  validation: "zod schemas"
+  triggers: "Auto-create variance on WO completion"
+
+acceptance_checklist:
+  - "LRV calculated correctly (formula verified)"
+  - "LEV calculated correctly (formula verified)"
+  - "Variance decomposition works per operation"
+  - "Auto-create variance on WO completion"
+  - "API returns rate vs efficiency breakdown"
+  - "Variance report generates < 2s"
+  - "UI displays variance breakdown by operation"
+  - "Shift and worker details shown"
+  - "Status badges show favorable/unfavorable"
+  - "RLS enforces org isolation"
+  - "All tests pass (unit, integration, edge cases)"
+
+output_artifacts:
+  - "Migration: extend cost_variances table"
+  - "Function: calculate_labor_rate_variance()"
+  - "Function: calculate_labor_efficiency_variance()"
+  - "Function: calculate_work_order_labor_variance()"
+  - "Trigger: wo_labor_variance"
+  - "API: 3 endpoints"
+  - "Service: LaborVarianceService with 4 methods"
+  - "Components: 2 UI components"
+  - "Tests: Unit, integration, edge cases"

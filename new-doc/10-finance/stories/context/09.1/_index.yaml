@@ -1,0 +1,89 @@
+story:
+  id: "09.1"
+  name: "Finance Settings & Module Config"
+  epic: "09-finance"
+  phase: "1"
+  complexity: "S"
+  estimate_days: 2
+
+dependencies:
+  required:
+    - story: "01.1"
+      provides: ["organizations", "users", "roles"]
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/finance.md"
+  prd_sections: ["Finance Module Settings"]
+  story: "docs/2-MANAGEMENT/epics/current/09-finance/09.1.finance-settings-module-config.md"
+
+files_to_create:
+  database:
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_create_finance_settings.sql"
+      type: "migration"
+  api:
+    - path: "apps/frontend/app/api/finance/settings/route.ts"
+      methods: ["GET", "PUT"]
+    - path: "apps/frontend/app/api/finance/settings/initialize/route.ts"
+      methods: ["POST"]
+  services:
+    - path: "apps/frontend/lib/services/finance-settings-service.ts"
+  validation:
+    - path: "apps/frontend/lib/validation/finance-settings-schema.ts"
+  pages:
+    - path: "apps/frontend/app/(authenticated)/finance/settings/page.tsx"
+  components:
+    - path: "apps/frontend/components/finance/settings/FinanceSettingsForm.tsx"
+    - path: "apps/frontend/components/finance/settings/ValuationMethodSelector.tsx"
+    - path: "apps/frontend/components/finance/settings/VarianceThresholdInputs.tsx"
+
+database:
+  tables:
+    - name: "finance_settings"
+      columns: ["id", "org_id", "finance_enabled", "valuation_method", "variance_warning_percent", "variance_critical_percent", "overhead_allocation_method", "cost_center_hierarchy_levels", "base_currency_id"]
+      rls: true
+      indexes: ["org_id", "finance_enabled"]
+
+api_endpoints:
+  - method: "GET"
+    path: "/api/finance/settings"
+    auth: true
+    roles: ["admin", "finance_manager", "cost_accountant"]
+  - method: "PUT"
+    path: "/api/finance/settings"
+    auth: true
+    roles: ["admin", "finance_manager"]
+  - method: "POST"
+    path: "/api/finance/settings/initialize"
+    auth: true
+    roles: ["admin"]
+
+validation_rules:
+  finance_enabled: "boolean, default false"
+  valuation_method: "enum: fifo, weighted_average, standard_cost"
+  variance_warning_percent: "number 0-100, default 5.00"
+  variance_critical_percent: "number 0-100, >= warning, default 10.00"
+  overhead_allocation_method: "enum: labor_hours, machine_hours, units_produced, none"
+  cost_center_hierarchy_levels: "integer 1-5, default 3"
+  cost_rounding_decimals: "integer 2-6, default 4"
+
+patterns:
+  rls: "ADR-013"
+  api: "REST with org_id filter"
+  service: "class-based with static methods"
+  validation: "zod schemas"
+
+acceptance_checklist:
+  - "finance_settings table created with constraints"
+  - "RLS policies enforce org isolation"
+  - "GET settings returns org config"
+  - "PUT settings validates and updates"
+  - "Initialize creates defaults with PLN"
+  - "Audit logging works"
+  - "UI form functional with validation"
+
+output_artifacts:
+  - "finance_settings table migration"
+  - "Settings API endpoints (GET, PUT, POST)"
+  - "FinanceSettingsService"
+  - "Settings validation schemas"
+  - "Settings management UI page"

@@ -1,0 +1,186 @@
+# API Context: 08.17 - Finance Approval Workflow
+# 5 endpoints: submit, approve, reject, approval details, pending list
+
+endpoints:
+  - method: "GET"
+    path: "/api/npd/costing/:id/approval"
+    description: "Get costing approval details"
+    auth: true
+    roles: ["NPD_LEAD", "FINANCE", "ADMIN"]
+    response:
+      success:
+        status: 200
+        body:
+          costing:
+            id: 1
+            project_id: 1
+            project_number: "NPD-001"
+            formulation_number: "v2.0"
+            target_cost: 10.00
+            estimated_cost: 11.50
+            variance: 1.50
+            variance_pct: 15.00
+            status: "submitted"
+            submitted_at: "2025-01-15T10:00:00Z"
+            submitted_by: { id: "uuid-123", name: "Jane Doe" }
+            approved_at: null
+            approved_by: null
+            rejected_at: null
+            rejected_by: null
+            rejection_reason: null
+            auto_approved: false
+          variance_threshold: 10.00
+          requires_approval: true
+
+  - method: "POST"
+    path: "/api/npd/costing/:id/submit"
+    description: "Submit costing for Finance approval"
+    auth: true
+    roles: ["NPD_LEAD", "ADMIN"]
+    request:
+      body: {}  # No body required
+    response:
+      success:
+        status: 200
+        body:
+          success: true
+          status: "approved"  # or "submitted" if requires manual approval
+          auto_approved: true
+          message: "Costing automatically approved (variance 8% < threshold 10%)"
+      errors:
+        - status: 400
+          message: "Target cost and estimated cost required before submission"
+        - status: 400
+          message: "Costing already submitted"
+        - status: 403
+          message: "Only project owner can submit costing"
+
+  - method: "POST"
+    path: "/api/npd/costing/:id/approve"
+    description: "Finance approves costing"
+    auth: true
+    roles: ["FINANCE", "ADMIN"]
+    request:
+      body:
+        notes: "Approved after cost review meeting"  # Optional
+    response:
+      success:
+        status: 200
+        body:
+          success: true
+          status: "approved"
+          approved_at: "2025-01-15T14:30:00Z"
+          approved_by: { id: "uuid-finance-123", name: "John Smith" }
+      errors:
+        - status: 400
+          message: "Costing not submitted for approval"
+        - status: 403
+          message: "Finance role required to approve costing"
+
+  - method: "POST"
+    path: "/api/npd/costing/:id/reject"
+    description: "Finance rejects costing"
+    auth: true
+    roles: ["FINANCE", "ADMIN"]
+    request:
+      body:
+        reason: "Variance too high. Rework formulation to reduce cost by 5%."  # Required
+    response:
+      success:
+        status: 200
+        body:
+          success: true
+          status: "rejected"
+          rejected_at: "2025-01-15T14:30:00Z"
+          rejected_by: { id: "uuid-finance-123", name: "John Smith" }
+          reason: "Variance too high. Rework formulation to reduce cost by 5%."
+      errors:
+        - status: 400
+          message: "Rejection reason required"
+        - status: 400
+          message: "Costing not submitted for approval"
+        - status: 403
+          message: "Finance role required to reject costing"
+
+  - method: "GET"
+    path: "/api/npd/approvals"
+    description: "Finance pending approvals dashboard"
+    auth: true
+    roles: ["FINANCE", "ADMIN"]
+    response:
+      success:
+        status: 200
+        body:
+          approvals:
+            - costing_id: 1
+              project_id: 1
+              project_number: "NPD-001"
+              project_name: "Vegan Protein Bar"
+              formulation_number: "v2.0"
+              target_cost: 10.00
+              estimated_cost: 11.50
+              variance: 1.50
+              variance_pct: 15.00
+              submitted_at: "2025-01-15T10:00:00Z"
+              submitted_by: { id: "uuid-123", name: "Jane Doe" }
+            - costing_id: 2
+              project_id: 3
+              project_number: "NPD-003"
+              project_name: "Gluten-Free Bread"
+              formulation_number: "v1.0"
+              target_cost: 5.00
+              estimated_cost: 6.00
+              variance: 1.00
+              variance_pct: 20.00
+              submitted_at: "2025-01-14T09:00:00Z"
+              submitted_by: { id: "uuid-456", name: "Alice Brown" }
+          total: 2
+
+service_methods:
+  - name: "NPDCostingApprovalService.submitCosting(costingId, userId)"
+    description: "Submit costing with auto-approve logic"
+    returns: "{ status: 'submitted' | 'approved', auto_approved: boolean }"
+
+  - name: "NPDCostingApprovalService.approveCosting(costingId, userId, notes?)"
+    description: "Finance approves costing"
+    returns: "void"
+
+  - name: "NPDCostingApprovalService.rejectCosting(costingId, userId, reason)"
+    description: "Finance rejects costing"
+    returns: "void"
+
+  - name: "NPDCostingApprovalService.getPendingApprovals(orgId)"
+    description: "Fetch all pending approvals for Finance"
+    returns: "PendingApproval[]"
+
+  - name: "NPDCostingApprovalService.sendSubmissionEmail(costing, variance, variancePct)"
+    description: "Email Finance on submission"
+    returns: "void"
+
+  - name: "NPDCostingApprovalService.sendApprovalEmail(costing, approverUserId, notes?)"
+    description: "Email NPD Lead on approval"
+    returns: "void"
+
+  - name: "NPDCostingApprovalService.sendRejectionEmail(costing, rejecterUserId, reason)"
+    description: "Email NPD Lead on rejection"
+    returns: "void"
+
+  - name: "NPDCostingApprovalService.sendAutoApproveEmail(costing, userId)"
+    description: "Email NPD Lead on auto-approve"
+    returns: "void"
+
+validation:
+  - field: "reason (reject)"
+    rules: ["required", "min length 10 characters"]
+  - field: "target_cost (submit)"
+    rules: ["required", "> 0"]
+  - field: "estimated_cost (submit)"
+    rules: ["required", "> 0"]
+
+error_handling:
+  - scenario: "Email send failure"
+    action: "Log error, retry up to 3 times, continue with approval workflow"
+  - scenario: "Finance role missing on org"
+    action: "Allow submission, queue for admin to assign Finance role"
+  - scenario: "Variance calculation error"
+    action: "Return 500, log error, require manual Finance review"

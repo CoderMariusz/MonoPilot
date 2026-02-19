@@ -1,0 +1,90 @@
+# Story 06.37 - Quality Dashboard Context (Entry Point)
+# Generated: 2025-01-15
+# Purpose: Story metadata, dependencies, and overview
+# Phase: 4 (Analytics & Reporting)
+
+story:
+  id: "06.37"
+  name: "Quality Dashboard"
+  slug: "quality-dashboard"
+  epic: "06-quality"
+  phase: "4"
+  complexity: "L"
+  estimate_days: 5-6
+  type: "frontend"
+  state: "ready"
+  priority: "P0"
+
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Materialized views (optional)
+  - api.yaml         # 6 dashboard endpoints
+  - frontend.yaml    # Components, charts (Recharts)
+  - tests.yaml       # Unit, integration, E2E tests
+
+dependencies:
+  required:
+    - story: "01.1"
+      provides: ["org context", "RLS pattern"]
+    - story: "06.5"
+      provides: ["quality_inspections data"]
+    - story: "06.6"
+      provides: ["test_results data"]
+    - story: "06.9"
+      provides: ["ncr_reports data"]
+    - story: "06.22"
+      provides: ["CCP data"]
+    - story: "06.23"
+      provides: ["CCP monitoring records"]
+    - story: "06.31"
+      provides: ["CAPA data"]
+    - story: "06.34"
+      provides: ["Supplier scorecard data"]
+
+  blocks:
+    - story: "06.39"
+      reason: "Extends dashboard with advanced analytics"
+
+deliverables:
+  - type: "database"
+    count: 1
+    description: "Materialized view for KPIs (optional)"
+  - type: "api"
+    count: 6
+    description: "KPIs, NCR trend, Defect Pareto, Inspection status, Supplier heatmap, PDF export"
+  - type: "service"
+    count: 1
+    description: "DashboardService with 8 methods"
+  - type: "components"
+    count: 12
+    description: "Dashboard container, KPI cards, 4 charts, filters, export, WebSocket provider"
+  - type: "page"
+    count: 1
+    description: "/quality/dashboard"
+  - type: "test"
+    count: 3
+    description: "Unit (service), Integration (API), E2E (full dashboard)"
+
+technical_notes:
+  - "Charts: Recharts library (already in use)"
+  - "KPI cache: Materialized view refreshed every 5 minutes (optional)"
+  - "Real-time updates: WebSocket for critical KPIs (First Pass Yield, CCP Compliance)"
+  - "PDF export: Server-side with Puppeteer (preferred) or client-side with jsPDF + html2canvas"
+  - "Date range default: Last 90 days"
+  - "Role-based views: QA Inspector sees limited dashboard, QA Manager sees full dashboard"
+  - "Target KPIs: First Pass Yield >95%, NCR Rate <5 per 1000, CCP Compliance >99%"
+
+business_rules:
+  - rule: "KPI Targets Configurable"
+    description: "KPI targets configurable per organization in quality_settings"
+  - rule: "Real-Time Critical Metrics"
+    description: "First Pass Yield and CCP Compliance update real-time via WebSocket"
+  - rule: "Role-Based Views"
+    description: "QA Inspector sees limited dashboard; QA Manager/Director see full dashboard"
+  - rule: "PDF Export Permissions"
+    description: "PDF export requires QA_MANAGER or QUALITY_DIRECTOR role"
+  - rule: "Drill-Down Links"
+    description: "All widgets link to underlying data (inspections, NCRs, test results)"
+
+summary: |
+  Story 06.37 implements executive Quality Dashboard with 5 KPI cards, 4 charts (NCR trend, Defect Pareto, Inspection status, Supplier heatmap), date range filters, PDF export, and real-time updates via WebSocket. Dashboard provides actionable insights for QA Managers and Quality Directors to monitor quality performance and drive continuous improvement.

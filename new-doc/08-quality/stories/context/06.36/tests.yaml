@@ -1,0 +1,7 @@
+# Story 06.36 - Test Specifications
+
+unit_tests:
+  - create audit finding with category/severity
+  - supplier submit corrective action response
+  - auditor verify and close finding
+  - auto-calculate due date by severity (critical=7d, major=30d, minor=60d)

@@ -1,0 +1,113 @@
+# Story 05.12 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "05.12"
+  name: "GRN from TO (Transfer Receipt)"
+  slug: "grn-from-to"
+  epic: "05-warehouse"
+  phase: "1"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "backend + frontend"
+  state: "ready"
+  model: "SONNET"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables used, updates (no new tables)
+  - api.yaml         # Endpoints, auth, errors
+  - frontend.yaml    # Components, hooks, types
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "05.1"
+      name: "LP Table + CRUD"
+      provides: ["license_plates", "LicensePlateService"]
+      status: "ready"
+    - story: "05.10"
+      name: "GRN CRUD + Items"
+      provides: ["grns", "grn_items", "GRNService"]
+      status: "ready"
+    - story: "05.0"
+      name: "Warehouse Settings"
+      provides: ["warehouse_settings", "transit_location_config"]
+      status: "ready"
+    - story: "03.8"
+      name: "TO CRUD + Lines"
+      provides: ["transfer_orders", "to_lines"]
+      status: "ready"
+    - story: "01.8"
+      name: "Warehouses CRUD"
+      provides: ["warehouses"]
+      status: "ready"
+    - story: "01.9"
+      name: "Locations CRUD"
+      provides: ["locations"]
+      status: "ready"
+    - story: "02.1"
+      name: "Products CRUD"
+      provides: ["products"]
+      status: "ready"
+  blocked_by: []
+  blocks:
+    - story: "05.17"
+      name: "Scanner Receive"
+    - story: "05.14"
+      name: "GRN Cancellation"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/warehouse.md"
+    sections: ["WH-FR-004"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/warehouse.md"
+    sections: ["GRN", "License Plates", "Transfer Orders"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/05-warehouse/05.12.grn-from-to.md"
+  wireframes:
+    - id: "WH-005"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/WH-005-grn-from-to-modal.md"
+      components: ["ReceiveTOWizard", "PendingTOsTable", "TOLinesTable", "VarianceInputs"]
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for multi-tenancy"
+  patterns:
+    - path: "apps/frontend/lib/services/grn-service.ts"
+      relevance: "GRN service patterns from 05.10/05.11"
+    - path: "apps/frontend/lib/services/license-plate-service.ts"
+      relevance: "LP creation patterns from 05.1"
+
+# High-level deliverables
+deliverables:
+  - type: "api"
+    count: 3
+    description: "POST /grns/from-to/:toId, GET /receiving/pending-tos, GET /receiving/to/:toId/lines"
+  - type: "service"
+    count: 7
+    description: "GRNService.createFromTO(), validateTOReceipt(), handleTransitLP(), calculateTOVariance(), getReceivableTOs(), getTOLinesForReceipt(), updateTOStatus()"
+  - type: "validation"
+    count: 2
+    description: "createGRNFromTOSchema, createGRNItemFromTOSchema"
+  - type: "component"
+    count: 8
+    description: "ReceiveTOWizard, ReceivingStep1-4, PendingTOsTable, TOLinesTable, ReceiveTOLineForm, VarianceInputs"
+  - type: "test"
+    count: 4
+    description: "Unit, integration, RLS, E2E tests"
+
+# Technical notes
+technical_notes:
+  - "No new database tables - uses existing grns, grn_items, license_plates, transfer_orders, to_lines"
+  - "Updates existing LPs location when transit_location enabled (moves LP)"
+  - "Creates new LPs when transit_location disabled"
+  - "source_type='to' and to_id populated on GRN header"
+  - "Variance tracking: shipped_qty vs received_qty with required reason"
+  - "TO status lifecycle: shipped -> partial -> received"
+  - "Transaction atomicity: GRN + LPs + TO updates in single transaction"
+  - "Destination warehouse validation: must match TO.to_warehouse_id"

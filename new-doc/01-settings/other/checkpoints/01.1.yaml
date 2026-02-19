@@ -1,0 +1,97 @@
+# Story 01.1 - Org Context + Base RLS Scaffolding
+# Type: backend (foundation)
+# Epic: 01-settings
+# Audit Date: 2026-01-08
+
+story:
+  id: "01.1"
+  name: "Org Context + Base RLS Scaffolding"
+  epic: "01-settings"
+  phase: "1A"
+  complexity: "M"
+
+audit:
+  code_exists: true
+  estimated_completion: 100
+
+  files_found:
+    services:
+      - path: "apps/frontend/lib/services/org-context-service.ts"
+        lines: 233
+        status: "COMPLETE"
+      - path: "apps/frontend/lib/services/auth-context-service.ts"
+        lines: 118
+        status: "COMPLETE"
+      - path: "apps/frontend/lib/services/permission-service.ts"
+        lines: 146
+        status: "COMPLETE"
+
+    api_routes:
+      - path: "apps/frontend/app/api/settings/organization/route.ts"
+        methods: ["GET", "PUT"]
+      - path: "apps/frontend/app/api/settings/users/route.ts"
+        methods: ["GET", "POST"]
+      - path: "apps/frontend/app/api/settings/modules/route.ts"
+        methods: ["GET"]
+
+    migrations:
+      - "001_create_organizations_table.sql"
+      - "002_create_roles_table.sql"
+      - "003_create_users_table.sql"
+      - "005_create_modules_tables.sql"
+      - "006_rls_policies.sql"
+
+  tests_exist: true
+  test_files:
+    - path: "apps/frontend/lib/services/__tests__/org-context-service.test.ts"
+      tests: 24
+    - path: "apps/frontend/lib/services/__tests__/permission-service.test.ts"
+      tests: 25
+    - path: "apps/frontend/app/api/settings/planning/__tests__/route.test.ts"
+      tests: 22
+  test_count: 71
+
+database:
+  tables_created: 4
+  tables:
+    - name: "organizations"
+      rls: true
+    - name: "roles"
+      rls: true
+    - name: "users"
+      rls: true
+    - name: "organization_modules"
+      rls: true
+  rls_policies_count: 12
+  rls_compliance: "ADR-013 (100%)"
+
+acceptance_criteria:
+  total: 6
+  passed: 6
+  items:
+    - "AC-01: Derive user_id and org_id from session - PASS"
+    - "AC-02: Cross-tenant returns 404 (not 403) - PASS"
+    - "AC-03: 404 prevents existence leak - PASS"
+    - "AC-04: Query without org_id blocked - PASS"
+    - "AC-05: RLS auto-filters to user's org_id - PASS"
+    - "AC-06: Non-admin writes rejected - PASS"
+
+status: DONE
+
+phases:
+  P1: "COMPLETE - ux-designer"
+  P2: "COMPLETE - test-writer"
+  P3: "COMPLETE - backend-dev"
+  P4: "COMPLETE - senior-dev"
+  P5: "COMPLETE - code-reviewer"
+  P6: "COMPLETE - qa-agent"
+  P7: "COMPLETE - tech-writer"
+
+recommendation: |
+  READY FOR IMMEDIATE DEPLOYMENT
+  All phases complete. 71 tests passing.
+  Multi-tenant isolation verified.
+  0 critical/high security issues.
+
+next_phase: NONE
+next_agent: DEPLOYMENT

@@ -1,0 +1,505 @@
+# Story 05.7 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# ==========================================================================
+# Test Files to Create
+# ==========================================================================
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/warehouse-dashboard-service.test.ts"
+    type: "unit"
+    description: "Unit tests for dashboard KPI/alert calculations"
+
+  - path: "apps/frontend/app/api/warehouse/dashboard/__tests__/kpis.test.ts"
+    type: "integration"
+    description: "Integration tests for KPIs endpoint"
+
+  - path: "apps/frontend/app/api/warehouse/dashboard/__tests__/alerts.test.ts"
+    type: "integration"
+    description: "Integration tests for alerts endpoint"
+
+  - path: "apps/frontend/app/api/warehouse/dashboard/__tests__/activity.test.ts"
+    type: "integration"
+    description: "Integration tests for activity endpoint"
+
+  - path: "__tests__/e2e/warehouse/dashboard.spec.ts"
+    type: "e2e"
+    description: "E2E tests for dashboard page"
+
+# ==========================================================================
+# Acceptance Criteria
+# ==========================================================================
+acceptance_criteria:
+  # KPI Cards
+  - id: "AC-01"
+    title: "Dashboard Page Structure"
+    given: "I am an authenticated user with warehouse permissions"
+    when: "I navigate to /warehouse"
+    then: |
+      - 5 KPI cards display in a responsive grid
+      - Alert panels display below KPI cards
+      - Recent activity feed displays on the page
+      - Quick action buttons visible (Create LP, View Inventory)
+      - Auto-refresh indicator showing 'Last updated: [timestamp]'
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-02"
+    title: "KPI Card - Total LPs"
+    given: "My organization has license plates in the database"
+    when: "The dashboard loads"
+    then: |
+      - 'Total LPs' card displays count of LPs where status != 'consumed'
+      - Icon: Box
+      - Format: '1,234 LPs'
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-03"
+    title: "KPI Card - Available LPs"
+    given: "My organization has license plates with various statuses"
+    when: "The dashboard loads"
+    then: |
+      - 'Available LPs' card displays count where status='available' AND qa_status='passed'
+      - Shows percentage of total
+      - Icon: CheckCircle (green)
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-04"
+    title: "KPI Card - Reserved LPs"
+    given: "My organization has reserved license plates"
+    when: "The dashboard loads"
+    then: |
+      - 'Reserved LPs' card displays count of active reservations
+      - Shows percentage of total
+      - Icon: Lock (orange)
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-05"
+    title: "KPI Card - Consumed Today"
+    given: "My organization has consumed LPs in the last 24 hours"
+    when: "The dashboard loads"
+    then: |
+      - 'Consumed Today' card displays count where status='consumed' AND updated_at >= today midnight
+      - Subtitle: 'Since midnight'
+      - Icon: TrendingDown
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-06"
+    title: "KPI Card - Expiring Soon"
+    given: "My organization has license plates with expiry dates"
+    when: "The dashboard loads"
+    then: |
+      - 'Expiring Soon' card displays count where expiry_date BETWEEN today AND today+30 days
+      - Status must be 'available'
+      - Subtitle: 'Next 30 days'
+      - Icon: AlertTriangle (red)
+    test_type: "unit"
+    priority: "P0"
+
+  # Alert Panels
+  - id: "AC-07"
+    title: "Alert Panel - Low Stock"
+    given: "Products have min_stock thresholds defined"
+    when: "The dashboard loads"
+    then: |
+      - 'Low Stock Alerts' panel displays products where available LP count < min_stock
+      - Each alert shows: Product name, Current count, Min stock threshold
+      - Click navigates to inventory browser filtered by product
+      - Empty state: 'No low stock alerts'
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-08"
+    title: "Alert Panel - Expiring Items"
+    given: "License plates have expiry dates approaching"
+    when: "The dashboard loads"
+    then: |
+      - 'Expiring Items' panel displays LPs expiring in 30 days, sorted by expiry_date ASC
+      - Color-coded: Red (< 7 days), Orange (7-14 days), Yellow (15-30 days)
+      - Click navigates to LP detail page
+      - Empty state: 'No items expiring soon'
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-09"
+    title: "Alert Panel - Blocked LPs"
+    given: "License plates have qa_status='quarantine' or qa_status='failed'"
+    when: "The dashboard loads"
+    then: |
+      - 'Blocked LPs' panel displays LPs with qa_status IN ('quarantine', 'failed')
+      - Shows: LP number, Product name, QA status, Block reason
+      - Click navigates to LP detail page
+      - Empty state: 'No blocked LPs'
+    test_type: "integration"
+    priority: "P0"
+
+  # Activity Feed
+  - id: "AC-10"
+    title: "Recent Activity Feed"
+    given: "My organization has LP operations recorded"
+    when: "The dashboard loads"
+    then: |
+      - 'Recent Activity' feed displays last 20 LP operations
+      - Each entry shows: Timestamp, Operation icon, LP number, User, Description
+      - Operation types: Create (Plus), Consume (ArrowDown), Split, Merge, Move
+      - Sorted by timestamp DESC
+      - Empty state: 'No recent activity'
+    test_type: "integration"
+    priority: "P0"
+
+  # Quick Actions
+  - id: "AC-11"
+    title: "Quick Action Buttons"
+    given: "I am on the warehouse dashboard"
+    when: "I look at the quick actions area"
+    then: |
+      - 'Create LP' button (primary) visible
+      - 'View Inventory' button (secondary) visible
+      - Buttons are clickable and navigate correctly
+    test_type: "e2e"
+    priority: "P1"
+
+  # Auto-Refresh
+  - id: "AC-12"
+    title: "Auto-Refresh and Caching"
+    given: "The dashboard is open"
+    when: "60 seconds have elapsed since last fetch"
+    then: |
+      - Dashboard data automatically refreshes
+      - 'Last updated' timestamp updates
+      - KPI queries hit Redis cache if available (1 min TTL)
+      - Loading indicator shows during refresh
+    test_type: "integration"
+    priority: "P0"
+
+  # Performance
+  - id: "AC-13"
+    title: "Performance Requirements"
+    given: "My organization has 10,000+ license plates"
+    when: "The dashboard loads"
+    then: |
+      - Page renders within 2 seconds
+      - KPI cards load from cache (< 100ms per query)
+      - Activity feed limited to last 20 only
+      - Alert panels limited to 10 items each
+      - No full table scans (all queries use indexes)
+    test_type: "performance"
+    priority: "P0"
+
+# ==========================================================================
+# Unit Tests
+# ==========================================================================
+unit_tests:
+  dashboard_service:
+    - name: "getDashboardKPIs returns all 5 KPIs"
+      setup: "Mock Supabase with sample LP data"
+      expected: "Returns object with total_lps, available_lps, reserved_lps, consumed_today, expiring_soon"
+
+    - name: "getDashboardKPIs excludes consumed from total"
+      setup: "Create 10 LPs: 5 available, 3 reserved, 2 consumed"
+      expected: "total_lps = 8 (excludes consumed)"
+
+    - name: "getDashboardKPIs counts available correctly"
+      setup: "Create 10 LPs with various statuses and qa_statuses"
+      expected: "available_lps = count where status='available' AND qa_status='passed'"
+
+    - name: "getDashboardKPIs counts consumed_today using org timezone"
+      setup: "Create LPs with various updated_at timestamps"
+      expected: "consumed_today counts only those consumed since midnight"
+
+    - name: "getDashboardKPIs counts expiring_soon within 30 days"
+      setup: "Create LPs with expiry dates: past, today+7, today+15, today+45"
+      expected: "expiring_soon = count with expiry between today and today+30"
+
+    - name: "getDashboardAlerts returns low stock products"
+      setup: "Create products with min_stock=10 and varying LP counts"
+      expected: "Returns products where LP count < min_stock"
+
+    - name: "getDashboardAlerts returns expiring items sorted by date"
+      setup: "Create LPs with various expiry dates"
+      expected: "Returns LPs sorted by expiry_date ASC, limited to 10"
+
+    - name: "getDashboardAlerts returns blocked LPs"
+      setup: "Create LPs with qa_status in quarantine/failed"
+      expected: "Returns blocked LPs with status='blocked'"
+
+    - name: "getRecentActivity returns operations from genealogy"
+      setup: "Create lp_genealogy records with various operations"
+      expected: "Returns last 20 operations sorted by timestamp DESC"
+
+    - name: "invalidateDashboardCache deletes Redis keys"
+      setup: "Set cache keys in Redis"
+      expected: "Both kpis and alerts cache keys deleted"
+
+  cache_handling:
+    - name: "getDashboardKPIs returns cached value when available"
+      setup: "Set cached value in Redis"
+      expected: "Returns cached value without database query"
+
+    - name: "getDashboardKPIs populates cache on miss"
+      setup: "Empty Redis cache"
+      expected: "Queries database and sets cache with 60s TTL"
+
+    - name: "getDashboardAlerts returns cached value when available"
+      setup: "Set cached value in Redis"
+      expected: "Returns cached value without database query"
+
+    - name: "getRecentActivity does not use cache"
+      setup: "Any state"
+      expected: "Always queries database (real-time)"
+
+# ==========================================================================
+# Integration Tests
+# ==========================================================================
+integration_tests:
+  kpis_endpoint:
+    - name: "GET /api/warehouse/dashboard/kpis returns 200 with KPIs"
+      setup: "Authenticated user with warehouse permission"
+      action: "GET /api/warehouse/dashboard/kpis"
+      expected: "200 OK with all 5 KPI fields"
+
+    - name: "GET /api/warehouse/dashboard/kpis returns 401 for unauthenticated"
+      setup: "No auth token"
+      action: "GET /api/warehouse/dashboard/kpis"
+      expected: "401 Unauthorized"
+
+    - name: "GET /api/warehouse/dashboard/kpis returns 403 for no warehouse permission"
+      setup: "User without warehouse read permission"
+      action: "GET /api/warehouse/dashboard/kpis"
+      expected: "403 Forbidden"
+
+    - name: "GET /api/warehouse/dashboard/kpis respects org isolation"
+      setup: "Create LPs in Org A and Org B"
+      action: "User from Org A calls endpoint"
+      expected: "Only Org A LP counts returned"
+
+    - name: "GET /api/warehouse/dashboard/kpis sets Cache-Control header"
+      setup: "Authenticated request"
+      action: "GET /api/warehouse/dashboard/kpis"
+      expected: "Cache-Control: private, max-age=60"
+
+  alerts_endpoint:
+    - name: "GET /api/warehouse/dashboard/alerts returns 200 with alerts"
+      setup: "Authenticated user with warehouse permission"
+      action: "GET /api/warehouse/dashboard/alerts"
+      expected: "200 OK with low_stock, expiring_items, blocked_lps arrays"
+
+    - name: "GET /api/warehouse/dashboard/alerts limits each array to 10"
+      setup: "Create 20+ items for each alert type"
+      action: "GET /api/warehouse/dashboard/alerts"
+      expected: "Each array has max 10 items"
+
+    - name: "GET /api/warehouse/dashboard/alerts calculates days_until_expiry"
+      setup: "Create LP expiring in 7 days"
+      action: "GET /api/warehouse/dashboard/alerts"
+      expected: "expiring_items[0].days_until_expiry = 7"
+
+  activity_endpoint:
+    - name: "GET /api/warehouse/dashboard/activity returns 200 with activities"
+      setup: "Authenticated user with warehouse permission"
+      action: "GET /api/warehouse/dashboard/activity"
+      expected: "200 OK with activities array"
+
+    - name: "GET /api/warehouse/dashboard/activity respects limit param"
+      setup: "Create 30 activities"
+      action: "GET /api/warehouse/dashboard/activity?limit=10"
+      expected: "Returns 10 activities"
+
+    - name: "GET /api/warehouse/dashboard/activity sorts by timestamp DESC"
+      setup: "Create activities at different times"
+      action: "GET /api/warehouse/dashboard/activity"
+      expected: "First item is most recent"
+
+    - name: "GET /api/warehouse/dashboard/activity has no cache header"
+      setup: "Authenticated request"
+      action: "GET /api/warehouse/dashboard/activity"
+      expected: "Cache-Control: no-cache"
+
+  rls_tests:
+    - name: "Dashboard KPIs org isolation"
+      setup: |
+        - Create Org A with 50 LPs
+        - Create Org B with 30 LPs
+      action: "User A queries dashboard KPIs"
+      expected: "total_lps = 50 (not 80)"
+
+    - name: "Dashboard alerts org isolation"
+      setup: |
+        - Create low stock product in Org A
+        - Create low stock product in Org B
+      action: "User A queries dashboard alerts"
+      expected: "Only Org A products in low_stock array"
+
+# ==========================================================================
+# E2E Tests
+# ==========================================================================
+e2e_tests:
+  dashboard_page:
+    - name: "Dashboard loads with KPI cards"
+      steps:
+        - "Navigate to /warehouse"
+        - "Wait for page to load"
+      expected:
+        - "5 KPI cards visible"
+        - "Each card has icon, value, label"
+        - "Page loads within 2 seconds"
+
+    - name: "Dashboard shows alert panels"
+      setup: "Create low stock product, expiring LP, blocked LP"
+      steps:
+        - "Navigate to /warehouse"
+        - "Wait for page to load"
+      expected:
+        - "Low Stock panel shows product"
+        - "Expiring Items panel shows LP"
+        - "Blocked LPs panel shows blocked LP"
+
+    - name: "Dashboard shows activity feed"
+      setup: "Create LP (generates activity)"
+      steps:
+        - "Navigate to /warehouse"
+        - "Scroll to activity feed"
+      expected:
+        - "Activity feed visible"
+        - "Recent LP creation shows in feed"
+
+    - name: "Quick actions navigate correctly"
+      steps:
+        - "Navigate to /warehouse"
+        - "Click 'Create LP' button"
+      expected:
+        - "Navigates to /warehouse/license-plates/new"
+
+    - name: "Manual refresh updates data"
+      steps:
+        - "Navigate to /warehouse"
+        - "Note current timestamp"
+        - "Click refresh button"
+      expected:
+        - "'Last updated' timestamp changes"
+        - "Data refetches"
+
+    - name: "Alert item click navigates to detail"
+      setup: "Create expiring LP"
+      steps:
+        - "Navigate to /warehouse"
+        - "Click on expiring item in alert panel"
+      expected:
+        - "Navigates to LP detail page"
+
+    - name: "Empty state displays when no LPs"
+      setup: "Organization with no LPs"
+      steps:
+        - "Navigate to /warehouse"
+      expected:
+        - "Empty state message displays"
+        - "Quick action to receive items visible"
+
+    - name: "Loading state displays during fetch"
+      steps:
+        - "Navigate to /warehouse"
+        - "Observe initial load"
+      expected:
+        - "Skeleton loaders appear"
+        - "Then replaced with data"
+
+# ==========================================================================
+# Performance Tests
+# ==========================================================================
+performance_tests:
+  - name: "KPIs endpoint response time"
+    setup: "10,000 LPs in database"
+    action: "GET /api/warehouse/dashboard/kpis"
+    expected: "Response time < 500ms"
+    threshold_ms: 500
+
+  - name: "Alerts endpoint response time"
+    setup: "10,000 LPs with various states"
+    action: "GET /api/warehouse/dashboard/alerts"
+    expected: "Response time < 500ms"
+    threshold_ms: 500
+
+  - name: "Activity endpoint response time"
+    setup: "1,000 genealogy records"
+    action: "GET /api/warehouse/dashboard/activity?limit=20"
+    expected: "Response time < 300ms"
+    threshold_ms: 300
+
+  - name: "Dashboard page load time"
+    setup: "Org with 10,000 LPs"
+    action: "Navigate to /warehouse"
+    expected: "Full page render < 2 seconds"
+    threshold_ms: 2000
+
+  - name: "Cache hit performance"
+    setup: "Warm Redis cache"
+    action: "GET /api/warehouse/dashboard/kpis"
+    expected: "Response time < 100ms"
+    threshold_ms: 100
+
+# ==========================================================================
+# Definition of Done
+# ==========================================================================
+definition_of_done:
+  - "Dashboard page renders at /warehouse with all sections"
+  - "5 KPI cards display correct counts with proper formatting"
+  - "3 Alert panels show relevant items with click-through navigation"
+  - "Recent activity feed shows last 20 operations"
+  - "Quick action buttons navigate correctly"
+  - "Auto-refresh works every 60 seconds"
+  - "Redis caching implemented with 1 min TTL"
+  - "Cache invalidation on LP operations"
+  - "All queries use indexes (verified with EXPLAIN)"
+  - "API tests passing (>80% coverage)"
+  - "Zod validation for all API responses"
+  - "RLS policies verified (org isolation)"
+  - "E2E smoke test for dashboard load"
+  - "Performance test with 10K+ LPs (< 2s load time)"
+  - "Responsive layout works on desktop and tablet"
+  - "'Last updated' timestamp displays correctly"
+
+# ==========================================================================
+# Coverage Requirements
+# ==========================================================================
+coverage:
+  unit:
+    target: 80
+    files:
+      - "lib/services/warehouse-dashboard-service.ts: 80%"
+
+  integration:
+    target: 90
+    files:
+      - "All 3 dashboard endpoints: 90%"
+
+  e2e:
+    target: 70
+    files:
+      - "Dashboard page smoke test: 100%"
+      - "Navigation tests: 80%"
+
+# ==========================================================================
+# Risks
+# ==========================================================================
+risks:
+  - id: "RISK-01"
+    description: "Slow queries with large LP counts"
+    mitigation: "Use indexes, cache results, limit result sets"
+    severity: "medium"
+    test_coverage: "performance_tests"
+
+  - id: "RISK-02"
+    description: "Cache invalidation not triggered"
+    mitigation: "Hook into all LP service methods"
+    severity: "medium"
+    test_coverage: "unit_tests.cache_handling"
+
+  - id: "RISK-03"
+    description: "RLS bypass on aggregation queries"
+    mitigation: "Comprehensive RLS integration tests"
+    severity: "high"
+    test_coverage: "integration_tests.rls_tests"

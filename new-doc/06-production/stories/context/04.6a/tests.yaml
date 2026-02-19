@@ -1,0 +1,184 @@
+# Story 04.6a - Test Specifications
+
+test_files:
+  unit:
+    - path: "apps/frontend/lib/services/__tests__/consumption-service.test.ts"
+    - path: "apps/frontend/lib/validation/__tests__/consumption-schema.test.ts"
+  integration:
+    - path: "apps/frontend/app/api/production/work-orders/[woId]/consume/__tests__/route.test.ts"
+    - path: "apps/frontend/app/api/production/work-orders/[woId]/consumptions/__tests__/route.test.ts"
+  e2e:
+    - path: "e2e/production/material-consumption.spec.ts"
+
+unit_tests:
+  consumption_service:
+    - test: "validateLP returns error when LP does not exist"
+      given: "lpId that does not exist in database"
+      when: "validateLP is called"
+      then: "returns { valid: false, error: 'LP_NOT_FOUND' }"
+
+    - test: "validateLP returns error when LP status is consumed"
+      given: "LP with status = 'consumed'"
+      when: "validateLP is called"
+      then: "returns { valid: false, error: 'LP_NOT_AVAILABLE' }"
+
+    - test: "validateLP returns error when product does not match"
+      given: "LP with product_id = 'abc', material with product_id = 'xyz'"
+      when: "validateLP is called"
+      then: "returns { valid: false, error: 'PRODUCT_MISMATCH' }"
+
+    - test: "validateLP returns error when UoM does not match"
+      given: "LP with uom = 'kg', material with uom = 'L'"
+      when: "validateLP is called"
+      then: "returns { valid: false, error: 'UOM_MISMATCH' }"
+
+    - test: "validateLP returns success when all validations pass"
+      given: "LP with matching product, uom, status = available"
+      when: "validateLP is called"
+      then: "returns { valid: true, lp: LP }"
+
+    - test: "recordConsumption decreases LP quantity"
+      given: "LP with qty = 100, consume_qty = 40"
+      when: "recordConsumption is called"
+      then: "LP.qty becomes 60"
+
+    - test: "recordConsumption marks LP as consumed when fully depleted"
+      given: "LP with qty = 50, consume_qty = 50"
+      when: "recordConsumption is called"
+      then: "LP.status becomes 'consumed', LP.qty becomes 0"
+
+    - test: "recordConsumption increases material consumed_qty"
+      given: "wo_materials with consumed_qty = 200, consume_qty = 50"
+      when: "recordConsumption is called"
+      then: "wo_materials.consumed_qty becomes 250"
+
+  consumption_schema:
+    - test: "consumeRequestSchema validates required fields"
+      given: "request with missing wo_material_id"
+      when: "schema.parse is called"
+      then: "throws ZodError with 'wo_material_id is required'"
+
+    - test: "consumeRequestSchema rejects negative quantity"
+      given: "request with consume_qty = -10"
+      when: "schema.parse is called"
+      then: "throws ZodError with 'consume_qty must be positive'"
+
+    - test: "consumeRequestSchema accepts valid request"
+      given: "request with all valid fields"
+      when: "schema.parse is called"
+      then: "returns parsed object without errors"
+
+integration_tests:
+  consume_api:
+    - test: "POST /consume returns 400 when LP not found"
+      given: "request with non-existent lp_id"
+      when: "POST request sent"
+      then: "status 400, error = 'LP_NOT_FOUND'"
+
+    - test: "POST /consume returns 400 when LP not available"
+      given: "request with lp_id where status = 'consumed'"
+      when: "POST request sent"
+      then: "status 400, error = 'LP_NOT_AVAILABLE'"
+
+    - test: "POST /consume returns 400 when product mismatch"
+      given: "request with LP.product_id != material.product_id"
+      when: "POST request sent"
+      then: "status 400, error = 'PRODUCT_MISMATCH'"
+
+    - test: "POST /consume returns 400 when insufficient quantity"
+      given: "request with consume_qty > LP.qty"
+      when: "POST request sent"
+      then: "status 400, error = 'INSUFFICIENT_QUANTITY'"
+
+    - test: "POST /consume returns 201 on successful consumption"
+      given: "valid request with all validations passing"
+      when: "POST request sent"
+      then: "status 201, returns consumption record and updated LP"
+
+    - test: "POST /consume enforces RLS org isolation"
+      given: "request for WO in different org"
+      when: "POST request sent"
+      then: "status 403, error = 'Not authorized'"
+
+  consumptions_api:
+    - test: "GET /consumptions returns paginated history"
+      given: "WO with 25 consumptions"
+      when: "GET request with limit=10"
+      then: "returns 10 consumptions with pagination info"
+
+    - test: "GET /consumptions filters by status"
+      given: "WO with 5 active and 2 reversed consumptions"
+      when: "GET request with status=reversed"
+      then: "returns only 2 reversed consumptions"
+
+  reverse_api:
+    - test: "POST /reverse returns 403 for non-manager"
+      given: "user with role = 'production_operator'"
+      when: "POST request sent"
+      then: "status 403, error = 'Only managers can reverse consumptions'"
+
+    - test: "POST /reverse returns 200 for manager"
+      given: "user with role = 'production_manager'"
+      when: "POST request with valid reason"
+      then: "status 200, consumption marked as reversed, LP qty restored"
+
+    - test: "POST /reverse restores LP quantity"
+      given: "consumption of 30 kg, LP current qty = 20"
+      when: "POST reverse request"
+      then: "LP.qty becomes 50, LP.status becomes 'available'"
+
+e2e_tests:
+  - scenario: "Operator consumes material from LP"
+    steps:
+      - "Navigate to /production/consumption/:woId"
+      - "Click [+] on Flour material row"
+      - "Enter LP barcode 'LP-2025-08877'"
+      - "Verify LP validated (green check, details displayed)"
+      - "Enter quantity 250"
+      - "Click [Confirm Consumption]"
+      - "Verify success toast displays"
+      - "Verify MaterialsTable progress updated (consumed increased by 250)"
+      - "Verify ConsumptionHistoryTable shows new entry"
+
+  - scenario: "Manager reverses incorrect consumption"
+    steps:
+      - "Login as production_manager"
+      - "Navigate to /production/consumption/:woId"
+      - "Find consumption in history table"
+      - "Click [Rev] button"
+      - "Select reason 'Scanned wrong LP'"
+      - "Enter notes 'Operator scanned LP-08851 instead of LP-08852'"
+      - "Click [Confirm Reversal]"
+      - "Verify success toast displays"
+      - "Verify consumption status shows 'Reversed'"
+      - "Verify LP quantity restored"
+
+  - scenario: "Validation error displays when LP product mismatch"
+    steps:
+      - "Navigate to /production/consumption/:woId"
+      - "Click [+] on Flour material row"
+      - "Enter LP barcode for Water LP"
+      - "Verify error 'Product mismatch' displays within 500ms"
+      - "Verify LP selection cleared"
+
+  - scenario: "Full LP Required badge displays for 1:1 materials"
+    steps:
+      - "Navigate to /production/consumption/:woId"
+      - "Find material with consume_whole_lp = true"
+      - "Verify 'Full LP Required' badge with lock icon displays"
+      - "Click [+] to open modal"
+      - "Select LP"
+      - "Verify qty input is pre-filled with LP.qty and read-only"
+
+performance:
+  - metric: "LP validation response time"
+    target: "< 500ms"
+    test: "Measure time from LP scan to validation result display"
+
+  - metric: "Consumption recording time"
+    target: "< 2s"
+    test: "Measure time from [Confirm] click to success toast"
+
+  - metric: "Materials table load time"
+    target: "< 1s"
+    test: "Measure time to load and render materials table"

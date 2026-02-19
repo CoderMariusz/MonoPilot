@@ -1,0 +1,47 @@
+# Story 10.6 - Database Schema
+# OEE Threshold Alerts
+
+migrations:
+  - path: "supabase/migrations/XXX_create_performance_alerts.sql"
+    type: "migration"
+    description: "Create performance_alerts table"
+
+tables:
+  - name: "performance_alerts"
+    description: "OEE alerts triggered when metrics fall below thresholds"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id) ON DELETE CASCADE" }
+      - { name: "alert_type", type: "TEXT", constraints: "NOT NULL CHECK (alert_type IN ('oee_low', 'availability_low', 'performance_low', 'quality_low', 'extended_downtime'))" }
+      - { name: "severity", type: "TEXT", constraints: "NOT NULL CHECK (severity IN ('warning', 'critical'))" }
+      - { name: "metric_name", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "threshold_value", type: "DECIMAL(5,2)", constraints: "NOT NULL" }
+      - { name: "actual_value", type: "DECIMAL(5,2)", constraints: "NOT NULL" }
+      - { name: "reference_type", type: "TEXT", constraints: "NOT NULL CHECK (reference_type IN ('machine', 'line', 'work_order'))" }
+      - { name: "reference_id", type: "UUID", constraints: "NOT NULL" }
+      - { name: "triggered_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT now()" }
+      - { name: "acknowledged_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "acknowledged_at", type: "TIMESTAMPTZ", constraints: "" }
+      - { name: "resolved_at", type: "TIMESTAMPTZ", constraints: "" }
+      - { name: "notification_sent", type: "BOOLEAN", constraints: "DEFAULT false" }
+      - { name: "notes", type: "TEXT", constraints: "" }
+    rls: true
+    indexes:
+      - "idx_alerts_org ON performance_alerts(org_id)"
+      - "idx_alerts_active ON performance_alerts(org_id, triggered_at DESC) WHERE resolved_at IS NULL"
+      - "idx_alerts_severity ON performance_alerts(severity, triggered_at DESC)"
+    constraints:
+      - "chk_acknowledged CHECK (acknowledged_at IS NULL OR acknowledged_at >= triggered_at)"
+
+rls_policies:
+  pattern: "ADR-013"
+  policies:
+    - { table: "performance_alerts", name: "alerts_select", operation: "SELECT" }
+    - { table: "performance_alerts", name: "alerts_insert", operation: "INSERT" }
+    - { table: "performance_alerts", name: "alerts_update", operation: "UPDATE" }
+
+functions:
+  - name: "check_oee_thresholds"
+    params: ["p_org_id UUID", "p_machine_id UUID"]
+    returns: "VOID"
+    description: "Check if OEE below threshold, create alert if needed"

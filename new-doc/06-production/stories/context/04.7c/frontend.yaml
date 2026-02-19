@@ -1,0 +1,282 @@
+# Story 04.7c - Frontend Specification
+# Purpose: Components for by-product registration
+# Agent: FRONTEND-DEV (UI focus)
+
+# Page (existing - no new page)
+pages:
+  - path: "apps/frontend/app/(authenticated)/production/outputs/[woId]/page.tsx"
+    description: "Output Registration page - already exists from 04.7a"
+    changes:
+      - "Add ByProductsSection component below output history"
+      - "Add by-product auto-creation flow after main output"
+      - "Add manual by-product registration flow"
+    existing: true
+
+# Components
+components:
+  - path: "apps/frontend/components/production/outputs/ByProductsSection.tsx"
+    description: "Section showing by-product registration status"
+    type: "section"
+    props:
+      - name: "woId"
+        type: "string"
+        required: true
+      - name: "autoCreateEnabled"
+        type: "boolean"
+        required: true
+      - name: "byProducts"
+        type: "ByProductStatus[]"
+        required: true
+      - name: "onRegister"
+        type: "(byProduct: ByProductStatus) => void"
+        required: true
+      - name: "onRegisterAll"
+        type: "() => void"
+        required: true
+    sections:
+      - name: "Header"
+        description: "Title with auto-create status indicator"
+        elements:
+          - "Section title: By-Products"
+          - "Auto-create status badge"
+          - "Register All button"
+      - name: "By-Product List"
+        description: "List of by-products with progress"
+        elements:
+          - "Product name and code"
+          - "Progress: actual/expected qty with percentage"
+          - "LP count"
+          - "Status badge (Registered/Not Registered)"
+          - "Actions: View LPs, Add More, Register Now"
+    wireframe_ref: "PROD-004-part2 - By-Products Section (lines 62-75)"
+
+  - path: "apps/frontend/components/production/outputs/RegisterByProductModal.tsx"
+    description: "Modal for registering by-product"
+    type: "modal"
+    props:
+      - name: "byProduct"
+        type: "ByProductStatus"
+        required: true
+      - name: "mainOutputLpId"
+        type: "string"
+        required: true
+      - name: "mainBatch"
+        type: "string"
+        required: true
+      - name: "open"
+        type: "boolean"
+        required: true
+      - name: "onOpenChange"
+        type: "(open: boolean) => void"
+        required: true
+      - name: "onSuccess"
+        type: "(result: ByProductRegistrationResult) => void"
+        required: true
+    state:
+      - name: "quantity"
+        type: "number"
+        initial: "byProduct.expected_qty"
+      - name: "batchNumber"
+        type: "string"
+        initial: "generateByProductBatch(mainBatch, byProduct.product_code)"
+      - name: "locationId"
+        type: "string"
+        initial: "byProduct.default_location_id"
+      - name: "expiryDate"
+        type: "Date"
+        initial: "today + shelf_life_days"
+      - name: "qaStatus"
+        type: "QAStatus | null"
+        initial: "null"
+      - name: "notes"
+        type: "string"
+        initial: "''"
+      - name: "isSubmitting"
+        type: "boolean"
+        initial: "false"
+    sections:
+      - name: "By-Product Details"
+        description: "Read-only product info"
+        fields:
+          - "Product name and code"
+          - "Expected qty based on yield"
+          - "UoM"
+      - name: "Registration Form"
+        description: "Editable fields"
+        fields:
+          - "Actual Quantity (number input, pre-filled with expected)"
+          - "Batch Number (auto-generated, editable)"
+          - "Location (dropdown, pre-selected)"
+          - "Expiry Date (date picker, auto-calculated)"
+          - "QA Status (optional dropdown)"
+          - "Notes (optional textarea)"
+    actions:
+      - name: "Cancel"
+        type: "secondary"
+        action: "Close modal"
+      - name: "Register By-Product"
+        type: "primary"
+        action: "Submit registration"
+        disabled_when: "quantity < 0 || isSubmitting"
+    wireframe_ref: "PROD-004-part2 - Register By-Product Flow (lines 250-272)"
+
+  - path: "apps/frontend/components/production/outputs/ByProductCompletionModal.tsx"
+    description: "Confirmation after all by-products registered"
+    type: "modal"
+    props:
+      - name: "results"
+        type: "ByProductRegistrationResult[]"
+        required: true
+      - name: "open"
+        type: "boolean"
+        required: true
+      - name: "onClose"
+        type: "() => void"
+        required: true
+    sections:
+      - name: "Success Message"
+        description: "Green check with completion heading"
+      - name: "Results Summary"
+        description: "List of created by-product LPs"
+        fields:
+          - "LP Number"
+          - "Product Name"
+          - "Quantity"
+          - "Location"
+
+  - path: "apps/frontend/components/production/outputs/ZeroQtyWarningModal.tsx"
+    description: "Warning when by-product qty is 0"
+    type: "modal"
+    props:
+      - name: "byProductName"
+        type: "string"
+        required: true
+      - name: "open"
+        type: "boolean"
+        required: true
+      - name: "onCancel"
+        type: "() => void"
+        required: true
+      - name: "onSkip"
+        type: "() => void"
+        required: true
+      - name: "onConfirm"
+        type: "() => void"
+        required: true
+    content:
+      title: "Zero Quantity Warning"
+      message: "By-product quantity is 0. This means no by-product will be registered."
+      actions:
+        - "Cancel - return to form"
+        - "Skip By-Product - skip this by-product"
+        - "Confirm Anyway - register with 0 qty"
+
+# Services (frontend hooks)
+services:
+  - path: "apps/frontend/lib/hooks/use-by-product-registration.ts"
+    description: "React hook for by-product registration"
+    exports:
+      - name: "useByProductRegistration"
+        type: "hook"
+        params:
+          - "woId: string"
+        returns:
+          - "byProducts: ByProductStatus[]"
+          - "isLoading: boolean"
+          - "registerByProduct: (request: RegisterByProductRequest) => Promise<ByProductRegistrationResult>"
+          - "autoCreateAll: (mainOutputLpId: string) => Promise<ByProductRegistrationResult[]>"
+          - "refetch: () => void"
+
+# UI Patterns
+ui_patterns:
+  by_product_card:
+    pattern: |
+      <Card className="p-4">
+        <div className="flex justify-between items-start">
+          <div>
+            <h4 className="font-medium">{byProduct.product_name}</h4>
+            <p className="text-sm text-muted-foreground">{byProduct.product_code}</p>
+          </div>
+          <Badge variant={byProduct.status === 'registered' ? 'success' : 'destructive'}>
+            {byProduct.status === 'registered' ? 'Registered' : 'Not Registered'}
+          </Badge>
+        </div>
+        <div className="mt-2">
+          <Progress value={(byProduct.actual_qty / byProduct.expected_qty) * 100} />
+          <p className="text-sm mt-1">
+            {byProduct.actual_qty}/{byProduct.expected_qty} {byProduct.uom} ({Math.round((byProduct.actual_qty / byProduct.expected_qty) * 100)}%)
+          </p>
+          <p className="text-xs text-muted-foreground">{byProduct.lp_count} LPs</p>
+        </div>
+        <div className="mt-3 flex gap-2">
+          {byProduct.status === 'registered' ? (
+            <>
+              <Button variant="outline" size="sm">View LPs</Button>
+              <Button variant="outline" size="sm">Add More</Button>
+            </>
+          ) : (
+            <Button size="sm" onClick={() => onRegister(byProduct)}>
+              Register Now
+            </Button>
+          )}
+        </div>
+      </Card>
+
+  auto_create_info:
+    pattern: |
+      <Alert>
+        <Info className="h-4 w-4" />
+        <AlertTitle>Auto-create: {autoCreateEnabled ? 'ON' : 'OFF'}</AlertTitle>
+        <AlertDescription>
+          {autoCreateEnabled
+            ? 'By-products will be automatically created when main output is registered'
+            : 'You will need to manually register by-products after main output'}
+        </AlertDescription>
+      </Alert>
+
+# States
+states:
+  - name: "loading"
+    description: "Fetching by-product data"
+    ui: "Skeleton cards"
+  - name: "empty"
+    description: "No by-products defined in BOM"
+    ui: "Message: No by-products defined for this WO"
+  - name: "partial"
+    description: "Some by-products registered"
+    ui: "Mix of registered and not-registered cards"
+  - name: "complete"
+    description: "All by-products registered"
+    ui: "All cards show Registered status"
+
+# Accessibility
+accessibility:
+  touch_targets:
+    - "Register buttons: 48x48dp minimum"
+    - "Modal action buttons: 40dp height"
+  screen_reader:
+    - "Progress bars: aria-valuenow, aria-valuemin, aria-valuemax"
+    - "Status badges: aria-label with full status text"
+  keyboard:
+    - "Tab navigation through by-product cards"
+    - "Enter to activate Register button"
+    - "Escape to close modals"
+
+# Toast Notifications
+toasts:
+  - type: "success"
+    message: "By-product registered"
+    description: "LP-{lp_number} created with {qty} {uom}"
+    duration: 5000
+  - type: "success"
+    message: "All by-products registered"
+    description: "{count} by-product LPs created"
+    duration: 5000
+  - type: "warning"
+    message: "By-product skipped"
+    description: "{product_name} registered with 0 qty"
+    duration: 5000
+  - type: "error"
+    message: "Failed to register by-product"
+    description: "{error_message}"
+    duration: 7000

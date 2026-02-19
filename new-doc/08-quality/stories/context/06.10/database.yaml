@@ -1,0 +1,262 @@
+# Story 06.10 - In-Process Inspection: Database Schema & Migrations
+# Generated: 2025-12-18
+
+database:
+  tables_reused:
+    - name: "quality_inspections"
+      from_story: "06.5"
+      changes: "Add wo_id, wo_operation_id columns for in-process inspection linkage"
+      columns:
+        - id: "UUID PRIMARY KEY"
+        - org_id: "UUID NOT NULL REFERENCES organizations(id) - for RLS"
+        - inspection_number: "TEXT NOT NULL - format: INS-IPR-{YYYY}-{NNNNN}"
+        - inspection_type: "TEXT NOT NULL - 'incoming', 'in_process', 'final' - FILTERED: 'in_process'"
+        - reference_type: "TEXT NOT NULL - 'wo' or 'wo_operation' - KEY FOR IN-PROCESS"
+        - reference_id: "UUID NOT NULL - work_order.id or wo_operation.id"
+        - product_id: "UUID NOT NULL REFERENCES products(id)"
+        - spec_id: "UUID REFERENCES quality_specifications(id) - OPTIONAL"
+        - wo_id: "UUID REFERENCES work_orders(id) - ADDED IN THIS STORY"
+        - wo_operation_id: "UUID REFERENCES wo_operations(id) - ADDED IN THIS STORY"
+        - batch_number: "TEXT - from WO.batch_number"
+        - inspector_id: "UUID REFERENCES users(id)"
+        - status: "TEXT DEFAULT 'scheduled' - scheduled, in_progress, completed, cancelled"
+        - scheduled_date: "DATE"
+        - started_at: "TIMESTAMPTZ"
+        - completed_at: "TIMESTAMPTZ"
+        - result: "TEXT - pass, fail, conditional"
+        - result_notes: "TEXT"
+        - defects_found: "INTEGER DEFAULT 0"
+        - major_defects: "INTEGER DEFAULT 0"
+        - minor_defects: "INTEGER DEFAULT 0"
+        - created_at: "TIMESTAMPTZ DEFAULT now()"
+        - created_by: "UUID REFERENCES users(id)"
+
+  tables_modified:
+    wo_operations:
+      from_epic: "04"
+      description: "Add QA status tracking for in-process inspection integration"
+      new_columns:
+        - qa_status: "TEXT DEFAULT 'pending' - pending, passed, failed, conditional, not_required"
+        - qa_inspection_id: "UUID REFERENCES quality_inspections(id)"
+      indexes:
+        - name: "idx_wo_operations_qa_status"
+          columns: ["qa_status"]
+          condition: "WHERE qa_status != 'not_required'"
+          purpose: "Fast lookup of operations requiring QA review"
+
+    routing_operations:
+      from_epic: "02"
+      description: "Add quality checkpoint configuration"
+      new_columns:
+        - requires_quality_check: "BOOLEAN DEFAULT false"
+        - is_critical: "BOOLEAN DEFAULT false"
+      purpose: "Control auto-create inspection trigger and inspection priority"
+
+    quality_settings:
+      from_story: "06.0"
+      description: "Add in-process specific settings"
+      new_columns:
+        - auto_create_inspection_on_operation: "BOOLEAN DEFAULT false"
+        - require_operation_qa_pass: "BOOLEAN DEFAULT false"
+        - block_next_operation_on_fail: "BOOLEAN DEFAULT true"
+      purpose: "Configure auto-create behavior and production blocking rules"
+
+  migrations:
+    migration_001:
+      name: "add_wo_reference_to_inspections"
+      description: "Add wo_id, wo_operation_id columns to quality_inspections table"
+      changes:
+        - "ALTER TABLE quality_inspections ADD COLUMN wo_id UUID REFERENCES work_orders(id)"
+        - "ALTER TABLE quality_inspections ADD COLUMN wo_operation_id UUID REFERENCES wo_operations(id)"
+        - "CREATE INDEX idx_inspections_wo ON quality_inspections(wo_id) WHERE wo_id IS NOT NULL"
+        - "CREATE INDEX idx_inspections_wo_operation ON quality_inspections(wo_operation_id) WHERE wo_operation_id IS NOT NULL"
+        - "CREATE INDEX idx_inspections_wo_type ON quality_inspections(org_id, wo_id, inspection_type) WHERE inspection_type = 'in_process'"
+        - "CREATE INDEX idx_inspections_wo_pending ON quality_inspections(org_id, wo_id, status) WHERE inspection_type = 'in_process' AND status IN ('scheduled', 'in_progress')"
+
+    migration_002:
+      name: "add_qa_status_to_wo_operations"
+      description: "Add QA tracking columns to wo_operations table"
+      changes:
+        - "ALTER TABLE wo_operations ADD COLUMN qa_status TEXT DEFAULT 'pending' CHECK (qa_status IN ('pending', 'passed', 'failed', 'conditional', 'not_required'))"
+        - "ALTER TABLE wo_operations ADD COLUMN qa_inspection_id UUID REFERENCES quality_inspections(id)"
+        - "CREATE INDEX idx_wo_operations_qa_status ON wo_operations(qa_status) WHERE qa_status != 'not_required'"
+
+    migration_003:
+      name: "add_quality_requirements_to_routing_operations"
+      description: "Add quality checkpoint flags to routing_operations"
+      changes:
+        - "ALTER TABLE routing_operations ADD COLUMN IF NOT EXISTS requires_quality_check BOOLEAN DEFAULT false"
+        - "ALTER TABLE routing_operations ADD COLUMN IF NOT EXISTS is_critical BOOLEAN DEFAULT false"
+
+    migration_004:
+      name: "add_inprocess_settings_to_quality_settings"
+      description: "Add in-process specific configuration settings"
+      changes:
+        - "ALTER TABLE quality_settings ADD COLUMN IF NOT EXISTS auto_create_inspection_on_operation BOOLEAN DEFAULT false"
+        - "ALTER TABLE quality_settings ADD COLUMN IF NOT EXISTS require_operation_qa_pass BOOLEAN DEFAULT false"
+        - "ALTER TABLE quality_settings ADD COLUMN IF NOT EXISTS block_next_operation_on_fail BOOLEAN DEFAULT true"
+
+  triggers_and_functions:
+    function_001:
+      name: "create_inprocess_inspection_on_operation_complete"
+      trigger_name: "trigger_create_inprocess_inspection"
+      table: "wo_operations"
+      event: "AFTER UPDATE"
+      when: "NEW.status = 'completed' AND (OLD.status IS NULL OR OLD.status != 'completed')"
+      logic:
+        - "Check quality_settings.auto_create_inspection_on_operation = true for org"
+        - "Check routing_operation.requires_quality_check = true"
+        - "Look up active specification for product"
+        - "Generate inspection_number via generate_inspection_number(org_id, 'in_process')"
+        - "INSERT into quality_inspections with:"
+          - "inspection_type = 'in_process'"
+          - "reference_type = 'wo_operation'"
+          - "reference_id = wo_operation.id"
+          - "wo_id = work_order.id"
+          - "wo_operation_id = wo_operation.id"
+          - "product_id = wo.output_product_id"
+          - "spec_id = (latest active spec for product)"
+          - "batch_number = wo.batch_number"
+          - "status = 'scheduled'"
+          - "priority = 'high' if is_critical, else 'normal'"
+        - "Log to quality_audit_log"
+      purpose: "Automatically create in-process inspections when operations complete"
+      enabled: "Only when quality_settings.auto_create_inspection_on_operation = true"
+
+    function_002:
+      name: "update_wo_operation_qa_on_inspection"
+      trigger_name: "trigger_update_wo_operation_qa"
+      table: "quality_inspections"
+      event: "AFTER UPDATE"
+      when: "NEW.status = 'completed' AND NEW.inspection_type = 'in_process' AND (OLD.status IS NULL OR OLD.status != 'completed')"
+      logic:
+        - "If wo_operation_id IS NOT NULL:"
+          - "UPDATE wo_operations SET qa_status = CASE result: 'pass' → 'passed', 'fail' → 'failed', 'conditional' → 'conditional'"
+          - "UPDATE wo_operations SET qa_inspection_id = inspection.id"
+          - "Log to quality_audit_log with WO operation context"
+      purpose: "Propagate inspection result to WO operation QA status"
+      side_effect: "Blocks next operation start if required and QA failed"
+
+  rls_policies:
+    policy_001:
+      name: "Inspections org isolation"
+      table: "quality_inspections"
+      scope: "ALL"
+      rule: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      purpose: "Prevent cross-tenant access to inspections"
+
+    policy_002:
+      name: "WO operations QA status update"
+      table: "wo_operations"
+      scope: "UPDATE on qa_status, qa_inspection_id columns"
+      rule: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      note: "Controlled via quality_inspections RLS; quality module updates qa_status"
+
+  sequences:
+    sequence_001:
+      name: "inspection_number_sequences"
+      purpose: "Generate unique inspection numbers per org and type"
+      format: "INS-{type}-{YYYY}-{NNNNN}"
+      types:
+        - "INC: incoming"
+        - "IPR: in_process"
+        - "FIN: final"
+      example: "INS-IPR-2025-00001"
+
+  data_integrity:
+    constraints:
+      - "UNIQUE(org_id, inspection_number) - global uniqueness per org"
+      - "UNIQUE(org_id, wo_id, wo_operation_id, inspection_type) - only one in-process per operation per type"
+      - "Foreign key cascade: wo_operations deletion cascades to quality_inspections?"
+        - "NO CASCADE - prevent accidental deletion of inspection records"
+      - "qa_status enum values: pending, passed, failed, conditional, not_required"
+
+  indexes:
+    # Performance indexes for in-process inspections
+    index_001:
+      name: "idx_inspections_wo"
+      columns: ["wo_id"]
+      condition: "WHERE wo_id IS NOT NULL"
+      purpose: "Fast lookup: list all inspections for a work order"
+
+    index_002:
+      name: "idx_inspections_wo_operation"
+      columns: ["wo_operation_id"]
+      condition: "WHERE wo_operation_id IS NOT NULL"
+      purpose: "Fast lookup: get inspection for specific operation"
+
+    index_003:
+      name: "idx_inspections_wo_type"
+      columns: ["org_id", "wo_id", "inspection_type"]
+      condition: "WHERE inspection_type = 'in_process'"
+      purpose: "Fast query: list in-process inspections for WO"
+
+    index_004:
+      name: "idx_inspections_wo_pending"
+      columns: ["org_id", "wo_id", "status"]
+      condition: "WHERE inspection_type = 'in_process' AND status IN ('scheduled', 'in_progress')"
+      purpose: "Fast query: pending in-process inspections for WO (for operation blocking)"
+
+    index_005:
+      name: "idx_wo_operations_qa_status"
+      columns: ["qa_status"]
+      condition: "WHERE qa_status != 'not_required'"
+      purpose: "Fast query: operations requiring QA review or action"
+
+    index_006:
+      name: "idx_inspections_inprocess_pending"
+      columns: ["org_id", "status", "inspection_type"]
+      condition: "WHERE inspection_type = 'in_process' AND status IN ('scheduled', 'in_progress')"
+      purpose: "Fast query: in-process queue list (for dashboard)"
+
+  test_data_setup:
+    prerequisite_stories:
+      - "01.1 (Org + users)"
+      - "02.1 (Products)"
+      - "02.7 (Routings)"
+      - "02.8 (Routing operations)"
+      - "03.10 (Work orders)"
+      - "03.12 (WO operations)"
+      - "04.2a (WO start)"
+      - "04.3 (Operation start/complete)"
+      - "06.3 (Product specifications)"
+      - "06.4 (Test parameters)"
+      - "06.5 (Incoming inspection - patterns)"
+
+    test_scenarios:
+      scenario_1:
+        name: "Auto-create in-process inspection"
+        setup:
+          - "Create WO in in_progress status"
+          - "Complete WO operation with requires_quality_check = true"
+          - "Quality settings: auto_create_inspection_on_operation = true"
+        verify:
+          - "Inspection created with type='in_process'"
+          - "wo_id and wo_operation_id populated"
+          - "status = 'scheduled'"
+          - "inspection_number generated"
+
+      scenario_2:
+        name: "WO operation QA status update on completion"
+        setup:
+          - "Inspection created for WO operation"
+          - "Complete inspection with result='pass'"
+        verify:
+          - "wo_operation.qa_status = 'passed'"
+          - "wo_operation.qa_inspection_id populated"
+
+      scenario_3:
+        name: "Next operation blocking on QA failure"
+        setup:
+          - "WO with seq 1 and seq 2 operations"
+          - "Seq 1 inspection completed with result='fail'"
+          - "quality_settings.block_next_operation_on_fail = true"
+        verify:
+          - "wo_operation (seq 1).qa_status = 'failed'"
+          - "Attempt to start seq 2 operation returns error"
+
+  migration_rollback_notes:
+    - "wo_id and wo_operation_id are new columns - safe to drop if rolling back"
+    - "qa_status added to wo_operations - ensure no external dependencies on this column"
+    - "Triggers can be disabled without data loss - re-enable when re-applying migration"
+    - "Keep inspection_number_sequences for rollback safety (used by 06.5 too)"

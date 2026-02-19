@@ -1,0 +1,422 @@
+# API Endpoints for Story 08.4
+# Formulations CRUD & Versioning
+
+base_path: /api/npd/formulations
+
+endpoints:
+  # List formulations
+  - method: GET
+    path: /api/npd/formulations
+    summary: "List formulations with filters and pagination"
+    auth: true
+    roles: [NPD_LEAD, R&D, REGULATORY, FINANCE, PRODUCTION]
+    query_params:
+      - name: page
+        type: number
+        required: false
+        default: 1
+        description: "Page number"
+
+      - name: limit
+        type: number
+        required: false
+        default: 20
+        description: "Items per page"
+
+      - name: search
+        type: string
+        required: false
+        description: "Search formulation_number, notes"
+
+      - name: npd_project_id
+        type: number
+        required: false
+        description: "Filter by project"
+
+      - name: status
+        type: string
+        required: false
+        enum: [draft, approved, locked]
+        description: "Filter by status"
+
+      - name: effective_date
+        type: string
+        required: false
+        format: ISO 8601 date
+        description: "Filter by currently effective (date between from/to)"
+
+      - name: sortBy
+        type: string
+        required: false
+        default: created_at
+        enum: [formulation_number, status, effective_from, created_at]
+        description: "Sort field"
+
+      - name: sortOrder
+        type: string
+        required: false
+        default: desc
+        enum: [asc, desc]
+        description: "Sort order"
+
+    response:
+      status: 200
+      body:
+        type: object
+        schema:
+          formulations: Array<FormulationWithProject>
+          total: number
+          page: number
+          limit: number
+
+    errors:
+      - status: 401
+        code: UNAUTHORIZED
+        message: "Authentication required"
+
+      - status: 403
+        code: FORBIDDEN
+        message: "Insufficient permissions"
+
+      - status: 500
+        code: INTERNAL_ERROR
+        message: "Database query failed"
+
+  # Get single formulation
+  - method: GET
+    path: /api/npd/formulations/:id
+    summary: "Get formulation details by ID"
+    auth: true
+    roles: [NPD_LEAD, R&D, REGULATORY, FINANCE, PRODUCTION]
+    params:
+      - name: id
+        type: number
+        required: true
+        description: "Formulation ID"
+
+    response:
+      status: 200
+      body:
+        type: FormulationWithProject
+
+    errors:
+      - status: 404
+        code: NOT_FOUND
+        message: "Formulation not found"
+
+      - status: 403
+        code: FORBIDDEN
+        message: "Access denied (different org)"
+
+  # Create formulation
+  - method: POST
+    path: /api/npd/formulations
+    summary: "Create new formulation"
+    auth: true
+    roles: [NPD_LEAD, R&D]
+    body:
+      type: CreateFormulationRequest
+      schema:
+        npd_project_id: number (required)
+        formulation_number: string (required, format: v1.0)
+        effective_from: string | null (optional, ISO date)
+        effective_to: string | null (optional, ISO date)
+        status: 'draft' | 'approved' (optional, default: 'draft')
+        total_qty: number (required, > 0)
+        uom: string (required, max 20 chars)
+        parent_formulation_id: number | null (optional)
+        notes: string (optional, max 2000 chars)
+
+    validation:
+      - "npd_project_id must exist in npd_projects table"
+      - "formulation_number must match format v\\d+\\.\\d+ (e.g., v1.0, v1.1, v2.0)"
+      - "effective_to must be >= effective_from (if both set)"
+      - "total_qty must be > 0"
+      - "uom must be non-empty, max 20 chars"
+      - "Date overlap check (trigger will validate)"
+
+    response:
+      status: 201
+      body:
+        type: Formulation
+
+    errors:
+      - status: 400
+        code: VALIDATION_ERROR
+        message: "Invalid input data (Zod validation)"
+
+      - status: 400
+        code: DATE_OVERLAP
+        message: "Date range overlaps with existing formulation for this project"
+
+      - status: 404
+        code: PROJECT_NOT_FOUND
+        message: "NPD Project not found"
+
+      - status: 409
+        code: DUPLICATE_VERSION
+        message: "Formulation version already exists for this project"
+
+  # Update formulation
+  - method: PUT
+    path: /api/npd/formulations/:id
+    summary: "Update formulation (blocked if locked)"
+    auth: true
+    roles: [NPD_LEAD, R&D]
+    params:
+      - name: id
+        type: number
+        required: true
+        description: "Formulation ID"
+
+    body:
+      type: UpdateFormulationRequest
+      schema:
+        formulation_number: string (optional, format: v1.0)
+        effective_from: string | null (optional, ISO date)
+        effective_to: string | null (optional, ISO date)
+        status: 'draft' | 'approved' | 'locked' (optional)
+        total_qty: number (optional, > 0)
+        uom: string (optional, max 20 chars)
+        notes: string (optional, max 2000 chars)
+
+    validation:
+      - "Cannot change npd_project_id (immutable)"
+      - "Cannot update if status = 'locked' (trigger will block)"
+      - "effective_to must be >= effective_from (if both set)"
+      - "total_qty must be > 0 (if provided)"
+
+    response:
+      status: 200
+      body:
+        type: Formulation
+
+    errors:
+      - status: 400
+        code: LOCKED_FORMULATION
+        message: "Cannot modify locked formulation"
+
+      - status: 400
+        code: DATE_OVERLAP
+        message: "Date range overlaps with existing formulation for this project"
+
+      - status: 404
+        code: NOT_FOUND
+        message: "Formulation not found"
+
+  # Delete formulation
+  - method: DELETE
+    path: /api/npd/formulations/:id
+    summary: "Delete formulation (blocked if locked or used in handoff)"
+    auth: true
+    roles: [NPD_LEAD, ADMIN]
+    params:
+      - name: id
+        type: number
+        required: true
+        description: "Formulation ID"
+
+    validation:
+      - "Cannot delete if status = 'locked' (trigger will block)"
+      - "Cannot delete if formulation.id referenced by boms.npd_formulation_id"
+
+    response:
+      status: 204
+      body: null
+
+    errors:
+      - status: 400
+        code: LOCKED_FORMULATION
+        message: "Cannot delete locked formulation"
+
+      - status: 400
+        code: FORMULATION_IN_USE
+        message: "Cannot delete formulation used in BOM handoff: BOM-001"
+
+      - status: 404
+        code: NOT_FOUND
+        message: "Formulation not found"
+
+  # Lock formulation
+  - method: POST
+    path: /api/npd/formulations/:id/lock
+    summary: "Lock formulation (set status = 'locked', make immutable)"
+    auth: true
+    roles: [NPD_LEAD]
+    params:
+      - name: id
+        type: number
+        required: true
+        description: "Formulation ID"
+
+    body:
+      type: object
+      schema:
+        confirmation: true (required)
+
+    validation:
+      - "Formulation must have status = 'approved' before locking"
+      - "Cannot lock if already locked"
+
+    response:
+      status: 200
+      body:
+        type: Formulation
+
+    errors:
+      - status: 400
+        code: INVALID_STATUS
+        message: "Formulation must be approved before locking"
+
+      - status: 400
+        code: ALREADY_LOCKED
+        message: "Formulation is already locked"
+
+      - status: 404
+        code: NOT_FOUND
+        message: "Formulation not found"
+
+  # Get formulation lineage
+  - method: GET
+    path: /api/npd/formulations/:id/lineage
+    summary: "Get formulation lineage (parent + children)"
+    auth: true
+    roles: [NPD_LEAD, R&D, REGULATORY, FINANCE, PRODUCTION]
+    params:
+      - name: id
+        type: number
+        required: true
+        description: "Formulation ID"
+
+    response:
+      status: 200
+      body:
+        type: FormulationLineageResponse
+        schema:
+          current: FormulationWithProject
+          parent: FormulationWithProject | null
+          children: Array<FormulationWithProject>
+
+    errors:
+      - status: 404
+        code: NOT_FOUND
+        message: "Formulation not found"
+
+  # Get formulation timeline
+  - method: GET
+    path: /api/npd/formulations/timeline/:projectId
+    summary: "Get all formulation versions for a project (timeline view)"
+    auth: true
+    roles: [NPD_LEAD, R&D, REGULATORY, FINANCE, PRODUCTION]
+    params:
+      - name: projectId
+        type: number
+        required: true
+        description: "NPD Project ID"
+
+    response:
+      status: 200
+      body:
+        type: FormulationTimelineResponse
+        schema:
+          project:
+            id: number
+            project_number: string
+            project_name: string
+          versions: Array<FormulationTimelineVersion>
+          current_date: string (ISO date)
+
+    errors:
+      - status: 404
+        code: PROJECT_NOT_FOUND
+        message: "NPD Project not found"
+
+# Data Types
+types:
+  FormulationWithProject:
+    id: number
+    org_id: string
+    npd_project_id: number
+    project:
+      id: number
+      project_number: string
+      project_name: string
+      current_gate: string
+    formulation_number: string
+    status: 'draft' | 'approved' | 'locked'
+    effective_from: string | null
+    effective_to: string | null
+    parent_formulation_id: number | null
+    total_qty: number
+    uom: string
+    notes: string | null
+    approved_by: string | null
+    approved_at: string | null
+    created_at: string
+    updated_at: string
+    items_count: number
+
+  FormulationTimelineVersion:
+    id: number
+    formulation_number: string
+    status: 'draft' | 'approved' | 'locked'
+    effective_from: string | null
+    effective_to: string | null
+    total_qty: number
+    uom: string
+    notes: string | null
+    is_currently_active: boolean
+    has_overlap: boolean
+
+  CreateFormulationRequest:
+    npd_project_id: number
+    formulation_number: string
+    effective_from: string | null
+    effective_to: string | null
+    status: 'draft' | 'approved'
+    total_qty: number
+    uom: string
+    parent_formulation_id: number | null
+    notes: string
+
+  UpdateFormulationRequest:
+    formulation_number: string
+    effective_from: string | null
+    effective_to: string | null
+    status: 'draft' | 'approved' | 'locked'
+    total_qty: number
+    uom: string
+    notes: string
+
+# Error Codes Reference
+error_codes:
+  UNAUTHORIZED: "User not authenticated"
+  FORBIDDEN: "User lacks required role or org access"
+  NOT_FOUND: "Resource not found"
+  VALIDATION_ERROR: "Input validation failed (Zod)"
+  DATE_OVERLAP: "Date range overlaps with existing formulation"
+  DUPLICATE_VERSION: "Formulation version already exists"
+  LOCKED_FORMULATION: "Cannot modify/delete locked formulation"
+  FORMULATION_IN_USE: "Formulation used in BOM handoff"
+  INVALID_STATUS: "Invalid status transition"
+  ALREADY_LOCKED: "Formulation already locked"
+  PROJECT_NOT_FOUND: "NPD Project not found"
+  INTERNAL_ERROR: "Database or server error"
+
+# Rate Limiting
+rate_limits:
+  GET: 100 requests/minute
+  POST: 20 requests/minute
+  PUT: 20 requests/minute
+  DELETE: 10 requests/minute
+
+# Caching Strategy
+caching:
+  GET /api/npd/formulations:
+    strategy: "Server-side cache, 60s TTL, invalidate on POST/PUT/DELETE"
+  GET /api/npd/formulations/:id:
+    strategy: "Server-side cache, 60s TTL, invalidate on PUT/DELETE"
+  GET /api/npd/formulations/:id/lineage:
+    strategy: "Server-side cache, 120s TTL, invalidate on PUT/DELETE"
+  GET /api/npd/formulations/timeline/:projectId:
+    strategy: "Server-side cache, 60s TTL, invalidate on POST/PUT/DELETE"

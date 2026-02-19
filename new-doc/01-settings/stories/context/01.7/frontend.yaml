@@ -1,0 +1,213 @@
+# Story 01.7 - Frontend Specification
+# Purpose: Components, hooks, pages (module toggles UI)
+# Agent: FRONTEND-DEV
+
+is_backend_focused: false
+
+pages:
+  - path: "apps/frontend/app/(authenticated)/settings/modules/page.tsx"
+    description: "Module toggles management page"
+    layout: "Settings layout with sidebar"
+    sections:
+      - "Page header with title and description"
+      - "Module cards grouped by type (Core, Premium, New)"
+      - "Dependency indicators and status"
+      - "Toggle switches for enable/disable"
+
+components:
+  - path: "apps/frontend/components/settings/modules/ModuleCard.tsx"
+    description: "Individual module card with toggle switch"
+    props:
+      module: "Module"
+      onToggle: "(enabled: boolean) => Promise<void>"
+    features:
+      - "Module name, description, icon"
+      - "Toggle switch (ON/OFF)"
+      - "Dependency list (requires X, required by Y)"
+      - "Premium badge for NPD/Finance/OEE/Integrations"
+      - "Can_disable indicator (Settings cannot be disabled)"
+    states:
+      - "loading: switch disabled, spinner shown"
+      - "success: switch enabled, toast shown"
+      - "error: switch re-enabled, error toast shown"
+      - "disabled: non-admin role, switch disabled"
+
+  - path: "apps/frontend/components/settings/modules/ModuleToggleList.tsx"
+    description: "List of module cards grouped by type"
+    props:
+      modules: "Module[]"
+      onToggle: "(moduleId: string, enabled: boolean) => Promise<void>"
+    layout:
+      - "Section: Core Modules (Settings, Technical, Planning, Production, Quality, Warehouse, Shipping)"
+      - "Section: Premium Modules (NPD, Finance, OEE, Integrations)"
+      - "Collapse/Expand groups"
+    features:
+      - "Filter/search modules"
+      - "Show enabled count (X enabled, Y disabled)"
+      - "Cascade warning banner if needed"
+
+  - path: "apps/frontend/components/settings/modules/DependencyWarningModal.tsx"
+    description: "Modal for dependency confirmation"
+    props:
+      open: "boolean"
+      module: "Module"
+      action: "'enable' | 'disable'"
+      affected: "string[]"
+      onConfirm: "(cascade: boolean) => Promise<void>"
+      onCancel: "() => void"
+    content:
+      - "Warning message about dependencies"
+      - "List of modules that will be affected"
+      - "Cascade toggle (enable both, disable both)"
+      - "Confirm and Cancel buttons"
+    example:
+      - "Enable Technical requires: Nothing"
+      - "Enable Planning requires: Technical. Enable both?"
+      - "Disable Planning impacts: Production, Finance. Disable both?"
+
+hooks:
+  - path: "apps/frontend/lib/hooks/use-modules.ts"
+    description: "React hook for module state and toggles"
+    exports:
+      - name: "useModules"
+        returns: "UseQueryResult<Module[]>"
+        description: "Fetch all modules with org-specific status"
+        pattern: |
+          export function useModules() {
+            return useQuery({
+              queryKey: ['settings', 'modules'],
+              queryFn: getAllModules,
+              staleTime: 1 * 60 * 1000, // 1 minute
+            });
+          }
+
+      - name: "useToggleModule"
+        returns: "UseMutationResult<ToggleResponse>"
+        description: "Mutation to toggle module enabled/disabled"
+        pattern: |
+          export function useToggleModule() {
+            const queryClient = useQueryClient();
+            return useMutation({
+              mutationFn: ({ moduleId, enabled, cascade }: TogglePayload) =>
+                toggleModule(moduleId, enabled, cascade),
+              onSuccess: () => {
+                queryClient.invalidateQueries(['settings', 'modules']);
+              },
+            });
+          }
+
+ux:
+  wireframes:
+    - id: "SET-022"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SET-022-module-toggles.md"
+      description: "Module Toggles management page"
+      components:
+        - "Page header with description"
+        - "Module cards grouped by type (Core, Premium, New)"
+        - "Toggle switches (ON/OFF visual state)"
+        - "Dependency indicators (Requires: X, Required for: Y)"
+        - "Premium badge with upgrade button"
+        - "Status summary footer (X enabled, Y disabled)"
+        - "Expand/Collapse group sections"
+
+  patterns:
+    card: "ShadCN Card with icon, name, description, toggle"
+    toggle: "ShadCN Switch component for ON/OFF"
+    modal: "ShadCN Dialog for dependency warnings"
+    toast: "ShadCN Toast for success/error messages"
+    grouping: "Collapsible sections for Core/Premium/New"
+
+  states:
+    - "loading: Skeleton cards (11 items)"
+    - "success: Module cards with current status"
+    - "empty: All modules disabled message with CTA"
+    - "error: Failed to load with retry button"
+    - "toggling: Switch disabled during API call"
+
+  accessibility:
+    - "ARIA labels for toggle switches"
+    - "Keyboard navigation in card list"
+    - "Screen reader announcements for dependency warnings"
+    - "High contrast mode support"
+    - "Focus indicators on all interactive elements"
+
+color_scheme:
+  module_status:
+    enabled:
+      bg: "bg-green-50"
+      border: "border-green-200"
+      text: "text-green-900"
+      icon: "CheckCircle"
+    disabled:
+      bg: "bg-gray-50"
+      border: "border-gray-200"
+      text: "text-gray-600"
+      icon: "CircleOff"
+
+  module_type:
+    core:
+      badge: "bg-blue-100 text-blue-800"
+      description: "Free, always available"
+    premium:
+      badge: "bg-purple-100 text-purple-800"
+      description: "$50/user/month"
+
+navigation:
+  path: "/settings/modules"
+  sidebar_label: "Module Toggles"
+  icon: "Puzzle"
+  order: 4
+  parent: "Settings"
+  breadcrumbs:
+    - { label: "Settings", href: "/settings" }
+    - { label: "Module Toggles", href: "/settings/modules" }
+
+integration:
+  sidebar_navigation:
+    description: "Hide disabled modules from sidebar nav"
+    implementation: |
+      // In layout/sidebar component
+      const { data: modules } = useModules();
+      const enabledModules = modules?.filter(m => m.enabled).map(m => m.code);
+      const navItems = ALL_NAV_ITEMS.filter(item =>
+        item.module === 'settings' || enabledModules?.includes(item.module)
+      );
+
+  route_guards:
+    description: "Redirect disabled module routes"
+    implementation: |
+      // In app/(authenticated)/[module]/layout.tsx
+      export async function ModuleLayout({ params }: ModuleLayoutProps) {
+        const enabled = await isModuleEnabled(params.module);
+        if (!enabled) {
+          redirect('/dashboard?error=module_disabled');
+        }
+        return <>{children}</>;
+      }
+
+  api_guards:
+    description: "Return 403 for disabled module APIs"
+    implementation: |
+      // In route handlers
+      export function requireModule(moduleCode: string) {
+        return async (req: Request) => {
+          const enabled = await isModuleEnabled(moduleCode);
+          if (!enabled) {
+            return Response.json(
+              { error: 'Module not enabled' },
+              { status: 403 }
+            );
+          }
+        };
+      }
+
+permissions:
+  view_modules:
+    roles: ["super_admin", "admin", "manager", "supervisor", "quality_lead", "warehouse_lead", "production_lead", "operator", "viewer"]
+    notes: "All roles can view (read-only for non-admin)"
+  toggle_modules:
+    roles: ["super_admin", "admin"]
+    notes: "Only Admin+ can enable/disable modules"
+  upgrade_premium:
+    roles: ["super_admin", "admin"]
+    notes: "Only Admin+ can initiate subscription upgrade"

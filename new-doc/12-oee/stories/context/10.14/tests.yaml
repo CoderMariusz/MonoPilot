@@ -1,0 +1,50 @@
+# Story 10.14 - Test Specification
+# Purpose: Email alerts and handover notes tests
+# Agent: QA-AGENT
+
+acceptance_criteria:
+  - id: "AC-01"
+    given: "alert triggered with severity = critical and notify_email = true"
+    when: "alert created"
+    then: "email sent within 1 minute with subject [CRITICAL] OEE Alert: Machine-01"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-02"
+    given: "shift ending soon"
+    when: "supervisor creates handover note with Type=Action Item, Priority=High"
+    then: "note created and visible to next shift"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-03"
+    given: "handover note from previous shift"
+    when: "incoming supervisor clicks [Acknowledge] and adds notes"
+    then: "acknowledged_by and acknowledged_at set, originating supervisor notified"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-04"
+    given: "User A (Org A) creates note"
+    when: "User B (Org B) queries notes"
+    then: "Org A note not visible to Org B"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/email-notification-service.test.ts"
+    type: "unit"
+  - path: "apps/frontend/lib/services/__tests__/handover-notes-service.test.ts"
+    type: "unit"
+  - path: "apps/frontend/app/api/oee/handover-notes/__tests__/api.test.ts"
+    type: "integration"
+  - path: "tests/e2e/oee-handover-notes.spec.ts"
+    type: "e2e"
+
+definition_of_done:
+  - "Email notifications sent for critical alerts"
+  - "Handover notes CRUD works"
+  - "Acknowledgment workflow complete"
+  - "RLS isolates notes by org"
+  - "Tests >80% coverage"

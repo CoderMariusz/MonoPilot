@@ -1,0 +1,564 @@
+# Story 05.2 - API Specification
+# Purpose: Endpoints, request/response schemas, service methods, error handling
+# Agent: BACKEND-DEV (API focus)
+
+# =============================================================================
+# API Endpoints
+# =============================================================================
+endpoints:
+  # ---------------------------------------------------------------------------
+  # Link Operations (Create genealogy records)
+  # ---------------------------------------------------------------------------
+  - method: "POST"
+    path: "/api/warehouse/genealogy/link-consumption"
+    description: "Record LP consumed in production - called by Epic 04.6"
+    file: "apps/frontend/app/api/warehouse/genealogy/link-consumption/route.ts"
+    auth: "required"
+    roles: ["production_operator", "production_manager", "warehouse_operator", "admin", "owner"]
+    request:
+      body:
+        parentLpId: { type: "string", format: "uuid", required: true, description: "LP being consumed" }
+        childLpId: { type: "string", format: "uuid", required: true, description: "Output LP" }
+        woId: { type: "string", format: "uuid", required: true, description: "Work Order reference" }
+        quantity: { type: "number", required: true, description: "Quantity consumed" }
+        operationId: { type: "string", format: "uuid", required: false, description: "WO Operation reference" }
+    response:
+      status: 201
+      type: "GenealogyLink"
+      schema:
+        id: "UUID"
+        parentLpId: "UUID"
+        childLpId: "UUID"
+        operationType: "'consume'"
+        quantity: "number"
+        operationDate: "ISO8601"
+        woId: "UUID"
+        created: true
+    errors:
+      - { status: 400, code: "SELF_REFERENCE", message: "Cannot create self-referencing genealogy link" }
+      - { status: 400, code: "VALIDATION_ERROR", message: "Invalid input data" }
+      - { status: 404, code: "PARENT_LP_NOT_FOUND", message: "Parent LP not found" }
+      - { status: 404, code: "CHILD_LP_NOT_FOUND", message: "Child LP not found" }
+      - { status: 403, code: "ORG_MISMATCH", message: "LPs belong to different organizations" }
+      - { status: 409, code: "DUPLICATE_LINK", message: "Genealogy link already exists between these LPs" }
+
+  - method: "POST"
+    path: "/api/warehouse/genealogy/link-output"
+    description: "Link multiple consumed LPs to output LP - called by Epic 04.7"
+    file: "apps/frontend/app/api/warehouse/genealogy/link-output/route.ts"
+    auth: "required"
+    roles: ["production_operator", "production_manager", "admin", "owner"]
+    request:
+      body:
+        consumedLpIds: { type: "array", items: "uuid", required: true, description: "Array of consumed LP IDs" }
+        outputLpId: { type: "string", format: "uuid", required: true, description: "New output LP" }
+        woId: { type: "string", format: "uuid", required: true, description: "Work Order reference" }
+    response:
+      status: 201
+      type: "GenealogyLinkBatch"
+      schema:
+        ids: "UUID[]"
+        count: "number"
+        created: true
+    errors:
+      - { status: 400, code: "EMPTY_CONSUMED_LPS", message: "At least one consumed LP required" }
+      - { status: 404, code: "OUTPUT_LP_NOT_FOUND", message: "Output LP not found" }
+      - { status: 404, code: "CONSUMED_LP_NOT_FOUND", message: "One or more consumed LPs not found" }
+
+  - method: "POST"
+    path: "/api/warehouse/genealogy/link-split"
+    description: "Record split operation (source LP -> new LP)"
+    file: "apps/frontend/app/api/warehouse/genealogy/link-split/route.ts"
+    auth: "required"
+    roles: ["warehouse_operator", "warehouse_manager", "admin", "owner"]
+    request:
+      body:
+        sourceLpId: { type: "string", format: "uuid", required: true, description: "Original LP" }
+        newLpId: { type: "string", format: "uuid", required: true, description: "Split-off LP" }
+        quantity: { type: "number", required: true, description: "Quantity split" }
+    response:
+      status: 201
+      type: "GenealogyLink"
+      schema:
+        id: "UUID"
+        operationType: "'split'"
+        created: true
+    errors:
+      - { status: 400, code: "SELF_REFERENCE", message: "Source and new LP cannot be the same" }
+      - { status: 404, code: "SOURCE_LP_NOT_FOUND", message: "Source LP not found" }
+      - { status: 404, code: "NEW_LP_NOT_FOUND", message: "New LP not found" }
+
+  - method: "POST"
+    path: "/api/warehouse/genealogy/link-merge"
+    description: "Record merge operation (source LPs -> target LP)"
+    file: "apps/frontend/app/api/warehouse/genealogy/link-merge/route.ts"
+    auth: "required"
+    roles: ["warehouse_operator", "warehouse_manager", "admin", "owner"]
+    request:
+      body:
+        sourceLpIds: { type: "array", items: "uuid", required: true, description: "LPs being merged" }
+        targetLpId: { type: "string", format: "uuid", required: true, description: "Primary LP (remains)" }
+    response:
+      status: 201
+      type: "GenealogyLinkBatch"
+      schema:
+        ids: "UUID[]"
+        count: "number"
+        created: true
+    errors:
+      - { status: 400, code: "EMPTY_SOURCE_LPS", message: "At least one source LP required" }
+      - { status: 400, code: "SELF_MERGE", message: "Cannot merge LP into itself" }
+      - { status: 404, code: "TARGET_LP_NOT_FOUND", message: "Target LP not found" }
+
+  # ---------------------------------------------------------------------------
+  # Reverse Operation
+  # ---------------------------------------------------------------------------
+  - method: "POST"
+    path: "/api/warehouse/genealogy/:id/reverse"
+    description: "Mark genealogy link as reversed (for corrections)"
+    file: "apps/frontend/app/api/warehouse/genealogy/[id]/reverse/route.ts"
+    auth: "required"
+    roles: ["production_manager", "warehouse_manager", "admin", "owner"]
+    request:
+      params:
+        id: { type: "string", format: "uuid", required: true }
+    response:
+      status: 200
+      type: "GenealogyReversal"
+      schema:
+        id: "UUID"
+        reversed: true
+        reversedAt: "ISO8601"
+    errors:
+      - { status: 404, code: "GENEALOGY_NOT_FOUND", message: "Genealogy record not found" }
+      - { status: 400, code: "ALREADY_REVERSED", message: "Genealogy record already reversed" }
+
+  # ---------------------------------------------------------------------------
+  # Trace Queries
+  # ---------------------------------------------------------------------------
+  - method: "GET"
+    path: "/api/warehouse/genealogy/forward-trace/:lpId"
+    description: "Get all descendants of an LP"
+    file: "apps/frontend/app/api/warehouse/genealogy/forward-trace/[lpId]/route.ts"
+    auth: "required"
+    roles: ["*"]
+    request:
+      params:
+        lpId: { type: "string", format: "uuid", required: true }
+      query:
+        maxDepth: { type: "number", default: 10, min: 1, max: 10 }
+        includeReversed: { type: "boolean", default: false }
+    response:
+      status: 200
+      type: "GenealogyTraceResult"
+      schema:
+        lpId: "UUID"
+        descendants:
+          type: "array"
+          items:
+            lp_id: "UUID"
+            lp_number: "string"
+            product_name: "string"
+            operation_type: "'consume' | 'output' | 'split' | 'merge'"
+            quantity: "number"
+            operation_date: "ISO8601"
+            depth: "number"
+        hasMoreLevels: "boolean"
+        totalCount: "number"
+    errors:
+      - { status: 404, code: "LP_NOT_FOUND", message: "License plate not found" }
+
+  - method: "GET"
+    path: "/api/warehouse/genealogy/backward-trace/:lpId"
+    description: "Get all ancestors of an LP"
+    file: "apps/frontend/app/api/warehouse/genealogy/backward-trace/[lpId]/route.ts"
+    auth: "required"
+    roles: ["*"]
+    request:
+      params:
+        lpId: { type: "string", format: "uuid", required: true }
+      query:
+        maxDepth: { type: "number", default: 10, min: 1, max: 10 }
+        includeReversed: { type: "boolean", default: false }
+    response:
+      status: 200
+      type: "GenealogyTraceResult"
+      schema:
+        lpId: "UUID"
+        ancestors:
+          type: "array"
+          items:
+            lp_id: "UUID"
+            lp_number: "string"
+            product_name: "string"
+            operation_type: "'consume' | 'output' | 'split' | 'merge'"
+            quantity: "number"
+            operation_date: "ISO8601"
+            depth: "number"
+        hasMoreLevels: "boolean"
+        totalCount: "number"
+    errors:
+      - { status: 404, code: "LP_NOT_FOUND", message: "License plate not found" }
+
+  - method: "GET"
+    path: "/api/warehouse/genealogy/full-tree/:lpId"
+    description: "Get complete genealogy tree (both directions)"
+    file: "apps/frontend/app/api/warehouse/genealogy/full-tree/[lpId]/route.ts"
+    auth: "required"
+    roles: ["*"]
+    request:
+      params:
+        lpId: { type: "string", format: "uuid", required: true }
+      query:
+        direction: { type: "string", enum: ["forward", "backward", "both"], default: "both" }
+        maxDepth: { type: "number", default: 5, min: 1, max: 10 }
+    response:
+      status: 200
+      type: "GenealogyFullTree"
+      schema:
+        lpId: "UUID"
+        ancestors: "GenealogyNode[]"
+        descendants: "GenealogyNode[]"
+        hasMoreLevels:
+          ancestors: "boolean"
+          descendants: "boolean"
+    errors:
+      - { status: 404, code: "LP_NOT_FOUND", message: "License plate not found" }
+
+  - method: "GET"
+    path: "/api/warehouse/genealogy/by-wo/:woId"
+    description: "Get all genealogy records for a Work Order"
+    file: "apps/frontend/app/api/warehouse/genealogy/by-wo/[woId]/route.ts"
+    auth: "required"
+    roles: ["*"]
+    request:
+      params:
+        woId: { type: "string", format: "uuid", required: true }
+    response:
+      status: 200
+      type: "GenealogyByWO"
+      schema:
+        woId: "UUID"
+        genealogy:
+          consume: "GenealogyRecord[]"
+          output: "GenealogyRecord[]"
+        totalCount: "number"
+    errors:
+      - { status: 404, code: "WO_NOT_FOUND", message: "Work order not found" }
+
+  # ---------------------------------------------------------------------------
+  # LP Detail Integration
+  # ---------------------------------------------------------------------------
+  - method: "GET"
+    path: "/api/warehouse/license-plates/:id/genealogy"
+    description: "Get genealogy for LP detail page (limited depth)"
+    file: "apps/frontend/app/api/warehouse/license-plates/[id]/genealogy/route.ts"
+    auth: "required"
+    roles: ["*"]
+    request:
+      params:
+        id: { type: "string", format: "uuid", required: true }
+    response:
+      status: 200
+      type: "LPGenealogyDetail"
+      schema:
+        lpId: "UUID"
+        ancestors: "GenealogyNode[]"  # depth 3
+        descendants: "GenealogyNode[]"  # depth 3
+    errors:
+      - { status: 404, code: "LP_NOT_FOUND", message: "License plate not found" }
+
+# =============================================================================
+# Service Layer
+# =============================================================================
+services:
+  - path: "apps/frontend/lib/services/lp-genealogy-service.ts"
+    description: "LP Genealogy service with all CRUD and trace operations"
+    exports:
+      # Types
+      - name: "GenealogyLink"
+        type: "interface"
+        fields:
+          - "id: string"
+          - "orgId: string"
+          - "parentLpId: string"
+          - "childLpId: string"
+          - "operationType: OperationType"
+          - "quantity: number"
+          - "operationDate: Date"
+          - "woId?: string"
+          - "operationId?: string"
+          - "isReversed: boolean"
+          - "reversedAt?: Date"
+          - "reversedBy?: string"
+          - "createdAt: Date"
+          - "createdBy?: string"
+
+      - name: "GenealogyNode"
+        type: "interface"
+        fields:
+          - "lpId: string"
+          - "lpNumber: string"
+          - "productName: string"
+          - "operationType: OperationType"
+          - "quantity: number"
+          - "operationDate: string"
+          - "depth: number"
+
+      - name: "GenealogyTraceResult"
+        type: "interface"
+        fields:
+          - "lpId: string"
+          - "nodes: GenealogyNode[]"
+          - "hasMoreLevels: boolean"
+          - "totalCount: number"
+
+      - name: "OperationType"
+        type: "type"
+        definition: "'consume' | 'output' | 'split' | 'merge'"
+
+      # Link Operations (Epic 04 Contract)
+      - name: "linkConsumption"
+        type: "async function"
+        params:
+          - "parentLpId: string"
+          - "childLpId: string"
+          - "woId: string"
+          - "quantity: number"
+          - "operationId?: string"
+        returns: "Promise<GenealogyLink>"
+        description: "Link consumed LP to output LP - CRITICAL for Epic 04.6"
+
+      - name: "linkOutput"
+        type: "async function"
+        params:
+          - "consumedLpIds: string[]"
+          - "outputLpId: string"
+          - "woId: string"
+        returns: "Promise<GenealogyLink[]>"
+        description: "Link multiple consumed LPs to single output LP - CRITICAL for Epic 04.7"
+
+      - name: "linkSplit"
+        type: "async function"
+        params:
+          - "sourceLpId: string"
+          - "newLpId: string"
+          - "quantity: number"
+        returns: "Promise<GenealogyLink>"
+        description: "Record split operation"
+
+      - name: "linkMerge"
+        type: "async function"
+        params:
+          - "sourceLpIds: string[]"
+          - "targetLpId: string"
+        returns: "Promise<GenealogyLink[]>"
+        description: "Record merge operation"
+
+      - name: "reverseLink"
+        type: "async function"
+        params:
+          - "genealogyId: string"
+        returns: "Promise<void>"
+        description: "Mark genealogy link as reversed"
+
+      # Trace Operations
+      - name: "getForwardTrace"
+        type: "async function"
+        params:
+          - "lpId: string"
+          - "maxDepth?: number"
+          - "includeReversed?: boolean"
+        returns: "Promise<GenealogyTraceResult>"
+        description: "Get all descendants using recursive CTE"
+
+      - name: "getBackwardTrace"
+        type: "async function"
+        params:
+          - "lpId: string"
+          - "maxDepth?: number"
+          - "includeReversed?: boolean"
+        returns: "Promise<GenealogyTraceResult>"
+        description: "Get all ancestors using recursive CTE"
+
+      - name: "getFullTree"
+        type: "async function"
+        params:
+          - "lpId: string"
+          - "direction?: 'forward' | 'backward' | 'both'"
+          - "maxDepth?: number"
+        returns: "Promise<{ ancestors: GenealogyNode[]; descendants: GenealogyNode[]; hasMoreLevels: { ancestors: boolean; descendants: boolean } }>"
+        description: "Get complete genealogy tree"
+
+      - name: "getGenealogyByWO"
+        type: "async function"
+        params:
+          - "woId: string"
+        returns: "Promise<{ consume: GenealogyLink[]; output: GenealogyLink[] }>"
+        description: "Get all genealogy for a work order"
+
+# =============================================================================
+# Validation Schemas (Zod)
+# =============================================================================
+validation:
+  path: "apps/frontend/lib/validation/lp-genealogy-schemas.ts"
+  exports:
+    - name: "OperationTypeEnum"
+      type: "z.enum"
+      values: ["consume", "output", "split", "merge"]
+
+    - name: "LinkConsumptionSchema"
+      type: "z.object"
+      fields:
+        parentLpId: "z.string().uuid('Invalid parent LP ID')"
+        childLpId: "z.string().uuid('Invalid child LP ID')"
+        woId: "z.string().uuid('Invalid Work Order ID')"
+        quantity: "z.number().positive('Quantity must be positive')"
+        operationId: "z.string().uuid().optional()"
+      refinements:
+        - "data.parentLpId !== data.childLpId: 'Parent and child LP cannot be the same'"
+
+    - name: "LinkOutputSchema"
+      type: "z.object"
+      fields:
+        consumedLpIds: "z.array(z.string().uuid()).min(1, 'At least one consumed LP required')"
+        outputLpId: "z.string().uuid('Invalid output LP ID')"
+        woId: "z.string().uuid('Invalid Work Order ID')"
+
+    - name: "LinkSplitSchema"
+      type: "z.object"
+      fields:
+        sourceLpId: "z.string().uuid('Invalid source LP ID')"
+        newLpId: "z.string().uuid('Invalid new LP ID')"
+        quantity: "z.number().positive('Quantity must be positive')"
+      refinements:
+        - "data.sourceLpId !== data.newLpId: 'Source and new LP cannot be the same'"
+
+    - name: "LinkMergeSchema"
+      type: "z.object"
+      fields:
+        sourceLpIds: "z.array(z.string().uuid()).min(1, 'At least one source LP required')"
+        targetLpId: "z.string().uuid('Invalid target LP ID')"
+
+    - name: "TraceQuerySchema"
+      type: "z.object"
+      fields:
+        maxDepth: "z.coerce.number().int().min(1).max(10).default(10)"
+        includeReversed: "z.coerce.boolean().default(false)"
+
+    - name: "GenealogyDirectionSchema"
+      type: "z.enum"
+      values: ["forward", "backward", "both"]
+      default: "both"
+
+# =============================================================================
+# TypeScript Types
+# =============================================================================
+types:
+  - path: "apps/frontend/lib/types/genealogy.ts"
+    description: "Genealogy TypeScript interfaces"
+    exports:
+      - "OperationType"
+      - "GenealogyLink"
+      - "GenealogyNode"
+      - "GenealogyTraceResult"
+      - "GenealogyFullTree"
+      - "LinkConsumptionInput"
+      - "LinkOutputInput"
+      - "LinkSplitInput"
+      - "LinkMergeInput"
+
+# =============================================================================
+# Implementation Patterns
+# =============================================================================
+patterns:
+  api_route_pattern: |
+    // Example: apps/frontend/app/api/warehouse/genealogy/link-consumption/route.ts
+    import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+    import { cookies } from 'next/headers';
+    import { NextRequest, NextResponse } from 'next/server';
+    import { linkConsumption } from '@/lib/services/lp-genealogy-service';
+    import { LinkConsumptionSchema } from '@/lib/validation/lp-genealogy-schemas';
+
+    export async function POST(request: NextRequest) {
+      try {
+        const supabase = createRouteHandlerClient({ cookies });
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+        if (authError || !user) {
+          return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const body = await request.json();
+        const validated = LinkConsumptionSchema.parse(body);
+
+        const result = await linkConsumption(
+          validated.parentLpId,
+          validated.childLpId,
+          validated.woId,
+          validated.quantity,
+          validated.operationId
+        );
+
+        return NextResponse.json({ ...result, created: true }, { status: 201 });
+      } catch (error) {
+        // Handle validation errors, not found, conflicts, etc.
+        return handleApiError(error);
+      }
+    }
+
+  service_pattern: |
+    // Example: Trace using RPC function
+    export async function getForwardTrace(
+      lpId: string,
+      maxDepth: number = 10,
+      includeReversed: boolean = false
+    ): Promise<GenealogyTraceResult> {
+      const orgId = await getOrgIdFromContext();
+
+      const { data, error } = await supabase.rpc('get_lp_forward_trace', {
+        p_lp_id: lpId,
+        p_org_id: orgId,
+        p_max_depth: Math.min(maxDepth, 10),
+        p_include_reversed: includeReversed,
+      });
+
+      if (error) throw error;
+
+      const hasMoreLevels = data.some((node: any) => node.depth === maxDepth);
+
+      return {
+        lpId,
+        nodes: data,
+        hasMoreLevels,
+        totalCount: data.length,
+      };
+    }
+
+# =============================================================================
+# Performance Requirements
+# =============================================================================
+performance:
+  - endpoint: "POST /genealogy/link-consumption"
+    target: "<200ms"
+    notes: "Single insert operation"
+
+  - endpoint: "POST /genealogy/link-output"
+    target: "<500ms"
+    notes: "Batch insert for multiple LPs"
+
+  - endpoint: "GET /genealogy/forward-trace/:lpId"
+    target: "<500ms for 10 levels"
+    notes: "Recursive CTE with proper indexes"
+
+  - endpoint: "GET /genealogy/backward-trace/:lpId"
+    target: "<500ms for 10 levels"
+    notes: "Recursive CTE with proper indexes"
+
+  - endpoint: "GET /genealogy/full-tree/:lpId"
+    target: "<1000ms for complex tree"
+    notes: "Parallel forward + backward queries"
+
+  - endpoint: "GET /genealogy/by-wo/:woId"
+    target: "<300ms"
+    notes: "Simple query with wo_id index"

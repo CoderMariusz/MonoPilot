@@ -1,0 +1,683 @@
+# Story 06.17 - Tests Context
+# Generated: 2026-01-15
+# Purpose: Test specifications, acceptance criteria verification
+
+# =============================================================================
+# TEST STRATEGY
+# =============================================================================
+
+test_strategy:
+  unit_tests:
+    coverage_target: 80%
+    framework: vitest
+    focus_areas:
+      - AlertService methods
+      - Template rendering
+      - Preference resolution
+      - Phone number validation
+      - Quiet hours logic
+  integration_tests:
+    framework: vitest
+    focus_areas:
+      - API endpoints
+      - RLS policies
+      - Database operations
+      - Delivery logging
+  websocket_tests:
+    framework: vitest
+    focus_areas:
+      - Real-time delivery
+      - Connection handling
+      - Event subscription
+  e2e_tests:
+    framework: playwright
+    focus_areas:
+      - Full alert flow
+      - Preferences flow
+      - Acknowledge flow
+      - WebSocket integration
+
+# =============================================================================
+# UNIT TESTS
+# =============================================================================
+
+unit_tests:
+  file: lib/services/__tests__/alert-service.test.ts
+
+  describe_blocks:
+    - name: AlertService
+      tests:
+        # createAlert
+        - describe: createAlert
+          tests:
+            - it: creates alert with correct fields
+              given: valid alert input
+              when: createAlert called
+              then: alert created with all fields populated
+              assertions:
+                - "alert.id is UUID"
+                - "alert.alert_number matches QA-YYYY-NNNNN"
+                - "alert.org_id matches input"
+                - "alert.severity matches input"
+                - "alert.status is 'pending'"
+
+            - it: generates unique alert number
+              given: org exists
+              when: createAlert called twice
+              then: two different alert numbers generated
+              assertions:
+                - "first is QA-2026-00001"
+                - "second is QA-2026-00002"
+
+            - it: resolves recipients from template roles
+              given: template with default_recipients = ["QA_MANAGER"]
+              and: org has 2 QA Managers
+              when: createAlert called
+              then: 2 recipient records created
+              assertions:
+                - "recipients.length === 2"
+                - "each recipient has user_id of a QA Manager"
+
+            - it: renders template with data
+              given: template with subject "CCP {{ccp_name}} Deviation"
+              when: createAlert called with data { ccp_name: "Cooking Temp" }
+              then: subject is "CCP Cooking Temp Deviation"
+
+            - it: sets next_escalation_at based on template
+              given: template with escalation_timeout_min = 60
+              when: createAlert called
+              then: next_escalation_at is now + 60 minutes
+
+        # deliverAlert
+        - describe: deliverAlert
+          tests:
+            - it: sends WebSocket to online users
+              given: user is connected via WebSocket
+              when: deliverAlert called
+              then: WebSocket message sent
+              assertions:
+                - "recipient.websocket_sent_at updated"
+                - "recipient.websocket_delivered_at updated"
+
+            - it: queues email for enabled users
+              given: user has email_enabled = true
+              when: deliverAlert called
+              then: email queued
+              assertions:
+                - "recipient.email_sent_at updated"
+                - "delivery_log entry created with channel = 'email'"
+
+            - it: queues SMS for critical + enabled
+              given: alert severity = 'critical'
+              and: user has sms_enabled = true
+              when: deliverAlert called
+              then: SMS queued
+              assertions:
+                - "recipient.sms_sent_at updated"
+                - "delivery_log entry created with channel = 'sms'"
+
+            - it: does not send SMS for non-critical
+              given: alert severity = 'medium'
+              and: user has sms_enabled = true
+              when: deliverAlert called
+              then: SMS NOT queued
+              assertions:
+                - "recipient.sms_sent_at is NULL"
+
+            - it: respects quiet hours for non-critical
+              given: alert severity = 'medium'
+              and: user has quiet_hours_enabled = true
+              and: current time is within quiet hours
+              when: deliverAlert called
+              then: email NOT sent, WebSocket still sent
+
+            - it: ignores quiet hours for critical
+              given: alert severity = 'critical'
+              and: user has quiet_hours_enabled = true
+              and: current time is within quiet hours
+              when: deliverAlert called
+              then: all channels sent
+
+        # acknowledge
+        - describe: acknowledge
+          tests:
+            - it: updates recipient record
+              given: user is recipient of alert
+              when: acknowledge called
+              then: recipient.acknowledged_at set
+              assertions:
+                - "recipient.status = 'acknowledged'"
+                - "recipient.acknowledgment_notes = notes"
+
+            - it: updates alert on first acknowledgment
+              given: alert has 3 recipients, none acknowledged
+              when: first recipient acknowledges
+              then: alert.acknowledged_at set
+              assertions:
+                - "alert.acknowledged_by = user_id"
+                - "alert.status = 'acknowledged'"
+
+            - it: stops escalation
+              given: alert has next_escalation_at in future
+              when: acknowledge called
+              then: next_escalation_at = NULL
+
+            - it: creates audit log entry
+              given: acknowledge called
+              then: delivery_log entry created
+              assertions:
+                - "log.channel = 'internal'"
+                - "log.status = 'acknowledged'"
+
+        # processEscalations
+        - describe: processEscalations
+          tests:
+            - it: escalates overdue alerts
+              given: alert with next_escalation_at in past
+              and: status = 'pending'
+              when: processEscalations called
+              then: alert escalated
+              assertions:
+                - "alert.escalation_level = 1"
+                - "alert.escalated_at set"
+
+            - it: adds escalation recipients
+              given: template with escalation_roles = ["QUALITY_DIRECTOR"]
+              when: alert escalated
+              then: new recipient records created
+              assertions:
+                - "new recipients have escalation_level = 1"
+
+            - it: skips acknowledged alerts
+              given: alert with status = 'acknowledged'
+              when: processEscalations called
+              then: alert NOT escalated
+
+            - it: sets next escalation if more levels
+              given: escalation_level = 0
+              and: more escalation roles exist
+              when: alert escalated
+              then: next_escalation_at set for next level
+
+        # isChannelEnabled
+        - describe: isChannelEnabled
+          tests:
+            - it: returns default preference
+              given: no overrides configured
+              when: isChannelEnabled called for email, medium
+              then: returns email_enabled value
+
+            - it: respects severity override
+              given: severity_preferences.critical.email = false
+              when: isChannelEnabled called for email, critical
+              then: returns false
+
+            - it: respects alert type override
+              given: alert_type_preferences.ccp_deviation.email = false
+              when: isChannelEnabled called for email, critical, ccp_deviation
+              then: returns false
+
+            - it: critical always enables websocket
+              given: websocket_enabled = false
+              when: isChannelEnabled called for websocket, critical
+              then: returns true (overridden)
+
+        # renderTemplate
+        - describe: renderTemplate
+          tests:
+            - it: replaces simple variables
+              given: template "Hello {{name}}"
+              and: data { name: "World" }
+              when: renderTemplate called
+              then: result is "Hello World"
+
+            - it: handles missing variables
+              given: template "Hello {{name}}"
+              and: data {}
+              when: renderTemplate called
+              then: result is "Hello "
+
+            - it: handles nested variables
+              given: template "CCP: {{ccp.name}}"
+              and: data { ccp: { name: "Cooking" } }
+              when: renderTemplate called
+              then: result is "CCP: Cooking"
+
+# =============================================================================
+# INTEGRATION TESTS
+# =============================================================================
+
+integration_tests:
+  file: app/api/quality/alerts/__tests__/route.test.ts
+
+  describe_blocks:
+    - name: Alerts API
+      tests:
+        # GET /api/quality/alerts
+        - describe: "GET /api/quality/alerts"
+          tests:
+            - it: returns user alerts only
+              given: user A has 5 alerts, user B has 3 alerts
+              when: user A calls GET /api/quality/alerts
+              then: 5 alerts returned
+              assertions:
+                - "all alerts have recipient.user_id = user A"
+
+            - it: filters by severity
+              given: user has 3 critical, 2 medium alerts
+              when: GET /api/quality/alerts?severity=critical
+              then: 3 alerts returned
+
+            - it: filters by status
+              given: user has 2 pending, 3 read alerts
+              when: GET /api/quality/alerts?status=pending
+              then: 2 alerts returned
+
+            - it: returns unread_only
+              given: user has 2 read, 3 unread alerts
+              when: GET /api/quality/alerts?unread_only=true
+              then: 3 alerts returned
+
+            - it: paginates correctly
+              given: user has 50 alerts
+              when: GET /api/quality/alerts?page=2&limit=20
+              then: 20 alerts returned, pagination.page = 2
+
+            - it: enforces RLS
+              given: user A from org A, user B from org B
+              and: alert belongs to org A
+              when: user B calls GET /api/quality/alerts
+              then: alert NOT returned
+
+        # GET /api/quality/alerts/unread-count
+        - describe: "GET /api/quality/alerts/unread-count"
+          tests:
+            - it: returns correct counts by severity
+              given: user has 2 critical unread, 1 high unread, 3 medium read
+              when: GET /api/quality/alerts/unread-count
+              then: { total: 3, critical: 2, high: 1, medium: 0, low: 0 }
+
+            - it: returns empty counts for new user
+              given: user has no alerts
+              when: GET /api/quality/alerts/unread-count
+              then: { total: 0, critical: 0, high: 0, medium: 0, low: 0 }
+
+        # POST /api/quality/alerts/:id/acknowledge
+        - describe: "POST /api/quality/alerts/:id/acknowledge"
+          tests:
+            - it: acknowledges as recipient
+              given: user is recipient of alert
+              when: POST /api/quality/alerts/:id/acknowledge
+              then: 200, alert acknowledged
+
+            - it: returns 404 for non-recipient
+              given: user is NOT recipient of alert
+              when: POST /api/quality/alerts/:id/acknowledge
+              then: 404 NOT_FOUND
+
+            - it: stops escalation
+              given: alert has next_escalation_at
+              when: POST /api/quality/alerts/:id/acknowledge
+              then: next_escalation_at = NULL
+
+            - it: creates audit log
+              when: acknowledge called
+              then: delivery_log entry created
+
+            - it: accepts optional notes
+              given: acknowledge with notes = "Reviewed and resolved"
+              when: POST /api/quality/alerts/:id/acknowledge
+              then: recipient.acknowledgment_notes = "Reviewed and resolved"
+
+        # PUT /api/quality/alerts/:id/read
+        - describe: "PUT /api/quality/alerts/:id/read"
+          tests:
+            - it: marks as read
+              given: user is recipient, read_at = NULL
+              when: PUT /api/quality/alerts/:id/read
+              then: 200, recipient.read_at set
+
+            - it: sets first_read_at on alert
+              given: no recipients have read
+              when: first recipient marks as read
+              then: alert.first_read_at set
+
+            - it: returns 404 for non-recipient
+              given: user is NOT recipient
+              when: PUT /api/quality/alerts/:id/read
+              then: 404 NOT_FOUND
+
+        # PUT /api/quality/alerts/preferences
+        - describe: "PUT /api/quality/alerts/preferences"
+          tests:
+            - it: updates preferences
+              given: valid preferences payload
+              when: PUT /api/quality/alerts/preferences
+              then: 200, preferences updated
+
+            - it: validates phone number format
+              given: sms_phone_number = "invalid"
+              when: PUT /api/quality/alerts/preferences
+              then: 400 VALIDATION_ERROR
+
+            - it: requires phone for SMS
+              given: sms_enabled = true, sms_phone_number = null
+              when: PUT /api/quality/alerts/preferences
+              then: 400 PHONE_REQUIRED
+
+            - it: validates time format
+              given: quiet_hours_start = "25:00"
+              when: PUT /api/quality/alerts/preferences
+              then: 400 VALIDATION_ERROR
+
+        # POST /api/quality/alerts/send
+        - describe: "POST /api/quality/alerts/send"
+          tests:
+            - it: sends to specified recipients
+              given: valid alert payload with 3 recipients
+              when: POST /api/quality/alerts/send
+              then: 201, alert created with 3 recipients
+
+            - it: requires QA_MANAGER role
+              given: user is QA_INSPECTOR
+              when: POST /api/quality/alerts/send
+              then: 403 FORBIDDEN
+
+            - it: validates required fields
+              given: missing subject
+              when: POST /api/quality/alerts/send
+              then: 400 VALIDATION_ERROR
+
+        # POST /api/quality/alerts/test
+        - describe: "POST /api/quality/alerts/test"
+          tests:
+            - it: sends test alert to current user only
+              when: POST /api/quality/alerts/test
+              then: 200, test alert created
+              assertions:
+                - "recipients.length === 1"
+                - "recipients[0].user_id === current user"
+                - "alert.metadata.is_test === true"
+
+# =============================================================================
+# WEBSOCKET TESTS
+# =============================================================================
+
+websocket_tests:
+  file: lib/websocket/__tests__/alert-handler.test.ts
+
+  describe_blocks:
+    - name: Alert WebSocket
+      tests:
+        - it: delivers alert to connected user
+          given: user is connected to WebSocket
+          when: alert created with user as recipient
+          then: quality_alert event received
+          assertions:
+            - "event.payload.alert_id matches"
+            - "event.payload.severity matches"
+
+        - it: delivers to multiple connected recipients
+          given: 3 users connected, all are recipients
+          when: alert created
+          then: all 3 receive quality_alert event
+
+        - it: handles disconnected user gracefully
+          given: user is NOT connected
+          when: alert created with user as recipient
+          then: no error, websocket_delivered_at remains NULL
+
+        - it: sends acknowledged event
+          given: user A and user B are recipients
+          and: both connected
+          when: user A acknowledges
+          then: user B receives alert_acknowledged event
+
+# =============================================================================
+# RLS TESTS
+# =============================================================================
+
+rls_tests:
+  file: supabase/__tests__/rls/quality-alerts.test.ts
+
+  describe_blocks:
+    - name: Alert RLS Policies
+      tests:
+        - it: user can only see their own alerts
+          given: user A is recipient of alert 1
+          and: user B is recipient of alert 2
+          when: user A queries quality_alert_recipients
+          then: only alert 1 recipient returned
+
+        - it: admin can see all org alerts
+          given: admin user in org A
+          when: admin queries quality_alerts
+          then: all org A alerts returned
+
+        - it: cross-org access blocked
+          given: user A in org A, alert in org B
+          when: user A queries quality_alerts
+          then: alert NOT returned
+
+        - it: user can update own preferences only
+          given: user A has preferences
+          when: user B tries to update A's preferences
+          then: update blocked
+
+        - it: delivery log is append-only
+          given: delivery_log entry exists
+          when: attempt to UPDATE
+          then: operation blocked
+
+# =============================================================================
+# E2E TESTS
+# =============================================================================
+
+e2e_tests:
+  file: tests/e2e/quality-alerts.spec.ts
+
+  describe_blocks:
+    - name: Quality Alerts E2E
+      tests:
+        - describe: complete alert flow
+          steps:
+            - action: Login as QA Manager
+            - action: Create critical NCR
+            - verify: Alert created
+            - verify: Alert bell shows unread count
+            - verify: WebSocket message received (toast shown)
+            - action: Open alert dropdown
+            - verify: Alert appears in list
+            - verify: Severity badge is red (critical)
+            - action: Click acknowledge button
+            - verify: Confirmation dialog shown
+            - action: Enter notes and confirm
+            - verify: Alert marked as acknowledged
+            - verify: Unread count decremented
+            - verify: Escalation stopped (if applicable)
+
+        - describe: alert preferences flow
+          steps:
+            - action: Login as any user
+            - action: Navigate to Settings > Notifications
+            - verify: Preferences form displayed
+            - action: Enable SMS
+            - verify: Phone number field appears
+            - action: Enter valid phone number
+            - action: Enable quiet hours
+            - action: Set start time 22:00, end time 07:00
+            - action: Save preferences
+            - verify: Success toast shown
+            - action: Click Test Notification button
+            - verify: Test alert received
+            - action: Check email was sent (mock verification)
+
+        - describe: alert bell badge
+          steps:
+            - action: Login as QA Inspector
+            - verify: Alert bell visible in header
+            - trigger: Create alert via API (backend)
+            - verify: Badge count updates (real-time)
+            - verify: Badge is red (critical alert)
+            - action: Click alert bell
+            - verify: Dropdown shows new alert at top
+            - action: Click alert item
+            - verify: Alert marked as read
+            - verify: Badge count decremented
+
+        - describe: escalation flow
+          steps:
+            - action: Create critical alert (via API)
+            - action: Wait for escalation timeout (mock time)
+            - trigger: Run escalation cron job
+            - verify: Alert escalated
+            - verify: QUALITY_DIRECTOR added as recipient
+            - verify: Escalation notification sent
+
+# =============================================================================
+# ACCEPTANCE CRITERIA MAPPING
+# =============================================================================
+
+acceptance_criteria_mapping:
+  AC-1: # Alert Table Structure
+    tests:
+      - "Database migration creates all tables"
+      - "RLS policies enforce org isolation"
+      - "Alert number generation works"
+    coverage: "Integration tests + manual verification"
+
+  AC-2: # Alert Creation - CCP Deviation
+    tests:
+      - "unit: createAlert with CCP deviation template"
+      - "integration: POST /api/quality/alerts/send with ccp_deviation"
+    coverage: "Unit + Integration"
+
+  AC-3: # Alert Creation - Critical NCR
+    tests:
+      - "e2e: complete alert flow (creates NCR -> alert)"
+    coverage: "E2E"
+
+  AC-4: # Alert Creation - Failed Inspection
+    tests:
+      - "integration: inspection failure triggers alert"
+    coverage: "Integration (requires 06.5 integration)"
+
+  AC-5: # Alert Routing by Role
+    tests:
+      - "unit: resolveRecipients from roles"
+      - "unit: isChannelEnabled respects preferences"
+    coverage: "Unit"
+
+  AC-6: # Alert Delivery - WebSocket
+    tests:
+      - "websocket: delivers to connected user"
+      - "websocket: handles disconnected gracefully"
+    coverage: "WebSocket tests"
+
+  AC-7: # Alert Delivery - Email
+    tests:
+      - "unit: sendEmail queues correctly"
+      - "integration: delivery_log created"
+    coverage: "Unit + Integration"
+
+  AC-8: # Alert Delivery - SMS
+    tests:
+      - "unit: sendSMS only for critical"
+      - "unit: validates phone number"
+    coverage: "Unit"
+
+  AC-9: # Alert Acknowledgment
+    tests:
+      - "unit: acknowledge updates recipient"
+      - "unit: first acknowledgment updates alert"
+      - "integration: POST /:id/acknowledge works"
+    coverage: "Unit + Integration"
+
+  AC-10: # Alert Read/Unread Status
+    tests:
+      - "integration: PUT /:id/read marks as read"
+      - "integration: GET /unread-count returns correct values"
+    coverage: "Integration"
+
+  AC-11: # Alert List API
+    tests:
+      - "integration: GET /api/quality/alerts with filters"
+      - "integration: pagination works"
+    coverage: "Integration"
+
+  AC-12: # Alert Preferences API
+    tests:
+      - "integration: GET /preferences returns data"
+      - "integration: PUT /preferences validates and saves"
+    coverage: "Integration"
+
+  AC-13: # Escalation Rules
+    tests:
+      - "unit: processEscalations finds overdue"
+      - "unit: escalateAlert adds recipients"
+      - "e2e: escalation flow"
+    coverage: "Unit + E2E"
+
+  AC-14: # Alert Bell UI
+    tests:
+      - "e2e: alert bell badge updates real-time"
+      - "e2e: dropdown shows recent alerts"
+    coverage: "E2E"
+
+  AC-15: # Alert Preferences Page
+    tests:
+      - "e2e: preferences form saves correctly"
+      - "e2e: SMS requires phone"
+    coverage: "E2E"
+
+  AC-16: # Admin Alert Management
+    tests:
+      - "integration: POST /send requires QA_MANAGER"
+      - "integration: POST /test sends to self only"
+    coverage: "Integration"
+
+  AC-17: # Audit Trail
+    tests:
+      - "unit: delivery_log created for all actions"
+      - "rls: delivery_log is append-only"
+    coverage: "Unit + RLS"
+
+  AC-18: # Performance Requirements
+    tests:
+      - "Manual: measure response times"
+    coverage: "Performance testing (manual)"
+
+# =============================================================================
+# TEST DATA / FIXTURES
+# =============================================================================
+
+fixtures:
+  - name: alertTemplates
+    description: "Default alert templates for testing"
+    data:
+      - template_code: ccp_deviation
+        severity: critical
+        subject_template: "CCP {{ccp_name}} Deviation"
+        body_template: "Value: {{value}}"
+      - template_code: test_alert
+        severity: medium
+        subject_template: "Test Alert"
+        body_template: "This is a test"
+
+  - name: userWithPreferences
+    description: "User with configured preferences"
+    data:
+      email_enabled: true
+      sms_enabled: true
+      sms_phone_number: "+12025551234"
+      quiet_hours_enabled: true
+      quiet_hours_start: "22:00"
+      quiet_hours_end: "07:00"
+
+  - name: alertWithRecipients
+    description: "Alert with multiple recipients"
+    data:
+      severity: critical
+      alert_type: ccp_deviation
+      subject: "Test CCP Deviation"
+      recipients: 3

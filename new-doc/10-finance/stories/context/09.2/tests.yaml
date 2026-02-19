@@ -1,0 +1,17 @@
+unit_tests:
+  StandardCostService:
+    - "create() creates draft with total_cost calculated"
+    - "approve() changes status to approved"
+    - "activate() supersedes old active costs"
+    - "getByProduct() returns active cost"
+    - "getHistory() returns all versions"
+
+integration_tests:
+  - "POST /api/finance/standard-costs creates draft"
+  - "POST /:id/approve requires finance_manager role"
+  - "GET /by-product/:id returns 404 if no active cost"
+  - "Overlapping active costs prevented by constraint"
+
+e2e_tests:
+  - "Create standard cost → Approve → Activate workflow"
+  - "View cost history and compare versions"

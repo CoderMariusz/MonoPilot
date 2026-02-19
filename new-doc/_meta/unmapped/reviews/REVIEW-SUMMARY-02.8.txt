@@ -1,0 +1,159 @@
+CODE REVIEW SUMMARY: Story 02.8 - Routing Operations Management
+========================================================================
+
+DECISION: REQUEST_CHANGES (BLOCKING)
+REVIEWER: CODE-REVIEWER Agent
+DATE: 2025-12-28
+
+RATINGS:
+  Security:      4/10 (CRITICAL ISSUES)
+  Code Quality:  7/10 (ACCEPTABLE)
+  Overall:       BLOCKING
+
+TEST STATUS: 60/60 PASSING (100%)
+
+ISSUES FOUND: 8 total
+  - CRITICAL: 3 (BLOCKING)
+  - MAJOR:    2 (Should fix)
+  - MINOR:    3 (Nice to have)
+
+========================================================================
+CRITICAL ISSUES (MUST FIX BEFORE MERGE)
+========================================================================
+
+1. SEC-001: Missing RLS policies on routing_operations table
+   Location: supabase/migrations/*
+   Impact: CROSS-TENANT DATA EXPOSURE
+   Fix: Create migration with ADR-013 standard RLS policy
+   Time: 2 hours
+
+2. SEC-002: Service layer using admin client bypasses RLS
+   Location: routing-operations-service.ts:296
+   Impact: RLS BYPASS IN CREATE OPERATION
+   Fix: Replace createServerSupabaseAdmin() with createServerSupabase()
+   Time: 1 hour
+
+3. DB-001: Missing base table migration
+   Location: supabase/migrations/*
+   Impact: CODE CANNOT RUN
+   Fix: Create 046_create_routing_operations.sql
+   Time: 2 hours
+
+TOTAL CRITICAL FIX TIME: 4-6 hours
+
+========================================================================
+MAJOR ISSUES (SHOULD FIX)
+========================================================================
+
+4. CODE-001: Database schema mismatch
+   Location: routing-operations-service.ts:247-249
+   Fix: Map cleanup_time and instructions from actual DB fields
+   Time: 1 hour
+
+5. SEC-003: Manual permission parsing in API routes
+   Location: operations/route.ts:92-96
+   Fix: Create centralized permission service
+   Time: 3 hours
+
+========================================================================
+POSITIVE HIGHLIGHTS
+========================================================================
+
+EXCELLENT (10/10):
+  - Parallel Operations Logic
+  - Test Coverage (60/60 passing)
+
+VERY GOOD (9/10):
+  - Validation Schemas
+  - TypeScript Types
+
+GOOD (8/10):
+  - Service Layer Structure
+
+========================================================================
+WHAT WORKS WELL
+========================================================================
+
+1. Parallel operations implementation is PERFECT
+   - MAX duration per sequence group (not SUM)
+   - SUM cost for all ops (parallel still incur cost)
+   - Correctly implements FR-2.48
+
+2. Comprehensive validation with Zod
+   - All fields validated with clear error messages
+   - Attachment validation (type, size, count)
+   - Helper functions for common checks
+
+3. Complete type coverage
+   - All interfaces well-defined
+   - Nullable fields correctly marked
+   - Request/response types clear
+
+4. 100% test coverage
+   - All 32 ACs covered
+   - Unit + integration + E2E tests
+   - RLS tests (though RLS not implemented!)
+
+========================================================================
+WHY REQUEST_CHANGES WITH 100% TESTS PASSING?
+========================================================================
+
+SECURITY TRUMPS TEST COVERAGE.
+
+Missing RLS policies = CRITICAL SECURITY VULNERABILITY
+- Org A can read/modify Org B's routing operations
+- Data breach risk in multi-tenant SaaS
+- GDPR violation potential
+
+Tests pass because they likely use admin/service role which bypasses RLS.
+
+This is why security reviews are essential even when tests pass.
+
+========================================================================
+NEXT STEPS
+========================================================================
+
+P0 - CRITICAL (4-6 hours):
+  1. Create RLS policies migration
+  2. Create base table migration
+  3. Fix admin client bypass in createOperation
+
+P1 - MAJOR (4 hours):
+  4. Fix database field mapping
+  5. Create centralized permission service
+
+P2 - MINOR (3 hours):
+  6. Add parallel operations UI indicator
+  7. Fix average_yield placeholder
+  8. Add accessibility attributes
+
+========================================================================
+APPROVAL CRITERIA STATUS
+========================================================================
+
+[✓] All AC implemented (60/60 tests)
+[✗] No CRITICAL security issues (FAILED: Missing RLS)
+[✗] No MAJOR security issues (FAILED: Admin client bypass)
+[✓] Tests pass with coverage (100%)
+[✓] Positive feedback included
+[✓] All issues have file:line references
+
+STATUS: 4 of 6 criteria met → REQUEST_CHANGES
+
+========================================================================
+HANDOFF TO DEV
+========================================================================
+
+Fix the 3 CRITICAL issues first (estimated 4-6 hours), then request
+re-review. The business logic is production-ready, but security gaps
+must be addressed before deployment.
+
+MAJOR and MINOR issues can be addressed in follow-up story if time
+is constrained.
+
+DETAILED REPORT: docs/2-MANAGEMENT/reviews/code-review-story-02.8.md
+YAML HANDOFF:    docs/2-MANAGEMENT/reviews/code-review-story-02.8.yaml
+
+========================================================================
+END OF SUMMARY
+========================================================================

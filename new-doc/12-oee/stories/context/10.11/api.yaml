@@ -1,0 +1,119 @@
+# Story 10.11 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling, services
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  # GET Downtime Pareto Analysis
+  - method: "GET"
+    path: "/api/oee/downtime/analysis"
+    description: "Get downtime Pareto analysis data"
+    file: "apps/frontend/app/api/oee/downtime/analysis/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    request:
+      query_params:
+        date_from: "string (required) - YYYY-MM-DD"
+        date_to: "string (required) - YYYY-MM-DD"
+        limit: "number (optional) - Top N reasons, default: 10"
+        line_id: "string (optional) - UUID of production line"
+        machine_id: "string (optional) - UUID of machine"
+        category: "string (optional) - Reason category filter"
+
+    response:
+      status: 200
+      type: "DowntimeParetoResponse"
+      schema:
+        reasons:
+          - reason_code: "string"
+            reason_name: "string"
+            category: "string | null"
+            event_count: "number"
+            total_duration: "number (minutes)"
+            avg_duration: "number (minutes)"
+            percentage: "number (0-100)"
+            cumulative_percentage: "number (0-100)"
+            rank: "number"
+        summary:
+          total_downtime: "number (minutes)"
+          total_events: "number"
+          unique_reasons: "number"
+          top_reason: "string"
+          top_reason_percentage: "number"
+          reasons_for_80_percent: "number"
+        period:
+          date_from: "string"
+          date_to: "string"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 400
+        code: "INVALID_DATE_RANGE"
+        message: "date_from must be before date_to"
+      - status: 400
+        code: "INVALID_LIMIT"
+        message: "Limit must be between 1 and 50"
+
+    performance:
+      target_ms: 500
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/downtime-analysis-service.ts"
+    description: "Downtime Pareto analysis service"
+    exports:
+      - name: "DowntimeAnalysisService"
+        type: "class"
+        methods:
+          - name: "getParetoAnalysis"
+            type: "static async"
+            params: ["params: ParetoAnalysisParams"]
+            returns: "Promise<DowntimeParetoResponse>"
+            description: "Get aggregated downtime data for Pareto chart"
+
+          - name: "calculateCumulativePercentage"
+            type: "static"
+            params: ["reasons: ReasonTotal[]"]
+            returns: "ReasonWithCumulative[]"
+            description: "Add cumulative percentage to each reason"
+
+          - name: "getSummaryStats"
+            type: "static"
+            params: ["reasons: ReasonTotal[]"]
+            returns: "ParetoSummary"
+            description: "Calculate summary statistics"
+
+          - name: "getReasonsFor80Percent"
+            type: "static"
+            params: ["reasons: ReasonWithCumulative[]"]
+            returns: "number"
+            description: "Count reasons accounting for 80% of downtime"
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/downtime-analysis.ts"
+    description: "Downtime Pareto TypeScript interfaces"
+    exports:
+      - "ParetoAnalysisParams"
+      - "DowntimeParetoResponse"
+      - "ReasonTotal"
+      - "ReasonWithCumulative"
+      - "ParetoSummary"
+
+# Validation
+validation:
+  - path: "apps/frontend/lib/validation/downtime-analysis-validation.ts"
+    schemas:
+      - name: "paretoAnalysisParamsSchema"
+        validates: "ParetoAnalysisParams"
+        rules:
+          - "date_from: string().regex(/^\\d{4}-\\d{2}-\\d{2}$/)"
+          - "date_to: string().regex(/^\\d{4}-\\d{2}-\\d{2}$/)"
+          - "limit: number().min(1).max(50).default(10)"
+          - "line_id: uuid().optional()"
+          - "machine_id: uuid().optional()"
+          - "category: string().optional()"
+        refinements:
+          - "date_to >= date_from"

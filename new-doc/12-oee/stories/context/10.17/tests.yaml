@@ -1,0 +1,38 @@
+# Story 10.17 - Test Specification
+# Purpose: Bottleneck analysis tests
+# Agent: QA-AGENT
+
+acceptance_criteria:
+  - id: "AC-01"
+    given: "line with 4 operations: Mixing (60s), Filling (45s), Labeling (90s), Packing (50s)"
+    when: "analyzing bottleneck"
+    then: "bottleneck = Labeling (90s, slowest), line capacity = 40 units/hr"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-02"
+    given: "bottleneck identified"
+    when: "calculating impact if improved to 60s"
+    then: "new capacity = 60 units/hr (+50%)"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-03"
+    given: "line balance diagram"
+    when: "viewing chart"
+    then: "horizontal bars show cycle times, bottleneck highlighted red"
+    test_type: "e2e"
+    priority: "P0"
+
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/bottleneck-service.test.ts"
+    type: "unit"
+  - path: "apps/frontend/app/api/oee/analytics/bottlenecks/__tests__/api.test.ts"
+    type: "integration"
+  - path: "tests/e2e/oee-bottleneck.spec.ts"
+    type: "e2e"
+
+definition_of_done:
+  - "Bottleneck identification algorithm works"
+  - "Line balance chart displays"
+  - "Impact calculator functional"

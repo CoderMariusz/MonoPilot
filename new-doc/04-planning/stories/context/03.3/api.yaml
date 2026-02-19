@@ -1,0 +1,480 @@
+# Story 03.3 - API Specification
+# Purpose: Endpoints, request/response schemas, services, validation
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  # List Purchase Orders
+  - method: "GET"
+    path: "/api/planning/purchase-orders"
+    description: "List POs with pagination, filtering, sorting"
+    file: "apps/frontend/app/api/planning/purchase-orders/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "planner", "production_manager", "viewer"]
+    query_params:
+      - { name: "search", type: "string", description: "Filter by PO number or supplier name (min 2 chars)" }
+      - { name: "supplier_id", type: "UUID", description: "Filter by supplier" }
+      - { name: "status", type: "string", description: "Filter by status (comma-separated for multiple)" }
+      - { name: "warehouse_id", type: "UUID", description: "Filter by receiving warehouse" }
+      - { name: "date_from", type: "date", description: "Expected delivery date from" }
+      - { name: "date_to", type: "date", description: "Expected delivery date to" }
+      - { name: "sort", type: "string", description: "Sort field (po_number, expected_delivery_date, total, created_at)" }
+      - { name: "order", type: "string", description: "Sort order (asc, desc)" }
+      - { name: "page", type: "number", description: "Page number (default 1)" }
+      - { name: "limit", type: "number", description: "Items per page (default 20, max 100)" }
+    response:
+      status: 200
+      schema:
+        success: "boolean"
+        data: "POListItem[]"
+        meta:
+          total: "number"
+          page: "number"
+          limit: "number"
+          pages: "number"
+    errors:
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+
+  # Create Purchase Order
+  - method: "POST"
+    path: "/api/planning/purchase-orders"
+    description: "Create PO with header and lines in single transaction"
+    file: "apps/frontend/app/api/planning/purchase-orders/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "planner", "production_manager"]
+    request:
+      schema: "CreatePOInput"
+      required:
+        - "supplier_id"
+        - "warehouse_id"
+        - "expected_delivery_date"
+      optional:
+        - "currency"
+        - "tax_code_id"
+        - "payment_terms"
+        - "shipping_method"
+        - "notes"
+        - "internal_notes"
+        - "lines"
+    response:
+      status: 201
+      schema: "PurchaseOrderWithLines"
+    errors:
+      - { status: 400, code: "VALIDATION_ERROR", message: "Invalid input data" }
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+      - { status: 403, code: "FORBIDDEN", message: "Insufficient permissions" }
+
+  # Get PO Detail
+  - method: "GET"
+    path: "/api/planning/purchase-orders/[id]"
+    description: "Get single PO with lines and joined data"
+    file: "apps/frontend/app/api/planning/purchase-orders/[id]/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "planner", "production_manager", "viewer"]
+    response:
+      status: 200
+      schema: "PurchaseOrderWithLines"
+    errors:
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+      - { status: 404, code: "NOT_FOUND", message: "Purchase order not found" }
+
+  # Update Purchase Order
+  - method: "PUT"
+    path: "/api/planning/purchase-orders/[id]"
+    description: "Update PO header and optionally lines"
+    file: "apps/frontend/app/api/planning/purchase-orders/[id]/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "planner", "production_manager"]
+    request:
+      schema: "UpdatePOInput"
+    response:
+      status: 200
+      schema: "PurchaseOrderWithLines"
+    errors:
+      - { status: 400, code: "VALIDATION_ERROR", message: "Invalid input data" }
+      - { status: 400, code: "INVALID_STATUS", message: "Cannot edit PO in current status" }
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+      - { status: 403, code: "FORBIDDEN", message: "Insufficient permissions" }
+      - { status: 404, code: "NOT_FOUND", message: "Purchase order not found" }
+
+  # Delete Purchase Order
+  - method: "DELETE"
+    path: "/api/planning/purchase-orders/[id]"
+    description: "Delete draft PO (hard delete)"
+    file: "apps/frontend/app/api/planning/purchase-orders/[id]/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "planner"]
+    response:
+      status: 200
+      schema: { success: true }
+    errors:
+      - { status: 400, code: "INVALID_STATUS", message: "Only draft POs can be deleted" }
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+      - { status: 403, code: "FORBIDDEN", message: "Insufficient permissions" }
+      - { status: 404, code: "NOT_FOUND", message: "Purchase order not found" }
+
+  # Submit PO
+  - method: "POST"
+    path: "/api/planning/purchase-orders/[id]/submit"
+    description: "Submit PO (draft -> submitted/confirmed)"
+    file: "apps/frontend/app/api/planning/purchase-orders/[id]/submit/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "planner", "production_manager"]
+    response:
+      status: 200
+      schema:
+        id: "UUID"
+        status: "string"
+        approval_required: "boolean"
+    errors:
+      - { status: 400, code: "NO_LINES", message: "Cannot submit PO without line items" }
+      - { status: 400, code: "INVALID_STATUS", message: "PO must be in draft status to submit" }
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+      - { status: 404, code: "NOT_FOUND", message: "Purchase order not found" }
+
+  # Confirm PO
+  - method: "POST"
+    path: "/api/planning/purchase-orders/[id]/confirm"
+    description: "Confirm PO (submitted/pending_approval -> confirmed)"
+    file: "apps/frontend/app/api/planning/purchase-orders/[id]/confirm/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "planner"]
+    response:
+      status: 200
+      schema:
+        id: "UUID"
+        status: "confirmed"
+    errors:
+      - { status: 400, code: "INVALID_STATUS", message: "PO cannot be confirmed from current status" }
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+      - { status: 404, code: "NOT_FOUND", message: "Purchase order not found" }
+
+  # Cancel PO
+  - method: "POST"
+    path: "/api/planning/purchase-orders/[id]/cancel"
+    description: "Cancel PO (soft delete via status change)"
+    file: "apps/frontend/app/api/planning/purchase-orders/[id]/cancel/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "planner"]
+    request:
+      schema:
+        reason: "string (optional)"
+    response:
+      status: 200
+      schema:
+        id: "UUID"
+        status: "cancelled"
+    errors:
+      - { status: 400, code: "HAS_RECEIPTS", message: "Cannot cancel PO with recorded receipts" }
+      - { status: 400, code: "INVALID_STATUS", message: "PO cannot be cancelled from current status" }
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+      - { status: 404, code: "NOT_FOUND", message: "Purchase order not found" }
+
+  # Add PO Line
+  - method: "POST"
+    path: "/api/planning/purchase-orders/[id]/lines"
+    description: "Add single line to PO"
+    file: "apps/frontend/app/api/planning/purchase-orders/[id]/lines/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "planner", "production_manager"]
+    request:
+      schema: "CreatePOLineInput"
+    response:
+      status: 201
+      schema: "POLine"
+    errors:
+      - { status: 400, code: "DUPLICATE_PRODUCT", message: "Product already exists on this PO" }
+      - { status: 400, code: "INVALID_STATUS", message: "Cannot add lines to PO in current status" }
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+      - { status: 404, code: "NOT_FOUND", message: "Purchase order not found" }
+
+  # Update PO Line
+  - method: "PUT"
+    path: "/api/planning/purchase-orders/[id]/lines/[lineId]"
+    description: "Update single PO line"
+    file: "apps/frontend/app/api/planning/purchase-orders/[id]/lines/[lineId]/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "planner", "production_manager"]
+    request:
+      schema: "UpdatePOLineInput"
+    response:
+      status: 200
+      schema: "POLine"
+    errors:
+      - { status: 400, code: "INVALID_STATUS", message: "Cannot update lines on PO in current status" }
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+      - { status: 404, code: "NOT_FOUND", message: "PO line not found" }
+
+  # Delete PO Line
+  - method: "DELETE"
+    path: "/api/planning/purchase-orders/[id]/lines/[lineId]"
+    description: "Delete single PO line"
+    file: "apps/frontend/app/api/planning/purchase-orders/[id]/lines/[lineId]/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "planner"]
+    response:
+      status: 200
+      schema: { success: true }
+    errors:
+      - { status: 400, code: "HAS_RECEIPTS", message: "Cannot delete line with received quantity" }
+      - { status: 400, code: "INVALID_STATUS", message: "Cannot delete lines from PO in current status" }
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+      - { status: 404, code: "NOT_FOUND", message: "PO line not found" }
+
+  # Get PO Status History
+  - method: "GET"
+    path: "/api/planning/purchase-orders/[id]/history"
+    description: "Get status change history for PO"
+    file: "apps/frontend/app/api/planning/purchase-orders/[id]/history/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "planner", "production_manager", "viewer"]
+    response:
+      status: 200
+      schema: "POStatusHistory[]"
+    errors:
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+      - { status: 404, code: "NOT_FOUND", message: "Purchase order not found" }
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/purchase-order-service.ts"
+    description: "Purchase Order service with CRUD, status transitions, line operations"
+    exports:
+      - name: "PurchaseOrderService"
+        type: "class"
+        methods:
+          # List operations
+          - { name: "list", params: "params: POListParams", returns: "Promise<PaginatedResult<POListItem>>" }
+          - { name: "getById", params: "id: string", returns: "Promise<PurchaseOrderWithLines | null>" }
+          # CRUD operations
+          - { name: "create", params: "data: CreatePOInput", returns: "Promise<PurchaseOrderWithLines>" }
+          - { name: "update", params: "id: string, data: UpdatePOInput", returns: "Promise<PurchaseOrderWithLines>" }
+          - { name: "delete", params: "id: string", returns: "Promise<void>" }
+          # Status transitions
+          - { name: "submit", params: "id: string", returns: "Promise<PurchaseOrder>" }
+          - { name: "confirm", params: "id: string", returns: "Promise<PurchaseOrder>" }
+          - { name: "cancel", params: "id: string, reason?: string", returns: "Promise<PurchaseOrder>" }
+          # Line operations
+          - { name: "addLine", params: "poId: string, line: CreatePOLineInput", returns: "Promise<POLine>" }
+          - { name: "updateLine", params: "poId: string, lineId: string, data: UpdatePOLineInput", returns: "Promise<POLine>" }
+          - { name: "deleteLine", params: "poId: string, lineId: string", returns: "Promise<void>" }
+          # Utilities
+          - { name: "generateNextNumber", params: "orgId: string", returns: "Promise<string>" }
+          - { name: "calculateTotals", params: "lines: POLineInput[]", returns: "POTotals" }
+          - { name: "getStatusHistory", params: "poId: string", returns: "Promise<POStatusHistory[]>" }
+          - { name: "validateStatusTransition", params: "currentStatus: POStatus, newStatus: POStatus", returns: "boolean" }
+          - { name: "canEditLines", params: "status: POStatus", returns: "boolean" }
+          - { name: "canDeleteLine", params: "lineId: string", returns: "Promise<{ allowed: boolean; reason?: string }>" }
+          - { name: "getDefaultsFromSupplier", params: "supplierId: string", returns: "Promise<SupplierDefaults>" }
+          - { name: "getProductPrice", params: "productId: string, supplierId: string", returns: "Promise<ProductPriceInfo>" }
+
+# Validation Schemas (Zod)
+validation:
+  path: "apps/frontend/lib/validation/purchase-order.ts"
+  schemas:
+    - name: "currencyEnum"
+      type: "z.enum"
+      values: ["PLN", "EUR", "USD", "GBP"]
+
+    - name: "poStatusEnum"
+      type: "z.enum"
+      values: ["draft", "submitted", "pending_approval", "confirmed", "receiving", "closed", "cancelled"]
+
+    - name: "createPOLineSchema"
+      type: "z.object"
+      fields:
+        - { name: "product_id", type: "z.string().uuid()", required: true }
+        - { name: "quantity", type: "z.number().positive().max(999999999)", required: true }
+        - { name: "unit_price", type: "z.number().min(0).max(999999999)", required: true }
+        - { name: "uom", type: "z.string().min(1).max(20)", required: true }
+        - { name: "discount_percent", type: "z.number().min(0).max(100).default(0)", required: false }
+        - { name: "expected_delivery_date", type: "z.string().date().optional().nullable()", required: false }
+        - { name: "notes", type: "z.string().max(500).optional().nullable()", required: false }
+
+    - name: "updatePOLineSchema"
+      type: "createPOLineSchema.partial().extend"
+      fields:
+        - { name: "id", type: "z.string().uuid().optional()", description: "If present, update; if absent, create new" }
+        - { name: "_delete", type: "z.boolean().optional()", description: "Mark for deletion" }
+
+    - name: "createPOSchema"
+      type: "z.object"
+      fields:
+        - { name: "supplier_id", type: "z.string().uuid()", required: true }
+        - { name: "warehouse_id", type: "z.string().uuid()", required: true }
+        - { name: "expected_delivery_date", type: "z.string().date().refine(futureDate)", required: true }
+        - { name: "currency", type: "currencyEnum.default('PLN')", required: false }
+        - { name: "tax_code_id", type: "z.string().uuid().optional().nullable()", required: false }
+        - { name: "payment_terms", type: "z.string().max(50).optional().nullable()", required: false }
+        - { name: "shipping_method", type: "z.string().max(100).optional().nullable()", required: false }
+        - { name: "notes", type: "z.string().max(2000).optional().nullable()", required: false }
+        - { name: "internal_notes", type: "z.string().max(2000).optional().nullable()", required: false }
+        - { name: "lines", type: "z.array(createPOLineSchema).min(0).max(200)", required: false }
+
+    - name: "updatePOSchema"
+      type: "z.object"
+      fields:
+        - { name: "expected_delivery_date", type: "z.string().date().optional()", required: false }
+        - { name: "warehouse_id", type: "z.string().uuid().optional()", required: false }
+        - { name: "tax_code_id", type: "z.string().uuid().optional().nullable()", required: false }
+        - { name: "payment_terms", type: "z.string().max(50).optional().nullable()", required: false }
+        - { name: "shipping_method", type: "z.string().max(100).optional().nullable()", required: false }
+        - { name: "notes", type: "z.string().max(2000).optional().nullable()", required: false }
+        - { name: "internal_notes", type: "z.string().max(2000).optional().nullable()", required: false }
+        - { name: "lines", type: "z.array(updatePOLineSchema).optional()", required: false }
+
+# Types
+types:
+  path: "apps/frontend/lib/types/purchase-order.ts"
+  exports:
+    - name: "POStatus"
+      type: "type"
+      definition: "'draft' | 'submitted' | 'pending_approval' | 'confirmed' | 'receiving' | 'closed' | 'cancelled'"
+
+    - name: "Currency"
+      type: "type"
+      definition: "'PLN' | 'EUR' | 'USD' | 'GBP'"
+
+    - name: "PurchaseOrder"
+      type: "interface"
+      fields:
+        - "id: string"
+        - "org_id: string"
+        - "po_number: string"
+        - "supplier_id: string"
+        - "currency: Currency"
+        - "tax_code_id: string | null"
+        - "expected_delivery_date: string"
+        - "warehouse_id: string"
+        - "status: POStatus"
+        - "payment_terms: string | null"
+        - "shipping_method: string | null"
+        - "notes: string | null"
+        - "internal_notes: string | null"
+        - "approval_status: string | null"
+        - "approved_by: string | null"
+        - "approved_at: string | null"
+        - "approval_notes: string | null"
+        - "subtotal: number"
+        - "tax_amount: number"
+        - "total: number"
+        - "discount_total: number"
+        - "created_at: string"
+        - "updated_at: string"
+        - "created_by: string"
+        - "updated_by: string"
+
+    - name: "POLine"
+      type: "interface"
+      fields:
+        - "id: string"
+        - "po_id: string"
+        - "line_number: number"
+        - "product_id: string"
+        - "quantity: number"
+        - "uom: string"
+        - "unit_price: number"
+        - "discount_percent: number"
+        - "discount_amount: number"
+        - "line_total: number"
+        - "expected_delivery_date: string | null"
+        - "confirmed_delivery_date: string | null"
+        - "received_qty: number"
+        - "notes: string | null"
+        - "created_at: string"
+        - "updated_at: string"
+        - "product?: { code: string; name: string }"
+
+    - name: "PurchaseOrderWithLines"
+      type: "interface"
+      extends: "PurchaseOrder"
+      fields:
+        - "lines: POLine[]"
+        - "supplier?: { code: string; name: string }"
+        - "warehouse?: { code: string; name: string }"
+        - "tax_code?: { code: string; rate: number }"
+
+    - name: "POListItem"
+      type: "interface"
+      fields:
+        - "id: string"
+        - "po_number: string"
+        - "supplier_name: string"
+        - "status: POStatus"
+        - "expected_delivery_date: string"
+        - "total: number"
+        - "currency: Currency"
+        - "line_count: number"
+        - "created_at: string"
+
+    - name: "POTotals"
+      type: "interface"
+      fields:
+        - "subtotal: number"
+        - "discount_total: number"
+        - "tax_amount: number"
+        - "total: number"
+
+    - name: "POStatusHistory"
+      type: "interface"
+      fields:
+        - "id: string"
+        - "po_id: string"
+        - "from_status: string | null"
+        - "to_status: string"
+        - "changed_by: string | null"
+        - "changed_at: string"
+        - "notes: string | null"
+        - "user?: { first_name: string; last_name: string }"
+
+# Implementation patterns
+patterns:
+  transaction_pattern: |
+    // Create PO with lines in single transaction
+    const { data, error } = await supabase.rpc('create_po_with_lines', {
+      p_supplier_id: input.supplier_id,
+      p_warehouse_id: input.warehouse_id,
+      p_expected_delivery_date: input.expected_delivery_date,
+      // ... other params
+      p_lines: JSON.stringify(input.lines)
+    });
+
+  status_transition_pattern: |
+    // Validate status transition before update
+    const validTransitions: Record<POStatus, POStatus[]> = {
+      draft: ['submitted', 'cancelled'],
+      submitted: ['pending_approval', 'confirmed', 'cancelled'],
+      pending_approval: ['confirmed', 'cancelled'],
+      confirmed: ['receiving', 'cancelled'],
+      receiving: ['closed', 'cancelled'],
+      closed: [],
+      cancelled: []
+    };
+
+    function validateStatusTransition(from: POStatus, to: POStatus): boolean {
+      return validTransitions[from]?.includes(to) ?? false;
+    }
+
+  price_cascade_pattern: |
+    // Get product price with supplier cascade
+    async function getProductPrice(productId: string, supplierId: string) {
+      // 1. Check supplier-product specific price
+      const { data: sp } = await supabase
+        .from('supplier_products')
+        .select('unit_price')
+        .eq('product_id', productId)
+        .eq('supplier_id', supplierId)
+        .single();
+
+      if (sp?.unit_price) {
+        return { price: sp.unit_price, source: 'supplier' };
+      }
+
+      // 2. Fall back to product standard price
+      const { data: product } = await supabase
+        .from('products')
+        .select('std_price')
+        .eq('id', productId)
+        .single();
+
+      return { price: product?.std_price ?? 0, source: 'standard' };
+    }

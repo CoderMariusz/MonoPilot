@@ -1,0 +1,224 @@
+# Story 01.4 - API Specification
+# Purpose: Step 1 save endpoint
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  - method: "POST"
+    path: "/api/v1/settings/onboarding/step/1"
+    file: "apps/frontend/app/api/v1/settings/onboarding/step/1/route.ts"
+    description: "Save organization profile (wizard step 1)"
+    auth: true
+    roles: ["super_admin", "admin"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+        Content-Type: "application/json"
+      body:
+        name:
+          type: "string"
+          required: true
+          validation: "2-100 characters"
+        timezone:
+          type: "string"
+          required: true
+          validation: "Valid IANA timezone"
+        language:
+          type: "string"
+          required: true
+          validation: "One of: pl, en, de, fr"
+        currency:
+          type: "string"
+          required: true
+          validation: "One of: PLN, EUR, USD, GBP"
+
+    response:
+      status: 200
+      schema:
+        success: true
+        next_step: 2
+        organization:
+          id: "uuid"
+          name: "string"
+          timezone: "string"
+          language: "string"
+          currency: "string"
+
+    errors:
+      - status: 400
+        code: "VALIDATION_ERROR"
+        message: "Invalid request body"
+        details: "Array of field errors"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Only admin users can update organization"
+
+    on_success:
+      - "Update organizations table with provided values"
+      - "Set onboarding_step = 2"
+      - "Set onboarding_started_at = NOW() if null"
+
+    pattern: |
+      import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+      import { cookies } from 'next/headers';
+      import { NextResponse } from 'next/server';
+      import { z } from 'zod';
+      import { hasRole } from '@/lib/services/permission-service';
+      import { getOrgContext } from '@/lib/services/org-context-service';
+
+      const step1Schema = z.object({
+        name: z.string().min(2, 'Name must be at least 2 characters').max(100, 'Name must be at most 100 characters'),
+        timezone: z.string().refine(
+          (tz) => Intl.supportedValuesOf('timeZone').includes(tz),
+          'Invalid timezone'
+        ),
+        language: z.enum(['pl', 'en', 'de', 'fr']),
+        currency: z.enum(['PLN', 'EUR', 'USD', 'GBP']),
+      });
+
+      export async function POST(request: Request) {
+        const supabase = createRouteHandlerClient({ cookies });
+        const context = await getOrgContext();
+
+        if (!context) {
+          return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        if (!hasRole(context, ['super_admin', 'admin'])) {
+          return NextResponse.json({ error: 'Only admin users can update organization' }, { status: 403 });
+        }
+
+        const body = await request.json();
+        const result = step1Schema.safeParse(body);
+
+        if (!result.success) {
+          return NextResponse.json({
+            error: 'Validation error',
+            details: result.error.errors,
+          }, { status: 400 });
+        }
+
+        const { name, timezone, language, currency } = result.data;
+
+        const { data: org, error } = await supabase
+          .from('organizations')
+          .update({
+            name,
+            timezone,
+            language,
+            currency,
+            onboarding_step: 2,
+            onboarding_started_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', context.org_id)
+          .select()
+          .single();
+
+        if (error) {
+          return NextResponse.json({ error: 'Failed to update organization' }, { status: 500 });
+        }
+
+        return NextResponse.json({
+          success: true,
+          next_step: 2,
+          organization: {
+            id: org.id,
+            name: org.name,
+            timezone: org.timezone,
+            language: org.language,
+            currency: org.currency,
+          },
+        });
+      }
+
+  - method: "GET"
+    path: "/api/v1/settings/organization"
+    file: "apps/frontend/app/api/v1/settings/organization/route.ts"
+    description: "Get current organization profile (for pre-fill)"
+    auth: true
+    roles: ["*"]
+    note: "May already exist from 01.1 - verify and reuse"
+
+    response:
+      status: 200
+      schema:
+        id: "uuid"
+        name: "string"
+        timezone: "string"
+        language: "string"
+        currency: "string"
+        onboarding_step: "number"
+
+# Validation Schema
+validation:
+  - path: "apps/frontend/lib/validation/organization-profile-step.ts"
+    description: "Zod schema for step 1 form data"
+    schema: |
+      import { z } from 'zod';
+
+      export const organizationProfileStepSchema = z.object({
+        name: z
+          .string()
+          .min(2, 'Organization name must be at least 2 characters')
+          .max(100, 'Organization name must be at most 100 characters'),
+        timezone: z
+          .string()
+          .refine(
+            (tz) => {
+              try {
+                return Intl.supportedValuesOf('timeZone').includes(tz);
+              } catch {
+                return false;
+              }
+            },
+            'Invalid timezone'
+          ),
+        language: z.enum(['pl', 'en', 'de', 'fr'], {
+          errorMap: () => ({ message: 'Please select a language' }),
+        }),
+        currency: z.enum(['PLN', 'EUR', 'USD', 'GBP'], {
+          errorMap: () => ({ message: 'Please select a currency' }),
+        }),
+      });
+
+      export type OrganizationProfileStepData = z.infer<typeof organizationProfileStepSchema>;
+
+# Utilities
+utilities:
+  - path: "apps/frontend/lib/utils/browser-detection.ts"
+    description: "Browser timezone and language detection"
+    exports:
+      - name: "getBrowserTimezone"
+        returns: "string"
+      - name: "getBrowserLanguage"
+        returns: "string"
+    pattern: |
+      /**
+       * Detect browser timezone using Intl API
+       * @returns IANA timezone string (e.g., 'Europe/Warsaw')
+       */
+      export function getBrowserTimezone(): string {
+        try {
+          return Intl.DateTimeFormat().resolvedOptions().timeZone;
+        } catch {
+          return 'UTC';
+        }
+      }
+
+      /**
+       * Detect browser language and map to supported languages
+       * @returns Language code ('pl', 'en', 'de', 'fr')
+       */
+      export function getBrowserLanguage(): string {
+        const supportedLanguages = ['pl', 'en', 'de', 'fr'];
+        try {
+          const browserLang = navigator.language.slice(0, 2).toLowerCase();
+          return supportedLanguages.includes(browserLang) ? browserLang : 'en';
+        } catch {
+          return 'en';
+        }
+      }

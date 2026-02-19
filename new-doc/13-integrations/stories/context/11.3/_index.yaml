@@ -1,0 +1,92 @@
+story:
+  id: "11.3"
+  name: "Integration Logs & Audit Trail"
+  epic: "11-integrations"
+  phase: "1"
+  complexity: "M"
+  estimate_days: 3-4
+
+dependencies:
+  required:
+    - story: "01.1"
+      provides: ["organizations", "users", "roles"]
+    - story: "11.1"
+      provides: ["integration_health", "activity feed pattern"]
+    - story: "11.2"
+      provides: ["api_key_id foreign key"]
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/integrations.md"
+  prd_sections: ["FR-INT-005"]
+  story: "docs/2-MANAGEMENT/epics/current/11-integrations/11.3.integration-logs-audit-trail.md"
+
+files_to_create:
+  database:
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_create_integration_logs.sql"
+      type: "migration"
+  api:
+    - path: "apps/frontend/app/api/integrations/logs/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/integrations/logs/[id]/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/integrations/logs/stats/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/integrations/logs/export/route.ts"
+      methods: ["POST"]
+  services:
+    - path: "apps/frontend/lib/services/integration-logs-service.ts"
+  validation:
+    - path: "apps/frontend/lib/validation/integration-logs.ts"
+  pages:
+    - path: "apps/frontend/app/(authenticated)/integrations/logs/page.tsx"
+  components:
+    - path: "apps/frontend/components/integrations/logs/IntegrationLogsTable.tsx"
+    - path: "apps/frontend/components/integrations/logs/LogsFilters.tsx"
+    - path: "apps/frontend/components/integrations/logs/LogDetailModal.tsx"
+    - path: "apps/frontend/components/integrations/logs/ExportLogsButton.tsx"
+
+database:
+  tables:
+    - name: "integration_logs"
+      columns: ["id", "org_id", "timestamp", "integration_type", "event_type", "direction", "status", "http_status", "request_body", "response_body", "error_message", "api_key_id", "webhook_id", "external_system", "retry_count", "duration_ms"]
+      rls: true
+      indexes: ["org_id + timestamp DESC", "status", "integration_type", "external_system", "GIN on request_body", "GIN on response_body"]
+      immutable: true
+
+api_endpoints:
+  - method: "GET"
+    path: "/api/integrations/logs"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN", "IT_MANAGER"]
+  - method: "GET"
+    path: "/api/integrations/logs/:id"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN", "IT_MANAGER"]
+
+patterns:
+  rls: "ADR-013"
+  immutability: "No updates/deletes via RLS, append-only"
+  search: "GIN indexes on JSONB for full-text"
+  retention: "90 days default, cleanup via cron"
+  masking: "Passwords, API keys masked before insert"
+
+acceptance_checklist:
+  - "Logs created immutably (no updates allowed)"
+  - "Sensitive data masked (passwords, API keys)"
+  - "Full-text search on request/response bodies"
+  - "Filters: date range, status, type, external system"
+  - "Pagination (50 per page default)"
+  - "CSV export generates valid file"
+  - "Cleanup job deletes logs >90 days"
+  - "RLS enforces org isolation"
+  - "Query performance <800ms with indexes"
+  - "Unit tests >80% coverage"
+
+output_artifacts:
+  - "integration_logs table (immutable, RLS)"
+  - "log_integration_event() function"
+  - "cleanup_old_integration_logs() function"
+  - "API endpoints for query/search/stats/export"
+  - "IntegrationLogsService with query, search, export"
+  - "Frontend logs page with filters and search"
+  - "Unit + integration tests"

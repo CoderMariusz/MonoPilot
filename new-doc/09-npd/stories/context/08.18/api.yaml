@@ -1,0 +1,138 @@
+# API Context: 08.18 - Access Control & Audit Trail
+# 1 endpoint: audit trail query
+
+endpoints:
+  - method: "GET"
+    path: "/api/npd/audit-trail"
+    description: "Query audit trail with filters"
+    auth: true
+    roles: ["ADMIN", "QUALITY_DIRECTOR"]  # Admin-only
+    request:
+      query_params:
+        - name: "project_id"
+          type: "integer"
+          required: false
+          description: "Filter by project (includes formulations, costing, etc.)"
+        - name: "user_id"
+          type: "string (UUID)"
+          required: false
+          description: "Filter by user who performed action"
+        - name: "event_type"
+          type: "string"
+          required: false
+          description: "Filter by event type (e.g., NPD.npd_formulations.UPDATE)"
+        - name: "entity_type"
+          type: "string"
+          required: false
+          description: "Filter by entity type (npd_projects, npd_formulations, etc.)"
+        - name: "action"
+          type: "string"
+          required: false
+          enum: ["INSERT", "UPDATE", "DELETE"]
+          description: "Filter by action"
+        - name: "date_from"
+          type: "string (ISO date)"
+          required: false
+          description: "Filter by date range (start)"
+        - name: "date_to"
+          type: "string (ISO date)"
+          required: false
+          description: "Filter by date range (end)"
+        - name: "page"
+          type: "integer"
+          required: false
+          default: 1
+          description: "Page number"
+        - name: "limit"
+          type: "integer"
+          required: false
+          default: 20
+          description: "Results per page"
+    response:
+      success:
+        status: 200
+        body:
+          audit_logs:
+            - id: 1
+              user:
+                id: "uuid-123"
+                name: "Jane Doe"
+                email: "jane@example.com"
+              event_type: "NPD.npd_formulations.UPDATE"
+              entity_type: "npd_formulations"
+              entity_id: 5
+              entity_name: "v2.0"
+              action: "UPDATE"
+              old_values:
+                target_cost: 10.00
+                status: "draft"
+              new_values:
+                target_cost: 12.00
+                status: "draft"
+              changed_fields: ["target_cost"]
+              created_at: "2025-01-15T14:30:00Z"
+            - id: 2
+              user:
+                id: "uuid-456"
+                name: "John Smith"
+                email: "john@example.com"
+              event_type: "NPD.npd_projects.UPDATE"
+              entity_type: "npd_projects"
+              entity_id: 1
+              entity_name: "NPD-001 Vegan Protein Bar"
+              action: "UPDATE"
+              old_values:
+                current_gate: "G2"
+                status: "feasibility"
+              new_values:
+                current_gate: "G3"
+                status: "development"
+              changed_fields: ["current_gate", "status"]
+              created_at: "2025-01-15T14:00:00Z"
+          pagination:
+            total: 50
+            page: 1
+            limit: 20
+            pages: 3
+      errors:
+        - status: 401
+          message: "Unauthorized"
+        - status: 403
+          message: "Admin or Quality Director role required"
+
+service_methods:
+  - name: "NPDAuditService.getAuditTrail(orgId, filters, page, limit)"
+    description: "Fetch audit logs with filters"
+    returns: "PaginatedResult<AuditLogEntry>"
+    parameters:
+      - "orgId: string"
+      - "filters: AuditTrailFilters"
+      - "page: number (default 1)"
+      - "limit: number (default 20)"
+
+  - name: "NPDAuditService.getEntityAuditTrail(entityType, entityId)"
+    description: "Fetch audit trail for specific entity"
+    returns: "AuditLogEntry[]"
+    parameters:
+      - "entityType: string (e.g., 'npd_formulations')"
+      - "entityId: number"
+
+validation:
+  - field: "project_id"
+    rules: ["must be integer", "must exist in npd_projects"]
+  - field: "user_id"
+    rules: ["must be valid UUID", "must exist in users"]
+  - field: "event_type"
+    rules: ["must match pattern NPD.<table>.<action>"]
+  - field: "date_from / date_to"
+    rules: ["must be ISO date format", "date_to must be >= date_from"]
+  - field: "page / limit"
+    rules: ["must be positive integer", "limit max 100"]
+
+error_handling:
+  - scenario: "Non-admin user attempts access"
+    action: "Return 403 with message 'Admin or Quality Director role required'"
+  - scenario: "Invalid filter value"
+    action: "Return 400 with validation error message"
+  - scenario: "Query timeout (>10s)"
+    action: "Return 500, log error, suggest narrowing filters"

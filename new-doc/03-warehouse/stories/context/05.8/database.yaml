@@ -1,0 +1,263 @@
+# Story 05.8 - Database Schema
+# Purpose: Tables, RLS policies, triggers, indexes
+# Agent: BACKEND-DEV (database focus)
+
+migrations:
+  - path: "supabase/migrations/XXX_create_asns_table.sql"
+    type: "migration"
+    description: "ASN header table with PO linkage, carrier, tracking, status"
+  - path: "supabase/migrations/XXX_create_asn_items_table.sql"
+    type: "migration"
+    description: "ASN items table with expected/received qty, batch, expiry"
+  - path: "supabase/migrations/XXX_add_enable_asn_to_warehouse_settings.sql"
+    type: "migration"
+    description: "Add enable_asn boolean column to warehouse_settings"
+  - path: "supabase/migrations/XXX_asn_rls_policies.sql"
+    type: "migration"
+    description: "RLS policies following ADR-013 pattern"
+  - path: "supabase/migrations/XXX_asn_number_function.sql"
+    type: "migration"
+    description: "Function to generate ASN-YYYY-NNNNN numbers"
+
+tables:
+  - name: "asns"
+    description: "Advanced Shipping Notice header with PO linkage, carrier, tracking"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id) ON DELETE CASCADE" }
+      - { name: "asn_number", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "po_id", type: "UUID", constraints: "NOT NULL REFERENCES purchase_orders(id)" }
+      - { name: "supplier_id", type: "UUID", constraints: "NOT NULL REFERENCES suppliers(id)" }
+      - { name: "expected_date", type: "DATE", constraints: "NOT NULL" }
+      - { name: "actual_date", type: "DATE", constraints: "" }
+      - { name: "carrier", type: "TEXT", constraints: "" }
+      - { name: "tracking_number", type: "TEXT", constraints: "" }
+      - { name: "status", type: "TEXT", constraints: "NOT NULL DEFAULT 'pending'" }
+      - { name: "notes", type: "TEXT", constraints: "" }
+      # Audit fields
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+      - { name: "created_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+    constraints:
+      - "UNIQUE(org_id, asn_number)"
+      - "CHECK (status IN ('pending', 'partial', 'received', 'cancelled'))"
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_asns_org_status ON asns(org_id, status)"
+      - "idx_asns_org_expected_date ON asns(org_id, expected_date)"
+      - "idx_asns_po_id ON asns(po_id)"
+      - "idx_asns_supplier_id ON asns(supplier_id)"
+      - "idx_asns_org_number ON asns(org_id, asn_number)"
+
+  - name: "asn_items"
+    description: "ASN line items with expected/received quantities, batch, expiry"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "asn_id", type: "UUID", constraints: "NOT NULL REFERENCES asns(id) ON DELETE CASCADE" }
+      - { name: "product_id", type: "UUID", constraints: "NOT NULL REFERENCES products(id)" }
+      - { name: "po_line_id", type: "UUID", constraints: "REFERENCES purchase_order_lines(id)" }
+      - { name: "expected_qty", type: "DECIMAL(15,4)", constraints: "NOT NULL" }
+      - { name: "received_qty", type: "DECIMAL(15,4)", constraints: "DEFAULT 0" }
+      - { name: "uom", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "supplier_lp_number", type: "TEXT", constraints: "" }
+      - { name: "supplier_batch_number", type: "TEXT", constraints: "" }
+      - { name: "gtin", type: "TEXT", constraints: "" }
+      - { name: "expiry_date", type: "DATE", constraints: "" }
+      - { name: "notes", type: "TEXT", constraints: "" }
+    constraints:
+      - "UNIQUE(asn_id, product_id)"
+      - "CHECK (expected_qty > 0)"
+      - "CHECK (received_qty >= 0)"
+    rls: true
+    rls_pattern: "EXISTS (SELECT 1 FROM asns WHERE asns.id = asn_items.asn_id AND asns.org_id = (SELECT org_id FROM users WHERE id = auth.uid()))"
+    indexes:
+      - "idx_asn_items_asn_id ON asn_items(asn_id)"
+      - "idx_asn_items_product_id ON asn_items(product_id)"
+      - "idx_asn_items_po_line_id ON asn_items(po_line_id)"
+
+  - name: "warehouse_settings"
+    description: "Add enable_asn column (alter table)"
+    alter_column:
+      - { name: "enable_asn", type: "BOOLEAN", constraints: "DEFAULT false" }
+
+# RLS Policies (ADR-013)
+rls_policies:
+  pattern: "Users Table Lookup"
+  pattern_sql: "(SELECT org_id FROM users WHERE id = auth.uid())"
+
+  policies:
+    # asns policies
+    - table: "asns"
+      name: "asns_select"
+      operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+    - table: "asns"
+      name: "asns_insert"
+      operation: "INSERT"
+      with_check: >
+        org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        AND (
+          (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid())
+          IN ('owner', 'admin', 'planner', 'warehouse_manager', 'production_manager')
+        )
+
+    - table: "asns"
+      name: "asns_update"
+      operation: "UPDATE"
+      using: >
+        org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        AND status IN ('pending')
+        AND (
+          (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid())
+          IN ('owner', 'admin', 'planner', 'warehouse_manager', 'production_manager')
+        )
+
+    - table: "asns"
+      name: "asns_delete"
+      operation: "DELETE"
+      using: >
+        org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        AND status = 'pending'
+        AND (
+          (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid())
+          IN ('owner', 'admin', 'planner', 'warehouse_manager')
+        )
+
+    # asn_items policies (via FK to asns)
+    - table: "asn_items"
+      name: "asn_items_select"
+      operation: "SELECT"
+      using: >
+        EXISTS (
+          SELECT 1 FROM asns
+          WHERE asns.id = asn_items.asn_id
+            AND asns.org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        )
+
+    - table: "asn_items"
+      name: "asn_items_insert"
+      operation: "INSERT"
+      with_check: >
+        EXISTS (
+          SELECT 1 FROM asns
+          WHERE asns.id = asn_items.asn_id
+            AND asns.org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+            AND asns.status = 'pending'
+        )
+
+    - table: "asn_items"
+      name: "asn_items_update"
+      operation: "UPDATE"
+      using: >
+        EXISTS (
+          SELECT 1 FROM asns
+          WHERE asns.id = asn_items.asn_id
+            AND asns.org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+            AND asns.status = 'pending'
+        )
+
+    - table: "asn_items"
+      name: "asn_items_delete"
+      operation: "DELETE"
+      using: >
+        EXISTS (
+          SELECT 1 FROM asns
+          WHERE asns.id = asn_items.asn_id
+            AND asns.org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+            AND asns.status = 'pending'
+        )
+
+# Functions
+functions:
+  - name: "generate_asn_number"
+    params: "p_org_id UUID"
+    returns: "TEXT"
+    description: |
+      Generates next ASN number as ASN-YYYY-NNNNN for org/year
+      Example: ASN-2024-00001, ASN-2024-00002
+    sql: |
+      DECLARE
+        v_year TEXT;
+        v_next_seq INTEGER;
+        v_prefix TEXT;
+      BEGIN
+        v_year := TO_CHAR(NOW(), 'YYYY');
+        v_prefix := 'ASN-' || v_year || '-';
+
+        SELECT COALESCE(MAX(
+          CAST(SUBSTRING(asn_number FROM LENGTH(v_prefix) + 1) AS INTEGER)
+        ), 0) + 1
+        INTO v_next_seq
+        FROM asns
+        WHERE org_id = p_org_id
+          AND asn_number LIKE v_prefix || '%';
+
+        RETURN v_prefix || LPAD(v_next_seq::TEXT, 5, '0');
+      END;
+
+  - name: "update_asn_status"
+    params: "p_asn_id UUID"
+    returns: "TEXT"
+    description: |
+      Updates ASN status based on received quantities:
+      - pending: No items have received_qty > 0
+      - partial: Some items have received_qty > 0 but not all fully received
+      - received: All items have received_qty >= expected_qty
+    sql: |
+      DECLARE
+        v_total_items INTEGER;
+        v_items_with_receipts INTEGER;
+        v_fully_received_items INTEGER;
+        v_new_status TEXT;
+      BEGIN
+        SELECT COUNT(*),
+               COUNT(*) FILTER (WHERE received_qty > 0),
+               COUNT(*) FILTER (WHERE received_qty >= expected_qty)
+        INTO v_total_items, v_items_with_receipts, v_fully_received_items
+        FROM asn_items
+        WHERE asn_id = p_asn_id;
+
+        IF v_items_with_receipts = 0 THEN
+          v_new_status := 'pending';
+        ELSIF v_fully_received_items = v_total_items THEN
+          v_new_status := 'received';
+        ELSE
+          v_new_status := 'partial';
+        END IF;
+
+        UPDATE asns
+        SET status = v_new_status,
+            actual_date = CASE WHEN v_new_status = 'received' THEN CURRENT_DATE ELSE actual_date END,
+            updated_at = NOW()
+        WHERE id = p_asn_id
+          AND status NOT IN ('cancelled');
+
+        RETURN v_new_status;
+      END;
+
+# Status Transitions
+status_transitions:
+  allowed:
+    - { from: "pending", to: ["partial", "received", "cancelled"] }
+    - { from: "partial", to: ["received"] }
+    - { from: "received", to: [] }
+    - { from: "cancelled", to: [] }
+  notes:
+    - "pending -> partial: Triggered when first GRN line received against ASN"
+    - "pending -> received: Triggered when all items fully received in single GRN"
+    - "partial -> received: Triggered when remaining items fully received"
+    - "pending -> cancelled: Manual cancellation (no receipts)"
+    - "Cannot cancel ASN with received items (status = partial or received)"
+    - "Status transitions auto-triggered by update_asn_status function"
+
+# Carrier Tracking URLs
+carrier_tracking:
+  description: "Generate tracking URL based on carrier name"
+  carriers:
+    - { name: "FedEx", url_pattern: "https://www.fedex.com/fedextrack/?trknbr={tracking_number}" }
+    - { name: "UPS", url_pattern: "https://www.ups.com/track?tracknum={tracking_number}" }
+    - { name: "DHL", url_pattern: "https://www.dhl.com/en/express/tracking.html?AWB={tracking_number}" }
+    - { name: "USPS", url_pattern: "https://tools.usps.com/go/TrackConfirmAction?qtc_tLabels1={tracking_number}" }
+    - { name: "InPost", url_pattern: "https://inpost.pl/sledzenie-przesylek?number={tracking_number}" }

@@ -1,0 +1,461 @@
+# Story 03.16 - API Specification
+# Purpose: Dashboard endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  # KPIs Endpoint
+  - method: "GET"
+    path: "/api/planning/dashboard/kpis"
+    description: "Returns all dashboard KPI metrics for the organization"
+    file: "apps/frontend/app/api/planning/dashboard/kpis/route.ts"
+    auth: "required"
+    roles: ["*"]  # All authenticated users with planning module access
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      query_params: {}  # org_id derived from session
+
+    response:
+      status: 200
+      type: "DashboardKPIs"
+      schema:
+        po_pending_approval: "number"
+        po_this_month: "number"
+        to_in_transit: "number"
+        wo_scheduled_today: "number"
+        wo_overdue: "number"
+        open_orders: "number"
+      example:
+        po_pending_approval: 3
+        po_this_month: 15
+        to_in_transit: 2
+        wo_scheduled_today: 8
+        wo_overdue: 1
+        open_orders: 24
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token provided"
+      - status: 500
+        code: "KPI_FETCH_ERROR"
+        message: "Failed to fetch dashboard KPIs"
+        when: "Database query fails"
+
+    caching:
+      redis_key: "planning:dashboard:kpis:{org_id}"
+      ttl_seconds: 120
+
+  # Alerts Endpoint
+  - method: "GET"
+    path: "/api/planning/dashboard/alerts"
+    description: "Returns dashboard alerts grouped by severity"
+    file: "apps/frontend/app/api/planning/dashboard/alerts/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      query_params:
+        limit:
+          type: "number"
+          required: false
+          default: 10
+          min: 1
+          max: 50
+          description: "Maximum number of alerts per type"
+
+    response:
+      status: 200
+      type: "DashboardAlerts"
+      schema:
+        alerts: "Alert[]"
+        total: "number"
+      alert_schema:
+        id: "string (UUID)"
+        type: "'overdue_po' | 'pending_approval'"
+        severity: "'warning' | 'critical'"
+        entity_type: "'purchase_order' | 'transfer_order' | 'work_order'"
+        entity_id: "string (UUID)"
+        entity_number: "string"
+        description: "string"
+        days_overdue: "number | null"
+        created_at: "string (ISO 8601)"
+      example:
+        alerts:
+          - id: "uuid-1"
+            type: "overdue_po"
+            severity: "critical"
+            entity_type: "purchase_order"
+            entity_id: "uuid-po-1"
+            entity_number: "PO-2024-00123"
+            description: "Delivery overdue from Acme Supplies"
+            days_overdue: 5
+            created_at: "2024-12-10T08:00:00Z"
+          - id: "uuid-2"
+            type: "pending_approval"
+            severity: "warning"
+            entity_type: "purchase_order"
+            entity_id: "uuid-po-2"
+            entity_number: "PO-2024-00145"
+            description: "Awaiting approval for 3 days"
+            days_overdue: null
+            created_at: "2024-12-14T10:00:00Z"
+        total: 2
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token provided"
+      - status: 400
+        code: "INVALID_LIMIT"
+        message: "Limit must be between 1 and 50"
+        when: "limit query param out of range"
+      - status: 500
+        code: "ALERTS_FETCH_ERROR"
+        message: "Failed to fetch dashboard alerts"
+        when: "Database query fails"
+
+    caching:
+      redis_key: "planning:dashboard:alerts:{org_id}"
+      ttl_seconds: 120
+
+  # Activity Endpoint
+  - method: "GET"
+    path: "/api/planning/dashboard/activity"
+    description: "Returns recent planning activity feed"
+    file: "apps/frontend/app/api/planning/dashboard/activity/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      query_params:
+        limit:
+          type: "number"
+          required: false
+          default: 20
+          min: 1
+          max: 100
+          description: "Maximum number of activities"
+
+    response:
+      status: 200
+      type: "DashboardActivity"
+      schema:
+        activities: "Activity[]"
+        total: "number"
+      activity_schema:
+        id: "string (UUID)"
+        entity_type: "'purchase_order' | 'transfer_order' | 'work_order'"
+        entity_id: "string (UUID)"
+        entity_number: "string"
+        action: "'created' | 'updated' | 'approved' | 'cancelled' | 'completed'"
+        user_id: "string (UUID)"
+        user_name: "string"
+        timestamp: "string (ISO 8601)"
+      example:
+        activities:
+          - id: "uuid-act-1"
+            entity_type: "purchase_order"
+            entity_id: "uuid-po-1"
+            entity_number: "PO-2024-00156"
+            action: "created"
+            user_id: "uuid-user-1"
+            user_name: "John Smith"
+            timestamp: "2024-12-17T10:30:00Z"
+          - id: "uuid-act-2"
+            entity_type: "work_order"
+            entity_id: "uuid-wo-1"
+            entity_number: "WO-20241217-0001"
+            action: "created"
+            user_id: "uuid-user-2"
+            user_name: "Jane Doe"
+            timestamp: "2024-12-17T10:15:00Z"
+        total: 2
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token provided"
+      - status: 400
+        code: "INVALID_LIMIT"
+        message: "Limit must be between 1 and 100"
+        when: "limit query param out of range"
+      - status: 500
+        code: "ACTIVITY_FETCH_ERROR"
+        message: "Failed to fetch dashboard activity"
+        when: "Database query fails"
+
+    caching:
+      redis_key: "planning:dashboard:activity:{org_id}"
+      ttl_seconds: 120
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/planning-dashboard-service.ts"
+    description: "Dashboard data aggregation and caching service"
+    exports:
+      - name: "getKPIs"
+        type: "async function"
+        params:
+          - "orgId: string"
+        returns: "Promise<DashboardKPIs>"
+        description: "Fetch all 6 KPI metrics"
+
+      - name: "getAlerts"
+        type: "async function"
+        params:
+          - "orgId: string"
+          - "limit?: number"
+        returns: "Promise<DashboardAlertsResponse>"
+        description: "Fetch dashboard alerts with severity"
+
+      - name: "getRecentActivity"
+        type: "async function"
+        params:
+          - "orgId: string"
+          - "limit?: number"
+        returns: "Promise<DashboardActivityResponse>"
+        description: "Fetch recent activity feed"
+
+      - name: "invalidateDashboardCache"
+        type: "async function"
+        params:
+          - "orgId: string"
+          - "keys?: ('kpis' | 'alerts' | 'activity')[]"
+        returns: "Promise<void>"
+        description: "Invalidate cached dashboard data"
+
+# Validation Schemas (Zod)
+validation:
+  path: "apps/frontend/lib/validation/planning-dashboard-schemas.ts"
+  schemas:
+    - name: "dashboardKPIQuerySchema"
+      description: "Validates KPI endpoint query (minimal)"
+      fields: []  # org_id from session
+
+    - name: "dashboardAlertsQuerySchema"
+      description: "Validates alerts endpoint query"
+      fields:
+        - name: "limit"
+          type: "z.number().int().min(1).max(50).optional().default(10)"
+
+    - name: "dashboardActivityQuerySchema"
+      description: "Validates activity endpoint query"
+      fields:
+        - name: "limit"
+          type: "z.number().int().min(1).max(100).optional().default(20)"
+
+    - name: "dashboardKPIsSchema"
+      description: "Response schema for KPIs"
+      fields:
+        - name: "po_pending_approval"
+          type: "z.number().int().min(0)"
+        - name: "po_this_month"
+          type: "z.number().int().min(0)"
+        - name: "to_in_transit"
+          type: "z.number().int().min(0)"
+        - name: "wo_scheduled_today"
+          type: "z.number().int().min(0)"
+        - name: "wo_overdue"
+          type: "z.number().int().min(0)"
+        - name: "open_orders"
+          type: "z.number().int().min(0)"
+
+    - name: "alertSchema"
+      description: "Single alert item schema"
+      fields:
+        - name: "id"
+          type: "z.string().uuid()"
+        - name: "type"
+          type: "z.enum(['overdue_po', 'pending_approval', 'low_inventory', 'material_shortage'])"
+        - name: "severity"
+          type: "z.enum(['warning', 'critical'])"
+        - name: "entity_type"
+          type: "z.enum(['purchase_order', 'transfer_order', 'work_order'])"
+        - name: "entity_id"
+          type: "z.string().uuid()"
+        - name: "entity_number"
+          type: "z.string()"
+        - name: "description"
+          type: "z.string()"
+        - name: "days_overdue"
+          type: "z.number().int().optional()"
+        - name: "created_at"
+          type: "z.string().datetime()"
+
+    - name: "activitySchema"
+      description: "Single activity item schema"
+      fields:
+        - name: "id"
+          type: "z.string().uuid()"
+        - name: "entity_type"
+          type: "z.enum(['purchase_order', 'transfer_order', 'work_order'])"
+        - name: "entity_id"
+          type: "z.string().uuid()"
+        - name: "entity_number"
+          type: "z.string()"
+        - name: "action"
+          type: "z.enum(['created', 'updated', 'approved', 'cancelled', 'completed'])"
+        - name: "user_id"
+          type: "z.string().uuid()"
+        - name: "user_name"
+          type: "z.string()"
+        - name: "timestamp"
+          type: "z.string().datetime()"
+
+# Types
+types:
+  path: "apps/frontend/lib/types/planning-dashboard.ts"
+  exports:
+    - name: "DashboardKPIs"
+      description: "KPI metrics interface"
+    - name: "Alert"
+      description: "Single alert item"
+    - name: "AlertType"
+      description: "Alert type union"
+    - name: "AlertSeverity"
+      description: "Alert severity union"
+    - name: "DashboardAlertsResponse"
+      description: "Alerts endpoint response"
+    - name: "Activity"
+      description: "Single activity item"
+    - name: "ActivityAction"
+      description: "Activity action union"
+    - name: "DashboardActivityResponse"
+      description: "Activity endpoint response"
+
+# Implementation Patterns
+patterns:
+  api_route: |
+    // apps/frontend/app/api/planning/dashboard/kpis/route.ts
+    import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+    import { cookies } from 'next/headers';
+    import { NextResponse } from 'next/server';
+    import { getOrgContext } from '@/lib/services/org-context-service';
+    import { getKPIs } from '@/lib/services/planning-dashboard-service';
+
+    export async function GET() {
+      const context = await getOrgContext();
+      if (!context) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      try {
+        const kpis = await getKPIs(context.org_id);
+        return NextResponse.json(kpis);
+      } catch (error) {
+        console.error('KPI fetch error:', error);
+        return NextResponse.json(
+          { error: 'Failed to fetch dashboard KPIs' },
+          { status: 500 }
+        );
+      }
+    }
+
+  service_pattern: |
+    // apps/frontend/lib/services/planning-dashboard-service.ts
+    import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+    import { redis } from '@/lib/cache/redis';
+
+    const CACHE_PREFIX = 'planning:dashboard';
+    const TTL = 120; // 2 minutes
+
+    export interface DashboardKPIs {
+      po_pending_approval: number;
+      po_this_month: number;
+      to_in_transit: number;
+      wo_scheduled_today: number;
+      wo_overdue: number;
+      open_orders: number;
+    }
+
+    export async function getKPIs(orgId: string): Promise<DashboardKPIs> {
+      const cacheKey = `${CACHE_PREFIX}:kpis:${orgId}`;
+
+      // Check cache first
+      const cached = await redis.get(cacheKey);
+      if (cached) {
+        return JSON.parse(cached);
+      }
+
+      const supabase = createClientComponentClient();
+
+      // Execute parallel COUNT queries
+      const [poPending, poMonth, toTransit, woToday, woOverdue, openOrders] =
+        await Promise.all([
+          supabase
+            .from('purchase_orders')
+            .select('*', { count: 'exact', head: true })
+            .eq('org_id', orgId)
+            .eq('approval_status', 'pending'),
+          supabase
+            .from('purchase_orders')
+            .select('*', { count: 'exact', head: true })
+            .eq('org_id', orgId)
+            .gte('created_at', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()),
+          supabase
+            .from('transfer_orders')
+            .select('*', { count: 'exact', head: true })
+            .eq('org_id', orgId)
+            .in('status', ['partially_shipped', 'shipped']),
+          supabase
+            .from('work_orders')
+            .select('*', { count: 'exact', head: true })
+            .eq('org_id', orgId)
+            .eq('scheduled_date', new Date().toISOString().split('T')[0]),
+          supabase
+            .from('work_orders')
+            .select('*', { count: 'exact', head: true })
+            .eq('org_id', orgId)
+            .lt('scheduled_date', new Date().toISOString().split('T')[0])
+            .not('status', 'in', '("completed","closed","cancelled")'),
+          supabase
+            .from('purchase_orders')
+            .select('*', { count: 'exact', head: true })
+            .eq('org_id', orgId)
+            .not('status', 'in', '("closed","cancelled")'),
+        ]);
+
+      const kpis: DashboardKPIs = {
+        po_pending_approval: poPending.count ?? 0,
+        po_this_month: poMonth.count ?? 0,
+        to_in_transit: toTransit.count ?? 0,
+        wo_scheduled_today: woToday.count ?? 0,
+        wo_overdue: woOverdue.count ?? 0,
+        open_orders: openOrders.count ?? 0,
+      };
+
+      // Cache result
+      await redis.set(cacheKey, JSON.stringify(kpis), 'EX', TTL);
+
+      return kpis;
+    }
+
+    export async function invalidateDashboardCache(
+      orgId: string,
+      keys?: ('kpis' | 'alerts' | 'activity')[]
+    ): Promise<void> {
+      const toInvalidate = keys ?? ['kpis', 'alerts', 'activity'];
+      const deleteKeys = toInvalidate.map(k => `${CACHE_PREFIX}:${k}:${orgId}`);
+      await Promise.all(deleteKeys.map(k => redis.del(k)));
+    }
+
+# Error Handling
+error_handling:
+  strategy: "Return specific error codes for frontend handling"
+  error_codes:
+    UNAUTHORIZED: "401 - Invalid or missing JWT"
+    USER_NOT_FOUND: "404 - User not in system"
+    KPI_FETCH_ERROR: "500 - Database error on KPI query"
+    ALERTS_FETCH_ERROR: "500 - Database error on alerts query"
+    ACTIVITY_FETCH_ERROR: "500 - Database error on activity query"
+    INVALID_LIMIT: "400 - Limit param out of range"
+  logging: "Log all 500 errors to console with stack trace"

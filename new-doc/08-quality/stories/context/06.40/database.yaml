@@ -1,0 +1,29 @@
+# Story 06.40 - Document Control Database
+
+tables:
+  - name: quality_documents
+    columns:
+      - id, org_id, document_number, document_type
+      - title, description, tags[]
+      - version, is_latest_version, previous_version_id
+      - status (draft, review, approved, archived, obsolete)
+      - owner_id, reviewer_id, approved_by, approved_at
+      - expiry_date, expiry_alert_sent
+      - file_path, file_name, file_size_bytes, file_type, file_hash
+      - linked_entity_type, linked_entity_id
+      - change_reason, revision_notes
+    indexes:
+      - idx_documents_org_type, idx_documents_latest
+      - idx_documents_search (tsvector on title + description + tags)
+
+  - name: document_number_sequences
+    columns:
+      - org_id, year, document_type, current_value
+
+functions:
+  - generate_document_number(org_id, type)
+  - notify_expiring_documents() - cron daily
+
+file_storage:
+  bucket: quality-documents
+  path: "{org_id}/{document_number}/v{version}/{filename}"

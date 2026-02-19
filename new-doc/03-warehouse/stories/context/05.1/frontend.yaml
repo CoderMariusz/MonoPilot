@@ -1,0 +1,336 @@
+# Story 05.1 - Frontend Specification
+# Purpose: Pages, components, hooks, types, UX patterns
+# Agent: FRONTEND-DEV
+
+# Pages
+pages:
+  - path: "apps/frontend/app/(authenticated)/warehouse/license-plates/page.tsx"
+    description: "LP list page with DataTable, filters, KPI cards"
+    wireframe: "docs/3-ARCHITECTURE/ux/wireframes/WH-002-license-plates-list.md"
+    components:
+      - "LPDataTable"
+      - "LPFilters"
+      - "LPSearchInput"
+      - "LPKPICards"
+      - "LPDetailPanel"
+    features:
+      - "Paginated DataTable with 50 items per page"
+      - "8 filters (warehouse, location, product, status, QA, batch, expiry range, search)"
+      - "4 KPI cards (Total, Available, Expiring Soon, QA Pending)"
+      - "Column sorting (lp_number, created_at, expiry_date, quantity)"
+      - "Row click opens detail panel"
+      - "Status and QA status badges with colors"
+      - "Expiry indicators (green >30d, yellow 7-30d, red <7d, expired)"
+
+# Components
+components:
+  - path: "apps/frontend/components/warehouse/license-plates/LPDataTable.tsx"
+    description: "DataTable with sorting, pagination, row selection"
+    props:
+      - { name: "data", type: "LicensePlate[]" }
+      - { name: "pagination", type: "PaginationState" }
+      - { name: "onSort", type: "(field: string, direction: 'asc' | 'desc') => void" }
+      - { name: "onRowClick", type: "(lp: LicensePlate) => void" }
+      - { name: "onSelectionChange", type: "(ids: string[]) => void" }
+    columns:
+      - { name: "checkbox", width: "48px", sortable: false }
+      - { name: "lp_number", width: "180px", sortable: true }
+      - { name: "product", width: "200px", sortable: true, subtext: "batch + expiry" }
+      - { name: "qty", width: "100px", sortable: true, format: "quantity + uom" }
+      - { name: "location", width: "150px", sortable: true, subtext: "warehouse" }
+      - { name: "status", width: "100px", sortable: true, component: "LPStatusBadge" }
+      - { name: "qa_status", width: "100px", sortable: true, component: "LPQAStatusBadge" }
+      - { name: "actions", width: "80px", sortable: false, component: "LPRowActions" }
+
+  - path: "apps/frontend/components/warehouse/license-plates/LPFilters.tsx"
+    description: "Filter panel with 8 filter controls"
+    props:
+      - { name: "filters", type: "LPQueryParams" }
+      - { name: "onChange", type: "(filters: LPQueryParams) => void" }
+      - { name: "warehouses", type: "Warehouse[]" }
+      - { name: "products", type: "Product[]" }
+    filters:
+      - { name: "warehouse_id", type: "searchable-dropdown", label: "Warehouse" }
+      - { name: "location_id", type: "searchable-dropdown", label: "Location", cascade: "warehouse_id" }
+      - { name: "product_id", type: "searchable-dropdown", label: "Product" }
+      - { name: "status", type: "multi-select", label: "Status", options: ["available", "reserved", "consumed", "blocked"] }
+      - { name: "qa_status", type: "multi-select", label: "QA Status", options: ["pending", "passed", "failed", "quarantine"] }
+      - { name: "batch_number", type: "text", label: "Batch" }
+      - { name: "expiry_range", type: "date-range", label: "Expiry Date" }
+      - { name: "search", type: "text", label: "LP Number", debounce: 300 }
+
+  - path: "apps/frontend/components/warehouse/license-plates/LPSearchInput.tsx"
+    description: "LP number search with 300ms debounce"
+    props:
+      - { name: "value", type: "string" }
+      - { name: "onChange", type: "(value: string) => void" }
+    behavior:
+      - "300ms debounce"
+      - "Prefix search (optimized)"
+      - "Clear button when has value"
+      - "Search icon"
+
+  - path: "apps/frontend/components/warehouse/license-plates/LPKPICards.tsx"
+    description: "4 KPI summary cards"
+    props:
+      - { name: "summary", type: "LPSummary" }
+      - { name: "onCardClick", type: "(filter: string) => void" }
+    cards:
+      - { title: "Total LPs", value: "total_count", subtitle: "total_units" }
+      - { title: "Available", value: "available_count", subtitle: "available_units", onClick: "status=available" }
+      - { title: "Expiring Soon", value: "expiring_soon_count", subtitle: "< 30 days", onClick: "expiry filter" }
+      - { title: "QA Pending", value: "qa_pending_count", subtitle: "Require approval", onClick: "qa_status=pending" }
+
+  - path: "apps/frontend/components/warehouse/license-plates/LPDetailPanel.tsx"
+    description: "Slide-in panel for LP details"
+    wireframe: "docs/3-ARCHITECTURE/ux/wireframes/WH-003-license-plate-detail.md"
+    props:
+      - { name: "lp", type: "LicensePlate | null" }
+      - { name: "open", type: "boolean" }
+      - { name: "onClose", type: "() => void" }
+    sections:
+      - "Identity: LP Number, Status, QA Status"
+      - "Product: Name, Code, Qty, UoM"
+      - "Location: Warehouse, Location (full path)"
+      - "Tracking: Batch, Supplier Batch, Expiry, Manufacture Date"
+      - "Source: Type, PO/GRN/WO reference"
+      - "Timestamps: Created at, Created by, Updated at"
+    quick_actions:
+      - { action: "Block", visible: "status != blocked" }
+      - { action: "Unblock", visible: "status == blocked" }
+      - { action: "Print Label", visible: "always", disabled: true, note: "Phase 1" }
+      - { action: "View History", visible: "always", disabled: true, note: "Story 05.2" }
+
+  - path: "apps/frontend/components/warehouse/license-plates/LPStatusBadge.tsx"
+    description: "Status badge with color"
+    props:
+      - { name: "status", type: "LPStatus" }
+    variants:
+      - { status: "available", bg: "bg-green-100", text: "text-green-800", icon: "CheckCircle" }
+      - { status: "reserved", bg: "bg-yellow-100", text: "text-yellow-800", icon: "Lock" }
+      - { status: "consumed", bg: "bg-gray-100", text: "text-gray-500", icon: "Archive" }
+      - { status: "blocked", bg: "bg-red-100", text: "text-red-800", icon: "XCircle" }
+
+  - path: "apps/frontend/components/warehouse/license-plates/LPQAStatusBadge.tsx"
+    description: "QA status badge with color"
+    props:
+      - { name: "qaStatus", type: "QAStatus" }
+    variants:
+      - { status: "pending", bg: "bg-yellow-100", text: "text-yellow-800", icon: "Clock" }
+      - { status: "passed", bg: "bg-green-100", text: "text-green-800", icon: "CheckCircle" }
+      - { status: "failed", bg: "bg-red-100", text: "text-red-800", icon: "XCircle" }
+      - { status: "quarantine", bg: "bg-orange-100", text: "text-orange-800", icon: "AlertTriangle" }
+
+  - path: "apps/frontend/components/warehouse/license-plates/LPExpiryIndicator.tsx"
+    description: "Expiry date with warning colors"
+    props:
+      - { name: "expiryDate", type: "string | null" }
+    variants:
+      - { condition: "expired (< today)", color: "red", badge: "EXPIRED" }
+      - { condition: "< 7 days", color: "red", message: "Expires in X days" }
+      - { condition: "7-30 days", color: "yellow", message: "Expiring Soon" }
+      - { condition: "> 30 days", color: "green", message: null }
+
+  - path: "apps/frontend/components/warehouse/license-plates/LPRowActions.tsx"
+    description: "Row actions dropdown menu"
+    props:
+      - { name: "lp", type: "LicensePlate" }
+      - { name: "onAction", type: "(action: string) => void" }
+    actions:
+      - { action: "view", label: "View Details", visible: "always" }
+      - { action: "block", label: "Block LP", visible: "status == available" }
+      - { action: "unblock", label: "Unblock LP", visible: "status == blocked" }
+      - { action: "change_qa", label: "Change QA Status", visible: "always" }
+      - { action: "print", label: "Print Label", visible: "always", disabled: true }
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-license-plates.ts"
+    description: "React Query hook for LP list"
+    exports:
+      - name: "useLicensePlates"
+        params: ["params?: LPQueryParams"]
+        returns: "UseQueryResult<PaginatedResult<LicensePlate>>"
+        queryKey: "['license-plates', params]"
+        staleTime: "30000 (30 sec)"
+
+  - path: "apps/frontend/lib/hooks/use-license-plate.ts"
+    description: "React Query hook for single LP"
+    exports:
+      - name: "useLicensePlate"
+        params: ["id: string | null"]
+        returns: "UseQueryResult<LicensePlate | null>"
+        queryKey: "['license-plate', id]"
+        staleTime: "30000 (30 sec)"
+        enabled: "!!id"
+
+  - path: "apps/frontend/lib/hooks/use-lp-summary.ts"
+    description: "React Query hook for LP summary KPIs"
+    exports:
+      - name: "useLPSummary"
+        params: []
+        returns: "UseQueryResult<LPSummary>"
+        queryKey: "['license-plates-summary']"
+        staleTime: "60000 (1 min)"
+
+  - path: "apps/frontend/lib/hooks/use-lp-mutations.ts"
+    description: "React Query mutations for LP operations"
+    exports:
+      - name: "useCreateLP"
+        returns: "UseMutationResult"
+        invalidates: "['license-plates']"
+      - name: "useUpdateLP"
+        returns: "UseMutationResult"
+        invalidates: "['license-plates', 'license-plate']"
+      - name: "useBlockLP"
+        returns: "UseMutationResult"
+        invalidates: "['license-plates', 'license-plate']"
+      - name: "useUnblockLP"
+        returns: "UseMutationResult"
+        invalidates: "['license-plates', 'license-plate']"
+      - name: "useUpdateQAStatus"
+        returns: "UseMutationResult"
+        invalidates: "['license-plates', 'license-plate']"
+
+# TypeScript Types
+types:
+  - path: "apps/frontend/lib/types/license-plate.ts"
+    content: |
+      export type LPStatus = 'available' | 'reserved' | 'consumed' | 'blocked';
+      export type QAStatus = 'pending' | 'passed' | 'failed' | 'quarantine';
+      export type LPSource = 'manual' | 'receipt' | 'production' | 'return' | 'adjustment' | 'split';
+
+      export interface LicensePlate {
+        id: string;
+        org_id: string;
+        lp_number: string;
+        product_id: string;
+        quantity: number;
+        uom: string;
+        location_id: string;
+        warehouse_id: string;
+        status: LPStatus;
+        qa_status: QAStatus;
+        batch_number: string | null;
+        supplier_batch_number: string | null;
+        expiry_date: string | null;
+        manufacture_date: string | null;
+        source: LPSource;
+        po_number: string | null;
+        grn_id: string | null;
+        asn_id: string | null;
+        wo_id: string | null;
+        consumed_by_wo_id: string | null;
+        parent_lp_id: string | null;
+        catch_weight_kg: number | null;
+        gtin: string | null;
+        sscc: string | null;
+        pallet_id: string | null;
+        created_at: string;
+        created_by: string | null;
+        updated_at: string;
+        // Joined fields
+        product?: {
+          id: string;
+          name: string;
+          code: string;
+        };
+        location?: {
+          id: string;
+          code: string;
+          full_path: string;
+        };
+        warehouse?: {
+          id: string;
+          name: string;
+          code: string;
+        };
+      }
+
+      export interface LPSummary {
+        total_count: number;
+        total_units: number;
+        available_count: number;
+        available_units: number;
+        expiring_soon_count: number;
+        expiring_soon_days: number;
+        qa_pending_count: number;
+        reserved_count: number;
+        blocked_count: number;
+        consumed_count: number;
+      }
+
+      export interface LPQueryParams {
+        search?: string;
+        warehouse_id?: string;
+        location_id?: string;
+        product_id?: string;
+        status?: LPStatus;
+        qa_status?: QAStatus;
+        batch_number?: string;
+        expiry_before?: string;
+        expiry_after?: string;
+        sort?: 'lp_number' | 'created_at' | 'expiry_date' | 'quantity';
+        order?: 'asc' | 'desc';
+        page?: number;
+        limit?: number;
+      }
+
+# UX Patterns
+ux:
+  wireframes:
+    - id: "WH-002"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/WH-002-license-plates-list.md"
+      components: ["LPDataTable", "LPFilters", "LPKPICards", "LPStatusBadge", "LPQAStatusBadge", "LPExpiryIndicator"]
+    - id: "WH-003"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/WH-003-license-plate-detail.md"
+      components: ["LPDetailPanel"]
+  patterns:
+    table: "ShadCN DataTable with sticky header, row selection"
+    filters: "Filter bar with collapse on mobile"
+    panel: "Sheet component (slide from right) for detail view"
+    badges: "Badge component with color variants"
+    pagination: "ShadCN Pagination with page size selector"
+  states:
+    - "loading: Skeleton placeholders for cards and table"
+    - "empty: Empty state with create button"
+    - "filtered_empty: No results match filters, clear filters button"
+    - "error: Error message with retry button"
+    - "success: Data displayed in table"
+  responsive:
+    desktop: ">1024px - Full table with all columns"
+    tablet: "768-1024px - Condensed table, 2x2 KPI grid"
+    mobile: "<768px - Card layout, filters in drawer, Load More pagination"
+
+# Accessibility
+accessibility:
+  touch_targets: "48x48dp minimum for all interactive elements"
+  contrast: "4.5:1 minimum (WCAG AA)"
+  keyboard:
+    - "Tab: Navigate between interactive elements"
+    - "Enter: Activate button/link, open row detail"
+    - "Space: Toggle checkbox"
+    - "Escape: Close detail panel/dropdown"
+    - "Arrow keys: Navigate within dropdown/menu"
+  aria:
+    - "DataTable: role=table with proper row/cell structure"
+    - "Status badges: role=status aria-label={status}"
+    - "QA badges: role=status aria-label='QA status: {qa_status}'"
+    - "Filters: aria-expanded for dropdowns"
+    - "Detail panel: role=dialog aria-modal=true"
+  screen_reader:
+    - "KPI cards: '{title} card: {value}, {subtitle}'"
+    - "Table rows: LP number, product, quantity, status, QA status"
+    - "Expiry warnings: role=alert for expired items"
+
+# Performance
+performance:
+  initial_load: "<500ms (P95)"
+  filter_change: "<300ms"
+  pagination: "<300ms"
+  prefix_search: "<300ms (PRD requirement)"
+  detail_panel: "<200ms"
+  caching:
+    lp_list: "30 sec stale time (volatile data)"
+    lp_summary: "1 min stale time"
+    dropdowns: "5 min stale time (warehouses, products)"

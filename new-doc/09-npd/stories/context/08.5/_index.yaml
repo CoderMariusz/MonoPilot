@@ -1,0 +1,253 @@
+story:
+  id: "08.5"
+  name: "Allergen Aggregation & Display"
+  epic: "08-npd"
+  phase: "1"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "backend + frontend"
+  priority: "P0"
+
+dependencies:
+  required:
+    - story: "01.12"
+      provides: ["allergens", "product_allergens"]
+      status: "✅ READY"
+    - story: "08.4"
+      provides: ["npd_formulations", "npd_formulation_items"]
+      status: "⏳ PLANNED"
+    - story: "02.1"
+      provides: ["products"]
+      status: "✅ READY"
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/npd.md"
+  prd_sections: ["NPD-FR-10", "NPD-FR-30", "NPD-FR-61", "Section 3.5"]
+  architecture: null
+  story: "docs/2-MANAGEMENT/epics/current/08-npd/08.5.allergen-aggregation-display.md"
+  reference_story: "docs/2-MANAGEMENT/epics/current/01-settings/01.12.allergens-management.md"
+  patterns:
+    - "supabase/migrations/018_create_allergens_table.sql"
+    - "supabase/migrations/032_create_product_allergens_table.sql"
+    - "apps/frontend/lib/services/allergen-service.ts"
+
+files_to_create:
+  database:
+    - path: "supabase/migrations/XXX_create_aggregate_formulation_allergens_function.sql"
+      type: "migration"
+      description: "PostgreSQL function to aggregate allergens from formulation items"
+
+  api:
+    - path: "apps/frontend/app/api/npd/formulations/[id]/allergens/route.ts"
+      methods: ["GET"]
+      auth: true
+      roles: ["authenticated"]
+
+  services:
+    - path: "apps/frontend/lib/services/npd-formulation-service.ts"
+      description: "Add allergen aggregation methods (extends existing service from 08.4)"
+
+  validation:
+    - path: "apps/frontend/lib/validation/npd-allergen-schema.ts"
+      description: "Zod schemas for allergen responses"
+
+  pages:
+    - path: "apps/frontend/app/(authenticated)/npd/formulations/[id]/page.tsx"
+      description: "Add allergen panel to formulation detail page (extends 08.4)"
+
+  components:
+    - path: "apps/frontend/components/npd/allergens/FormulationAllergenPanel.tsx"
+      description: "Allergen declaration panel"
+    - path: "apps/frontend/components/npd/allergens/FormulationAllergenBadge.tsx"
+      description: "Allergen count badge"
+    - path: "apps/frontend/components/npd/allergens/AllergenList.tsx"
+      description: "List of allergens with icons"
+
+database:
+  functions:
+    - name: "aggregate_formulation_allergens"
+      parameters:
+        - "p_formulation_id UUID"
+      returns: "TABLE (allergen_id UUID, code VARCHAR, name_en VARCHAR, name_pl VARCHAR, name_de VARCHAR, name_fr VARCHAR, icon_url TEXT)"
+      description: "Aggregate and deduplicate allergens from all formulation items"
+      language: "plpgsql"
+      stability: "STABLE"
+
+  tables_referenced:
+    - name: "allergens"
+      from_epic: "01-settings"
+      columns: ["id", "code", "name_en", "name_pl", "name_de", "name_fr", "icon_url", "is_active"]
+
+    - name: "product_allergens"
+      from_epic: "01-settings"
+      columns: ["product_id", "allergen_id"]
+
+    - name: "npd_formulation_items"
+      from_epic: "08-npd"
+      columns: ["formulation_id", "product_id", "is_active"]
+
+api_endpoints:
+  - method: "GET"
+    path: "/api/npd/formulations/:id/allergens"
+    auth: true
+    roles: ["authenticated"]
+    query_params:
+      - name: "lang"
+        type: "enum"
+        values: ["en", "pl", "de", "fr"]
+        required: false
+    response:
+      success:
+        code: 200
+        schema: "{ allergens: Allergen[], total: number }"
+      errors:
+        - code: 401
+          description: "Unauthorized"
+        - code: 403
+          description: "Forbidden (RLS - different org)"
+        - code: 404
+          description: "Formulation not found"
+    performance:
+      target: "200ms"
+      notes: "Query for formulation with 20 items"
+
+ux:
+  wireframes: null
+
+  components:
+    - name: "FormulationAllergenPanel"
+      location: "Formulation detail page (main content area)"
+      description: "Panel showing allergen declaration"
+      sections:
+        - "Header: 'Allergen Declaration'"
+        - "Allergen count badge (optional)"
+        - "List of allergens with icons and localized names"
+        - "Empty state: 'No allergens detected'"
+
+    - name: "FormulationAllergenBadge"
+      description: "Badge showing allergen count with color coding"
+      states:
+        - "0 allergens: green background 'No Allergens'"
+        - "1-5 allergens: yellow background '{count} Allergens'"
+        - ">5 allergens: orange background '{count} Allergens'"
+
+    - name: "AllergenList"
+      description: "List of allergens sorted by code"
+      format: "[Icon] A01 - Gluten"
+      reuses: "AllergenIcon from Epic 01"
+
+  patterns:
+    panel: "Card component with header and content"
+    badge: "ShadCN Badge with variant based on count"
+    list: "Vertical list with icons and text"
+
+  states:
+    - "loading: Skeleton loader"
+    - "empty: 'No allergens detected' message"
+    - "error: Error message with retry button"
+    - "success: List of allergens"
+
+validation_rules:
+  allergen_aggregation: "Must deduplicate allergens across multiple formulation items"
+  allergen_sorting: "Must sort by allergen code (A01, A02, etc.)"
+  performance: "Query must complete within 200ms for 20-item formulation"
+  localization: "Must display allergen names in user's language preference"
+  rls_enforcement: "Must enforce org_id filter via RLS on formulation access"
+
+patterns:
+  rls: "ADR-013 (RLS enforced on formulation_id lookup)"
+  api: "REST with org_id filter via RLS"
+  service: "class-based with static methods (extends NPDFormulationService from 08.4)"
+  validation: "zod schemas for API responses"
+  database_function: "STABLE function returning TABLE"
+  reuse: "Reuse allergens table and AllergenIcon component from Epic 01"
+
+acceptance_checklist:
+  - "Database function deduplicates allergens (2 items with A07 returns 1 A07)"
+  - "Function returns allergens sorted by code (A01, A02, A03...)"
+  - "API endpoint returns 200 with allergen array for valid formulation"
+  - "API endpoint returns 404 for invalid formulation ID"
+  - "API endpoint returns 403 for formulation in different org (RLS)"
+  - "Allergen panel displays on formulation detail page"
+  - "Allergen panel shows icons with fallback for missing icons"
+  - "Allergen count badge shows correct count and color (green/yellow/orange)"
+  - "Panel shows 'No allergens detected' for empty formulation"
+  - "Panel auto-refreshes when formulation items change"
+  - "Allergen names display in user's language preference (PL/EN/DE/FR)"
+  - "Panel loads within 300ms"
+  - "Unit tests for allergen aggregation (>80% coverage)"
+  - "Integration tests for API endpoint"
+  - "E2E tests for panel rendering and auto-refresh"
+
+output_artifacts:
+  - "Migration: aggregate_formulation_allergens() function"
+  - "API endpoint: GET /api/npd/formulations/:id/allergens"
+  - "Service methods: getFormulationAllergens(), getAllergenCount()"
+  - "Component: FormulationAllergenPanel.tsx"
+  - "Component: FormulationAllergenBadge.tsx"
+  - "Component: AllergenList.tsx"
+  - "Zod schema: formulationAllergensResponseSchema"
+  - "Unit tests: npd-formulation-service.test.ts (allergen methods)"
+  - "Integration tests: allergens-route.test.ts"
+  - "E2E tests: formulation-allergen-panel.spec.ts"
+
+performance_requirements:
+  - metric: "Allergen aggregation query"
+    target: "200ms"
+    condition: "Formulation with 20 items"
+
+  - metric: "Allergen panel load"
+    target: "300ms"
+    condition: "Initial render on formulation detail page"
+
+  - metric: "Allergen panel refresh"
+    target: "300ms"
+    condition: "After formulation item update"
+
+integration_points:
+  upstream:
+    - module: "Settings (Epic 01)"
+      tables: ["allergens", "product_allergens"]
+      usage: "Reference data for allergen names, icons, and product associations"
+
+    - module: "Technical (Epic 02)"
+      tables: ["products"]
+      usage: "Ingredient products used in formulation items"
+
+    - module: "NPD (Story 08.4)"
+      tables: ["npd_formulation_items"]
+      usage: "Items to aggregate allergens from"
+
+  downstream:
+    - story: "08.11"
+      usage: "Handoff Wizard validates allergen declaration complete"
+
+    - story: "08.12"
+      usage: "Handoff: Formulation → BOM inherits allergen data"
+
+    - story: "08.3"
+      usage: "Gate Checklists - G3 item 'Allergen declaration validated'"
+
+out_of_scope:
+  - item: "Cross-contamination warnings"
+    reason: "Requires production line history analysis"
+    target_phase: "Phase 2 (Story 08.19)"
+
+  - item: "Allergen editing"
+    reason: "Allergens are read-only reference data"
+    target_phase: "Never (maintained in Settings)"
+
+  - item: "Custom allergen addition"
+    reason: "NPD uses only EU-mandated allergens"
+    target_phase: "Phase 3"
+
+  - item: "Precautionary allergen statements"
+    reason: "Manual entry in compliance documents"
+    target_phase: "Phase 2"
+
+notes:
+  - "Allergens table is global (no org_id) but RLS enforced via formulation access"
+  - "Reuse AllergenIcon component from Epic 01 (components/settings/allergens/)"
+  - "Function must be STABLE (not VOLATILE) for query optimization"
+  - "Allergen aggregation is read-only in Phase 1 (no manual override)"
+  - "Cross-contamination warnings deferred to Phase 2"

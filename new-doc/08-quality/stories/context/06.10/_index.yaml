@@ -1,0 +1,232 @@
+# Story 06.10 - In-Process Inspection Context (Entry Point)
+# Generated: 2025-12-18
+# Purpose: Story metadata, dependencies, and overview - read this first
+# Phase: 2 (In-Process & Final)
+
+story:
+  id: "06.10"
+  name: "In-Process Inspection"
+  slug: "in-process-inspection"
+  epic: "06-quality"
+  phase: "2"
+  complexity: "L"
+  estimate_days: 5-8
+  type: "full-stack"
+  state: "ready"
+  priority: "P0"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies, overview
+  - database.yaml    # Tables, RLS, migrations, triggers, indexes
+  - api.yaml         # Endpoints, request/response schemas, services
+  - frontend.yaml    # Components, pages, types, hooks, UX
+  - tests.yaml       # Acceptance criteria, test specifications, E2E scenarios
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["org_id context", "RLS pattern", "users table"]
+    - story: "02.1"
+      name: "Products CRUD"
+      provides: ["products table", "product reference for inspection"]
+    - story: "02.7"
+      name: "Routings CRUD"
+      provides: ["routings table", "routing reference for operation context"]
+    - story: "02.8"
+      name: "Routing Operations"
+      provides: ["routing_operations table", "operation checkpoint mapping"]
+    - story: "03.10"
+      name: "WO CRUD"
+      provides: ["work_orders table", "WO reference for in-process inspection"]
+    - story: "03.12"
+      name: "WO Operations"
+      provides: ["wo_operations table", "operation status, operation reference"]
+    - story: "04.2a"
+      name: "WO Start"
+      provides: ["WO status lifecycle", "in_progress status context"]
+    - story: "04.3"
+      name: "Operation Start/Complete"
+      provides: ["wo_operations status changes", "operation completion trigger"]
+    - story: "06.0"
+      name: "Quality Settings"
+      provides: ["quality_settings table", "auto_create_inspection_on_operation, require_operation_qa_pass settings"]
+    - story: "06.1"
+      name: "Quality Status Types"
+      provides: ["qa_status enum values"]
+    - story: "06.3"
+      name: "Product Specifications"
+      provides: ["quality_specifications table", "quality_spec_parameters", "test criteria"]
+    - story: "06.4"
+      name: "Test Parameters"
+      provides: ["quality_spec_parameters schema", "test method, acceptance criteria"]
+    - story: "06.5"
+      name: "Incoming Inspection"
+      provides: ["quality_inspections table", "inspection patterns, workflows, result determination logic"]
+
+  blocked_by: []
+
+  blocks:
+    - story: "06.6"
+      name: "Test Results Recording"
+      reason: "Inspection created before test results can be recorded"
+    - story: "06.11"
+      name: "Final Inspection"
+      reason: "In-process inspection patterns reused for final inspection"
+    - story: "06.12"
+      name: "Batch Release"
+      reason: "Batch release gate checks in-process inspection results"
+    - story: "06.17"
+      name: "Quality Alerts"
+      reason: "Inspection completion triggers alerts to production"
+    - story: "06.19"
+      name: "Operation Quality Checkpoints"
+      reason: "Checkpoint integration with inspection workflow"
+    - story: "06.20"
+      name: "Checkpoint Results"
+      reason: "Checkpoint results linked to inspection context"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/quality.md"
+    sections: ["FR-QA-006", "Section 9.2 - In-Process Inspection", "Section 7 - Operation Quality Checkpoints (FR-QA-026)"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/quality.md"
+    sections: ["quality_inspections", "API Design", "Data Flow - In-Process Inspection"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/06-quality/06.10.in-process-inspection.md"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "PRIMARY - RLS policy pattern for quality_inspections table"
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-001-multi-tenancy-isolation.md"
+      relevance: "Multi-tenancy isolation across all quality tables"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/QA-006-in-process-inspection.md"
+      relevance: "In-process inspection queue, detail page, execution, WO context integration"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "Add wo_id, wo_operation_id to quality_inspections; add qa_status, qa_inspection_id to wo_operations; add requires_quality_check, is_critical to routing_operations"
+  - type: "trigger/function"
+    count: 2
+    description: "create_inprocess_inspection_on_operation_complete() + update_wo_operation_qa_on_inspection()"
+  - type: "service"
+    count: 1
+    description: "in-process-inspection-service.ts extending inspection-service with WO operations integration"
+  - type: "validation"
+    count: 3
+    description: "createInProcessInspectionSchema, completeInProcessInspectionSchema, inProcessListQuerySchema"
+  - type: "api"
+    count: 8
+    description: "GET/POST inspections, GET/POST in-process specific, WO/operation filters, complete with WO update"
+  - type: "components"
+    count: 12
+    description: "InProcessInspectionDataTable, WOContextPanel, OperationQATimeline, OperationQABadge, etc."
+  - type: "page"
+    count: 3
+    description: "/quality/inspections/in-process (list), /quality/inspections/wo/[woId] (WO inspections), /quality/inspections/[id] (detail with WO context)"
+  - type: "test"
+    count: 3
+    description: "Unit tests (service with WO integration), Integration tests (API + WO operations), E2E tests (full in-process workflow)"
+
+# Technical notes
+technical_notes:
+  - "Inspection type: 'in_process' (filters on quality_inspections.inspection_type)"
+  - "Reference type: 'wo' or 'wo_operation' (reference_type + reference_id)"
+  - "Inspection status workflow: scheduled → in_progress → completed (or cancelled)"
+  - "Inspection result: pass/fail/conditional (determined on completion)"
+  - "Auto-create on operation completion if quality_settings.auto_create_inspection_on_operation = true"
+  - "Inspection number format: INS-IPR-{YYYY}-{NNNNN} (e.g., INS-IPR-2025-00001)"
+  - "WO operation QA status updated automatically on inspection completion: passed/failed/conditional/not_required"
+  - "Next operation blocking: if block_next_operation_on_fail=true and QA failed, next operation cannot start"
+  - "Conditional result requires QA_MANAGER role approval"
+  - "Inspection immutable once completed (is_locked = true behavior)"
+  - "Audit trail required for all state changes (quality_audit_log)"
+  - "Return 404 (not 403) for cross-tenant access per ADR-013"
+  - "WO must be in 'in_progress' status to create in-process inspection"
+  - "Operation linkage required - each in-process inspection must reference a wo_operation"
+
+# Business Rules
+business_rules:
+  - rule: "WO Status Prerequisite"
+    description: "In-process inspection can only be created for WO with status='in_progress'"
+    enforcement: "API validation on POST /api/quality/inspections with wo_id"
+  - rule: "Operation Linkage Required"
+    description: "In-process inspections must link to a wo_operation"
+    enforcement: "wo_operation_id is NOT NULL in database schema, API requires wo_operation_id"
+  - rule: "Auto-Create on Operation Complete"
+    description: "If setting enabled and routing operation requires QA, inspection auto-created"
+    enforcement: "Database trigger: create_inprocess_inspection_on_operation_complete()"
+  - rule: "QA Status Propagation"
+    description: "Inspection result updates wo_operation.qa_status automatically"
+    enforcement: "Database trigger: update_wo_operation_qa_on_inspection()"
+  - rule: "Next Operation Blocking"
+    description: "If block_next_operation_on_fail=true, failed QA prevents next operation start"
+    enforcement: "Application logic in operation-service checks previous operation QA status"
+  - rule: "One Active Inspection per Operation"
+    description: "Prevent duplicate inspections for same operation (warn but allow override)"
+    enforcement: "API validation via hasActiveOperationInspection() check"
+  - rule: "Inspector Assignment Required"
+    description: "Cannot start inspection without assigned inspector"
+    enforcement: "API validation - status must have inspector_id before starting"
+  - rule: "Conditional Requires Manager Approval"
+    description: "Only QA_MANAGER role can approve conditional results"
+    enforcement: "RLS policy on quality_inspections with role check"
+  - rule: "Production Notification"
+    description: "Production team notified on inspection completion (pass/fail)"
+    enforcement: "Service method notifyProductionOnCompletion() sends notifications"
+  - rule: "Audit Trail Required"
+    description: "All status changes, WO integration events logged to quality_audit_log"
+    enforcement: "Application layer creates audit_log entries on every state change"
+  - rule: "Specification Optional in MVP"
+    description: "Inspection can complete without linked specification (manual pass/fail)"
+    enforcement: "spec_id is nullable, result determination logic handles NULL spec_id"
+
+# Context Summary
+summary: |
+  Story 06.10 implements the in-process inspection workflow for Work-In-Progress (WIP) quality verification during production.
+
+  This story extends the inspection patterns from 06.5 (Incoming Inspection) with critical production integration:
+  - Inspections triggered by WO operation completion (not GRN completion)
+  - Direct linkage to work order operations with qa_status tracking
+  - Integration with WO lifecycle to pause/block operations on QA failure
+  - Production team notifications on inspection results
+  - Auto-creation based on operation quality checkpoint requirements
+
+  MVP SCOPE (This Story):
+  - quality_inspections table reuse with type='in_process' filter
+  - Auto-create inspection on WO operation completion (configurable)
+  - Manual inspection creation from production queue with WO/operation selection
+  - Inspection workflow: scheduled → in_progress → completed
+  - Inspector assignment and reassignment
+  - Test results recording per specification parameter (via story 06.6)
+  - Result determination: pass/fail/conditional
+  - WO operation QA status update on inspection completion
+  - Next operation blocking on QA failure (configurable)
+  - Inspection queue dashboard with WO/operation filters
+  - Inspection detail page with WO and operation context
+  - Integration with Epic 04 (WO Operations) for operation context
+  - Multi-operation batch inspection workflow support
+
+  DEFERRED (Phase 2+/Story 06.10b):
+  - Auto-create from operation completion (advanced scheduling)
+  - Sampling plan integration (AQL-based)
+  - Photo attachments for defect documentation
+  - Inspection templates per operation
+  - E-signature integration (FDA 21 CFR Part 11)
+  - Inspection analytics and trend reporting
+
+  KEY INTEGRATION POINTS:
+  - Triggered by WO operation completion (Epic 04)
+  - Updates wo_operation.qa_status automatically (Epic 04)
+  - Can trigger NCR creation on critical failure (Quality 06.9)
+  - Uses test parameters from specifications (Quality 06.3/06.4)
+  - Blocks next operation start on failure (Quality/Production boundary)
+  - Sends production notifications (Quality 06.17 - Quality Alerts)
+  - Links to operation quality checkpoints (Quality 06.19/06.20)
+  - Feeds batch release gate (Quality 06.12)

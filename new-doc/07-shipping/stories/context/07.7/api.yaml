@@ -1,0 +1,366 @@
+# Story 07.7 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling, services
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  # ==================== FETCH ALLOCATION DATA ====================
+  - method: "GET"
+    path: "/api/shipping/sales-orders/:id/allocations"
+    description: "Fetch allocation data with FIFO/FEFO suggestions and inventory freshness"
+    file: "apps/frontend/app/api/shipping/sales-orders/[id]/allocations/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    query_parameters:
+      - { name: "strategy", type: "string", required: false, enum: ["fifo", "fefo"], description: "Override default strategy" }
+      - { name: "include_suggestions", type: "boolean", required: false, default: true, description: "Include FIFO/FEFO suggestions" }
+      - { name: "include_last_updated", type: "boolean", required: false, default: true, description: "Include freshness timestamp" }
+
+    response:
+      status: 200
+      schema:
+        sales_order_id: "string (UUID)"
+        order_number: "string (e.g. SO-2025-0142)"
+        last_updated: "string (ISO 8601 timestamp)"
+        lines:
+          - line_id: "string"
+            line_number: "integer"
+            product_id: "string"
+            product_name: "string"
+            product_size: "string"
+            quantity_ordered: "number"
+            quantity_currently_allocated: "number"
+            unit_price: "number"
+            line_total: "number"
+            available_license_plates:
+              - license_plate_id: "string"
+                lp_number: "string"
+                location_code: "string"
+                on_hand_quantity: "number"
+                allocated_quantity: "number"
+                available_quantity: "number"
+                manufacturing_date: "string (date)"
+                receipt_date: "string (date)"
+                best_before_date: "string (date)"
+                expiry_days_remaining: "integer"
+                lot_number: "string | null"
+                batch_number: "string | null"
+                temperature_zone: "string"
+                suggested_allocation_qty: "number"
+                is_suggested: "boolean"
+                reason: "string (e.g. 'FIFO: oldest inventory')"
+            allocation_status: "string (full|partial|none)"
+            total_available: "number"
+            qty_short: "number"
+            allocation_summary:
+              fully_allocated: "boolean"
+              partially_allocated: "boolean"
+              total_available_qty: "number"
+              total_allocated_qty: "number"
+              shortfall_qty: "number"
+
+        allocation_summary:
+          total_lines: "integer"
+          fully_allocated_lines: "integer"
+          partially_allocated_lines: "integer"
+          not_allocated_lines: "integer"
+          total_qty_required: "number"
+          total_qty_allocated: "number"
+          total_qty_available: "number"
+          total_lps_selected: "integer"
+          coverage_percentage: "number"
+          allocation_complete: "boolean"
+          total_shortfall: "number"
+
+        fefo_warning_threshold_days: "integer"
+        strategy: "string (fifo|fefo)"
+        timestamp: "string (ISO 8601)"
+
+    errors:
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+      - { status: 404, code: "NOT_FOUND", message: "Sales order not found" }
+      - { status: 400, code: "INVALID_SO_STATUS", message: "SO must be in confirmed status" }
+
+  # ==================== CONFIRM ALLOCATION ====================
+  - method: "POST"
+    path: "/api/shipping/sales-orders/:id/allocate"
+    description: "Confirm allocation and reserve LPs for SO lines"
+    file: "apps/frontend/app/api/shipping/sales-orders/[id]/allocate/route.ts"
+    auth: "required"
+    roles: ["Manager", "Admin"]
+
+    request_body:
+      type: "AllocateRequest"
+      schema:
+        allocation_strategy: "string (fifo|fefo) - required"
+        allocations:
+          - sales_order_line_id: "string (UUID) - required"
+            line_allocations:
+              - license_plate_id: "string (UUID) - required"
+                quantity_to_allocate: "number - required, > 0"
+        hold_if_insufficient: "boolean (optional, default false)"
+        create_backorder_for_shortfall: "boolean (optional, default true)"
+        backorder_reason: "string (optional)"
+
+      validation:
+        - "allocation_strategy required"
+        - "At least one allocation required"
+        - "quantity_to_allocate must be > 0"
+        - "quantity_to_allocate must be <= LP available qty"
+        - "All LPs must match product_id of SO line"
+
+      example:
+        allocation_strategy: "fifo"
+        allocations:
+          - sales_order_line_id: "550e8400-e29b-41d4-a716-446655440000"
+            line_allocations:
+              - license_plate_id: "660e8400-e29b-41d4-a716-446655440000"
+                quantity_to_allocate: 400
+              - license_plate_id: "770e8400-e29b-41d4-a716-446655440000"
+                quantity_to_allocate: 550
+        create_backorder_for_shortfall: true
+
+    response:
+      status: 201
+      schema:
+        success: "boolean"
+        sales_order_id: "string"
+        order_number: "string"
+        allocated_at: "string (ISO 8601)"
+        undo_until: "string (ISO 8601 - 5 minutes after allocated_at)"
+        allocations_created:
+          - allocation_id: "string"
+            sales_order_line_id: "string"
+            license_plate_id: "string"
+            quantity_allocated: "number"
+            allocated_at: "string"
+            allocated_by: "string"
+        sales_order_status_updated:
+          old_status: "string"
+          new_status: "string (allocated|confirmed)"
+          timestamp: "string"
+        backorder_created:
+          backorder_id: "string (uuid) | null"
+          sales_order_line_id: "string"
+          product_id: "string"
+          quantity_backordered: "number"
+          status: "string"
+          created_at: "string"
+        summary:
+          total_allocated: "number"
+          total_required: "number"
+          total_allocated_pct: "number"
+          shortfall_qty: "number"
+          allocation_complete: "boolean"
+          held_on_insufficient_stock: "boolean"
+
+    errors:
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+      - { status: 403, code: "FORBIDDEN", message: "Insufficient permissions (requires Manager+)" }
+      - { status: 404, code: "NOT_FOUND", message: "SO, SO line, or LP not found" }
+      - { status: 400, code: "INVALID_SO_STATUS", message: "SO must be in confirmed status" }
+      - { status: 409, code: "LP_ALREADY_ALLOCATED", message: "LP already allocated to other SO" }
+      - { status: 400, code: "VALIDATION_ERROR", message: "Request validation failed" }
+
+  # ==================== RELEASE ALLOCATION ====================
+  - method: "POST"
+    path: "/api/shipping/sales-orders/:id/release-allocation"
+    description: "Release allocations and restore inventory to available"
+    file: "apps/frontend/app/api/shipping/sales-orders/[id]/release-allocation/route.ts"
+    auth: "required"
+    roles: ["Manager", "Admin"]
+
+    request_body:
+      type: "ReleaseAllocationRequest"
+      schema:
+        allocation_ids: "string[] (optional, omit to release all)"
+        reason: "string enum: undo_allocation | manual_adjustment | so_cancelled | line_deleted | other"
+
+      validation:
+        - "reason is optional (defaults to 'manual_adjustment')"
+        - "If allocation_ids provided, must be non-empty array"
+
+      example:
+        allocation_ids: null
+        reason: "undo_allocation"
+
+    response:
+      status: 200
+      schema:
+        success: "boolean"
+        allocations_released:
+          - allocation_id: "string"
+            sales_order_line_id: "string"
+            license_plate_id: "string"
+            quantity_released: "number"
+            released_at: "string"
+            released_by: "string"
+        inventory_freed: "number"
+        undo_window_expired: "boolean (true if > 5 min since allocation)"
+        summary: "string"
+
+    errors:
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+      - { status: 403, code: "FORBIDDEN", message: "Insufficient permissions" }
+      - { status: 404, code: "NOT_FOUND", message: "SO or allocation not found" }
+      - { status: 400, code: "NO_ALLOCATIONS", message: "SO has no active allocations to release" }
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/allocation-service.ts"
+    description: "Allocation business logic with FIFO/FEFO algorithm"
+    exports:
+      - name: "AllocationService"
+        type: "class"
+        methods:
+          - name: "allocateSalesOrder"
+            params: ["soId: string", "options?: AllocateOptions"]
+            returns: "Promise<AllocationResult>"
+            description: "Main allocation entry point - allocates all SO lines"
+
+          - name: "allocateLine"
+            params: ["soLineId: string"]
+            returns: "Promise<LineAllocationResult>"
+            description: "Allocate single SO line"
+
+          - name: "releaseAllocation"
+            params: ["soId: string", "reason?: string"]
+            returns: "Promise<ReleaseResult>"
+            description: "Release all allocations for SO"
+
+          - name: "releaseLineAllocation"
+            params: ["soLineId: string", "reason?: string"]
+            returns: "Promise<ReleaseResult>"
+            description: "Release allocations for single SO line"
+
+          - name: "getAvailableLPs"
+            params: ["productId: string", "strategy: 'FIFO'|'FEFO'", "limit?: number"]
+            returns: "Promise<LicensePlate[]>"
+            description: "Query available LPs for product, sorted by strategy"
+
+          - name: "getPickingStrategy"
+            params: ["productId: string"]
+            returns: "Promise<'FIFO'|'FEFO'>"
+            description: "Get product picking strategy or org default"
+
+          - name: "getAllocationThreshold"
+            params: ["orgId: string"]
+            returns: "Promise<number>"
+            description: "Get org allocation threshold percentage"
+
+          - name: "calculateFulfillmentPct"
+            params: ["lines: SOLine[]"]
+            returns: "number"
+            description: "Calculate fulfillment percentage for SO"
+
+          - name: "calculateBackorderQty"
+            params: ["line: SOLine"]
+            returns: "number"
+            description: "Calculate backorder quantity for SO line"
+
+  - path: "apps/frontend/lib/services/backorder-service.ts"
+    description: "Backorder creation and tracking"
+    exports:
+      - name: "BackorderService"
+        type: "class"
+        methods:
+          - name: "createBackorderSignal"
+            params: ["soLineId: string", "shortfallQty: number"]
+            returns: "Promise<void>"
+            description: "Publish backorder.created event for Planning module"
+
+          - name: "getBackorders"
+            params: ["orgId: string", "filters?: BackorderFilters"]
+            returns: "Promise<Backorder[]>"
+            description: "Query pending backorders with optional filters"
+
+          - name: "fulfillBackorder"
+            params: ["backorderId: string"]
+            returns: "Promise<void>"
+            description: "Mark backorder as fulfilled (when production completes)"
+
+# Validation Schemas
+validation:
+  - path: "apps/frontend/lib/validation/allocation.ts"
+    description: "Zod schemas for allocation validation"
+    exports:
+      - name: "allocationStrategyEnum"
+        values: ["FIFO", "FEFO"]
+
+      - name: "allocateRequestSchema"
+        fields:
+          allocation_strategy: "z.enum(['FIFO', 'FEFO'])"
+          allocations: "z.array(allocationLineSchema).min(1)"
+          hold_if_insufficient: "z.boolean().optional().default(false)"
+          create_backorder_for_shortfall: "z.boolean().optional().default(true)"
+          backorder_reason: "z.string().optional()"
+
+      - name: "allocationLineSchema"
+        fields:
+          sales_order_line_id: "z.string().uuid()"
+          line_allocations: "z.array(lpAllocationSchema).min(1)"
+
+      - name: "lpAllocationSchema"
+        fields:
+          license_plate_id: "z.string().uuid()"
+          quantity_to_allocate: "z.number().positive()"
+
+      - name: "releaseAllocationSchema"
+        fields:
+          allocation_ids: "z.array(z.string().uuid()).optional()"
+          reason: "z.enum(['undo_allocation', 'manual_adjustment', 'so_cancelled', 'line_deleted', 'other']).optional()"
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/allocation.ts"
+    description: "TypeScript interfaces for allocation module"
+    exports:
+      - name: "AllocationResult"
+        fields:
+          success: "boolean"
+          sales_order_id: "string"
+          allocations_created: "AllocationRecord[]"
+          backorder_created: "BackorderRecord | null"
+          summary: "AllocationSummary"
+          undo_until: "string"
+
+      - name: "AllocationRecord"
+        fields:
+          allocation_id: "string"
+          sales_order_line_id: "string"
+          license_plate_id: "string"
+          quantity_allocated: "number"
+          allocated_at: "string"
+          allocated_by: "string"
+
+      - name: "BackorderRecord"
+        fields:
+          backorder_id: "string"
+          sales_order_line_id: "string"
+          product_id: "string"
+          quantity_backordered: "number"
+          status: "string"
+          created_at: "string"
+
+      - name: "AllocationSummary"
+        fields:
+          total_lines: "number"
+          fully_allocated_lines: "number"
+          partially_allocated_lines: "number"
+          not_allocated_lines: "number"
+          total_qty_required: "number"
+          total_qty_allocated: "number"
+          coverage_percentage: "number"
+
+      - name: "LineAllocationResult"
+        fields:
+          allocations: "AllocationRecord[]"
+          allocated_qty: "number"
+          backorder_qty: "number"
+
+      - name: "ReleaseResult"
+        fields:
+          success: "boolean"
+          allocations_released: "AllocationRecord[]"
+          inventory_freed: "number"
+          undo_window_expired: "boolean"

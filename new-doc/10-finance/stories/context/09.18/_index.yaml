@@ -1,0 +1,114 @@
+story:
+  id: "09.18"
+  name: "BOM Cost Simulation & Compare"
+  epic: "09-finance"
+  phase: "2"
+  complexity: "M"
+  estimate_days: 3
+
+dependencies:
+  required:
+    - story: "02.4"
+      provides: ["boms", "bom_items", "BOM versioning"]
+    - story: "09.2"
+      provides: ["standard_costs"]
+    - story: "09.5"
+      provides: ["BOM costing logic", "cost_rollups"]
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/finance.md"
+  prd_sections: ["FR-9.2.3", "FR-9.2.4", "BOM Cost Simulation", "Recipe Cost Comparison"]
+  story: "docs/2-MANAGEMENT/epics/current/09-finance/09.18.bom-cost-simulation-compare.md"
+  patterns:
+    - "apps/frontend/components/technical/bom/BOMDetailModal.tsx"
+    - "apps/frontend/lib/services/bom-service.ts"
+
+files_to_create:
+  api:
+    - path: "apps/frontend/app/api/finance/bom-costs/[id]/simulate/route.ts"
+      methods: ["POST"]
+    - path: "apps/frontend/app/api/finance/bom-costs/compare/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/finance/bom-costs/preview/route.ts"
+      methods: ["POST"]
+  services:
+    - path: "apps/frontend/lib/services/bom-cost-simulation-service.ts"
+  validation:
+    - path: "apps/frontend/lib/validation/bom-cost-simulation-schema.ts"
+  pages:
+    - path: "apps/frontend/app/(authenticated)/finance/bom-costs/compare/page.tsx"
+  components:
+    - path: "apps/frontend/components/finance/bom/BOMCostSimulationModal.tsx"
+    - path: "apps/frontend/components/finance/bom/BOMVersionComparisonPage.tsx"
+    - path: "apps/frontend/components/finance/bom/BOMComparisonTable.tsx"
+    - path: "apps/frontend/components/finance/bom/CostImpactPreviewCard.tsx"
+    - path: "apps/frontend/components/finance/bom/CostBreakdown.tsx"
+    - path: "apps/frontend/components/finance/bom/BOMVersionSelector.tsx"
+  hooks:
+    - path: "apps/frontend/lib/hooks/use-bom-cost-simulation.ts"
+    - path: "apps/frontend/lib/hooks/use-bom-version-comparison.ts"
+    - path: "apps/frontend/lib/hooks/use-bom-cost-preview.ts"
+
+api_endpoints:
+  - method: "POST"
+    path: "/api/finance/bom-costs/:id/simulate"
+    auth: true
+    roles: ["admin", "finance_manager", "product_manager", "r_and_d"]
+  - method: "GET"
+    path: "/api/finance/bom-costs/compare"
+    auth: true
+    roles: ["admin", "finance_manager", "product_manager", "r_and_d"]
+  - method: "POST"
+    path: "/api/finance/bom-costs/preview"
+    auth: true
+    roles: ["admin", "finance_manager", "product_manager", "r_and_d"]
+
+ux:
+  wireframes:
+    - id: "FIN-BOM-SIMULATION-001"
+      path: "docs/2-MANAGEMENT/epics/current/09-finance/09.18.bom-cost-simulation-compare.md"
+      components: ["BOMCostSimulationModal", "BOMComparisonTable", "CostImpactPreviewCard"]
+  patterns:
+    simulation: "Modal with side-by-side current vs simulated cost"
+    comparison: "Table with version columns and change indicators"
+    preview: "Sticky card with real-time cost updates"
+  states: ["loading", "simulation_open", "comparison_loaded", "preview_updating"]
+
+validation_rules:
+  material_overrides: "array of { bom_item_id: UUID, unit_cost: number > 0 }"
+  labor_overrides: "array of { operation_id: UUID, standard_hours: number > 0 }"
+  overhead_rate_override: "number >= 0"
+  yield_override: "number 1-200 (percent)"
+  bom_ids: "array of 2-4 valid BOM UUIDs"
+
+patterns:
+  rls: "ADR-013"
+  api: "REST with org_id filter"
+  service: "class-based with static methods"
+  validation: "zod schemas"
+  realtime_preview: "Debounced recalculation on input change"
+
+acceptance_checklist:
+  - "Cost simulation modal opens from BOM detail page"
+  - "Simulation allows override of material costs, labor hours, yield"
+  - "Simulated cost recalculates in real-time (<200ms)"
+  - "Cost delta displayed with color coding (red/green)"
+  - "Apply simulation creates new BOM version with overrides"
+  - "BOM version comparison page compares 2-4 versions"
+  - "Comparison table shows added/removed/modified items"
+  - "Change indicators color-coded (green/red/yellow)"
+  - "Cost impact preview card updates on BOM item changes"
+  - "Export comparison to CSV functional"
+  - "Performance: simulation <200ms, comparison <1s"
+  - "RLS policies enforce org isolation"
+
+output_artifacts:
+  - "BOM cost simulation API endpoint"
+  - "BOM version comparison API endpoint"
+  - "BOM cost preview API endpoint"
+  - "BOMCostSimulationService with calculation logic"
+  - "BOM cost simulation modal component"
+  - "BOM version comparison page"
+  - "BOM comparison table with change indicators"
+  - "Cost impact preview card (real-time updates)"
+  - "Validation schemas for simulation and comparison"

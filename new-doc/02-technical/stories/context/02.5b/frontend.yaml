@@ -1,0 +1,654 @@
+# Story 02.5b - Frontend Specification
+# Purpose: Components, services, types for Phase 1B advanced BOM items
+# Agent: FRONTEND-DEV
+
+# Component locations
+component_base: "apps/frontend/components/technical/bom"
+page_base: "apps/frontend/app/(authenticated)/technical/boms/[id]"
+
+# New components for Phase 1B
+components:
+  - name: "BOMByproductsSection"
+    path: "components/technical/bom/BOMByproductsSection.tsx"
+    type: "section"
+    phase: "1B new"
+    description: "Byproducts table section below main items"
+    props:
+      bomId: "string"
+      bomOutputQty: "number"
+      byproducts: "BOMItem[]"
+      onAdd: "() => void"
+      onEdit: "(item: BOMItem) => void"
+      onDelete: "(itemId: string) => void"
+      isLoading: "boolean"
+      canEdit: "boolean"
+    dependencies:
+      - "@/components/ui/table"
+      - "@/components/ui/button"
+      - "@/components/ui/badge"
+      - "@/components/ui/dropdown-menu"
+    wireframe_ref: "TEC-006a Byproducts section"
+    pattern: |
+      // apps/frontend/components/technical/bom/BOMByproductsSection.tsx
+      import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+      import { Button } from "@/components/ui/button";
+      import { Badge } from "@/components/ui/badge";
+      import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+      import { MoreVertical, Plus, Pencil, Trash2 } from "lucide-react";
+
+      interface BOMByproductsSectionProps {
+        bomId: string;
+        bomOutputQty: number;
+        byproducts: BOMItem[];
+        onAdd: () => void;
+        onEdit: (item: BOMItem) => void;
+        onDelete: (itemId: string) => void;
+        isLoading: boolean;
+        canEdit: boolean;
+      }
+
+      export function BOMByproductsSection({
+        bomId,
+        bomOutputQty,
+        byproducts,
+        onAdd,
+        onEdit,
+        onDelete,
+        isLoading,
+        canEdit
+      }: BOMByproductsSectionProps) {
+        const totalYield = byproducts.reduce((sum, bp) => sum + (bp.yield_percent || 0), 0);
+
+        return (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-medium">Byproducts (Optional Outputs)</h3>
+              {canEdit && (
+                <Button onClick={onAdd} size="sm">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Byproduct
+                </Button>
+              )}
+            </div>
+
+            {byproducts.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No byproducts defined. Byproducts are secondary outputs from production.
+              </div>
+            ) : (
+              <>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">#</TableHead>
+                      <TableHead>Product</TableHead>
+                      <TableHead className="w-24">Qty</TableHead>
+                      <TableHead className="w-20">UoM</TableHead>
+                      <TableHead className="w-24">Yield%</TableHead>
+                      <TableHead>Notes</TableHead>
+                      <TableHead className="w-20">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {byproducts.map((bp, index) => (
+                      <TableRow key={bp.id}>
+                        <TableCell>{index + 1}</TableCell>
+                        <TableCell>
+                          <div className="font-medium">{bp.product_code}</div>
+                          <div className="text-sm text-muted-foreground">{bp.product_name}</div>
+                        </TableCell>
+                        <TableCell>{bp.quantity.toFixed(3)}</TableCell>
+                        <TableCell>{bp.uom}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{bp.yield_percent?.toFixed(1)}%</Badge>
+                        </TableCell>
+                        <TableCell className="max-w-xs truncate">{bp.notes || '-'}</TableCell>
+                        <TableCell>
+                          {canEdit && (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon">
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => onEdit(bp)}>
+                                  <Pencil className="h-4 w-4 mr-2" />
+                                  Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => onDelete(bp.id)}
+                                  className="text-destructive"
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                <div className="text-sm text-muted-foreground">
+                  Byproduct yield: {totalYield.toFixed(1)}% of main output
+                  ({byproducts.reduce((sum, bp) => sum + bp.quantity, 0).toFixed(3)} {byproducts[0]?.uom || 'kg'} from {bomOutputQty} kg batch)
+                </div>
+              </>
+            )}
+          </div>
+        );
+      }
+
+  - name: "ConditionalFlagsSelect"
+    path: "components/technical/bom/ConditionalFlagsSelect.tsx"
+    type: "input"
+    phase: "1B new"
+    description: "Multi-select dropdown for conditional flags (organic, vegan, etc.)"
+    props:
+      value: "ConditionFlags | null"
+      onChange: "(flags: ConditionFlags | null) => void"
+      disabled: "boolean"
+    dependencies:
+      - "@/components/ui/checkbox"
+      - "@/components/ui/label"
+      - "@/components/ui/popover"
+      - "@/components/ui/badge"
+    wireframe_ref: "TEC-006a Item Modal - Conditional Flags section"
+    pattern: |
+      // apps/frontend/components/technical/bom/ConditionalFlagsSelect.tsx
+      import { Checkbox } from "@/components/ui/checkbox";
+      import { Label } from "@/components/ui/label";
+      import { Badge } from "@/components/ui/badge";
+      import { useConditionalFlags } from "@/lib/hooks/use-conditional-flags";
+
+      const FLAG_COLORS: Record<string, string> = {
+        organic: "bg-green-100 text-green-800",
+        vegan: "bg-emerald-100 text-emerald-800",
+        gluten_free: "bg-yellow-100 text-yellow-800",
+        kosher: "bg-blue-100 text-blue-800",
+        halal: "bg-purple-100 text-purple-800",
+      };
+
+      interface ConditionalFlagsSelectProps {
+        value: ConditionFlags | null;
+        onChange: (flags: ConditionFlags | null) => void;
+        disabled?: boolean;
+      }
+
+      export function ConditionalFlagsSelect({
+        value,
+        onChange,
+        disabled = false
+      }: ConditionalFlagsSelectProps) {
+        const { flags, isLoading } = useConditionalFlags();
+
+        const handleToggle = (code: string, checked: boolean) => {
+          const newFlags = { ...value };
+          if (checked) {
+            newFlags[code] = true;
+          } else {
+            delete newFlags[code];
+          }
+          // If empty, set to null
+          onChange(Object.keys(newFlags).length > 0 ? newFlags : null);
+        };
+
+        const selectedCount = value ? Object.keys(value).filter(k => value[k]).length : 0;
+
+        return (
+          <div className="space-y-2">
+            <Label>Conditional Flags (Optional)</Label>
+            <div className="flex flex-wrap gap-2">
+              {flags.map(flag => (
+                <div key={flag.code} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={`flag-${flag.code}`}
+                    checked={value?.[flag.code] === true}
+                    onCheckedChange={(checked) => handleToggle(flag.code, !!checked)}
+                    disabled={disabled || isLoading}
+                  />
+                  <Label
+                    htmlFor={`flag-${flag.code}`}
+                    className="text-sm font-normal cursor-pointer"
+                  >
+                    <Badge className={FLAG_COLORS[flag.code] || "bg-gray-100"}>
+                      {flag.name}
+                    </Badge>
+                  </Label>
+                </div>
+              ))}
+            </div>
+            {selectedCount > 0 && (
+              <p className="text-xs text-muted-foreground">
+                {selectedCount} flag{selectedCount !== 1 ? 's' : ''} selected.
+                Use for variant recipes (e.g., organic version of product).
+              </p>
+            )}
+          </div>
+        );
+      }
+
+  - name: "ProductionLinesCheckbox"
+    path: "components/technical/bom/ProductionLinesCheckbox.tsx"
+    type: "input"
+    phase: "1B new"
+    description: "Checkbox group for production line assignment"
+    props:
+      value: "string[] | null"
+      onChange: "(lineIds: string[] | null) => void"
+      disabled: "boolean"
+    dependencies:
+      - "@/components/ui/checkbox"
+      - "@/components/ui/label"
+    wireframe_ref: "TEC-006a Item Modal - Production Lines section"
+    pattern: |
+      // apps/frontend/components/technical/bom/ProductionLinesCheckbox.tsx
+      import { Checkbox } from "@/components/ui/checkbox";
+      import { Label } from "@/components/ui/label";
+      import { useProductionLines } from "@/lib/hooks/use-production-lines";
+
+      interface ProductionLinesCheckboxProps {
+        value: string[] | null;
+        onChange: (lineIds: string[] | null) => void;
+        disabled?: boolean;
+      }
+
+      export function ProductionLinesCheckbox({
+        value,
+        onChange,
+        disabled = false
+      }: ProductionLinesCheckboxProps) {
+        const { lines, isLoading } = useProductionLines();
+
+        const handleToggle = (lineId: string, checked: boolean) => {
+          const current = value || [];
+          let newValue: string[];
+
+          if (checked) {
+            newValue = [...current, lineId];
+          } else {
+            newValue = current.filter(id => id !== lineId);
+          }
+
+          // If empty, set to null (= all lines)
+          onChange(newValue.length > 0 ? newValue : null);
+        };
+
+        const isAllLines = value === null || value.length === 0;
+
+        return (
+          <div className="space-y-2">
+            <Label>Production Lines (Optional)</Label>
+            <div className="border rounded-md p-3 space-y-2">
+              {lines.map(line => (
+                <div key={line.id} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={`line-${line.id}`}
+                    checked={value?.includes(line.id) ?? false}
+                    onCheckedChange={(checked) => handleToggle(line.id, !!checked)}
+                    disabled={disabled || isLoading}
+                  />
+                  <Label
+                    htmlFor={`line-${line.id}`}
+                    className="text-sm font-normal cursor-pointer"
+                  >
+                    {line.name}
+                  </Label>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {isAllLines
+                ? "Leave empty = available on all lines."
+                : `Selected ${value?.length} line(s). Item will only be used on selected lines.`}
+            </p>
+          </div>
+        );
+      }
+
+  - name: "BOMBulkImportModal"
+    path: "components/technical/bom/BOMBulkImportModal.tsx"
+    type: "modal"
+    phase: "1B new"
+    description: "Modal for bulk importing BOM items from CSV"
+    props:
+      bomId: "string"
+      isOpen: "boolean"
+      onClose: "() => void"
+      onSuccess: "(result: BulkImportResponse) => void"
+    dependencies:
+      - "@/components/ui/dialog"
+      - "@/components/ui/button"
+      - "@/components/ui/alert"
+      - "@/components/ui/progress"
+    wireframe_ref: "TEC-006a [Import CSV] action"
+    pattern: |
+      // apps/frontend/components/technical/bom/BOMBulkImportModal.tsx
+      import { useState, useRef } from "react";
+      import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+      import { Button } from "@/components/ui/button";
+      import { Alert, AlertDescription } from "@/components/ui/alert";
+      import { Progress } from "@/components/ui/progress";
+      import { Upload, Download, AlertCircle, CheckCircle } from "lucide-react";
+      import { bulkCreateBOMItems, parseCSVItems } from "@/lib/services/bom-items-service";
+
+      interface BOMBulkImportModalProps {
+        bomId: string;
+        isOpen: boolean;
+        onClose: () => void;
+        onSuccess: (result: BulkImportResponse) => void;
+      }
+
+      export function BOMBulkImportModal({
+        bomId,
+        isOpen,
+        onClose,
+        onSuccess
+      }: BOMBulkImportModalProps) {
+        const [file, setFile] = useState<File | null>(null);
+        const [isUploading, setIsUploading] = useState(false);
+        const [progress, setProgress] = useState(0);
+        const [error, setError] = useState<string | null>(null);
+        const [result, setResult] = useState<BulkImportResponse | null>(null);
+        const fileInputRef = useRef<HTMLInputElement>(null);
+
+        const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+          const selectedFile = e.target.files?.[0];
+          if (selectedFile) {
+            if (!selectedFile.name.endsWith('.csv')) {
+              setError('Please select a CSV file');
+              return;
+            }
+            setFile(selectedFile);
+            setError(null);
+            setResult(null);
+          }
+        };
+
+        const handleImport = async () => {
+          if (!file) return;
+
+          setIsUploading(true);
+          setProgress(10);
+          setError(null);
+
+          try {
+            // Parse CSV
+            setProgress(30);
+            const items = await parseCSVItems(file);
+
+            if (items.length === 0) {
+              throw new Error('No valid items found in CSV');
+            }
+            if (items.length > 500) {
+              throw new Error('Maximum 500 items allowed. Please split into multiple files.');
+            }
+
+            // Upload
+            setProgress(60);
+            const response = await bulkCreateBOMItems(bomId, items);
+
+            setProgress(100);
+            setResult(response);
+
+            if (response.errors.length === 0) {
+              // Full success - close after delay
+              setTimeout(() => {
+                onSuccess(response);
+                onClose();
+              }, 1500);
+            }
+          } catch (err) {
+            setError(err instanceof Error ? err.message : 'Import failed');
+          } finally {
+            setIsUploading(false);
+          }
+        };
+
+        const downloadTemplate = () => {
+          const headers = 'product_code,quantity,uom,sequence,scrap_percent,operation_seq';
+          const example = 'RM-001,50,kg,10,2,1\nING-002,5,kg,20,0,1';
+          const csv = headers + '\n' + example;
+          const blob = new Blob([csv], { type: 'text/csv' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'bom-items-template.csv';
+          a.click();
+        };
+
+        return (
+          <Dialog open={isOpen} onOpenChange={onClose}>
+            <DialogContent className="sm:max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Import BOM Items</DialogTitle>
+              </DialogHeader>
+
+              <div className="space-y-4 py-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-muted-foreground">
+                    Upload a CSV file with BOM items. Maximum 500 items per import.
+                  </p>
+                  <Button variant="outline" size="sm" onClick={downloadTemplate}>
+                    <Download className="h-4 w-4 mr-2" />
+                    Template
+                  </Button>
+                </div>
+
+                <div
+                  className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover:border-primary"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                  <p className="text-sm">
+                    {file ? file.name : 'Click to select CSV file'}
+                  </p>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".csv"
+                    className="hidden"
+                    onChange={handleFileSelect}
+                  />
+                </div>
+
+                {isUploading && (
+                  <div className="space-y-2">
+                    <Progress value={progress} />
+                    <p className="text-sm text-center text-muted-foreground">
+                      Importing items...
+                    </p>
+                  </div>
+                )}
+
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
+
+                {result && (
+                  <Alert variant={result.errors.length > 0 ? "warning" : "default"}>
+                    <CheckCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      {result.created} of {result.total} items imported successfully.
+                      {result.errors.length > 0 && (
+                        <div className="mt-2">
+                          <strong>Errors:</strong>
+                          <ul className="list-disc list-inside mt-1">
+                            {result.errors.slice(0, 5).map((err, i) => (
+                              <li key={i} className="text-sm">
+                                Row {err.row}: {err.error}
+                              </li>
+                            ))}
+                            {result.errors.length > 5 && (
+                              <li className="text-sm">
+                                ... and {result.errors.length - 5} more errors
+                              </li>
+                            )}
+                          </ul>
+                        </div>
+                      )}
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={onClose}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleImport}
+                  disabled={!file || isUploading}
+                >
+                  {isUploading ? 'Importing...' : 'Import Items'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        );
+      }
+
+  - name: "BOMItemModal (extended)"
+    path: "components/technical/bom/BOMItemModal.tsx"
+    type: "modal"
+    phase: "1B extension"
+    description: "Extended item modal with Phase 1B fields"
+    extends: "02.5a BOMItemModal"
+    new_sections:
+      - name: "License Plate Consumption Mode"
+        field: "consume_whole_lp"
+        component: "RadioGroup"
+        options: ["Partial", "Whole LP"]
+      - name: "Production Lines"
+        field: "line_ids"
+        component: "ProductionLinesCheckbox"
+      - name: "Conditional Flags"
+        field: "condition_flags"
+        component: "ConditionalFlagsSelect"
+      - name: "Byproduct Fields"
+        fields: ["is_by_product", "yield_percent"]
+        condition: "shown when adding byproduct"
+    wireframe_ref: "TEC-006a Add/Edit Item Modal"
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-conditional-flags.ts"
+    description: "Hook for fetching conditional flags"
+    phase: "1B new"
+    exports:
+      - name: "useConditionalFlags"
+        returns: "{ flags: ConditionalFlag[], isLoading: boolean, error: Error | null }"
+    pattern: |
+      import { useQuery } from '@tanstack/react-query';
+      import { getConditionalFlags } from '@/lib/services/bom-items-service';
+
+      export function useConditionalFlags() {
+        const { data, isLoading, error } = useQuery({
+          queryKey: ['conditional-flags'],
+          queryFn: getConditionalFlags,
+          staleTime: 10 * 60 * 1000, // 10 minutes - rarely changes
+        });
+
+        return {
+          flags: data || [],
+          isLoading,
+          error
+        };
+      }
+
+  - path: "apps/frontend/lib/hooks/use-production-lines.ts"
+    description: "Hook for fetching production lines"
+    phase: "1B new"
+    exports:
+      - name: "useProductionLines"
+        returns: "{ lines: ProductionLine[], isLoading: boolean, error: Error | null }"
+    pattern: |
+      import { useQuery } from '@tanstack/react-query';
+      import { getProductionLines } from '@/lib/services/bom-items-service';
+
+      export function useProductionLines() {
+        const { data, isLoading, error } = useQuery({
+          queryKey: ['production-lines'],
+          queryFn: getProductionLines,
+          staleTime: 5 * 60 * 1000, // 5 minutes
+        });
+
+        return {
+          lines: data || [],
+          isLoading,
+          error
+        };
+      }
+
+# Validation schemas
+validation:
+  path: "apps/frontend/lib/validation/bom-items.ts"
+  phase: "1B extension"
+  schemas:
+    - name: "bomItemSchemaPhase1B"
+      description: "Extended Zod schema with Phase 1B fields"
+      content: |
+        import { z } from 'zod';
+        import { bomItemSchema } from './bom-items-core';
+
+        export const bomItemSchemaPhase1B = bomItemSchema.extend({
+          consume_whole_lp: z.boolean().optional().default(false),
+          line_ids: z.array(z.string().uuid()).nullable().optional(),
+          is_by_product: z.boolean().optional().default(false),
+          yield_percent: z.number().min(0).max(100).nullable().optional(),
+          condition_flags: z.record(z.boolean()).nullable().optional(),
+        }).refine((data) => {
+          // If byproduct, yield_percent should be provided
+          if (data.is_by_product && data.yield_percent === null) {
+            return false;
+          }
+          return true;
+        }, {
+          message: "Yield percent is required for byproducts",
+          path: ["yield_percent"],
+        });
+
+    - name: "bulkImportSchema"
+      description: "Schema for bulk import request"
+      content: |
+        export const bulkImportSchema = z.object({
+          items: z.array(bomItemSchemaPhase1B).min(1).max(500),
+        });
+
+# UX Notes
+ux:
+  wireframes:
+    - id: "TEC-006a"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-006a-bom-items-detail.md"
+      sections_relevant:
+        - "Byproducts (Optional Outputs) section"
+        - "Add/Edit Item Modal - Phase 1B fields"
+        - "Conditional Flags field"
+        - "Production Lines checkbox group"
+        - "License Plate Consumption Mode radio"
+        - "[Import CSV] action"
+
+  component_patterns:
+    table: "ShadCN DataTable with sub-rows for details"
+    modal: "ShadCN Dialog with form validation"
+    multi_select: "ShadCN Checkbox group"
+    file_upload: "Drag-drop zone with progress indicator"
+
+  states:
+    - loading: "Skeleton for table, spinner for modals"
+    - empty: "Helpful message with action button"
+    - error: "Alert variant with retry action"
+    - success: "Toast notification"
+    - partial_success: "Alert with error list (bulk import)"
+
+  accessibility:
+    - "All form fields have labels"
+    - "Checkbox groups are keyboard navigable"
+    - "Modal focus trapping"
+    - "Error messages linked via aria-describedby"
+    - "Loading states announced to screen readers"

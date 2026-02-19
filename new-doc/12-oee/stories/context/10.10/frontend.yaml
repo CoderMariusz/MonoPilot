@@ -1,0 +1,203 @@
+# Story 10.10 - Frontend Specification
+# Purpose: Components, pages, hooks, types, UX wireframes
+# Agent: FRONTEND-DEV
+
+# TypeScript Types
+types:
+  - path: "apps/frontend/lib/types/utilization-analytics.ts"
+    content: |
+      export type Granularity = 'hourly' | 'daily' | 'weekly';
+      export type UtilizationStatus = 'low' | 'medium' | 'high';
+
+      export interface UtilizationHeatmapParams {
+        granularity: Granularity;
+        date_from: string;
+        date_to: string;
+        line_id?: string;
+        machine_ids?: string;
+      }
+
+      export interface MachineInfo {
+        id: string;
+        name: string;
+        code: string;
+        line_id?: string;
+        line_name?: string;
+      }
+
+      export interface TimeSlot {
+        slot: string;
+        label: string;
+      }
+
+      export interface UtilizationDataPoint {
+        machine_id: string;
+        slot: string;
+        utilization_pct: number;
+        actual_time: number;
+        planned_time: number;
+        status: UtilizationStatus;
+      }
+
+      export interface UtilizationSummary {
+        avg_utilization: number;
+        min_utilization: number;
+        max_utilization: number;
+        machines_below_50: number;
+      }
+
+      export interface UtilizationHeatmapResponse {
+        machines: MachineInfo[];
+        time_slots: TimeSlot[];
+        data: UtilizationDataPoint[];
+        summary: UtilizationSummary;
+      }
+
+# Components
+components:
+  - path: "apps/frontend/components/oee/analytics/UtilizationHeatmap.tsx"
+    description: "Main heatmap grid component"
+    props:
+      - { name: "data", type: "UtilizationHeatmapResponse", required: true }
+      - { name: "granularity", type: "Granularity", required: true }
+      - { name: "onCellClick", type: "(machineId: string, slot: string) => void", required: false }
+    features:
+      - "Grid layout: machines (Y) x time slots (X)"
+      - "Color-coded cells based on utilization %"
+      - "Hover tooltips with detailed metrics"
+      - "Click handler for drill-down"
+      - "Responsive scaling for different screen sizes"
+
+  - path: "apps/frontend/components/oee/analytics/HeatmapCell.tsx"
+    description: "Individual heatmap cell with color and tooltip"
+    props:
+      - { name: "utilization", type: "number", required: true }
+      - { name: "status", type: "UtilizationStatus", required: true }
+      - { name: "machineName", type: "string", required: true }
+      - { name: "timeLabel", type: "string", required: true }
+      - { name: "actualTime", type: "number", required: true }
+      - { name: "plannedTime", type: "number", required: true }
+      - { name: "onClick", type: "() => void", required: false }
+    features:
+      - "Background color based on status (red/yellow/green)"
+      - "Tooltip on hover with full details"
+      - "Click ripple effect"
+      - "Accessible color + text indicator"
+
+  - path: "apps/frontend/components/oee/analytics/HeatmapTooltip.tsx"
+    description: "Tooltip content for heatmap cells"
+    props:
+      - { name: "machineName", type: "string", required: true }
+      - { name: "timeLabel", type: "string", required: true }
+      - { name: "utilization", type: "number", required: true }
+      - { name: "actualTime", type: "number", required: true }
+      - { name: "plannedTime", type: "number", required: true }
+    displays:
+      - "Machine: Mixer-01"
+      - "Time: 14:00-15:00"
+      - "Utilization: 85%"
+      - "Actual: 51 min / Planned: 60 min"
+
+  - path: "apps/frontend/components/oee/analytics/GranularitySelector.tsx"
+    description: "Toggle for time granularity selection"
+    props:
+      - { name: "value", type: "Granularity", required: true }
+      - { name: "onChange", type: "(value: Granularity) => void", required: true }
+    options:
+      - { value: "hourly", label: "Hourly" }
+      - { value: "daily", label: "Daily" }
+      - { value: "weekly", label: "Weekly" }
+
+  - path: "apps/frontend/components/oee/analytics/UtilizationSummaryCards.tsx"
+    description: "Summary statistics cards above heatmap"
+    props:
+      - { name: "summary", type: "UtilizationSummary", required: true }
+    displays:
+      - { label: "Average Utilization", value: "avg_utilization", format: "percentage" }
+      - { label: "Lowest", value: "min_utilization", format: "percentage", color: "red" }
+      - { label: "Highest", value: "max_utilization", format: "percentage", color: "green" }
+      - { label: "Machines <50%", value: "machines_below_50", format: "count", color: "red" }
+
+  - path: "apps/frontend/components/oee/analytics/HeatmapLegend.tsx"
+    description: "Color legend for heatmap"
+    displays:
+      - { color: "red", label: "0-50% (Low)" }
+      - { color: "yellow", label: "50-80% (Medium)" }
+      - { color: "green", label: "80-100% (High)" }
+
+# Pages
+pages:
+  - path: "apps/frontend/app/(authenticated)/oee/analytics/utilization/page.tsx"
+    route: "/oee/analytics/utilization"
+    title: "Machine Utilization Heatmap"
+    description: "Visualize machine utilization patterns over time"
+    sections:
+      - name: "Filters"
+        components: ["DateRangePicker", "GranularitySelector", "LineFilter"]
+      - name: "Summary"
+        component: "UtilizationSummaryCards"
+      - name: "Heatmap"
+        component: "UtilizationHeatmap"
+      - name: "Legend"
+        component: "HeatmapLegend"
+    permissions: ["*"]
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-utilization-heatmap.ts"
+    description: "React Query hooks for utilization heatmap"
+    exports:
+      - name: "useUtilizationHeatmap"
+        type: "query"
+        params: ["params: UtilizationHeatmapParams"]
+        returns: "UseQueryResult<UtilizationHeatmapResponse>"
+        queryKey: "['utilization-heatmap', params]"
+        options:
+          staleTime: 60000  # 1 minute
+          refetchOnWindowFocus: true
+
+# Utilities
+utilities:
+  - path: "apps/frontend/lib/utils/heatmap-colors.ts"
+    description: "Color utilities for heatmap cells"
+    exports:
+      - name: "getUtilizationColor"
+        params: ["utilization: number"]
+        returns: "string (hex color)"
+        logic: "0-50: red, 50-80: yellow, 80-100: green"
+      - name: "getUtilizationStatus"
+        params: ["utilization: number"]
+        returns: "UtilizationStatus"
+      - name: "interpolateColor"
+        params: ["utilization: number"]
+        returns: "string (gradient color)"
+
+# UX Wireframes
+ux:
+  wireframes:
+    - id: "OEE-HEATMAP-001"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/OEE-HEATMAP-001.md"
+      title: "Utilization Heatmap Page"
+      components: ["UtilizationHeatmap", "GranularitySelector", "SummaryCards"]
+
+  patterns:
+    heatmap: "CSS Grid with dynamic columns based on granularity"
+    tooltip: "ShadCN Tooltip with custom content"
+    selector: "ShadCN ToggleGroup"
+
+  states:
+    - loading: "Skeleton grid with pulsing cells"
+    - empty: "Empty state: 'No utilization data for selected period'"
+    - error: "Error toast + retry button"
+
+  accessibility:
+    - "Color + pattern for status (not color alone)"
+    - "Keyboard navigation for cells"
+    - "Screen reader announces cell values"
+    - "High contrast mode support"
+
+# Integration Points
+integration:
+  - description: "Heatmap widget used in Performance Dashboard (Story 10.12)"
+  - description: "Click cell to navigate to machine details"
+  - description: "Date range synced with other analytics pages"

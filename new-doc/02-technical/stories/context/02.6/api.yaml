@@ -1,0 +1,748 @@
+# Story 02.6 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  # ===== CLONE BOM =====
+  - method: "POST"
+    path: "/api/v1/technical/boms/:id/clone"
+    description: "Clone BOM to same or different product with all items copied"
+    file: "apps/frontend/app/api/v1/technical/boms/[id]/clone/route.ts"
+    auth: "required"
+    roles: ["SUPER_ADMIN", "ADMIN", "PRODUCTION_MANAGER"]
+    permission: "technical.C"
+
+    request:
+      params:
+        id: "UUID - Source BOM ID"
+      body:
+        type: "CloneBOMRequest"
+        schema:
+          target_product_id:
+            type: "string (UUID)"
+            required: true
+            description: "Target product ID (same as source or different)"
+          effective_from:
+            type: "string (ISO date)"
+            required: false
+            default: "today"
+            description: "Effective start date for cloned BOM"
+          effective_to:
+            type: "string (ISO date) | null"
+            required: false
+            default: null
+            description: "Effective end date (null = no end date)"
+          status:
+            type: "draft | active"
+            required: false
+            default: "draft"
+            description: "Status of cloned BOM (always draft in MVP)"
+          notes:
+            type: "string | null"
+            required: false
+            max_length: 2000
+            description: "Optional notes override"
+
+    response:
+      status: 201
+      type: "CloneBOMResponse"
+      schema:
+        bom:
+          id: "string (UUID)"
+          product_id: "string (UUID)"
+          product_code: "string"
+          product_name: "string"
+          version: "number"
+          status: "string"
+          effective_from: "string (ISO date)"
+          effective_to: "string | null"
+          routing_id: "string | null"
+          items_count: "number"
+          created_at: "string (ISO datetime)"
+        message: "string"
+
+    errors:
+      - status: 400
+        code: "INVALID_REQUEST"
+        message: "Invalid request body"
+        when: "Missing required fields or invalid data types"
+      - status: 400
+        code: "DATE_OVERLAP"
+        message: "Effective date overlaps with existing BOM for target product"
+        when: "Target product has BOM with overlapping date range"
+      - status: 400
+        code: "PAST_DATE"
+        message: "Effective date cannot be in the past"
+        when: "effective_from is before today"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Insufficient permissions to clone BOM"
+        when: "User lacks technical.C permission"
+      - status: 404
+        code: "BOM_NOT_FOUND"
+        message: "Source BOM not found"
+        when: "Source BOM ID doesn't exist or belongs to different org"
+      - status: 404
+        code: "PRODUCT_NOT_FOUND"
+        message: "Target product not found"
+        when: "Target product ID doesn't exist"
+      - status: 500
+        code: "CLONE_FAILED"
+        message: "Clone operation failed"
+        when: "Database transaction error"
+
+  # ===== GET ALTERNATIVES =====
+  - method: "GET"
+    path: "/api/v1/technical/boms/:id/items/:itemId/alternatives"
+    description: "Get all alternatives for a BOM item with primary item info"
+    file: "apps/frontend/app/api/v1/technical/boms/[id]/items/[itemId]/alternatives/route.ts"
+    auth: "required"
+    roles: ["*"]  # All authenticated users
+    permission: "technical.R"
+
+    request:
+      params:
+        id: "UUID - BOM ID"
+        itemId: "UUID - BOM Item ID"
+
+    response:
+      status: 200
+      type: "AlternativesListResponse"
+      schema:
+        alternatives:
+          type: "array"
+          items:
+            id: "string (UUID)"
+            bom_item_id: "string (UUID)"
+            alternative_product_id: "string (UUID)"
+            alternative_product_code: "string"
+            alternative_product_name: "string"
+            alternative_product_type: "string"
+            quantity: "number"
+            uom: "string"
+            preference_order: "number"
+            notes: "string | null"
+            created_at: "string (ISO datetime)"
+        primary_item:
+          id: "string (UUID)"
+          product_code: "string"
+          product_name: "string"
+          product_type: "string"
+          quantity: "number"
+          uom: "string"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 404
+        code: "BOM_NOT_FOUND"
+        message: "BOM not found"
+      - status: 404
+        code: "ITEM_NOT_FOUND"
+        message: "BOM item not found"
+
+  # ===== CREATE ALTERNATIVE =====
+  - method: "POST"
+    path: "/api/v1/technical/boms/:id/items/:itemId/alternatives"
+    description: "Add alternative ingredient to BOM item"
+    file: "apps/frontend/app/api/v1/technical/boms/[id]/items/[itemId]/alternatives/route.ts"
+    auth: "required"
+    roles: ["SUPER_ADMIN", "ADMIN", "PRODUCTION_MANAGER"]
+    permission: "technical.C"
+
+    request:
+      params:
+        id: "UUID - BOM ID"
+        itemId: "UUID - BOM Item ID"
+      body:
+        type: "CreateAlternativeRequest"
+        schema:
+          alternative_product_id:
+            type: "string (UUID)"
+            required: true
+            description: "Alternative product ID"
+          quantity:
+            type: "number"
+            required: true
+            min: 0.000001
+            max_decimals: 6
+            description: "Quantity of alternative (may differ from primary)"
+          uom:
+            type: "string"
+            required: true
+            description: "Unit of measure (from alternative product)"
+          preference_order:
+            type: "number"
+            required: false
+            default: "auto-increment (max + 1)"
+            min: 2
+            description: "Preference order (2 = first alternative, 3 = second, etc.)"
+          notes:
+            type: "string | null"
+            required: false
+            max_length: 500
+            description: "Instructions for using this alternative"
+
+    response:
+      status: 201
+      type: "AlternativeResponse"
+      schema:
+        alternative:
+          id: "string (UUID)"
+          bom_item_id: "string (UUID)"
+          alternative_product_id: "string (UUID)"
+          alternative_product_code: "string"
+          alternative_product_name: "string"
+          quantity: "number"
+          uom: "string"
+          preference_order: "number"
+          notes: "string | null"
+          created_at: "string (ISO datetime)"
+        message: "string"
+
+    errors:
+      - status: 400
+        code: "INVALID_QUANTITY"
+        message: "Quantity must be greater than 0"
+        when: "quantity <= 0"
+      - status: 400
+        code: "PREFERENCE_TOO_LOW"
+        message: "Preference must be 2 or higher (1 is reserved for primary)"
+        when: "preference_order < 2"
+      - status: 400
+        code: "SAME_AS_PRIMARY"
+        message: "Alternative cannot be same as primary component"
+        when: "alternative_product_id equals primary item's product_id"
+      - status: 400
+        code: "TYPE_MISMATCH"
+        message: "Alternative must be same product type as primary"
+        when: "Alternative product has different type than primary"
+      - status: 400
+        code: "DUPLICATE_ALTERNATIVE"
+        message: "Alternative already exists for this item"
+        when: "Same alternative_product_id already added"
+      - status: 400
+        code: "CIRCULAR_REFERENCE"
+        message: "Cannot add BOM product as alternative"
+        when: "alternative_product_id equals BOM's product_id"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Insufficient permissions"
+      - status: 404
+        code: "BOM_NOT_FOUND"
+        message: "BOM not found"
+      - status: 404
+        code: "ITEM_NOT_FOUND"
+        message: "BOM item not found"
+      - status: 404
+        code: "PRODUCT_NOT_FOUND"
+        message: "Alternative product not found"
+
+  # ===== UPDATE ALTERNATIVE =====
+  - method: "PUT"
+    path: "/api/v1/technical/boms/:id/items/:itemId/alternatives/:altId"
+    description: "Update alternative ingredient"
+    file: "apps/frontend/app/api/v1/technical/boms/[id]/items/[itemId]/alternatives/[altId]/route.ts"
+    auth: "required"
+    roles: ["SUPER_ADMIN", "ADMIN", "PRODUCTION_MANAGER"]
+    permission: "technical.U"
+
+    request:
+      params:
+        id: "UUID - BOM ID"
+        itemId: "UUID - BOM Item ID"
+        altId: "UUID - Alternative ID"
+      body:
+        type: "UpdateAlternativeRequest"
+        schema:
+          quantity:
+            type: "number"
+            required: false
+            min: 0.000001
+            max_decimals: 6
+          uom:
+            type: "string"
+            required: false
+          preference_order:
+            type: "number"
+            required: false
+            min: 2
+          notes:
+            type: "string | null"
+            required: false
+            max_length: 500
+
+    response:
+      status: 200
+      type: "AlternativeResponse"
+      schema:
+        alternative: "same as create response"
+        message: "string"
+
+    errors:
+      - status: 400
+        code: "INVALID_QUANTITY"
+        message: "Quantity must be greater than 0"
+      - status: 400
+        code: "PREFERENCE_TOO_LOW"
+        message: "Preference must be 2 or higher"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Insufficient permissions"
+      - status: 404
+        code: "ALTERNATIVE_NOT_FOUND"
+        message: "Alternative not found"
+
+  # ===== DELETE ALTERNATIVE =====
+  - method: "DELETE"
+    path: "/api/v1/technical/boms/:id/items/:itemId/alternatives/:altId"
+    description: "Delete alternative ingredient"
+    file: "apps/frontend/app/api/v1/technical/boms/[id]/items/[itemId]/alternatives/[altId]/route.ts"
+    auth: "required"
+    roles: ["SUPER_ADMIN", "ADMIN", "PRODUCTION_MANAGER"]
+    permission: "technical.D"
+
+    request:
+      params:
+        id: "UUID - BOM ID"
+        itemId: "UUID - BOM Item ID"
+        altId: "UUID - Alternative ID"
+
+    response:
+      status: 200
+      type: "DeleteResponse"
+      schema:
+        success: "boolean"
+        message: "string"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Insufficient permissions"
+      - status: 404
+        code: "ALTERNATIVE_NOT_FOUND"
+        message: "Alternative not found"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/bom-clone-service.ts"
+    description: "BOM clone operations"
+    exports:
+      - name: "cloneBOM"
+        type: "async function"
+        params:
+          - "sourceBomId: string"
+          - "options: CloneBOMRequest"
+        returns: "Promise<CloneBOMResponse>"
+        description: "Clone BOM with all items to target product"
+
+      - name: "getNextVersion"
+        type: "async function"
+        params:
+          - "productId: string"
+        returns: "Promise<number>"
+        description: "Get next available version number for product"
+
+      - name: "validateCloneTarget"
+        type: "async function"
+        params:
+          - "productId: string"
+          - "effectiveFrom: string"
+          - "effectiveTo: string | null"
+        returns: "Promise<{ valid: boolean; error?: string }>"
+        description: "Validate clone target has no date overlap"
+
+  - path: "apps/frontend/lib/services/bom-alternatives-service.ts"
+    description: "BOM alternatives operations"
+    exports:
+      - name: "getAlternatives"
+        type: "async function"
+        params:
+          - "bomId: string"
+          - "itemId: string"
+        returns: "Promise<AlternativesListResponse>"
+        description: "Get all alternatives for a BOM item"
+
+      - name: "createAlternative"
+        type: "async function"
+        params:
+          - "bomId: string"
+          - "itemId: string"
+          - "data: CreateAlternativeRequest"
+        returns: "Promise<AlternativeResponse>"
+        description: "Create new alternative for BOM item"
+
+      - name: "updateAlternative"
+        type: "async function"
+        params:
+          - "bomId: string"
+          - "itemId: string"
+          - "altId: string"
+          - "data: UpdateAlternativeRequest"
+        returns: "Promise<AlternativeResponse>"
+        description: "Update existing alternative"
+
+      - name: "deleteAlternative"
+        type: "async function"
+        params:
+          - "bomId: string"
+          - "itemId: string"
+          - "altId: string"
+        returns: "Promise<void>"
+        description: "Delete alternative"
+
+      - name: "getNextPreferenceOrder"
+        type: "async function"
+        params:
+          - "itemId: string"
+        returns: "Promise<number>"
+        description: "Get next available preference order for item (max + 1, min 2)"
+
+      - name: "validateAlternativeRules"
+        type: "async function"
+        params:
+          - "primaryItem: BOMItem"
+          - "alternativeProductId: string"
+          - "excludeAltId?: string"
+        returns: "Promise<{ valid: boolean; error?: string; warning?: string }>"
+        description: "Validate alternative against business rules"
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/bom-clone.ts"
+    description: "BOM clone TypeScript interfaces"
+    content: |
+      export interface CloneBOMRequest {
+        target_product_id: string;
+        effective_from?: string;
+        effective_to?: string | null;
+        status?: 'draft' | 'active';
+        notes?: string | null;
+      }
+
+      export interface CloneBOMResponse {
+        bom: {
+          id: string;
+          product_id: string;
+          product_code: string;
+          product_name: string;
+          version: number;
+          status: string;
+          effective_from: string;
+          effective_to: string | null;
+          routing_id: string | null;
+          items_count: number;
+          created_at: string;
+        };
+        message: string;
+      }
+
+  - path: "apps/frontend/lib/types/bom-alternative.ts"
+    description: "BOM alternative TypeScript interfaces"
+    content: |
+      export interface BOMAlternative {
+        id: string;
+        bom_item_id: string;
+        alternative_product_id: string;
+        alternative_product_code: string;
+        alternative_product_name: string;
+        alternative_product_type: string;
+        quantity: number;
+        uom: string;
+        preference_order: number;
+        notes: string | null;
+        created_at: string;
+      }
+
+      export interface AlternativesListResponse {
+        alternatives: BOMAlternative[];
+        primary_item: {
+          id: string;
+          product_code: string;
+          product_name: string;
+          product_type: string;
+          quantity: number;
+          uom: string;
+        };
+      }
+
+      export interface CreateAlternativeRequest {
+        alternative_product_id: string;
+        quantity: number;
+        uom: string;
+        preference_order?: number;
+        notes?: string | null;
+      }
+
+      export interface UpdateAlternativeRequest {
+        quantity?: number;
+        uom?: string;
+        preference_order?: number;
+        notes?: string | null;
+      }
+
+      export interface AlternativeResponse {
+        alternative: BOMAlternative;
+        message: string;
+      }
+
+# Validation Schemas (Zod)
+validation:
+  - path: "apps/frontend/lib/validation/bom-clone.ts"
+    description: "Zod schemas for BOM clone"
+    schema: |
+      import { z } from 'zod';
+
+      export const cloneBOMSchema = z.object({
+        target_product_id: z.string()
+          .uuid("Select target product"),
+        effective_from: z.string()
+          .refine((val) => !val || !isNaN(Date.parse(val)), "Invalid date")
+          .refine((val) => {
+            if (!val) return true;
+            const date = new Date(val);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            return date >= today;
+          }, "Effective date cannot be in the past")
+          .optional(),
+        effective_to: z.string()
+          .refine((val) => !val || !isNaN(Date.parse(val)), "Invalid date")
+          .nullable()
+          .optional(),
+        status: z.enum(['draft', 'active']).default('draft'),
+        notes: z.string().max(2000, "Notes must be less than 2000 characters").optional(),
+      }).refine((data) => {
+        if (data.effective_to && data.effective_from) {
+          return new Date(data.effective_to) >= new Date(data.effective_from);
+        }
+        return true;
+      }, {
+        message: "Effective To must be after Effective From",
+        path: ["effective_to"],
+      });
+
+  - path: "apps/frontend/lib/validation/bom-alternative.ts"
+    description: "Zod schemas for BOM alternatives"
+    schema: |
+      import { z } from 'zod';
+
+      export const createAlternativeSchema = z.object({
+        alternative_product_id: z.string()
+          .uuid("Alternative component is required"),
+        quantity: z.number()
+          .positive("Quantity must be greater than 0")
+          .refine(val => {
+            const decimals = (val.toString().split('.')[1] || '').length;
+            return decimals <= 6;
+          }, "Maximum 6 decimal places allowed"),
+        uom: z.string()
+          .min(1, "Unit of measure is required"),
+        preference_order: z.number()
+          .int("Preference must be a whole number")
+          .min(2, "Preference must be 2 or higher (1 is reserved for primary)")
+          .optional(),
+        notes: z.string()
+          .max(500, "Notes must be less than 500 characters")
+          .nullable()
+          .optional(),
+      });
+
+      export const updateAlternativeSchema = z.object({
+        quantity: z.number()
+          .positive("Quantity must be greater than 0")
+          .refine(val => {
+            const decimals = (val.toString().split('.')[1] || '').length;
+            return decimals <= 6;
+          }, "Maximum 6 decimal places allowed")
+          .optional(),
+        uom: z.string()
+          .min(1, "Unit of measure is required")
+          .optional(),
+        preference_order: z.number()
+          .int("Preference must be a whole number")
+          .min(2, "Preference must be 2 or higher")
+          .optional(),
+        notes: z.string()
+          .max(500, "Notes must be less than 500 characters")
+          .nullable()
+          .optional(),
+      });
+
+# Implementation patterns
+patterns:
+  clone_api_route: |
+    // apps/frontend/app/api/v1/technical/boms/[id]/clone/route.ts
+    import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+    import { cookies } from 'next/headers';
+    import { NextResponse } from 'next/server';
+    import { cloneBOMSchema } from '@/lib/validation/bom-clone';
+
+    export async function POST(
+      request: Request,
+      { params }: { params: { id: string } }
+    ) {
+      const supabase = createRouteHandlerClient({ cookies });
+
+      // Validate auth
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      // Parse and validate request body
+      const body = await request.json();
+      const validation = cloneBOMSchema.safeParse(body);
+      if (!validation.success) {
+        return NextResponse.json({
+          error: 'Invalid request',
+          details: validation.error.errors
+        }, { status: 400 });
+      }
+
+      const { target_product_id, effective_from, effective_to, notes } = validation.data;
+
+      // Get source BOM
+      const { data: sourceBom, error: bomError } = await supabase
+        .from('boms')
+        .select('*, bom_items(*)')
+        .eq('id', params.id)
+        .single();
+
+      if (bomError || !sourceBom) {
+        return NextResponse.json({ error: 'Source BOM not found' }, { status: 404 });
+      }
+
+      // Get next version for target product
+      const { data: existingBoms } = await supabase
+        .from('boms')
+        .select('version')
+        .eq('product_id', target_product_id)
+        .order('version', { ascending: false })
+        .limit(1);
+
+      const nextVersion = (existingBoms?.[0]?.version || 0) + 1;
+
+      // Create new BOM
+      const { data: newBom, error: createError } = await supabase
+        .from('boms')
+        .insert({
+          org_id: sourceBom.org_id,
+          product_id: target_product_id,
+          version: nextVersion,
+          status: 'draft',
+          routing_id: sourceBom.routing_id,
+          effective_from: effective_from || new Date().toISOString().split('T')[0],
+          effective_to: effective_to || null,
+          output_qty: sourceBom.output_qty,
+          output_uom: sourceBom.output_uom,
+          units_per_box: sourceBom.units_per_box,
+          boxes_per_pallet: sourceBom.boxes_per_pallet,
+          notes: notes || `Cloned from BOM-${params.id}`,
+          created_by: user.id,
+        })
+        .select()
+        .single();
+
+      if (createError) {
+        return NextResponse.json({ error: 'Clone failed' }, { status: 500 });
+      }
+
+      // Clone items (MVP: basic items only)
+      if (sourceBom.bom_items?.length > 0) {
+        const itemsToInsert = sourceBom.bom_items
+          .filter(item => !item.is_by_product)
+          .map(item => ({
+            bom_id: newBom.id,
+            product_id: item.product_id,
+            quantity: item.quantity,
+            uom: item.uom,
+            sequence: item.sequence,
+            operation_seq: item.operation_seq,
+            scrap_percent: item.scrap_percent,
+            consume_whole_lp: item.consume_whole_lp,
+            notes: item.notes,
+          }));
+
+        await supabase.from('bom_items').insert(itemsToInsert);
+      }
+
+      return NextResponse.json({
+        bom: {
+          ...newBom,
+          items_count: sourceBom.bom_items?.filter(i => !i.is_by_product).length || 0,
+        },
+        message: 'BOM cloned successfully',
+      }, { status: 201 });
+    }
+
+  alternatives_service: |
+    // apps/frontend/lib/services/bom-alternatives-service.ts
+    import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+
+    export async function getAlternatives(bomId: string, itemId: string) {
+      const response = await fetch(
+        `/api/v1/technical/boms/${bomId}/items/${itemId}/alternatives`
+      );
+      if (!response.ok) throw new Error('Failed to fetch alternatives');
+      return response.json();
+    }
+
+    export async function createAlternative(
+      bomId: string,
+      itemId: string,
+      data: CreateAlternativeRequest
+    ) {
+      const response = await fetch(
+        `/api/v1/technical/boms/${bomId}/items/${itemId}/alternatives`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        }
+      );
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to create alternative');
+      }
+      return response.json();
+    }
+
+    export async function validateAlternativeRules(
+      primaryItem: BOMItem,
+      alternativeProductId: string,
+      bomProductId: string,
+      existingAlternatives: BOMAlternative[]
+    ): Promise<{ valid: boolean; error?: string; warning?: string }> {
+      // Check if same as primary
+      if (alternativeProductId === primaryItem.product_id) {
+        return { valid: false, error: 'Alternative cannot be same as primary component' };
+      }
+
+      // Check if same as BOM product (circular reference)
+      if (alternativeProductId === bomProductId) {
+        return { valid: false, error: 'Cannot add BOM product as alternative' };
+      }
+
+      // Check if duplicate
+      if (existingAlternatives.some(a => a.alternative_product_id === alternativeProductId)) {
+        return { valid: false, error: 'Alternative already exists for this item' };
+      }
+
+      // Type check requires fetching product - done server-side
+      return { valid: true };
+    }

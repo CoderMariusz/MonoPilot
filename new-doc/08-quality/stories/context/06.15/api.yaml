@@ -1,0 +1,23 @@
+# Story 06.15 - API Context
+# Generated: 2026-01-15
+# Purpose: NCR Corrective Action API endpoints
+
+base_path: "/api/quality/ncrs/:id/corrective-actions"
+
+# Comprehensive API similar to 06.14 api.yaml
+# Key endpoints:
+# - GET /corrective-actions (list for NCR)
+# - POST /corrective-actions (create)
+# - PUT /corrective-actions/:actionId (update)
+# - DELETE /corrective-actions/:actionId (delete)
+# - POST /corrective-actions/:actionId/items (add item)
+# - PUT /corrective-actions/:actionId/items/:itemId (update item)
+# - DELETE /corrective-actions/:actionId/items/:itemId (delete item)
+# - PUT /corrective-actions/:actionId/items/reorder (drag-drop)
+# - POST /corrective-actions/:actionId/complete (mark complete)
+# - POST /corrective-actions/:actionId/verify (QA verify)
+# - POST /corrective-actions/:actionId/evidence (upload)
+# - DELETE /corrective-actions/:actionId/evidence/:id (delete)
+
+# See database.yaml for schema details
+# Pattern: Follow 06.14 api.yaml structure

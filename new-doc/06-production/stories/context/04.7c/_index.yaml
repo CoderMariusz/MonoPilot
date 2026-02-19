@@ -1,0 +1,127 @@
+# Story 04.7c - Index File (Entry Point)
+# Generated: 2026-01-14
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "04.7c"
+  name: "By-Product Registration"
+  slug: "by-product-registration"
+  epic: "04-production"
+  phase: "1B"
+  complexity: "M"
+  estimate_days: 3
+  type: "full-stack"
+  state: "ready"
+  priority: "P0"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # production_outputs updates, by-product tracking
+  - api.yaml         # Endpoints for by-product registration
+  - frontend.yaml    # Components, services, UI patterns
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "04.7a"
+      name: "Output Registration Desktop"
+      provides: ["production_outputs table", "output registration API", "LP creation from production"]
+    - story: "05.1"
+      name: "License Plates CRUD"
+      provides: ["license_plates table", "LP service", "LP number generation"]
+    - story: "05.5"
+      name: "LP Genealogy"
+      provides: ["lp_genealogy table", "genealogy service", "parent-child tracking"]
+    - story: "03.11a"
+      name: "WO BOM Snapshot"
+      provides: ["wo_materials table", "is_by_product flag", "yield_percent field"]
+    - story: "04.5"
+      name: "Production Settings"
+      provides: ["auto_create_by_product_lp setting"]
+  soft:
+    - story: "04.7b"
+      name: "Output Registration Scanner"
+      reason: "Similar by-product flow for mobile interface"
+  blocks:
+    - story: "04.7d"
+      reason: "Multiple outputs per WO builds on by-product tracking"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/production.md"
+    sections: ["FR-PROD-013"]
+  wireframe:
+    path: "docs/3-ARCHITECTURE/ux/wireframes/PROD-004-part2-modals-and-specs.md"
+    sections:
+      - "By-Products Section (lines 62-75)"
+      - "Register By-Product Flow (lines 250-272)"
+      - "Auto-Create By-Products Flow (lines 274-289)"
+      - "Field Specifications - By-Products Section (lines 337-349)"
+      - "FR-PROD-013 AC Coverage (lines 680-689)"
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/04-production/04.7a.output-registration-desktop.md"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for by-product outputs"
+
+# High-level deliverables
+deliverables:
+  - type: "api"
+    count: 2
+    description: "POST /api/production/outputs/by-products, GET /api/production/work-orders/:id/by-products"
+  - type: "service"
+    count: 1
+    description: "by-product-service.ts with calculation and creation logic"
+  - type: "validation"
+    count: 1
+    description: "by-product-schemas.ts Zod validation"
+  - type: "component"
+    count: 3
+    description: "ByProductsSection, RegisterByProductModal, ByProductCompletionModal"
+  - type: "page"
+    count: 0
+    description: "Uses existing output registration page"
+  - type: "test"
+    count: 3
+    description: "Unit + integration + E2E tests"
+
+# Technical notes
+technical_notes:
+  - "By-products identified by wo_materials.is_by_product = true"
+  - "Expected qty = WO.planned_qty * yield_percent / 100"
+  - "Batch number format: {main_batch}-BP-{product_code}"
+  - "Expiry date: today + by_product.shelf_life_days"
+  - "Location: product.default_by_product_location_id or line default"
+  - "Auto-create runs in same transaction as main output"
+  - "Genealogy shares same parent_lp_ids from main output"
+
+# MVP Scope Clarification
+mvp_scope:
+  in_scope:
+    - "Display expected by-product qty from BOM yield_percent"
+    - "Auto-create by-product LPs when setting enabled"
+    - "Manual entry flow when auto-create disabled"
+    - "Separate LP per by-product type"
+    - "Shared genealogy with main output"
+    - "Zero qty warning with confirmation"
+    - "Batch auto-generation with format {main_batch}-BP-{code}"
+  out_of_scope:
+    - "By-product quality testing workflow"
+    - "By-product cost allocation"
+    - "Partial by-product registration across multiple outputs"
+    - "By-product rejection workflow"
+
+# FR-PROD-013 Mapping
+prd_mapping:
+  fr: "FR-PROD-013"
+  title: "By-Product Registration"
+  ac_count: 5
+  covered:
+    - "AC #1: GIVEN WO.planned_qty = 1000 AND by-product yield_percent = 5, WHEN by-product prompt displays, THEN expected qty shows as 50"
+    - "AC #2: GIVEN auto_create_by_product_lp = true, WHEN main output registered, THEN by-product LPs auto-created with expected quantities"
+    - "AC #3: GIVEN auto_create_by_product_lp = false, WHEN main output registered, THEN user manually enters by-product quantities"
+    - "AC #4: GIVEN by-product expected = 50 AND user enters actual = 45, WHEN registered, THEN LP created with qty = 45"
+    - "AC #5: GIVEN by-product registered, WHEN genealogy queried, THEN by-product LP has same parent_lp_ids as main output LP"

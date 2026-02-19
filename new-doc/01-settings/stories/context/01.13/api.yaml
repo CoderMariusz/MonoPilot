@@ -1,0 +1,307 @@
+# Story 01.13 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+base_path: "/api/v1/settings/tax-codes"
+
+endpoints:
+  - method: "GET"
+    path: "/api/v1/settings/tax-codes"
+    description: "List tax codes (paginated, filtered)"
+    file: "apps/frontend/app/api/v1/settings/tax-codes/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    query_params:
+      - name: "search"
+        type: "string"
+        required: false
+        description: "Filter by code or name (min 2 chars)"
+      - name: "country_code"
+        type: "string"
+        required: false
+        description: "Filter by country (ISO 2-letter)"
+      - name: "status"
+        type: "string"
+        enum: ["active", "expired", "scheduled", "all"]
+        default: "all"
+      - name: "sort"
+        type: "string"
+        enum: ["code", "name", "rate", "country_code", "valid_from", "created_at"]
+        default: "created_at"
+      - name: "order"
+        type: "string"
+        enum: ["asc", "desc"]
+        default: "desc"
+      - name: "page"
+        type: "number"
+        default: 1
+      - name: "limit"
+        type: "number"
+        default: 20
+        max: 100
+
+    response:
+      status: 200
+      type: "PaginatedResult<TaxCode>"
+      schema:
+        data: "TaxCode[]"
+        total: "number"
+        page: "number"
+        limit: "number"
+
+    errors:
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+      - { status: 400, code: "INVALID_QUERY", message: "Invalid query parameters" }
+
+  - method: "POST"
+    path: "/api/v1/settings/tax-codes"
+    description: "Create tax code"
+    auth: "required"
+    roles: ["SUPER_ADMIN", "ADMIN"]
+
+    request:
+      type: "CreateTaxCodeInput"
+      schema:
+        code: "string (2-20 chars, uppercase alphanumeric)"
+        name: "string (2-100 chars)"
+        rate: "number (0.00-100.00, 2 decimals)"
+        country_code: "string (2 chars, uppercase)"
+        valid_from: "string (YYYY-MM-DD)"
+        valid_to: "string | null (YYYY-MM-DD)"
+        is_default: "boolean"
+
+    response:
+      status: 201
+      type: "TaxCode"
+
+    errors:
+      - { status: 400, code: "VALIDATION_ERROR", message: "Validation failed", field_errors: true }
+      - { status: 409, code: "DUPLICATE_CODE", message: "Tax code must be unique within jurisdiction" }
+      - { status: 403, code: "PERMISSION_DENIED", message: "Insufficient permissions" }
+
+  - method: "GET"
+    path: "/api/v1/settings/tax-codes/:id"
+    description: "Get tax code by ID"
+    auth: "required"
+    roles: ["*"]
+
+    response:
+      status: 200
+      type: "TaxCode"
+
+    errors:
+      - { status: 404, code: "NOT_FOUND", message: "Tax code not found" }
+
+  - method: "PUT"
+    path: "/api/v1/settings/tax-codes/:id"
+    description: "Update tax code"
+    auth: "required"
+    roles: ["SUPER_ADMIN", "ADMIN"]
+
+    request:
+      type: "UpdateTaxCodeInput"
+      notes:
+        - "code and country_code immutable if referenced"
+        - "All fields optional (partial update)"
+
+    response:
+      status: 200
+      type: "TaxCode"
+
+    errors:
+      - { status: 400, code: "IMMUTABLE_FIELD", message: "Cannot change code for referenced tax code" }
+      - { status: 404, code: "NOT_FOUND", message: "Tax code not found" }
+
+  - method: "DELETE"
+    path: "/api/v1/settings/tax-codes/:id"
+    description: "Soft delete tax code"
+    auth: "required"
+    roles: ["SUPER_ADMIN", "ADMIN"]
+
+    response:
+      status: 204
+
+    errors:
+      - { status: 400, code: "REFERENCED", message: "Cannot delete tax code referenced by 5 suppliers" }
+      - { status: 404, code: "NOT_FOUND", message: "Tax code not found" }
+
+  - method: "PATCH"
+    path: "/api/v1/settings/tax-codes/:id/set-default"
+    description: "Set as default tax code (atomic)"
+    auth: "required"
+    roles: ["SUPER_ADMIN", "ADMIN"]
+
+    response:
+      status: 200
+      type: "TaxCode"
+      notes:
+        - "Atomically unsets previous default"
+        - "Transaction ensures only one default"
+
+    errors:
+      - { status: 404, code: "NOT_FOUND", message: "Tax code not found" }
+
+  - method: "GET"
+    path: "/api/v1/settings/tax-codes/validate-code"
+    description: "Check code uniqueness (debounce)"
+    auth: "required"
+    roles: ["SUPER_ADMIN", "ADMIN"]
+
+    query_params:
+      - { name: "code", type: "string", required: true }
+      - { name: "country_code", type: "string", required: true }
+      - { name: "exclude_id", type: "string", required: false, description: "Exclude this tax code ID" }
+
+    response:
+      status: 200
+      type: "{ available: boolean }"
+
+    errors:
+      - { status: 400, code: "INVALID_QUERY", message: "Code and country_code required" }
+
+  - method: "GET"
+    path: "/api/v1/settings/tax-codes/default"
+    description: "Get default tax code for org"
+    auth: "required"
+    roles: ["*"]
+
+    response:
+      status: 200
+      type: "TaxCode | null"
+
+    errors:
+      - { status: 404, code: "NOT_FOUND", message: "No default tax code configured" }
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/tax-code-service.ts"
+    description: "Tax code business logic"
+    exports:
+      - name: "TaxCodeService"
+        type: "class"
+        methods:
+          - name: "list"
+            params: ["params: TaxCodeListParams"]
+            returns: "Promise<PaginatedResult<TaxCode>>"
+
+          - name: "getById"
+            params: ["id: string"]
+            returns: "Promise<TaxCode | null>"
+
+          - name: "getDefault"
+            params: []
+            returns: "Promise<TaxCode | null>"
+
+          - name: "create"
+            params: ["data: CreateTaxCodeInput"]
+            returns: "Promise<TaxCode>"
+
+          - name: "update"
+            params: ["id: string", "data: UpdateTaxCodeInput"]
+            returns: "Promise<TaxCode>"
+
+          - name: "delete"
+            params: ["id: string"]
+            returns: "Promise<void>"
+            notes: ["Soft delete"]
+
+          - name: "setDefault"
+            params: ["id: string"]
+            returns: "Promise<TaxCode>"
+
+          - name: "validateCode"
+            params: ["code: string", "countryCode: string", "excludeId?: string"]
+            returns: "Promise<{ available: boolean }>"
+
+          - name: "hasReferences"
+            params: ["id: string"]
+            returns: "Promise<{ count: number; entities: string[] }>"
+
+          - name: "canDelete"
+            params: ["id: string"]
+            returns: "Promise<{ allowed: boolean; reason?: string }>"
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/tax-code.ts"
+    description: "Tax code TypeScript interfaces"
+    exports:
+      - name: "TaxCode"
+        fields:
+          - "id: string"
+          - "org_id: string"
+          - "code: string"
+          - "name: string"
+          - "rate: number"
+          - "country_code: string"
+          - "valid_from: string"
+          - "valid_to: string | null"
+          - "is_default: boolean"
+          - "is_deleted: boolean"
+          - "created_at: string"
+          - "updated_at: string"
+          - "created_by: string"
+          - "updated_by: string"
+
+      - name: "TaxCodeStatus"
+        type: "type"
+        value: "'active' | 'expired' | 'scheduled'"
+
+      - name: "TaxCodeListParams"
+        fields:
+          - "search?: string"
+          - "country_code?: string"
+          - "status?: TaxCodeStatus | 'all'"
+          - "sort?: string"
+          - "order?: 'asc' | 'desc'"
+          - "page?: number"
+          - "limit?: number"
+
+      - name: "CreateTaxCodeInput"
+        fields:
+          - "code: string"
+          - "name: string"
+          - "rate: number"
+          - "country_code: string"
+          - "valid_from: string"
+          - "valid_to?: string | null"
+          - "is_default?: boolean"
+
+      - name: "UpdateTaxCodeInput"
+        notes: "Partial<CreateTaxCodeInput> with code/country optional"
+
+# Helper Functions
+helpers:
+  - name: "getTaxCodeStatus"
+    signature: "(taxCode: TaxCode): TaxCodeStatus"
+    logic: |
+      const today = new Date().toISOString().split('T')[0];
+      if (taxCode.valid_from > today) return 'scheduled';
+      if (taxCode.valid_to && taxCode.valid_to < today) return 'expired';
+      return 'active';
+
+# Implementation patterns
+patterns:
+  soft_delete: |
+    // Soft delete instead of hard delete
+    await supabase
+      .from('tax_codes')
+      .update({
+        is_deleted: true,
+        deleted_at: new Date().toISOString(),
+        deleted_by: userId
+      })
+      .eq('id', taxCodeId);
+
+  set_default_atomic: |
+    // Atomic default assignment with trigger
+    await supabase
+      .from('tax_codes')
+      .update({ is_default: true })
+      .eq('id', taxCodeId);
+    // Trigger handles unsetting previous default
+
+  status_calculation: |
+    // Status computed on frontend, not stored
+    const status = getTaxCodeStatus(taxCode);

@@ -1,0 +1,279 @@
+# Story 04.7d - Test Specification
+# Purpose: Acceptance criteria, test cases for multiple outputs
+# Agent: QA / DEV (testing focus)
+
+# Acceptance Criteria (from PRD FR-PROD-015)
+acceptance_criteria:
+  - id: "AC1"
+    description: "GIVEN WO.planned_qty = 1000 AND first output = 400, WHEN output registered, THEN WO.output_qty = 400 AND progress = 40%"
+    type: "functional"
+    test_type: "integration"
+
+  - id: "AC2"
+    description: "GIVEN WO.output_qty = 400 AND second output = 300, WHEN second output registered, THEN WO.output_qty = 700 AND progress = 70%"
+    type: "functional"
+    test_type: "integration"
+
+  - id: "AC3"
+    description: "GIVEN 3 outputs registered (LP-001, LP-002, LP-003), WHEN output history viewed, THEN all 3 LPs display with individual quantities"
+    type: "functional"
+    test_type: "e2e"
+
+  - id: "AC4"
+    description: "GIVEN each output creates separate LP, WHEN output registered, THEN new unique LP ID is generated"
+    type: "functional"
+    test_type: "integration"
+
+  - id: "AC5"
+    description: "GIVEN auto_complete_wo = true AND output_qty reaches 1000 (planned), WHEN output registered, THEN WO auto-completes"
+    type: "functional"
+    test_type: "integration"
+
+# Unit Tests
+unit_tests:
+  - file: "apps/frontend/lib/services/__tests__/output-aggregation-service.test.ts"
+    tests:
+      - name: "calculateProgress returns correct percentage"
+        assertions:
+          - "calculateProgress(400, 1000) === 40"
+          - "calculateProgress(700, 1000) === 70"
+          - "calculateProgress(1000, 1000) === 100"
+          - "calculateProgress(1200, 1000) === 120"
+          - "calculateProgress(0, 1000) === 0"
+          - "calculateProgress(500, 0) === 0"
+
+  - file: "apps/frontend/lib/validation/__tests__/production-schemas.test.ts"
+    tests:
+      - name: "outputQuerySchema validates pagination"
+        assertions:
+          - "Accepts page = 1"
+          - "Rejects page = 0"
+          - "Accepts limit = 20"
+          - "Rejects limit = 101"
+          - "Defaults page to 1 if not provided"
+          - "Defaults limit to 20 if not provided"
+
+      - name: "outputQuerySchema validates filters"
+        assertions:
+          - "Accepts qa_status = 'approved'"
+          - "Accepts qa_status = 'pending'"
+          - "Accepts qa_status = 'rejected'"
+          - "Rejects qa_status = 'invalid'"
+
+  - file: "apps/frontend/components/production/outputs/__tests__/OutputProgressCard.test.tsx"
+    tests:
+      - name: "renders progress correctly"
+        assertions:
+          - "Shows planned qty"
+          - "Shows output qty"
+          - "Shows remaining qty"
+          - "Progress bar at correct percentage"
+
+      - name: "handles over-production display"
+        assertions:
+          - "Progress > 100% shows green"
+          - "Shows over-production message"
+
+# Integration Tests
+integration_tests:
+  - file: "apps/frontend/app/api/production/work-orders/[id]/outputs/__tests__/route.test.ts"
+    tests:
+      - name: "returns outputs with pagination"
+        setup: "WO with 25 outputs"
+        request:
+          page: 1
+          limit: 10
+        assertions:
+          - "Returns 10 outputs"
+          - "pagination.total = 25"
+          - "pagination.pages = 3"
+
+      - name: "filters by qa_status"
+        setup: "WO with 5 approved, 3 pending, 2 rejected"
+        request:
+          qa_status: "approved"
+        assertions:
+          - "Returns 5 outputs"
+          - "All have qa_status = 'approved'"
+
+      - name: "excludes by-products from list"
+        setup: "WO with 3 main outputs, 2 by-product outputs"
+        assertions:
+          - "Returns 3 outputs"
+          - "No by-products in response"
+
+      - name: "returns correct summary"
+        setup: "WO with outputs totaling 3200 kg"
+        assertions:
+          - "summary.total_qty = 3200"
+          - "summary.total_outputs matches count"
+
+  - file: "apps/frontend/app/api/production/work-orders/[id]/progress/__tests__/route.test.ts"
+    tests:
+      - name: "returns correct progress"
+        setup: |
+          WO planned_qty = 1000
+          output_qty = 700
+        assertions:
+          - "progress_percent = 70"
+          - "remaining_qty = 300"
+
+      - name: "handles over-production"
+        setup: |
+          WO planned_qty = 1000
+          output_qty = 1200
+        assertions:
+          - "progress_percent = 120"
+          - "remaining_qty = 0"
+
+  - file: "supabase/functions/__tests__/update_wo_output_qty.test.ts"
+    tests:
+      - name: "trigger updates output_qty on INSERT"
+        setup: |
+          WO with output_qty = 0
+          Register output of 400
+        assertions:
+          - "WO.output_qty = 400"
+
+      - name: "trigger updates output_qty cumulatively"
+        setup: |
+          WO with output_qty = 400
+          Register output of 300
+        assertions:
+          - "WO.output_qty = 700"
+
+      - name: "trigger excludes by-products"
+        setup: |
+          WO with output_qty = 400
+          Register by-product output of 50
+        assertions:
+          - "WO.output_qty = 400 (unchanged)"
+
+      - name: "auto-complete trigger fires"
+        setup: |
+          auto_complete_wo = true
+          WO planned_qty = 1000
+          output_qty = 950
+          Register output of 50
+        assertions:
+          - "WO.status = 'completed'"
+          - "WO.completed_at is set"
+
+      - name: "auto-complete does not fire when disabled"
+        setup: |
+          auto_complete_wo = false
+          WO planned_qty = 1000
+          output_qty = 950
+          Register output of 50
+        assertions:
+          - "WO.status = 'in_progress'"
+          - "WO.completed_at is null"
+
+# E2E Tests
+e2e_tests:
+  - file: "e2e/production/multiple-outputs.spec.ts"
+    tests:
+      - name: "Register multiple outputs and track progress"
+        steps:
+          - "Login as Operator"
+          - "Navigate to WO (planned_qty = 1000)"
+          - "Verify progress = 0%"
+          - "Register output of 400"
+          - "Verify progress = 40%, output_qty = 400"
+          - "Register output of 300"
+          - "Verify progress = 70%, output_qty = 700"
+          - "Register output of 300"
+          - "Verify progress = 100%, output_qty = 1000"
+
+      - name: "Output history displays all outputs"
+        steps:
+          - "Login as Operator"
+          - "Navigate to WO with 3 outputs"
+          - "Verify output history table shows 3 rows"
+          - "Verify each row has unique LP number"
+          - "Verify quantities match registered amounts"
+
+      - name: "Auto-complete WO when target reached"
+        steps:
+          - "Login as Admin"
+          - "Verify auto_complete_wo = true"
+          - "Navigate to WO (planned = 1000, output = 950)"
+          - "Register output of 50"
+          - "Verify WO status changes to 'completed'"
+          - "Verify completion toast displayed"
+
+      - name: "Manual completion when auto-complete disabled"
+        steps:
+          - "Login as Admin"
+          - "Set auto_complete_wo = false"
+          - "Navigate to WO (planned = 1000, output = 950)"
+          - "Register output of 50"
+          - "Verify WO status remains 'in_progress'"
+          - "Verify progress shows 100%"
+
+      - name: "Over-production handling"
+        steps:
+          - "Login as Operator"
+          - "Navigate to completed WO (100%)"
+          - "Verify can still register output"
+          - "Register additional output of 200"
+          - "Verify progress > 100%"
+          - "Verify over-production indicator displayed"
+
+      - name: "Pagination in output history"
+        steps:
+          - "Navigate to WO with 25 outputs"
+          - "Verify first page shows 20 outputs"
+          - "Click 'Next' pagination"
+          - "Verify page 2 shows 5 outputs"
+          - "Verify page info shows 'Page 2 of 2'"
+
+      - name: "Filter outputs by QA status"
+        steps:
+          - "Navigate to WO with mixed QA statuses"
+          - "Select 'Approved' filter"
+          - "Verify only approved outputs shown"
+          - "Select 'Pending' filter"
+          - "Verify only pending outputs shown"
+
+# Performance Tests
+performance_tests:
+  - name: "Output history table render"
+    target: "<1s"
+    description: "Render table with 50+ outputs"
+
+  - name: "Progress calculation"
+    target: "<100ms"
+    description: "Calculate progress after output registration"
+
+  - name: "Auto-complete trigger"
+    target: "Same transaction"
+    description: "Auto-complete fires within output registration transaction"
+
+  - name: "GET outputs API"
+    target: "<500ms"
+    description: "Paginated outputs list with filters"
+
+# Test Data Requirements
+test_data:
+  work_orders:
+    - wo_number: "WO-TEST-001"
+      planned_qty: 1000
+      output_qty: 0
+      status: "in_progress"
+    - wo_number: "WO-TEST-002"
+      planned_qty: 5000
+      output_qty: 3200
+      status: "in_progress"
+  outputs:
+    - lp_number: "LP-TEST-001"
+      quantity: 400
+      qa_status: "approved"
+    - lp_number: "LP-TEST-002"
+      quantity: 300
+      qa_status: "approved"
+    - lp_number: "LP-TEST-003"
+      quantity: 600
+      qa_status: "pending"
+  settings:
+    auto_complete_wo: true

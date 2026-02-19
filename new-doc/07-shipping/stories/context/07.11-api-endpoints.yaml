@@ -1,0 +1,639 @@
+api_endpoints_summary:
+  story_id: "07.11"
+  story_name: "Packing & Shipment Creation"
+  total_endpoints: 7
+  base_path: "/api/shipping"
+  authentication: "Required on all endpoints"
+  rls_enforcement: "All endpoints filter by user's org_id"
+
+endpoints:
+  create_shipment:
+    id: "POST /api/shipping/shipments"
+    method: "POST"
+    path: "/api/shipping/shipments"
+    summary: "Create shipment from sales order"
+    description: |
+      Creates a new shipment record from a sales order.
+      Auto-generates shipment_number in format SH-YYYY-NNNNN.
+      Updates sales_order.status to 'packing'.
+      Initializes shipment status as 'pending' (no boxes yet).
+    authentication:
+      required: true
+      method: "Bearer token (Supabase auth)"
+      header: "Authorization: Bearer {token}"
+    authorization:
+      roles: ["Warehouse Manager", "Shipping Manager", "Packer", "Admin"]
+      permission: "shipping:create"
+    request:
+      content_type: "application/json"
+      body:
+        schema: |
+          {
+            "sales_order_id": "uuid" (required)
+          }
+        validation:
+          sales_order_id: "UUID format, must exist in database"
+          so_status: "sales_order.status must be 'picked' or 'picking'"
+        examples:
+          - sales_order_id: "550e8400-e29b-41d4-a716-446655440000"
+    response:
+      success:
+        status_code: 201
+        content_type: "application/json"
+        body: |
+          {
+            "success": true,
+            "data": {
+              "shipment_id": "660e8400-e29b-41d4-a716-446655440001",
+              "shipment_number": "SH-2025-00001",
+              "status": "pending",
+              "sales_order_id": "550e8400-e29b-41d4-a716-446655440000",
+              "created_at": "2025-12-18T10:30:00Z"
+            }
+          }
+      error:
+        - status_code: 400
+          error_code: "INVALID_SALES_ORDER"
+          message: "Sales order not found or not in 'picked' status"
+        - status_code: 403
+          error_code: "FORBIDDEN"
+          message: "User does not have permission to create shipments"
+        - status_code: 409
+          error_code: "CONFLICT"
+          message: "Shipment already exists for this sales order"
+    side_effects:
+      - "Creates new record in shipments table"
+      - "Updates sales_orders.status from 'picked' to 'packing'"
+      - "Auto-populates org_id from user context"
+      - "Auto-populates created_by from user context"
+    performance:
+      timeout: "5s"
+      expected_latency: "<500ms"
+    rls_behavior: "org_id auto-populated from user's org_id"
+
+  list_shipments:
+    id: "GET /api/shipping/shipments"
+    method: "GET"
+    path: "/api/shipping/shipments"
+    summary: "List shipments with filters and pagination"
+    description: |
+      Returns a paginated list of shipments for the user's organization.
+      Supports filtering by status, customer, and date range.
+      Sorted by created_at descending (newest first).
+    authentication:
+      required: true
+      method: "Bearer token"
+    authorization:
+      roles: ["All authenticated users"]
+      permission: "shipping:read"
+    request:
+      query_parameters:
+        status:
+          type: "string"
+          required: false
+          description: "Comma-separated status values to filter"
+          enum: ["pending", "packing", "packed", "manifested", "shipped", "delivered", "exception"]
+          example: "packing,packed"
+          default: "all statuses"
+        customer_id:
+          type: "uuid"
+          required: false
+          description: "Filter by customer ID"
+          example: "550e8400-e29b-41d4-a716-446655440002"
+        date_from:
+          type: "string"
+          required: false
+          format: "YYYY-MM-DD"
+          description: "Filter shipments created on or after this date"
+          example: "2025-12-15"
+        date_to:
+          type: "string"
+          required: false
+          format: "YYYY-MM-DD"
+          description: "Filter shipments created on or before this date"
+          example: "2025-12-20"
+        page:
+          type: "integer"
+          required: false
+          description: "Page number (1-indexed)"
+          default: 1
+          minimum: 1
+        limit:
+          type: "integer"
+          required: false
+          description: "Results per page"
+          default: 20
+          minimum: 1
+          maximum: 50
+        sort_by:
+          type: "string"
+          required: false
+          enum: ["shipment_number", "created_at", "status", "customer_name"]
+          default: "created_at"
+        sort_order:
+          type: "string"
+          required: false
+          enum: ["asc", "desc"]
+          default: "desc"
+      example_url: |
+        GET /api/shipping/shipments?status=packing,packed&customer_id=550e8400-e29b-41d4-a716-446655440002&page=1&limit=20
+    response:
+      success:
+        status_code: 200
+        body: |
+          {
+            "success": true,
+            "data": {
+              "shipments": [
+                {
+                  "id": "660e8400-e29b-41d4-a716-446655440001",
+                  "shipment_number": "SH-2025-00001",
+                  "status": "packing",
+                  "sales_order_id": "550e8400-e29b-41d4-a716-446655440000",
+                  "customer": { "id": "...", "name": "ABC Foods" },
+                  "total_boxes": 2,
+                  "total_weight": 45.5,
+                  "carrier": "dhl",
+                  "tracking_number": "1Z999AA10012345678",
+                  "created_at": "2025-12-18T10:30:00Z",
+                  "packed_at": null
+                }
+              ],
+              "total": 45,
+              "page": 1,
+              "pages": 3
+            }
+          }
+      error:
+        - status_code: 400
+          error_code: "INVALID_FILTER"
+          message: "Invalid filter parameter"
+    performance:
+      timeout: "10s"
+      expected_latency: "<1s"
+    rls_behavior: "Only returns shipments where org_id = user's org_id"
+
+  get_shipment_detail:
+    id: "GET /api/shipping/shipments/:id"
+    method: "GET"
+    path: "/api/shipping/shipments/:id"
+    summary: "Get shipment detail with boxes and contents"
+    description: |
+      Returns complete shipment information including all boxes and their contents.
+      Includes sales order, customer, and warehouse location details.
+    authentication:
+      required: true
+    authorization:
+      roles: ["All authenticated users"]
+    request:
+      path_parameters:
+        id:
+          type: "uuid"
+          required: true
+          description: "Shipment ID"
+    response:
+      success:
+        status_code: 200
+        body: |
+          {
+            "success": true,
+            "data": {
+              "shipment": {
+                "id": "660e8400-e29b-41d4-a716-446655440001",
+                "shipment_number": "SH-2025-00001",
+                "status": "packed",
+                "sales_order_id": "550e8400-e29b-41d4-a716-446655440000",
+                "customer_id": "550e8400-e29b-41d4-a716-446655440002",
+                "customer": { "name": "ABC Foods" },
+                "shipping_address_id": "550e8400-e29b-41d4-a716-446655440003",
+                "total_boxes": 2,
+                "total_weight": 45.5,
+                "created_at": "2025-12-18T10:30:00Z",
+                "packed_at": "2025-12-18T11:45:00Z",
+                "packed_by": "user-uuid"
+              },
+              "boxes": [
+                {
+                  "id": "760e8400-e29b-41d4-a716-446655440001",
+                  "box_number": 1,
+                  "weight": 23.5,
+                  "length": 60,
+                  "width": 40,
+                  "height": 30,
+                  "sscc": null,
+                  "created_at": "2025-12-18T10:35:00Z"
+                },
+                {
+                  "id": "760e8400-e29b-41d4-a716-446655440002",
+                  "box_number": 2,
+                  "weight": 22.0,
+                  "length": 60,
+                  "width": 40,
+                  "height": 25,
+                  "sscc": null,
+                  "created_at": "2025-12-18T10:40:00Z"
+                }
+              ],
+              "contents": [
+                {
+                  "id": "860e8400-e29b-41d4-a716-446655440001",
+                  "shipment_box_id": "760e8400-e29b-41d4-a716-446655440001",
+                  "sales_order_line_id": "950e8400-e29b-41d4-a716-446655440001",
+                  "product": { "name": "Organic Flour 5lb", "sku": "FLOUR-5LB" },
+                  "license_plate": { "lp_number": "LP-2025-0001" },
+                  "lot_number": "FLOUR-2024-001",
+                  "quantity": 100,
+                  "created_at": "2025-12-18T10:36:00Z"
+                }
+              ]
+            }
+          }
+      error:
+        - status_code: 404
+          error_code: "NOT_FOUND"
+          message: "Shipment not found"
+    performance:
+      timeout: "5s"
+      expected_latency: "<500ms"
+
+  get_available_lps:
+    id: "GET /api/shipping/shipments/:id/available-lps"
+    method: "GET"
+    path: "/api/shipping/shipments/:id/available-lps"
+    summary: "Get picked license plates available for packing"
+    description: |
+      Returns list of license plates that have been picked for this shipment's sales order
+      but have not yet been packed into any box.
+      Excludes LPs already in shipment_box_contents.
+    authentication:
+      required: true
+    authorization:
+      roles: ["Warehouse Manager", "Packer", "Admin"]
+    request:
+      path_parameters:
+        id:
+          type: "uuid"
+          required: true
+          description: "Shipment ID"
+    response:
+      success:
+        status_code: 200
+        body: |
+          {
+            "success": true,
+            "data": {
+              "license_plates": [
+                {
+                  "id": "050e8400-e29b-41d4-a716-446655440001",
+                  "lp_number": "LP-2025-0001",
+                  "product_id": "150e8400-e29b-41d4-a716-446655440001",
+                  "product_name": "Organic Flour 5lb",
+                  "lot_number": "FLOUR-2024-001",
+                  "quantity_available": 100,
+                  "location_id": "250e8400-e29b-41d4-a716-446655440001",
+                  "location_name": "ZONE-A-AISLE-01-BIN-001"
+                },
+                {
+                  "id": "050e8400-e29b-41d4-a716-446655440002",
+                  "lp_number": "LP-2025-0002",
+                  "product_name": "Organic Sugar 10lb",
+                  "lot_number": "SUGAR-2024-045",
+                  "quantity_available": 50,
+                  "location_name": "ZONE-A-AISLE-02-BIN-001"
+                }
+              ],
+              "total_count": 2,
+              "packed_count": 1,
+              "remaining_count": 1
+            }
+          }
+      error:
+        - status_code: 404
+          error_code: "SHIPMENT_NOT_FOUND"
+          message: "Shipment not found"
+    performance:
+      timeout: "5s"
+      expected_latency: "<500ms"
+
+  add_box:
+    id: "POST /api/shipping/shipments/:id/boxes"
+    method: "POST"
+    path: "/api/shipping/shipments/:id/boxes"
+    summary: "Add box to shipment"
+    description: |
+      Creates a new shipment_box with auto-incremented box_number.
+      Updates shipment status to 'packing' if it was 'pending'.
+      Box starts with NULL weight and dimensions (to be filled later).
+    authentication:
+      required: true
+    authorization:
+      roles: ["Warehouse Manager", "Packer", "Admin"]
+    request:
+      path_parameters:
+        id:
+          type: "uuid"
+          description: "Shipment ID"
+      body:
+        schema: |
+          {}
+        description: "Empty body - box_number auto-calculated"
+    response:
+      success:
+        status_code: 201
+        body: |
+          {
+            "success": true,
+            "data": {
+              "box_id": "760e8400-e29b-41d4-a716-446655440001",
+              "box_number": 1,
+              "shipment_id": "660e8400-e29b-41d4-a716-446655440001",
+              "status": "packing",
+              "weight": null,
+              "length": null,
+              "width": null,
+              "height": null,
+              "created_at": "2025-12-18T10:35:00Z"
+            }
+          }
+      error:
+        - status_code: 404
+          error_code: "SHIPMENT_NOT_FOUND"
+          message: "Shipment not found"
+    side_effects:
+      - "Creates shipment_box record"
+      - "Updates shipment.status from 'pending' to 'packing' if needed"
+    performance:
+      timeout: "3s"
+      expected_latency: "<300ms"
+
+  update_box:
+    id: "PUT /api/shipping/shipments/:id/boxes/:boxId"
+    method: "PUT"
+    path: "/api/shipping/shipments/:id/boxes/:boxId"
+    summary: "Update box weight and dimensions"
+    description: |
+      Updates weight and/or dimensions of a box.
+      Validates: weight > 0, dimensions 10-200 cm.
+      Cannot update box after shipment is packed.
+    authentication:
+      required: true
+    authorization:
+      roles: ["Warehouse Manager", "Packer", "Admin"]
+    request:
+      path_parameters:
+        id:
+          type: "uuid"
+          description: "Shipment ID"
+        boxId:
+          type: "uuid"
+          description: "Box ID"
+      body:
+        schema: |
+          {
+            "weight": 23.5 (optional, number, kg),
+            "length": 60 (optional, number, cm),
+            "width": 40 (optional, number, cm),
+            "height": 30 (optional, number, cm)
+          }
+        validation:
+          weight: "Required if shipment is being completed; value > 0 and <= 25kg (configurable)"
+          dimensions: "Optional; if provided must be 10-200 cm each"
+        examples:
+          - weight: 23.5
+            length: 60
+            width: 40
+            height: 30
+    response:
+      success:
+        status_code: 200
+        body: |
+          {
+            "success": true,
+            "data": {
+              "box_id": "760e8400-e29b-41d4-a716-446655440001",
+              "weight": 23.5,
+              "length": 60,
+              "width": 40,
+              "height": 30,
+              "updated_at": "2025-12-18T10:37:00Z"
+            }
+          }
+      error:
+        - status_code: 400
+          error_code: "VALIDATION_ERROR"
+          message: "Weight must be greater than 0 and less than 25kg"
+        - status_code: 400
+          error_code: "DIMENSION_ERROR"
+          message: "Dimensions must be between 10 and 200 cm"
+        - status_code: 404
+          error_code: "BOX_NOT_FOUND"
+          message: "Box not found in shipment"
+    performance:
+      timeout: "3s"
+      expected_latency: "<300ms"
+
+  add_content:
+    id: "POST /api/shipping/shipments/:id/boxes/:boxId/contents"
+    method: "POST"
+    path: "/api/shipping/shipments/:id/boxes/:boxId/contents"
+    summary: "Add license plate to box"
+    description: |
+      Assigns a picked license plate to a box.
+      Creates shipment_box_contents record with lot_number traceability.
+      Checks allergen separation and carton weight capacity.
+      Removes LP from available list (UI updates).
+    authentication:
+      required: true
+    authorization:
+      roles: ["Warehouse Manager", "Packer", "Admin"]
+    request:
+      path_parameters:
+        id:
+          type: "uuid"
+          description: "Shipment ID"
+        boxId:
+          type: "uuid"
+          description: "Box ID"
+      body:
+        schema: |
+          {
+            "license_plate_id": "uuid" (required),
+            "sales_order_line_id": "uuid" (required),
+            "quantity": 100 (required, number)
+          }
+        validation:
+          license_plate_id: "UUID, must exist in database"
+          quantity: "Number > 0, cannot exceed LP available qty"
+          allergen_check: "Warn if product allergen in customer restrictions"
+          weight_check: "Warn if adding would exceed 25kg capacity"
+    response:
+      success:
+        status_code: 201
+        body: |
+          {
+            "success": true,
+            "data": {
+              "content_id": "860e8400-e29b-41d4-a716-446655440001",
+              "box_id": "760e8400-e29b-41d4-a716-446655440001",
+              "license_plate_id": "050e8400-e29b-41d4-a716-446655440001",
+              "product_name": "Organic Flour 5lb",
+              "lot_number": "FLOUR-2024-001",
+              "quantity": 100,
+              "items_in_box": 1,
+              "current_weight": 23.5,
+              "remaining_capacity": 1.5,
+              "allergen_warning": null,
+              "created_at": "2025-12-18T10:36:00Z"
+            }
+          }
+      error:
+        - status_code: 400
+          error_code: "WEIGHT_EXCEEDED"
+          message: "Adding this item would exceed carton capacity"
+          details:
+            current_weight: 15.5
+            item_weight: 12
+            total_weight: 27.5
+            capacity: 25
+        - status_code: 400
+          error_code: "ALLERGEN_WARNING"
+          message: "Product contains allergen; customer restricts allergen"
+          warning: "non-blocking (can continue)"
+        - status_code: 404
+          error_code: "LICENSE_PLATE_NOT_FOUND"
+          message: "License plate not found or consumed"
+    side_effects:
+      - "Creates shipment_box_contents record"
+      - "Captures lot_number from license_plate for traceability"
+    performance:
+      timeout: "3s"
+      expected_latency: "<300ms"
+
+  complete_packing:
+    id: "POST /api/shipping/shipments/:id/complete-packing"
+    method: "POST"
+    path: "/api/shipping/shipments/:id/complete-packing"
+    summary: "Complete packing and update shipment status"
+    description: |
+      Finalizes packing for shipment.
+      Validates: all boxes have weight, all picked LPs are packed.
+      Updates shipment status to 'packed'.
+      Calculates total_weight and total_boxes.
+      Updates sales_order.status to 'packed'.
+      Sets packed_at and packed_by timestamps.
+    authentication:
+      required: true
+    authorization:
+      roles: ["Warehouse Manager", "Shipping Manager", "Admin"]
+    request:
+      path_parameters:
+        id:
+          type: "uuid"
+          description: "Shipment ID"
+      body:
+        schema: |
+          {}
+        description: "Empty body"
+    response:
+      success:
+        status_code: 200
+        body: |
+          {
+            "success": true,
+            "data": {
+              "shipment_id": "660e8400-e29b-41d4-a716-446655440001",
+              "shipment_number": "SH-2025-00001",
+              "status": "packed",
+              "total_boxes": 2,
+              "total_weight": 45.5,
+              "packed_at": "2025-12-18T11:45:00Z",
+              "packed_by": "user-uuid",
+              "message": "Shipment SH-2025-00001 packed successfully"
+            }
+          }
+      error:
+        - status_code: 400
+          error_code: "MISSING_WEIGHT"
+          message: "Cannot complete packing: All boxes must have weight"
+          details:
+            boxes_without_weight: 1
+        - status_code: 400
+          error_code: "UNPACKED_ITEMS"
+          message: "Cannot complete packing: Not all picked items are packed"
+          details:
+            unpacked_lps: 3
+        - status_code: 404
+          error_code: "SHIPMENT_NOT_FOUND"
+          message: "Shipment not found"
+        - status_code: 409
+          error_code: "INVALID_STATUS"
+          message: "Shipment is not in 'packing' status"
+    side_effects:
+      - "Updates shipments.status to 'packed'"
+      - "Sets shipments.packed_at to current timestamp"
+      - "Sets shipments.packed_by to current user ID"
+      - "Calculates and updates total_weight and total_boxes"
+      - "Updates associated sales_order.status to 'packed'"
+    validation_checklist:
+      - "All shipment_boxes have weight > 0"
+      - "All picked LPs are in shipment_box_contents OR marked as exception"
+      - "Shipment status is 'packing' (not pending or already packed)"
+    performance:
+      timeout: "5s"
+      expected_latency: "<1s"
+
+error_codes:
+  common:
+    - code: "AUTHENTICATION_REQUIRED"
+      http_status: 401
+      message: "Bearer token required"
+    - code: "FORBIDDEN"
+      http_status: 403
+      message: "User does not have permission for this operation"
+    - code: "NOT_FOUND"
+      http_status: 404
+      message: "Resource not found"
+    - code: "VALIDATION_ERROR"
+      http_status: 400
+      message: "Invalid request body or parameters"
+    - code: "CONFLICT"
+      http_status: 409
+      message: "Resource conflict (e.g., duplicate shipment)"
+
+request_response_formats:
+  all_responses:
+    structure: |
+      {
+        "success": true|false,
+        "data": {...} or null,
+        "error": {
+          "code": "ERROR_CODE",
+          "message": "Human readable message",
+          "details": {...} (optional)
+        } or null
+      }
+    content_type: "application/json"
+    encoding: "UTF-8"
+
+authentication_examples:
+  bearer_token:
+    header: "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+    source: "Supabase auth"
+    type: "JWT"
+
+rate_limiting:
+  global:
+    requests_per_minute: 600
+    applies_to: "All authenticated endpoints"
+    description: "Prevents abuse while allowing normal operations"
+
+cors:
+  allowed_origins: "Based on organization domain"
+  allowed_methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+  allowed_headers: ["Content-Type", "Authorization"]
+
+version_history:
+  - version: "1.0"
+    date: "2025-12-18"
+    description: "API endpoints documentation for Story 07.11"
+    author: "TECH-WRITER"

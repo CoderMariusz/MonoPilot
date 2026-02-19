@@ -1,0 +1,93 @@
+# Story 01.10 - Index File (Entry Point)
+# Generated: 2025-12-16
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "01.10"
+  name: "Machines CRUD"
+  slug: "machines-crud"
+  epic: "01-settings"
+  phase: "1B"
+  complexity: "M"
+  estimate_days: 1
+  type: "full-stack"
+  state: "ready"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, RLS, enums
+  - api.yaml         # Endpoints, auth, errors
+  - frontend.yaml    # Components, badges, filters
+  - tests.yaml       # Acceptance criteria, test specifications
+  - gaps.yaml        # Identified gaps, blockers
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.8"
+      name: "Warehouses CRUD"
+      provides: ["warehouses table"]
+    - story: "01.9"
+      name: "Locations CRUD"
+      provides: ["locations table for location_id FK"]
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["organizations table", "RLS pattern"]
+    - story: "01.6"
+      name: "Role Permissions"
+      provides: ["Permission checks"]
+  blocked_by: []
+  blocks:
+    - story: "01.11"
+      name: "Production Lines CRUD"
+      reason: "Lines assign machines"
+    - story: "04.x"
+      name: "Work Order Creation"
+      reason: "WO references machines"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/settings.md"
+    sections: ["FR-SET-050", "FR-SET-051", "FR-SET-052", "FR-SET-053", "FR-SET-055"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/settings.md"
+    sections: ["machines table"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/01-settings/01.10.machines-crud.md"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 2
+    description: "machines table + RLS policies + enums"
+  - type: "service"
+    count: 1
+    description: "machine-service.ts with CRUD + validation"
+  - type: "api"
+    count: 6
+    description: "CRUD + status update endpoints"
+  - type: "page"
+    count: 1
+    description: "Machines list page with filters"
+  - type: "component"
+    count: 7
+    description: "DataTable, Modal, TypeBadge, StatusBadge, LocationSelect, DeleteDialog, Filters"
+  - type: "test"
+    count: 3
+    description: "Unit + integration + e2e tests"
+
+# Technical notes
+technical_notes:
+  - "9 machine types with distinct icons/badges"
+  - "4 status states: active, maintenance, offline, decommissioned"
+  - "Capacity fields: units_per_hour, setup_time_minutes, max_batch_size"
+  - "Soft delete for historical references (is_deleted flag)"
+  - "Delete blocked if machine assigned to production line"
+  - "Location assignment optional (nullable location_id FK)"
+  - "Status updates affect production dashboard availability"
+  - "Permission: Admin/Production Manager for write operations"

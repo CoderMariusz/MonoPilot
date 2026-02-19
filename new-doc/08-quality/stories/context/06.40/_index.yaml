@@ -1,0 +1,52 @@
+# Story 06.40 - Document Control & Versioning Context
+# Generated: 2025-01-15
+# Purpose: ISO 9001 compliant document control
+# Phase: 4 (Analytics & Reporting)
+
+story:
+  id: "06.40"
+  name: "Document Control & Versioning"
+  slug: "document-control-versioning"
+  epic: "06-quality"
+  phase: "4"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "fullstack"
+  state: "ready"
+  priority: "P1"
+
+dependencies:
+  required:
+    - story: "01.1"
+      provides: ["org context"]
+
+deliverables:
+  - type: "database"
+    count: 1
+    description: "quality_documents table with versioning"
+  - type: "api"
+    count: 11
+    description: "CRUD + workflow + download endpoints"
+  - type: "service"
+    count: 1
+    description: "DocumentControlService with file upload"
+  - type: "components"
+    count: 10
+    description: "List, detail, upload, approval UI"
+
+technical_notes:
+  - "File storage: Supabase Storage (S3-compatible)"
+  - "Versioning: Major version increment on file update (1.0 → 2.0)"
+  - "Document number: QM-YYYY-NNNNN, SOP-YYYY-NNNNN, etc."
+  - "Approval workflow: Draft → Review → Approved"
+  - "Expiry alerts: Email 30 days before expiry"
+  - "File hash: SHA-256 for integrity"
+
+business_rules:
+  - rule: "Change Reason Required"
+    description: "New version requires change_reason"
+  - rule: "Archive Not Delete"
+    description: "Obsolete documents archived, not deleted"
+
+summary: |
+  Story 06.40 implements document control with upload, versioning, approval workflow, linking, search, expiry management, and file download.

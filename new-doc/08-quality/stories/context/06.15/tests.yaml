@@ -1,0 +1,26 @@
+# Story 06.15 - Tests Context
+# Generated: 2026-01-15
+# Purpose: NCR Corrective Action test specifications
+
+# Test coverage:
+# Unit:
+#   - CorrectiveActionService CRUD methods
+#   - Progress calculation logic
+#   - Item reordering logic
+#   - Completion validation (100% items required)
+#
+# Integration:
+#   - Action CRUD APIs
+#   - Item CRUD APIs
+#   - Progress trigger
+#   - Evidence upload
+#   - RLS policies
+#
+# E2E:
+#   - Create action with items
+#   - Drag-drop reorder
+#   - Complete items -> progress updates
+#   - Complete action
+#   - QA verification
+
+# Pattern: Follow 06.14/06.17 tests.yaml structure

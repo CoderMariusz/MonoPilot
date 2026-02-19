@@ -1,0 +1,92 @@
+# Story 03.9a - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "03.9a"
+  name: "TO Partial Shipments (Basic)"
+  slug: "to-partial-shipments"
+  epic: "03-planning"
+  phase: "1A"
+  complexity: "S"
+  estimate_days: 2
+  type: "backend + frontend"
+  state: "ready"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, columns, RLS (no new tables - uses existing)
+  - api.yaml         # Endpoints, validation, errors
+  - frontend.yaml    # Components, modals, UX
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["org_id", "RLS pattern"]
+    - story: "01.8"
+      name: "Warehouses CRUD"
+      provides: ["warehouses table", "from/to warehouse validation"]
+    - story: "02.1"
+      name: "Products CRUD"
+      provides: ["products table", "product_id FK"]
+    - story: "03.8"
+      name: "TO CRUD + Lines"
+      provides: ["transfer_orders", "transfer_order_lines", "status lifecycle"]
+  blocked_by:
+    - story: "03.8"
+      reason: "Extends TO functionality with ship/receive actions"
+  blocks:
+    - story: "03.9b"
+      name: "TO LP Pre-Selection"
+      reason: "LP selection builds on partial shipment framework"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/planning.md"
+    sections: ["FR-PLAN-015"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/planning.md"
+    sections: ["Transfer Orders", "Partial Shipments"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/03-planning/03.9a.to-partial-shipments.md"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-012-transfer-order-detail.md"
+      relevance: "TO Detail page with Ship/Receive actions"
+  patterns:
+    - path: "apps/frontend/lib/services/transfer-order-service.ts"
+      relevance: "Existing ship/receive service methods"
+    - path: "apps/frontend/lib/validation/transfer-order-schemas.ts"
+      relevance: "Existing Zod schemas for ship/receive"
+
+# High-level deliverables
+deliverables:
+  - type: "api"
+    count: 2
+    description: "POST /ship, POST /receive endpoints"
+  - type: "component"
+    count: 4
+    description: "ShipTOModal, ReceiveTOModal, TOLineProgressBar, TOActionsMenu update"
+  - type: "service"
+    count: 4
+    description: "shipTransferOrder (update), receiveTransferOrder (new), progress calculators"
+  - type: "validation"
+    count: 2
+    description: "ShipTORequestSchema, ReceiveTORequestSchema (extend existing)"
+  - type: "test"
+    count: 4
+    description: "Unit + integration + E2E tests"
+
+# Technical notes
+technical_notes:
+  - "No new database tables - uses existing transfer_orders.status, to_lines.shipped_qty, received_qty"
+  - "Extends existing shipTransferOrder service method in transfer-order-service.ts"
+  - "New receiveTransferOrder service method required"
+  - "Status transitions: PLANNED -> SHIPPED/PARTIALLY_SHIPPED -> RECEIVED/PARTIALLY_RECEIVED"
+  - "Audit trail: shipped_by, received_by, actual_ship_date, actual_receive_date"
+  - "Settings toggle: to_allow_partial_shipments in planning_settings table"
+  - "MVP excludes LP pre-selection (deferred to 03.9b)"

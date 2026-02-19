@@ -1,0 +1,336 @@
+# Story 04.6d - Test Specification
+# Purpose: Acceptance criteria, test cases for consumption reversal
+# Agent: QA / DEV (testing focus)
+
+# Acceptance Criteria (from PRD FR-PROD-009)
+acceptance_criteria:
+  - id: "AC1"
+    description: "GIVEN user has role 'Manager' or 'Admin', WHEN viewing consumption history, THEN 'Reverse' button is visible on each row"
+    type: "permission"
+    test_type: "e2e"
+
+  - id: "AC2"
+    description: "GIVEN user has role 'Operator', WHEN viewing consumption history, THEN 'Reverse' button is NOT visible"
+    type: "permission"
+    test_type: "e2e"
+
+  - id: "AC3"
+    description: "GIVEN consumption of 40 kg from LP-001 (now qty = 60), WHEN manager reverses consumption, THEN LP-001.qty = 100"
+    type: "functional"
+    test_type: "integration"
+
+  - id: "AC4"
+    description: "GIVEN consumption reversed, WHEN querying material_consumptions table, THEN record shows reversed = true, reversed_at = timestamp, reversed_by = manager user ID"
+    type: "data"
+    test_type: "integration"
+
+  - id: "AC5"
+    description: "GIVEN consumption reversed, WHEN querying lp_genealogy table, THEN genealogy record shows is_reversed = true"
+    type: "data"
+    test_type: "integration"
+
+  - id: "AC6"
+    description: "GIVEN manager clicks 'Reverse', WHEN confirmation modal displays, THEN 'Reason for reversal' is required field"
+    type: "validation"
+    test_type: "unit"
+
+  - id: "AC7"
+    description: "GIVEN reversal completes, WHEN recorded, THEN audit_log entry created with action = 'consumption_reversal', user_id, timestamp, original_consumption_id"
+    type: "audit"
+    test_type: "integration"
+
+  - id: "AC8"
+    description: "GIVEN LP status was 'consumed' before reversal, WHEN reversal completes for 50 kg, THEN LP status changes to 'available' with qty = 50"
+    type: "functional"
+    test_type: "integration"
+
+# Unit Tests
+unit_tests:
+  - file: "apps/frontend/lib/validation/__tests__/production-schemas.test.ts"
+    tests:
+      - name: "reverseConsumptionSchema validates required fields"
+        description: "Verify consumption_id and reason are required"
+        assertions:
+          - "Schema rejects empty object"
+          - "Schema rejects missing consumption_id"
+          - "Schema rejects missing reason"
+          - "Schema accepts valid consumption_id + reason"
+
+      - name: "reverseConsumptionSchema validates reason values"
+        description: "Only allowed reason values accepted"
+        assertions:
+          - "Accepts 'scanned_wrong_lp'"
+          - "Accepts 'wrong_quantity'"
+          - "Accepts 'operator_error'"
+          - "Accepts 'quality_issue'"
+          - "Accepts 'other'"
+          - "Rejects 'invalid_reason'"
+
+      - name: "reverseConsumptionSchema requires notes for 'other' reason"
+        description: "Notes field required when reason is 'other'"
+        assertions:
+          - "Accepts reason='scanned_wrong_lp' without notes"
+          - "Accepts reason='other' with notes"
+          - "Rejects reason='other' without notes"
+          - "Rejects reason='other' with empty notes"
+
+      - name: "reverseConsumptionSchema validates notes length"
+        description: "Notes must be 500 characters or less"
+        assertions:
+          - "Accepts 500 character notes"
+          - "Rejects 501 character notes"
+
+  - file: "apps/frontend/components/production/consumption/__tests__/ReverseConsumptionModal.test.tsx"
+    tests:
+      - name: "renders consumption details correctly"
+        description: "Modal displays all consumption information"
+        assertions:
+          - "Shows LP number"
+          - "Shows product name"
+          - "Shows consumed quantity"
+          - "Shows consumed by user"
+          - "Shows consumed at timestamp"
+
+      - name: "disables confirm button until reason selected"
+        description: "Button state based on form validity"
+        assertions:
+          - "Confirm button disabled initially"
+          - "Confirm button enabled after reason selected"
+          - "Confirm button disabled if reason='other' and no notes"
+
+      - name: "shows loading state during submission"
+        description: "UI feedback during API call"
+        assertions:
+          - "Confirm button shows spinner"
+          - "Form inputs disabled"
+          - "Cancel button disabled"
+
+      - name: "calls onSuccess callback on successful reversal"
+        description: "Callback invoked with result"
+        assertions:
+          - "onSuccess called with ConsumptionReversalResult"
+          - "Modal closes after success"
+
+      - name: "displays error message on failure"
+        description: "Error handling in UI"
+        assertions:
+          - "Error message displayed"
+          - "Form re-enabled for retry"
+
+# Integration Tests
+integration_tests:
+  - file: "apps/frontend/app/api/production/work-orders/[woId]/consume/reverse/__tests__/route.test.ts"
+    tests:
+      - name: "returns 401 for unauthenticated request"
+        description: "Auth required"
+        setup: "No auth token"
+        assertions:
+          - "Status 401"
+          - "Error message 'Unauthorized'"
+
+      - name: "returns 403 for Operator role"
+        description: "Role check - AC2"
+        setup: "Authenticated as Operator"
+        assertions:
+          - "Status 403"
+          - "Error message 'Only Managers and Admins can reverse consumptions'"
+
+      - name: "returns 200 for Manager role"
+        description: "Role check - AC1"
+        setup: "Authenticated as Production Manager"
+        assertions:
+          - "Status 200"
+          - "Response contains success: true"
+
+      - name: "returns 200 for Admin role"
+        description: "Role check - AC1"
+        setup: "Authenticated as Admin"
+        assertions:
+          - "Status 200"
+          - "Response contains success: true"
+
+      - name: "returns 404 for non-existent consumption"
+        description: "Consumption lookup"
+        setup: "Valid auth, invalid consumption_id"
+        assertions:
+          - "Status 404"
+          - "Error message 'Consumption not found'"
+
+      - name: "returns 400 for already reversed consumption"
+        description: "Prevent double reversal"
+        setup: "Valid auth, consumption.reversed = true"
+        assertions:
+          - "Status 400"
+          - "Error message 'This consumption has already been reversed'"
+
+      - name: "returns 400 for missing reason"
+        description: "Validation - AC6"
+        setup: "Valid auth, no reason in body"
+        assertions:
+          - "Status 400"
+          - "Error message 'Reason for reversal is required'"
+
+      - name: "restores LP quantity on reversal"
+        description: "LP update - AC3"
+        setup: |
+          LP-001 qty = 60
+          Consumption qty = 40
+        assertions:
+          - "LP-001.qty = 100 after reversal"
+          - "Response.restored_qty = 40"
+          - "Response.lp_new_qty = 100"
+
+      - name: "updates consumption record on reversal"
+        description: "Consumption update - AC4"
+        setup: "Valid reversal request"
+        assertions:
+          - "material_consumptions.reversed = true"
+          - "material_consumptions.reversed_at is timestamp"
+          - "material_consumptions.reversed_by = manager user ID"
+          - "material_consumptions.reversal_reason = request reason"
+
+      - name: "updates genealogy record on reversal"
+        description: "Genealogy update - AC5"
+        setup: "Consumption with genealogy record"
+        assertions:
+          - "lp_genealogy.is_reversed = true"
+
+      - name: "creates audit log entry"
+        description: "Audit trail - AC7"
+        setup: "Valid reversal request"
+        assertions:
+          - "audit_log entry created"
+          - "audit_log.action = 'consumption_reversal'"
+          - "audit_log.entity_type = 'material_consumption'"
+          - "audit_log.entity_id = consumption.id"
+          - "audit_log.user_id = manager user ID"
+          - "audit_log.metadata contains original_qty, lp_id, reason"
+
+      - name: "changes LP status from consumed to available"
+        description: "Status update - AC8"
+        setup: |
+          LP status = 'consumed'
+          Reversal qty = 50
+        assertions:
+          - "LP.status = 'available'"
+          - "LP.qty = 50"
+
+      - name: "does not change LP status if not consumed"
+        description: "Status preservation"
+        setup: |
+          LP status = 'available' (partial consumption)
+        assertions:
+          - "LP.status = 'available' (unchanged)"
+
+# E2E Tests
+e2e_tests:
+  - file: "e2e/production/consumption-reversal.spec.ts"
+    tests:
+      - name: "Manager can reverse consumption"
+        description: "Full reversal flow as Manager - AC1"
+        steps:
+          - "Login as Production Manager"
+          - "Navigate to WO consumption page"
+          - "Verify [Rev] button visible on consumption row"
+          - "Click [Rev] button"
+          - "Verify modal opens with consumption details"
+          - "Select reason 'Scanned Wrong LP'"
+          - "Click 'Confirm Reversal'"
+          - "Verify success toast appears"
+          - "Verify consumption row shows 'Reversed' badge"
+          - "Verify LP qty restored in database"
+
+      - name: "Operator cannot see Reverse button"
+        description: "Permission check - AC2"
+        steps:
+          - "Login as Operator"
+          - "Navigate to WO consumption page"
+          - "Verify consumption history table visible"
+          - "Verify NO [Rev] button on any row"
+
+      - name: "Reason is required for reversal"
+        description: "Validation - AC6"
+        steps:
+          - "Login as Manager"
+          - "Open reverse modal"
+          - "Verify 'Confirm Reversal' button disabled"
+          - "Select reason"
+          - "Verify 'Confirm Reversal' button enabled"
+
+      - name: "Notes required when reason is Other"
+        description: "Conditional validation"
+        steps:
+          - "Login as Manager"
+          - "Open reverse modal"
+          - "Select reason 'Other (specify)'"
+          - "Verify 'Confirm Reversal' button disabled"
+          - "Enter notes"
+          - "Verify 'Confirm Reversal' button enabled"
+
+      - name: "Cannot reverse already reversed consumption"
+        description: "Double reversal prevention"
+        steps:
+          - "Login as Manager"
+          - "Navigate to consumption with 'Reversed' badge"
+          - "Verify NO [Rev] button on reversed row"
+
+      - name: "LP quantity restored after reversal"
+        description: "Data integrity - AC3"
+        steps:
+          - "Login as Manager"
+          - "Note LP current qty (e.g., 60 kg)"
+          - "Reverse consumption (e.g., 40 kg)"
+          - "Verify success message shows new qty (100 kg)"
+          - "Navigate to LP detail"
+          - "Verify LP qty = 100 kg"
+
+      - name: "Audit trail created on reversal"
+        description: "Audit log - AC7"
+        steps:
+          - "Login as Admin"
+          - "Perform reversal"
+          - "Navigate to audit log"
+          - "Filter by action = 'consumption_reversal'"
+          - "Verify entry exists with correct details"
+
+# Performance Tests
+performance_tests:
+  - name: "Reversal API response time"
+    target: "<800ms"
+    description: "Full reversal transaction including LP update, consumption update, genealogy, audit log"
+
+  - name: "Modal open time"
+    target: "<200ms"
+    description: "Time to render reverse modal with consumption details"
+
+# Test Data Requirements
+test_data:
+  users:
+    - role: "admin"
+      name: "Admin User"
+    - role: "production_manager"
+      name: "Sarah Lee"
+    - role: "operator"
+      name: "John Smith"
+  work_orders:
+    - wo_number: "WO-2025-0156"
+      status: "in_progress"
+  license_plates:
+    - lp_number: "LP-2025-08851"
+      qty: 22.5
+      status: "available"
+    - lp_number: "LP-2025-08852"
+      qty: 0
+      status: "consumed"
+  consumptions:
+    - id: "test-consumption-1"
+      lp_id: "LP-2025-08851"
+      quantity: 2.5
+      reversed: false
+    - id: "test-consumption-2"
+      lp_id: "LP-2025-08852"
+      quantity: 50
+      reversed: false
+    - id: "test-consumption-reversed"
+      quantity: 10
+      reversed: true

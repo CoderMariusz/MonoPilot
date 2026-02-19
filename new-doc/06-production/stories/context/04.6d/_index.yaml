@@ -1,0 +1,133 @@
+# Story 04.6d - Index File (Entry Point)
+# Generated: 2025-01-14
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "04.6d"
+  name: "Consumption Correction (Reversal)"
+  slug: "consumption-correction"
+  epic: "04-production"
+  phase: "1"
+  complexity: "M"
+  estimate_days: 3
+  type: "full-stack"
+  state: "ready"
+  priority: "P0"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # material_consumptions updates, audit_log, RLS
+  - api.yaml         # Endpoints, auth, errors
+  - frontend.yaml    # Components, services, UI patterns
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "04.6a"
+      name: "Material Consumption Desktop"
+      provides: ["material_consumptions table", "consumption-service", "LP qty updates"]
+    - story: "05.1"
+      name: "License Plates CRUD"
+      provides: ["license_plates table", "LP status management", "lp_genealogy table"]
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["org_id context", "RLS patterns", "permission-service"]
+  soft:
+    - story: "04.5"
+      name: "Production Settings"
+      provides: ["production_settings table for config"]
+  blocked_by:
+    - story: "04.6a"
+      reason: "Reversal requires existing consumption records"
+  blocks:
+    - story: "04.10e"
+      name: "Material Consumption Report"
+      reason: "Reports need reversal data for accurate variance"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/production.md"
+    sections: ["FR-PROD-009"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/production.md"
+    sections: ["Material Consumption", "Audit Trail"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/04-production/04.0.epic-overview.md"
+  wireframe:
+    path: "docs/3-ARCHITECTURE/ux/wireframes/PROD-003-material-consumption.md"
+    sections: ["Reverse Consumption Modal", "Reverse Consumption - Confirmation Success"]
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for consumption reversal"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "Add reversal fields to material_consumptions + audit_log entry type"
+  - type: "api"
+    count: 1
+    description: "POST /api/production/work-orders/:woId/consume/reverse"
+  - type: "service"
+    count: 1
+    description: "reverseConsumption() in consumption-service.ts"
+  - type: "validation"
+    count: 1
+    description: "reverseConsumptionSchema with reason validation"
+  - type: "component"
+    count: 2
+    description: "ReverseConsumptionModal, ConsumptionReversalReason"
+  - type: "page"
+    count: 0
+    description: "Uses existing consumption page - modal only"
+  - type: "test"
+    count: 3
+    description: "Unit + integration + E2E tests"
+
+# Technical notes
+technical_notes:
+  - "Manager/Admin only - role check required"
+  - "Reversal restores LP quantity atomically"
+  - "If LP status was 'consumed', change to 'available'"
+  - "Genealogy record marked is_reversed = true"
+  - "Audit log entry required with action = 'consumption_reversal'"
+  - "Reason for reversal is REQUIRED field"
+  - "Cannot reverse already reversed consumption"
+  - "Transaction required: LP update + consumption update + genealogy update + audit log"
+
+# MVP Scope Clarification
+mvp_scope:
+  in_scope:
+    - "Reverse button visible only to Manager/Admin"
+    - "Confirmation modal with reason dropdown"
+    - "LP quantity restoration"
+    - "LP status update (consumed -> available)"
+    - "Genealogy record update (is_reversed = true)"
+    - "Audit log entry creation"
+    - "material_consumptions update (reversed, reversed_at, reversed_by)"
+    - "Success/error toast notifications"
+    - "Consumption history table shows 'Reversed' status"
+  out_of_scope:
+    - "Batch reversal (multiple consumptions at once)"
+    - "Reversal approval workflow (managers can reverse directly)"
+    - "Undo reversal (once reversed, cannot undo - must re-consume)"
+    - "Email/push notifications for reversal"
+    - "Reversal limits per day/WO"
+
+# FR-PROD-009 Mapping
+prd_mapping:
+  fr: "FR-PROD-009"
+  title: "Consumption Correction"
+  ac_count: 8
+  covered:
+    - "AC #1: GIVEN user has role 'Manager' or 'Admin', WHEN viewing consumption history, THEN 'Reverse' button is visible on each row"
+    - "AC #2: GIVEN user has role 'Operator', WHEN viewing consumption history, THEN 'Reverse' button is NOT visible"
+    - "AC #3: GIVEN consumption of 40 kg from LP-001 (now qty = 60), WHEN manager reverses, THEN LP-001.qty = 100"
+    - "AC #4: GIVEN consumption reversed, WHEN querying material_consumptions, THEN record shows reversed = true, reversed_at, reversed_by"
+    - "AC #5: GIVEN consumption reversed, WHEN querying lp_genealogy, THEN genealogy record shows is_reversed = true"
+    - "AC #6: GIVEN manager clicks 'Reverse', WHEN confirmation modal displays, THEN 'Reason for reversal' is required field"
+    - "AC #7: GIVEN reversal completes, WHEN recorded, THEN audit_log entry created with action = 'consumption_reversal'"
+    - "AC #8: GIVEN LP status was 'consumed' before reversal, WHEN reversal completes for 50 kg, THEN LP status = 'available' with qty = 50"

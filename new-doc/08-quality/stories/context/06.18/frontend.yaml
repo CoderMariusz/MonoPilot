@@ -1,0 +1,36 @@
+# Story 06.18 - Frontend Context
+# Generated: 2026-01-15
+# Purpose: Test result trending chart components
+
+# =============================================================================
+# COMPONENTS
+# =============================================================================
+
+components:
+  - name: TrendChart
+    path: components/quality/trends/TrendChart.tsx
+    description: "Recharts line chart with spec limits"
+    library: recharts
+    pattern: "Follow CostTrendChart.tsx pattern"
+    features:
+      - Multi-line (up to 6 parameters)
+      - ReferenceLine for spec min/max
+      - ReferenceArea for target zone
+      - Custom tooltip showing pass/fail
+      - Out-of-spec highlighting (red/yellow dots)
+      - Export to PNG/PDF buttons
+
+  - name: TrendFilters
+    path: components/quality/trends/TrendFilters.tsx
+    features:
+      - Product selector
+      - Parameter multi-select (max 6)
+      - Date range picker
+      - Aggregation toggle (daily/weekly/monthly)
+
+  - name: TrendIndicatorBadge
+    description: "Improving/Degrading/Stable badge"
+
+# Use existing DateRangePicker patterns
+# Use Recharts library (already in package.json)
+# Export: html-to-image + jspdf (already in package.json)

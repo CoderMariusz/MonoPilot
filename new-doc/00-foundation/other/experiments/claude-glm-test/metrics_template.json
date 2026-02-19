@@ -1,0 +1,89 @@
+{
+  "story_id": "XX.YY",
+  "scenario": "scenario_a or scenario_b",
+  "story_name": "Story Name",
+  "complexity": "S/M/L/XL",
+  "timestamp": "2026-01-03T18:00:00Z",
+
+  "tokens": {
+    "claude_total": 0,
+    "glm_total": 0,
+    "phases": {
+      "P1": {"model": "claude", "input": 0, "output": 0},
+      "P2": {"model": "claude or glm", "input": 0, "output": 0},
+      "P3_iter1": {"model": "claude or glm", "input": 0, "output": 0},
+      "P5_iter1": {"model": "claude", "input": 0, "output": 0},
+      "P3_iter2": {"model": "claude or glm", "input": 0, "output": 0},
+      "P5_iter2": {"model": "claude", "input": 0, "output": 0},
+      "P3_iter3": {"model": "claude or glm", "input": 0, "output": 0},
+      "P5_iter3": {"model": "claude", "input": 0, "output": 0},
+      "P6": {"model": "claude", "input": 0, "output": 0},
+      "P7": {"model": "claude or glm", "input": 0, "output": 0}
+    },
+    "orchestration_overhead": {
+      "description": "Claude tokens used for GLM prompt design and output review",
+      "P2": 0,
+      "P3": 0,
+      "P7": 0,
+      "total": 0
+    }
+  },
+
+  "iterations": {
+    "total": 0,
+    "p3_to_p5_cycles": 0,
+    "description": "Number of P5 review → P3 fix → P5 re-review cycles"
+  },
+
+  "bugs": {
+    "iter1_review": 0,
+    "iter2_review": 0,
+    "iter3_review": 0,
+    "total": 0,
+    "critical": 0,
+    "description": "Bugs found in each code review iteration"
+  },
+
+  "quality": {
+    "final_score": "0/10",
+    "code_review_scores": {
+      "iter1": "0/10",
+      "iter2": "0/10",
+      "final": "0/10"
+    },
+    "tests_total": 0,
+    "tests_passing": 0,
+    "production_ready": false
+  },
+
+  "cost_usd": {
+    "claude": 0.0,
+    "glm": 0.0,
+    "total": 0.0,
+    "breakdown": {
+      "claude_input": 0.0,
+      "claude_output": 0.0,
+      "glm_input": 0.0,
+      "glm_output": 0.0
+    }
+  },
+
+  "time_minutes": {
+    "total": 0,
+    "per_phase": {
+      "P1": 0,
+      "P2": 0,
+      "P3": 0,
+      "P5": 0,
+      "P6": 0,
+      "P7": 0
+    }
+  },
+
+  "deliverables": {
+    "files_created": [],
+    "lines_of_code": 0
+  },
+
+  "notes": ""
+}

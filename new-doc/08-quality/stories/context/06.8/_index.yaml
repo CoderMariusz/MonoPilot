@@ -1,0 +1,114 @@
+# Story 06.8 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "06.8"
+  name: "Scanner QA Pass/Fail"
+  slug: "scanner-qa-pass-fail"
+  epic: "06-quality"
+  phase: "1"
+  complexity: "M"
+  estimate_days: 3
+  type: "frontend + backend + mobile"
+  state: "ready"
+
+# Files in this context folder
+context_files:
+  - _index.yaml          # This file - metadata, dependencies
+  - database.yaml        # scanner_offline_queue table, quality_inspections extension
+  - api.yaml             # 3 endpoints for scanner QA operations
+  - frontend.yaml        # Scanner mobile components, pages, services
+  - tests.yaml           # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "06.1"
+      name: "Quality Status Types"
+      provides:
+        - "QA status enum (pending/passed/failed/hold)"
+        - "License plate qa_status tracking"
+    - story: "06.5"
+      name: "Incoming Inspection"
+      provides:
+        - "quality_inspections table"
+        - "inspection service for lookup"
+        - "LP inspection binding"
+    - story: "05.1"
+      name: "LP Table + CRUD"
+      provides:
+        - "license_plates table for LP lookup"
+        - "LP service"
+    - story: "02.1"
+      name: "Products CRUD"
+      provides:
+        - "products table for product reference"
+  blocked_by: []
+  blocks:
+    - story: "06.24"
+      name: "CCP Monitoring Scanner (Phase 2)"
+    - story: "04.0"
+      name: "Production Scanner (Phase 2)"
+    - story: "05.0"
+      name: "Warehouse Scanner (Phase 2)"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/quality.md"
+    sections: ["FR-QA-025", "3. Non-Functional Requirements"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/quality.md"
+    sections: ["Scanner Integration", "API Design", "Security"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/06-quality/06.8.scanner-qa-pass-fail.md"
+  wireframes:
+    - id: "QA-025"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/QA-025-scanner-qa.md"
+      description: "Scanner QA home, inspection recording, offline queue"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-006-scanner-first-mobile-ux.md"
+      relevance: "Scanner-first design, minimal chrome, large touch targets"
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policies for scanner offline queue"
+  patterns:
+    - "apps/frontend/components/ui/dialog.tsx"
+    - "apps/frontend/lib/services/offline-sync-service.ts (to be created)"
+
+# High-level deliverables
+deliverables:
+  - type: "database"
+    count: 2
+    description: "scanner_offline_queue table, quality_inspections metadata columns"
+  - type: "api"
+    count: 3
+    description: "POST quick-inspection, POST sync-offline, GET inspections/by-lp"
+  - type: "page"
+    count: 2
+    description: "Scanner QA home (/scanner/qa/), inspection detail (/scanner/qa/inspection/[id])"
+  - type: "component"
+    count: 8
+    description: "ScanInput, QuickPassFailButtons, PassConfirmDialog, FailConfirmDialog, SyncStatusBadge, OfflineBadge, SuccessScreen, FailScreen"
+  - type: "service"
+    count: 3
+    description: "ScannerQAService, AudioFeedbackService, OfflineSyncService"
+  - type: "validation"
+    count: 2
+    description: "quickInspectionSchema, syncOfflineSchema"
+  - type: "test"
+    count: 3
+    description: "Unit tests for services, integration tests for API, E2E tests for offline mode"
+
+# Technical notes
+technical_notes:
+  - "Mobile-first design: 320-480px portrait primary"
+  - "Dark theme: slate-900 background, white text"
+  - "Touch targets: 48px minimum, 56px for primary actions"
+  - "Offline-capable: IndexedDB queue, max 50 records"
+  - "Audio feedback: success beep, error beep, alarm tone"
+  - "Performance target: <500ms response, <200ms scan"
+  - "LP QA status updated on quick pass/fail"
+  - "Barcode scanner integration (hardware + camera)"
+  - "Audit trail: all scanner actions logged with device_id"
+  - "Phase 1 MVP only: no photos, e-signature, multi-language"

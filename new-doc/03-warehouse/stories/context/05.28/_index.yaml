@@ -1,0 +1,101 @@
+# Story 05.28 - Index File (Entry Point)
+# Generated: 2025-01-15
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "05.28"
+  name: "Expiry Alerts Dashboard"
+  slug: "expiry-alerts-dashboard"
+  epic: "05-warehouse"
+  phase: "2"
+  complexity: "M"
+  estimate_days: 3
+  type: "backend + frontend"
+  state: "ready"
+  priority: "P2"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Database queries, views, caching
+  - api.yaml         # Endpoints, auth, errors
+  - frontend.yaml    # Components, pages, wireframes
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "05.1"
+      name: "LP Table + CRUD"
+      provides: ["license_plates", "expiry_date field"]
+    - story: "05.7"
+      name: "Warehouse Dashboard"
+      provides: ["dashboard_base", "widget_components"]
+    - story: "05.0"
+      name: "Warehouse Settings"
+      provides: ["warehouse_settings", "expiry_warning_days"]
+  soft:
+    - story: "01.23"
+      name: "Notification Settings"
+      provides: ["email_preferences"]
+    - story: "02.1"
+      name: "Products"
+      provides: ["products", "unit_cost"]
+  blocked_by: []
+  blocks: []
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/warehouse.md"
+    sections: ["WH-FR-030", "WH-FR-010"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/05-warehouse/05.28.expiry-alerts-dashboard.md"
+  related_stories:
+    - path: "docs/2-MANAGEMENT/epics/current/05-warehouse/05.7.warehouse-dashboard.md"
+      relevance: "Dashboard base pattern"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern"
+  patterns:
+    - path: "docs/2-MANAGEMENT/epics/current/05-warehouse/context/05.7/"
+      relevance: "Dashboard context pattern"
+
+# High-level deliverables
+deliverables:
+  - type: "database"
+    count: 2
+    description: "warehouse_settings extension, expiry_alert_logs table"
+  - type: "api"
+    count: 7
+    description: "Expiring LPs, Summary, Export, Widget, Settings endpoints"
+  - type: "service"
+    count: 1
+    description: "expiry-alert-service.ts"
+  - type: "validation"
+    count: 1
+    description: "expiry-alert.ts (Zod schemas)"
+  - type: "edge_function"
+    count: 1
+    description: "expiry-check scheduled job"
+  - type: "component"
+    count: 7
+    description: "ExpiryAlertWidget, ExpiryBadge, ExpiryAlertPanel, ExpiredInventoryPanel, ExpirySettingsForm, ExpiryExportButton, ExpiryAlertSummary"
+  - type: "email_template"
+    count: 1
+    description: "expiry-alert-email.tsx"
+  - type: "test"
+    count: 3
+    description: "Unit + integration + E2E tests"
+
+# Technical notes
+technical_notes:
+  - "Multi-tier color coding: red (<=7d), orange (8-14d), yellow (15-30d)"
+  - "Configurable warning thresholds via warehouse_settings"
+  - "Daily scheduled Edge Function at 06:00 UTC"
+  - "Email notifications to warehouse managers"
+  - "Redis caching with 5 min TTL for expiry queries"
+  - "Cache invalidated on LP expiry_date changes"
+  - "Performance target: <300ms API response, <500ms for 100K+ LPs"
+  - "CSV export with streaming for large datasets"
+  - "Value at risk calculation: qty * unit_cost"

@@ -1,0 +1,425 @@
+# Story 08.7 - Frontend Context
+# Generated: 2026-01-15
+# Purpose: Components, pages, UX patterns for formulation costing
+
+ux:
+  wireframes:
+    - id: "NPD-012"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/NPD-012-formulation-costing-card.md"
+      relevance: "Main costing card with target/estimated/actual costs, variance indicator, and action buttons"
+      components: ["FormulationCostingCard", "CostSummarySection", "CostVarianceIndicator", "CostVarianceAlert", "CostBreakdownTable"]
+  patterns:
+    card: "ShadCN Card with sections"
+    table: "ShadCN Table with footer row"
+    modal: "ShadCN Dialog with form"
+    badge: "Dynamic variant badge for variance"
+    alert: "ShadCN Alert for warnings"
+  states:
+    - "loading: Fetching costing data"
+    - "empty: No costing record yet (show 'Set Target Cost' CTA)"
+    - "success: Costing data loaded"
+    - "error: Failed to load costing"
+
+# Pages
+pages:
+  - path: "app/(authenticated)/npd/formulations/[id]/page.tsx"
+    operation: "modify"
+    description: "Add FormulationCostingCard section to formulation detail page"
+    sections_to_add:
+      - name: "Costing Section"
+        location: "After formulation items table, before allergens section"
+        component: "FormulationCostingCard"
+
+# Components
+components:
+  - name: "FormulationCostingCard"
+    path: "components/npd/formulation/FormulationCostingCard.tsx"
+    type: "composite"
+    description: "Main costing summary card with target/estimated/actual costs, variance indicator, and action buttons"
+    props:
+      - { name: "formulationId", type: "number", required: true, description: "Formulation ID" }
+      - { name: "costing", type: "FormulationCostingResponse", required: true, description: "Costing data from API" }
+      - { name: "onUpdate", type: "() => void", required: false, description: "Callback after costing update" }
+    children:
+      - "CostSummarySection (target/estimated/actual)"
+      - "CostVarianceIndicator (variance badge)"
+      - "CostVarianceAlert (warning/blocker banner)"
+      - "ActionButtons (Recalculate, Submit, Approve, Reject)"
+      - "CostBreakdownTable (collapsible section)"
+    states:
+      - "loading: Fetching costing data"
+      - "empty: No costing record yet (show 'Set Target Cost' CTA)"
+      - "success: Costing data loaded"
+      - "error: Failed to load costing"
+    ui_pattern: "ShadCN Card with sections"
+    wireframe_ref: "NPD-012"
+
+  - name: "CostBreakdownTable"
+    path: "components/npd/formulation/CostBreakdownTable.tsx"
+    type: "data_table"
+    description: "Per-ingredient cost breakdown table with quantity, unit cost, total cost, percentage"
+    props:
+      - { name: "breakdown", type: "FormulationCostBreakdown", required: true, description: "Cost breakdown data" }
+    columns:
+      - { name: "Ingredient", field: "product_name", sortable: true }
+      - { name: "Quantity", field: "quantity + ' ' + uom", sortable: true, align: "right" }
+      - { name: "Unit Cost", field: "unit_cost", sortable: true, align: "right", format: "currency" }
+      - { name: "Total Cost", field: "total_cost", sortable: true, align: "right", format: "currency" }
+      - { name: "% of Total", field: "percentage", sortable: true, align: "right", format: "percentage_1_decimal" }
+    footer:
+      - { label: "TOTAL", colspan: 3, align: "right" }
+      - { field: "breakdown.total_cost", format: "currency", align: "right" }
+      - { fixed: "100%", align: "right" }
+    states:
+      - "loading: Skeleton rows"
+      - "empty: 'No items in formulation'"
+      - "success: Table with data"
+    ui_pattern: "ShadCN Table with footer row"
+    wireframe_ref: "NPD-012"
+
+  - name: "SetTargetCostModal"
+    path: "components/npd/formulation/SetTargetCostModal.tsx"
+    type: "modal_form"
+    description: "Modal to set or update target cost with notes"
+    props:
+      - { name: "formulationId", type: "number", required: true, description: "Formulation ID" }
+      - { name: "currentTargetCost", type: "number | null", required: false, description: "Current target cost (for edit)" }
+      - { name: "isOpen", type: "boolean", required: true, description: "Modal open state" }
+      - { name: "onClose", type: "() => void", required: true, description: "Close callback" }
+      - { name: "onSuccess", type: "(costing: FormulationCostingResponse) => void", required: true, description: "Success callback" }
+    form_fields:
+      - { name: "target_cost", type: "number", label: "Target Cost (PLN)", placeholder: "e.g., 50.00", validation: "positive, max 999999999" }
+      - { name: "notes", type: "textarea", label: "Notes (Optional)", placeholder: "Enter costing notes...", validation: "max 2000 chars" }
+    actions:
+      - { label: "Cancel", onClick: "onClose()", variant: "outline" }
+      - { label: "Save Target Cost", onClick: "handleSubmit()", variant: "default", loading: "submitting" }
+    validation: "setTargetCostSchema (Zod)"
+    api_call: "PUT /api/npd/formulations/:id/costing/target"
+    ui_pattern: "ShadCN Dialog with form"
+    wireframe_ref: "NPD-012"
+
+  - name: "RecalculateCostButton"
+    path: "components/npd/formulation/RecalculateCostButton.tsx"
+    type: "button"
+    description: "Button to recalculate estimated cost with loading state"
+    props:
+      - { name: "formulationId", type: "number", required: true, description: "Formulation ID" }
+      - { name: "onSuccess", type: "(costing: FormulationCostingResponse) => void", required: true, description: "Success callback" }
+      - { name: "disabled", type: "boolean", required: false, description: "Disabled state" }
+    states:
+      - "idle: Button ready"
+      - "loading: Recalculating (spinner)"
+      - "success: Toast 'Estimated cost updated'"
+      - "error: Toast with error message"
+    api_call: "POST /api/npd/formulations/:id/costing/recalculate"
+    ui_pattern: "ShadCN Button with loading state"
+    wireframe_ref: "NPD-012"
+
+  - name: "SubmitCostingButton"
+    path: "components/npd/formulation/SubmitCostingButton.tsx"
+    type: "button"
+    description: "Button to submit costing for Finance approval"
+    props:
+      - { name: "formulationId", type: "number", required: true, description: "Formulation ID" }
+      - { name: "onSuccess", type: "(costing: FormulationCostingResponse) => void", required: true, description: "Success callback" }
+      - { name: "disabled", type: "boolean", required: false, description: "Disabled state (e.g., if already submitted)" }
+    states:
+      - "idle: Button ready"
+      - "loading: Submitting (spinner)"
+      - "success: Toast 'Costing submitted for approval'"
+      - "error: Toast with error message"
+    api_call: "POST /api/npd/formulations/:id/costing/submit"
+    ui_pattern: "ShadCN Button with loading state"
+    wireframe_ref: "NPD-012"
+
+  - name: "ApproveCostingDialog"
+    path: "components/npd/formulation/ApproveCostingDialog.tsx"
+    type: "confirmation_dialog"
+    description: "Dialog for Finance to approve costing with optional notes"
+    props:
+      - { name: "formulationId", type: "number", required: true, description: "Formulation ID" }
+      - { name: "isOpen", type: "boolean", required: true, description: "Dialog open state" }
+      - { name: "onClose", type: "() => void", required: true, description: "Close callback" }
+      - { name: "onSuccess", type: "(costing: FormulationCostingResponse) => void", required: true, description: "Success callback" }
+    form_fields:
+      - { name: "notes", type: "textarea", label: "Approval Notes (Optional)", placeholder: "Enter approval notes...", validation: "max 2000 chars" }
+    actions:
+      - { label: "Cancel", onClick: "onClose()", variant: "outline" }
+      - { label: "Approve Costing", onClick: "handleApprove()", variant: "default", loading: "approving" }
+    validation: "approveCostingSchema (Zod)"
+    api_call: "POST /api/npd/formulations/:id/costing/approve"
+    ui_pattern: "ShadCN AlertDialog with form"
+    wireframe_ref: "NPD-012"
+
+  - name: "RejectCostingDialog"
+    path: "components/npd/formulation/RejectCostingDialog.tsx"
+    type: "confirmation_dialog"
+    description: "Dialog for Finance to reject costing with required reason"
+    props:
+      - { name: "formulationId", type: "number", required: true, description: "Formulation ID" }
+      - { name: "isOpen", type: "boolean", required: true, description: "Dialog open state" }
+      - { name: "onClose", type: "() => void", required: true, description: "Close callback" }
+      - { name: "onSuccess", type: "(costing: FormulationCostingResponse) => void", required: true, description: "Success callback" }
+    form_fields:
+      - { name: "reason", type: "textarea", label: "Rejection Reason (Required)", placeholder: "Enter reason for rejection...", validation: "min 5 chars, max 2000 chars" }
+    actions:
+      - { label: "Cancel", onClick: "onClose()", variant: "outline" }
+      - { label: "Reject Costing", onClick: "handleReject()", variant: "destructive", loading: "rejecting" }
+    validation: "rejectCostingSchema (Zod)"
+    api_call: "POST /api/npd/formulations/:id/costing/reject"
+    ui_pattern: "ShadCN AlertDialog with form"
+    wireframe_ref: "NPD-012"
+
+  - name: "CostVarianceIndicator"
+    path: "components/npd/formulation/CostVarianceIndicator.tsx"
+    type: "badge"
+    description: "Color-coded variance badge showing percentage with icon"
+    props:
+      - { name: "variance", type: "number | null", required: true, description: "Variance percentage" }
+      - { name: "alertType", type: "'none' | 'warning' | 'blocker'", required: true, description: "Alert severity" }
+    color_coding:
+      - { condition: "variance < 0 (favorable)", color: "green", icon: "ArrowDown", text: "{variance}% Under Target" }
+      - { condition: "variance 0-20% (normal)", color: "yellow", icon: "Equal", text: "{variance}%" }
+      - { condition: "variance 20-50% (warning)", color: "orange", icon: "AlertTriangle", text: "{variance}% Over Target" }
+      - { condition: "variance > 50% (blocker)", color: "red", icon: "XCircle", text: "{variance}% OVER - BLOCKED" }
+      - { condition: "variance is null", color: "gray", icon: "Minus", text: "N/A" }
+    ui_pattern: "ShadCN Badge with dynamic variant"
+    wireframe_ref: "NPD-012"
+
+  - name: "CostVarianceAlert"
+    path: "components/npd/formulation/CostVarianceAlert.tsx"
+    type: "alert_banner"
+    description: "Warning/blocker alert banner for cost variance"
+    props:
+      - { name: "varianceAlert", type: "VarianceAlert", required: true, description: "Variance alert data" }
+    variants:
+      - { type: "warning", color: "orange", icon: "AlertTriangle", dismissible: true }
+      - { type: "blocker", color: "red", icon: "XCircle", dismissible: false }
+      - { type: "none", display: "hidden" }
+    messages:
+      - { type: "warning", text: "Cost variance exceeds 20% target. Review formulation or adjust target cost." }
+      - { type: "blocker", text: "Cost variance exceeds 50% limit. Handoff blocked until variance resolved." }
+    ui_pattern: "ShadCN Alert with icon and action link"
+    wireframe_ref: "NPD-012"
+
+  - name: "CostHistoryModal"
+    path: "components/npd/formulation/CostHistoryModal.tsx"
+    type: "modal_table"
+    description: "Modal displaying cost history for all formulation versions in project"
+    props:
+      - { name: "formulationId", type: "number", required: true, description: "Formulation ID" }
+      - { name: "isOpen", type: "boolean", required: true, description: "Modal open state" }
+      - { name: "onClose", type: "() => void", required: true, description: "Close callback" }
+    columns:
+      - { name: "Version", field: "formulation_number", sortable: true }
+      - { name: "Target Cost", field: "target_cost", sortable: true, align: "right", format: "currency" }
+      - { name: "Estimated Cost", field: "estimated_cost", sortable: true, align: "right", format: "currency" }
+      - { name: "Actual Cost", field: "actual_cost", sortable: true, align: "right", format: "currency" }
+      - { name: "Variance %", field: "variance_pct", sortable: true, align: "right", format: "percentage_1_decimal" }
+      - { name: "Status", field: "status", sortable: true, component: "StatusBadge" }
+      - { name: "Created At", field: "created_at", sortable: true, format: "date_short" }
+      - { name: "Approved At", field: "approved_at", sortable: true, format: "date_short" }
+    states:
+      - "loading: Skeleton rows"
+      - "empty: 'No cost history available'"
+      - "success: Table with data"
+    api_call: "GET /api/npd/formulations/:id/costing/history"
+    ui_pattern: "ShadCN Dialog with DataTable"
+    wireframe_ref: "NPD-012"
+
+# UX Patterns
+ux_patterns:
+  - pattern: "Cost Summary Display"
+    description: "Three-column layout showing Target, Estimated, Actual costs with variance"
+    wireframe_ref: "NPD-012"
+    layout: |
+      +------------------+------------------+------------------+
+      | Target Cost      | Estimated Cost   | Actual Cost      |
+      | $50.00           | $35.00           | $37.50           |
+      | (Manual Entry)   | (Calculated)     | (From Pilot WO)  |
+      +------------------+------------------+------------------+
+      |                  Variance: +7.1% (yellow badge)       |
+      +-------------------------------------------------------+
+
+  - pattern: "Finance Approval Workflow"
+    description: "Status-based action buttons (draft/submitted/approved/rejected)"
+    wireframe_ref: "NPD-012"
+    states:
+      - { status: "draft", actions: ["Set Target Cost", "Recalculate", "Submit for Approval"], visible_to: ["R&D", "NPD_LEAD"] }
+      - { status: "submitted", actions: ["Approve", "Reject"], visible_to: ["Finance"] }
+      - { status: "approved", actions: ["View Only"], visible_to: ["all"] }
+      - { status: "rejected", actions: ["Edit Target Cost", "Resubmit"], visible_to: ["R&D", "NPD_LEAD"] }
+
+  - pattern: "Variance Color Coding"
+    description: "Visual indicators for cost variance severity"
+    wireframe_ref: "NPD-012"
+    colors:
+      - { range: "< 0%", color: "green", meaning: "Favorable (under target)" }
+      - { range: "0-20%", color: "yellow", meaning: "Normal range" }
+      - { range: "20-50%", color: "orange", meaning: "Warning - review needed" }
+      - { range: "> 50%", color: "red", meaning: "Blocker - handoff blocked" }
+
+  - pattern: "Cost Breakdown Collapsible"
+    description: "Collapsible section for detailed per-ingredient breakdown"
+    wireframe_ref: "NPD-012"
+    behavior: "Collapsed by default, expand to view detailed table"
+
+  - pattern: "Empty State"
+    description: "When no costing record exists yet"
+    wireframe_ref: "NPD-012"
+    content: |
+      Icon: Calculator
+      Heading: "Set Target Cost to Begin Costing"
+      Description: "Enter the target cost for this formulation to track estimated vs actual costs."
+      CTA: [Set Target Cost] button
+
+# State Management
+state_management:
+  - component: "FormulationCostingCard"
+    state_type: "local (React.useState)"
+    state_variables:
+      - { name: "costing", type: "FormulationCostingResponse | null", description: "Costing data" }
+      - { name: "isLoading", type: "boolean", description: "Loading state" }
+      - { name: "error", type: "Error | null", description: "Error state" }
+      - { name: "showSetTargetModal", type: "boolean", description: "Set target modal open state" }
+      - { name: "showApproveDialog", type: "boolean", description: "Approve dialog open state" }
+      - { name: "showRejectDialog", type: "boolean", description: "Reject dialog open state" }
+      - { name: "showBreakdown", type: "boolean", description: "Breakdown table collapsed state" }
+      - { name: "showHistoryModal", type: "boolean", description: "History modal open state" }
+    data_fetching: "useEffect(() => { fetchCosting(formulationId) }, [formulationId])"
+    refetch_triggers:
+      - "onUpdate callback from modals/buttons"
+      - "formulationId prop change"
+
+# Permission Checks
+permissions:
+  - component: "SetTargetCostModal"
+    required_roles: ["R&D", "NPD_LEAD", "Finance"]
+    hide_if_no_permission: true
+
+  - component: "RecalculateCostButton"
+    required_roles: ["R&D", "NPD_LEAD", "Finance"]
+    hide_if_no_permission: true
+
+  - component: "SubmitCostingButton"
+    required_roles: ["R&D", "NPD_LEAD"]
+    hide_if_no_permission: true
+    disabled_if: "costing.status !== 'draft' && costing.status !== 'rejected'"
+
+  - component: "ApproveCostingDialog"
+    required_roles: ["Finance"]
+    hide_if_no_permission: true
+    disabled_if: "costing.status !== 'submitted'"
+
+  - component: "RejectCostingDialog"
+    required_roles: ["Finance"]
+    hide_if_no_permission: true
+    disabled_if: "costing.status !== 'submitted'"
+
+# Accessibility
+accessibility:
+  - component: "FormulationCostingCard"
+    requirements:
+      - "Keyboard navigable (all buttons/links tabbable)"
+      - "ARIA labels for variance indicators (screen reader friendly)"
+      - "Color + text labels for variance (not color-only)"
+      - "Focus visible on interactive elements"
+
+  - component: "CostBreakdownTable"
+    requirements:
+      - "Table headers with scope attributes"
+      - "Sortable columns with ARIA sort indicators"
+      - "Currency values formatted with proper ARIA labels"
+
+  - component: "Modals/Dialogs"
+    requirements:
+      - "Focus trap (focus stays within modal)"
+      - "ESC key to close (onClose)"
+      - "Focus return to trigger button on close"
+      - "ARIA role='dialog' and aria-labelledby"
+
+# Error Handling
+error_handling:
+  - scenario: "Missing ingredient cost data"
+    display: "Toast error: 'Missing cost data for ingredient: {product_name}. Update product cost before calculating.'"
+    recovery: "Provide link to product edit page or show product code/name"
+
+  - scenario: "Cannot edit approved costing"
+    display: "Toast error: 'Cannot edit approved costing. Reject and resubmit to make changes.'"
+    recovery: "Show current status, explain workflow"
+
+  - scenario: "Network error on API call"
+    display: "Toast error: 'Failed to load costing data. Please try again.'"
+    recovery: "Show [Retry] button"
+
+  - scenario: "Variance exceeds blocker threshold"
+    display: "CostVarianceAlert banner (red, non-dismissible) + disabled handoff button"
+    recovery: "Explain how to reduce variance (adjust formulation or target cost)"
+
+# Performance Considerations
+performance:
+  - component: "CostBreakdownTable"
+    optimization: "Virtualization if >100 items (react-virtual)"
+    target: "<300ms render for 50 items"
+
+  - component: "FormulationCostingCard"
+    optimization: "Memoize breakdown calculation (useMemo)"
+    target: "<100ms re-render on costing update"
+
+  - component: "CostHistoryModal"
+    optimization: "Lazy load history data (only fetch when modal opens)"
+    target: "<500ms to display history table"
+
+# Testing Considerations
+testing:
+  - component: "FormulationCostingCard"
+    tests:
+      - "Renders empty state when no costing record"
+      - "Displays target/estimated/actual costs correctly"
+      - "Shows variance indicator with correct color"
+      - "Displays variance alert banner for warning/blocker"
+      - "Hides action buttons based on user role"
+      - "Recalculate button updates estimated cost"
+
+  - component: "CostBreakdownTable"
+    tests:
+      - "Renders all formulation items with costs"
+      - "Calculates percentages correctly"
+      - "Shows footer row with totals"
+      - "Sorts by columns"
+
+  - component: "SetTargetCostModal"
+    tests:
+      - "Validates target_cost > 0"
+      - "Submits PUT request on save"
+      - "Shows error for invalid input"
+      - "Pre-populates current target cost for edit"
+
+  - component: "ApproveCostingDialog"
+    tests:
+      - "Only visible to Finance role"
+      - "Submits POST /approve on confirm"
+      - "Shows success toast on approval"
+      - "Closes modal and refreshes costing on success"
+
+  - component: "RejectCostingDialog"
+    tests:
+      - "Validates reason field (min 5 chars)"
+      - "Submits POST /reject on confirm"
+      - "Shows error if reason missing"
+      - "Closes modal and refreshes costing on success"
+
+  - component: "CostVarianceIndicator"
+    tests:
+      - "Shows green badge for variance < 0%"
+      - "Shows yellow badge for variance 0-20%"
+      - "Shows orange badge for variance 20-50%"
+      - "Shows red badge for variance > 50%"
+      - "Shows gray badge for null variance"
+
+  - component: "CostVarianceAlert"
+    tests:
+      - "Shows warning alert for variance 20-50%"
+      - "Shows blocker alert for variance > 50%"
+      - "Hides for variance < 20%"
+      - "Alert is dismissible for warning, non-dismissible for blocker"

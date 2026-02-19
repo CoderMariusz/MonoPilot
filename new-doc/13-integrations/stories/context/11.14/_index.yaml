@@ -1,0 +1,63 @@
+# Story 11.14 - Index File (Entry Point)
+# Generated: 2026-01-15
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "11.14"
+  name: "XML Export"
+  slug: "xml-export"
+  epic: "11-integrations"
+  phase: "2"
+  complexity: "S"
+  estimate_days: 1-2
+  type: "backend + frontend"
+  state: "ready"
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["organizations"]
+    - story: "02.1"
+      name: "Products CRUD"
+      provides: ["products table"]
+    - story: "11.5"
+      name: "Data Export (CSV/JSON)"
+      provides: ["Export UI, service patterns"]
+      status: "ready"
+  blocks: []
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/integrations.md"
+    sections: ["FR-INT-024"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/11-integrations/11.14.xml-export.md"
+
+# High-level deliverables
+deliverables:
+  - type: "service"
+    count: 1
+    description: "xml-export-service.ts (XML serializer, XSD generator)"
+  - type: "api"
+    count: 5
+    description: "Export products/orders/inventory/shipments as XML, download XSD schema"
+  - type: "xsd_schema"
+    count: 4
+    description: "XSD schemas for products, orders, inventory, shipments"
+  - type: "frontend"
+    count: 1
+    description: "Add XML option to export UI"
+  - type: "test"
+    count: 3
+    description: "Unit + integration + E2E tests"
+
+# Technical notes
+technical_notes:
+  - "XML serializer with MonoPilot custom schema"
+  - "XSD schema generation for validation"
+  - "UTF-8 encoding with pretty print"
+  - "Namespace: http://monopilot.app/schema/v1"
+  - "Validates XML against XSD before download"

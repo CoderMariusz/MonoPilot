@@ -1,0 +1,462 @@
+# Feature Flow
+# Lightweight workflow for adding features to existing projects
+#
+# Documentation: @.claude/workflows/documentation/FEATURE-FLOW.md
+
+name: feature-flow
+description: Streamlined TDD workflow for single features (1-4 hours)
+trigger: "add_feature | implement | create | build | small_feature"
+
+# Expected duration: 1-4 hours
+# Use for clear, small features that don't need full story workflow
+
+documentation: "@.claude/workflows/documentation/FEATURE-FLOW.md"
+
+# When to use
+use_when:
+  - "Adding single feature to existing codebase"
+  - "Scope is clear or needs quick clarification"
+  - "No major architectural changes needed"
+  - "Estimated under 4 hours"
+
+# When NOT to use
+dont_use_when:
+  - "New project (use discovery-flow + epic-workflow)"
+  - "Major refactoring (use story-delivery)"
+  - "Architectural changes needed (use epic-workflow with ADR)"
+
+# Phase system integration
+phase_system:
+  phases:
+    - id: MVP
+      priority: P0
+      description: "Minimum viable product - core functionality"
+    - id: P1
+      priority: P1
+      description: "Essential improvements - high value"
+    - id: P2
+      priority: P2
+      description: "Nice to have - medium value"
+    - id: P3
+      priority: P3
+      description: "Future enhancements - low priority"
+
+  rules:
+    - "Complete current phase before starting next"
+    - "MVP features MUST be done before P1 work"
+    - "Exception: Bug fixes can happen in any phase"
+    - "Exception: User explicitly requests phase skip"
+
+phases:
+  # Phase 0: Intake & Routing
+  - id: intake
+    name: "Intake & Routing"
+    agent: ORCHESTRATOR
+    duration: "2-5 minutes"
+    activities:
+      - "Receive feature request"
+      - "Check current project phase (MVP/P1/P2/P3)"
+      - "Validate phase alignment"
+      - "Route to clarification or implementation"
+    decision:
+      aligned: clarification
+      not_aligned: add_to_backlog_or_override
+    gate:
+      id: INTAKE_COMPLETE
+      type: quality_gate
+      enforcer: ORCHESTRATOR
+      criteria:
+        - "Feature request received and documented"
+        - "Feature classified (MVP/P1/P2/P3)"
+        - "Phase alignment verified"
+        - "Routing decision made"
+      on_pass: clarification
+      on_fail: request_more_info
+      block_message: |
+        Cannot proceed to clarification:
+        - Feature not classified into phase (MVP/P1/P2/P3)
+        - Phase alignment not verified
+        Action: Classify feature and verify phase alignment
+
+  # Phase 1: Quick Clarification
+  - id: clarification
+    name: "Quick Clarification"
+    condition: "request_is_unclear"
+    agent: DISCOVERY-AGENT
+    type: quick_discovery
+    duration: "5-15 minutes"
+    config:
+      depth: quick
+      max_questions: 7
+      max_rounds: 1
+    focus:
+      - "What exactly should this feature do?"
+      - "Where in the app does this go?"
+      - "Does this need new UI?"
+      - "What data does this need?"
+      - "How do we know it works?"
+    output:
+      deliverables:
+        - "FEATURE-BRIEF.md"
+    checkpoint:
+      - "Requirements unambiguous"
+      - "Location identified"
+      - "Acceptance criteria clear"
+    next: ux_check
+
+  # Phase 2: UX Quick Check
+  - id: ux_check
+    name: "UX Quick Check"
+    condition: "feature.has_ui_component == true"
+    agent: UX-DESIGNER
+    type: quick_wireframe
+    duration: "15-30 minutes"
+    activities:
+      - "Quick wireframe/sketch"
+      - "Key interactions only"
+      - "No full mockups"
+    output:
+      content:
+        - "Wireframe (ASCII or simple sketch)"
+        - "Key interactions"
+        - "States (default, loading, error)"
+        - "Notes for dev"
+    checkpoint:
+      - "Dev can implement from spec"
+    gate:
+      id: UX_COMPLETE
+      type: review_gate
+      enforcer: UX-DESIGNER
+      criteria:
+        - "Wireframe or sketch created"
+        - "Key interactions documented"
+        - "UI states defined (default, loading, error)"
+        - "Implementation notes provided for dev"
+      on_pass: tdd
+      on_fail: revise_ux
+      block_message: |
+        Cannot proceed to implementation:
+        - UI/UX design not approved
+        - Missing wireframe or interaction documentation
+        Action: Complete UX design before TDD phase
+    next: tdd
+
+  # Phase 3: Streamlined TDD
+  - id: tdd
+    name: "Streamlined TDD"
+    duration: "1-2 hours total"
+    streamlined_rules:
+      skip:
+        - "Exhaustive edge case tests"
+        - "Full refactor phase"
+        - "Multiple review rounds"
+      keep:
+        - "Test-first approach"
+        - "Security review"
+        - "AC verification"
+    steps:
+      - id: tests
+        agent: TEST-WRITER
+        type: focused_tests
+        duration: "15-30 minutes"
+        description: "Write focused tests - happy path + key edge cases"
+        checkpoint:
+          - "Tests cover acceptance criteria"
+          - "Tests fail initially"
+        gate:
+          id: TESTS_WRITTEN
+          type: test_gate
+          enforcer: TEST-WRITER
+          criteria:
+            - "Tests exist for acceptance criteria"
+            - "Tests cover happy path"
+            - "Key edge cases covered"
+            - "All tests FAIL (TDD red phase)"
+          on_pass: implement
+          on_fail: write_more_tests
+          block_message: |
+            Cannot proceed to implementation:
+            - No failing tests written (TDD requirement)
+            - Tests must fail BEFORE implementation
+            Action: Write tests that fail, then implement
+
+      - id: implement
+        agent: BACKEND-DEV
+        alternate_agent: FRONTEND-DEV
+        type: minimal_implementation
+        duration: "30 min - 2 hours"
+        description: "Implement minimal code to pass tests"
+        checkpoint:
+          - "All tests pass"
+          - "Build succeeds"
+        gate:
+          id: IMPLEMENTATION_COMPLETE
+          type: test_gate
+          enforcer: BACKEND-DEV
+          alternate_enforcer: FRONTEND-DEV
+          criteria:
+            - "All tests PASS"
+            - "Build succeeds"
+            - "No regressions introduced"
+            - "Code implements acceptance criteria"
+          on_pass: review
+          on_fail: fix_implementation
+          block_message: |
+            Cannot proceed to review:
+            - X tests still failing
+            - Build must succeed before review
+            Action: Fix failing tests before requesting review
+
+      - id: review
+        agent: CODE-REVIEWER
+        type: quick_review
+        duration: "15-30 minutes"
+        description: "Quick review focused on security, bugs, AC"
+        focus:
+          - "Security issues"
+          - "Obvious bugs"
+          - "AC met"
+        skip:
+          - "Style nitpicks"
+        flag:
+          - "doc_update_required"
+        decision:
+          approved: qa
+          request_changes: implement
+        gate:
+          id: REVIEW_APPROVED
+          type: review_gate
+          enforcer: CODE-REVIEWER
+          criteria:
+            - "No security issues found"
+            - "No obvious bugs found"
+            - "Acceptance criteria met"
+            - "Code review approved"
+          on_pass: qa
+          on_fail: implement
+          block_message: |
+            Cannot proceed to QA:
+            - Code review rejected
+            - Issues found: [security/bugs/AC not met]
+            Action: Address review comments and resubmit
+
+  # Phase 4: Quick QA
+  - id: qa
+    name: "Quick QA"
+    agent: QA-AGENT
+    type: focused_testing
+    duration: "15-30 minutes"
+    scope:
+      - "Test new feature thoroughly"
+      - "Quick smoke test of related areas"
+      - "Skip full regression"
+    checkpoint:
+      - "Feature works as expected"
+      - "No obvious regressions"
+    gate:
+      id: QA_PASSED
+      type: quality_gate
+      enforcer: QA-AGENT
+      criteria:
+        - "Feature works as expected"
+        - "All acceptance criteria verified"
+        - "No obvious regressions found"
+        - "Smoke tests pass"
+      on_pass: doc_sync
+      on_fail: implement
+      block_message: |
+        Cannot proceed to documentation:
+        - QA failed
+        - Feature does not work as expected
+        Action: Fix issues and re-run QA
+    next: doc_sync
+
+  # Phase 5: Doc Sync (MANDATORY)
+  - id: doc_sync
+    name: "Doc Sync"
+    mandatory: true
+    agent: TECH-WRITER
+    duration: "15-30 minutes"
+    parallel_updates:
+      - id: prd_update
+        target: "docs/1-BASELINE/product/prd.md"
+        section: "## Updates Log"
+        format: "| Date | Feature | Phase | Description | Impact |"
+
+      - id: architecture_update
+        target: "docs/1-BASELINE/architecture/"
+        condition: "feature_impacts_architecture"
+        section: "## Updates"
+
+      - id: feature_docs
+        conditions:
+          - target: "API docs"
+            when: "new_endpoints"
+          - target: "User guide"
+            when: "user_facing"
+    checkpoint:
+      - "PRD updated"
+      - "Architecture docs updated (if applicable)"
+      - "Feature documentation complete"
+    next: tracking
+
+  # Phase 6: Phase Tracking
+  - id: tracking
+    name: "Phase Tracking"
+    activities:
+      - "Mark feature as DONE in phase tracker"
+      - "Update phase completion percentage"
+      - "Check if phase complete"
+    update:
+      file: "PROJECT-STATE.md"
+      section: "## Phase Progress"
+    phase_completion_check:
+      if_complete: "Notify for phase transition"
+      update_status: true
+
+  # Completion
+  - id: complete
+    type: feature_complete
+    summary: "Feature implemented and verified"
+    actions:
+      - "Update PROJECT-STATE.md"
+      - "Notify user of completion"
+
+    # AUTO STATE UPDATE + COMMIT
+    on_complete:
+      state_update:
+        update_root: true
+        script: "bash scripts/sync-state.sh --commit"
+      commit:
+        enabled: true
+        message: "Complete feature: {feature_name}"
+
+# =============================================================================
+# QUALITY GATES SUMMARY
+# =============================================================================
+quality_gates:
+  # Intake gate
+  INTAKE_COMPLETE:
+    phase: intake
+    enforcer: ORCHESTRATOR
+    type: quality_gate
+    blocker: "Cannot proceed to clarification"
+    criteria:
+      - "Feature classified (MVP/P1/P2/P3)"
+      - "Phase alignment verified"
+
+  # UX gate (conditional)
+  UX_COMPLETE:
+    phase: ux_check
+    enforcer: UX-DESIGNER
+    type: review_gate
+    condition: "feature.has_ui_component == true"
+    blocker: "Cannot proceed to TDD"
+    criteria:
+      - "Wireframe created"
+      - "UI states defined"
+
+  # TDD gates
+  TESTS_WRITTEN:
+    phase: tdd.tests
+    enforcer: TEST-WRITER
+    type: test_gate
+    blocker: "Cannot proceed to implementation"
+    criteria:
+      - "Tests exist for AC"
+      - "All tests FAIL (TDD red)"
+
+  IMPLEMENTATION_COMPLETE:
+    phase: tdd.implement
+    enforcer: BACKEND-DEV | frontend-dev
+    type: test_gate
+    blocker: "Cannot proceed to review"
+    criteria:
+      - "All tests PASS"
+      - "Build succeeds"
+
+  REVIEW_APPROVED:
+    phase: tdd.review
+    enforcer: CODE-REVIEWER
+    type: review_gate
+    blocker: "Cannot proceed to QA"
+    criteria:
+      - "No security issues"
+      - "AC met"
+      - "Code approved"
+
+  # QA gate
+  QA_PASSED:
+    phase: qa
+    enforcer: QA-AGENT
+    type: quality_gate
+    blocker: "Cannot proceed to documentation"
+    criteria:
+      - "Feature works as expected"
+      - "No regressions"
+
+  # Doc sync gate
+  DOC_SYNC_COMPLETE:
+    phase: doc_sync
+    enforcer: TECH-WRITER
+    type: quality_gate
+    blocker: "Cannot mark feature complete"
+    criteria:
+      - "PRD updated"
+      - "Architecture docs updated (if applicable)"
+
+# Integration with other flows
+integration:
+  escalate_to_story:
+    when: "Feature scope grows beyond 4 hours"
+    workflow: "engineering/story-delivery.yaml"
+
+  escalate_to_epic:
+    when: "Requires ADR or architectural changes"
+    workflow: "engineering/epic-workflow.yaml"
+
+  bug_found:
+    workflow: "engineering/bug-workflow.yaml"
+    can_interrupt: true
+
+  phase_complete:
+    notify: SCRUM-MASTER
+
+# Error handling
+on_error:
+  log_to: "@.claude/logs/workflows/"
+  retry_count: 1
+  escalate_to: ORCHESTRATOR
+
+error_recovery:
+  feature_scope_grows:
+    action: "Pause, convert to Story, restart"
+
+  phase_violation_requested:
+    action: "Document reason, get approval, proceed"
+
+  ux_unclear:
+    action: "Escalate to full UX-DESIGNER session"
+
+  tests_keep_failing:
+    action: "May need SENIOR-DEV involvement"
+
+  doc_sync_missed:
+    action: "DOC-AUDITOR catches in sprint check"
+
+# Metrics
+metrics:
+  - "Time from request to done"
+  - "Phase alignment (on-phase vs override)"
+  - "Rework rate"
+  - "Doc sync compliance"
+
+# Artifacts
+artifacts:
+  feature_brief:
+    path: "FEATURE-BRIEF.md"
+    created_by: clarification
+    temporary: true
+  implementation:
+    path: "src/**/*"
+    created_by: tdd.implement

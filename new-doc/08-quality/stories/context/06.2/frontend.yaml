@@ -1,0 +1,283 @@
+# Story 06.2 - Frontend Specification
+# Purpose: Pages, components, services, validation, UX
+# Agent: FRONTEND-DEV
+
+# Pages
+pages:
+  - path: "apps/frontend/app/(authenticated)/quality/holds/page.tsx"
+    description: "Holds list page with filters, KPIs, table"
+    wireframe: "docs/3-ARCHITECTURE/ux/wireframes/QA-002-holds-list.md"
+    components:
+      - "HoldStats"
+      - "HoldFilters"
+      - "HoldTable"
+      - "CreateHoldModal"
+
+  - path: "apps/frontend/app/(authenticated)/quality/holds/[id]/page.tsx"
+    description: "Hold detail page with items and release workflow"
+    components:
+      - "HoldDetail"
+      - "HoldItemsTable"
+      - "ReleaseModal"
+      - "HoldStatusBadge"
+      - "HoldPriorityBadge"
+
+# Components
+components:
+  - path: "apps/frontend/app/(authenticated)/quality/holds/components/HoldTable.tsx"
+    description: "Holds list table with aging indicators and row actions"
+    props:
+      holds: "QualityHoldSummary[]"
+      onRelease: "(id: string) => void"
+      onSelect: "(ids: string[]) => void"
+      isLoading: "boolean"
+    features:
+      - "Sortable columns (hold_number, priority, held_at)"
+      - "Checkbox selection for bulk actions"
+      - "Aging indicator icon with tooltip"
+      - "Quick action buttons (Release, View, ...)"
+      - "Multi-line row display with hold info"
+    states: ["loading", "empty", "error", "success"]
+
+  - path: "apps/frontend/app/(authenticated)/quality/holds/components/HoldForm.tsx"
+    description: "Create hold form with item selection"
+    props:
+      onSubmit: "(data: CreateHoldInput) => void"
+      isLoading: "boolean"
+    fields:
+      - name: "Hold Type (Material/Product/Batch)"
+        type: "select"
+        validation: "required"
+      - name: "Priority (Low/Medium/High/Critical)"
+        type: "select"
+        validation: "required"
+      - name: "Reason"
+        type: "textarea"
+        validation: "required, 10-500 chars"
+      - name: "Reference Type (LP/WO/Batch)"
+        type: "select"
+        validation: "required"
+      - name: "Reference ID (searchable dropdown)"
+        type: "autocomplete"
+        validation: "required"
+      - name: "Quantity to Hold"
+        type: "number"
+        validation: "> 0 and <= available"
+      - name: "Inspection Type (optional)"
+        type: "select"
+      - name: "Link to NCR (optional)"
+        type: "autocomplete"
+      - name: "Notify QA Manager"
+        type: "checkbox"
+      - name: "Auto-create NCR"
+        type: "checkbox"
+
+  - path: "apps/frontend/app/(authenticated)/quality/holds/components/HoldItemsTable.tsx"
+    description: "Items table with reference links and details"
+    props:
+      items: "QualityHoldItem[]"
+      holdStatus: "HoldStatus"
+    features:
+      - "Display reference type icon (LP, WO, Batch)"
+      - "Clickable reference links to detail pages"
+      - "Quantity and UOM display"
+      - "Location display (for LPs)"
+      - "Notes field"
+
+  - path: "apps/frontend/app/(authenticated)/quality/holds/components/ReleaseModal.tsx"
+    description: "Release hold modal with disposition selector"
+    props:
+      hold: "QualityHold"
+      onRelease: "(data: ReleaseHoldInput) => void"
+      isOpen: "boolean"
+      onClose: "() => void"
+      isLoading: "boolean"
+    fields:
+      - name: "Hold Information (read-only)"
+        display: "Hold #, Type, Priority, Reference, Quantity"
+      - name: "Release Notes"
+        type: "textarea"
+        validation: "required, 10-1000 chars"
+      - name: "Disposition Action"
+        type: "radio group"
+        options: ["Approve for use", "Approve with conditions", "Return to supplier", "Scrap/destroy", "Rework"]
+      - name: "Close linked NCR (optional)"
+        type: "checkbox"
+      - name: "Notify requester (optional)"
+        type: "checkbox"
+    workflow:
+      - "Display hold details"
+      - "User fills release notes and selects disposition"
+      - "Confirmation modal appears before release"
+      - "On success: show success toast and refresh"
+
+  - path: "apps/frontend/app/(authenticated)/quality/holds/components/HoldStatusBadge.tsx"
+    description: "Status badge component"
+    props:
+      status: "HoldStatus"
+    colors:
+      active: "red (#FEE2E2 bg, #991B1B text)"
+      released: "green (#D1FAE5 bg, #065F46 text)"
+      disposed: "gray (#F3F4F6 bg, #1F2937 text)"
+
+  - path: "apps/frontend/app/(authenticated)/quality/holds/components/HoldPriorityBadge.tsx"
+    description: "Priority badge component"
+    props:
+      priority: "HoldPriority"
+    colors:
+      critical: "red (#FEE2E2 bg, #991B1B text)"
+      high: "orange (#FED7AA bg, #9A3412 text)"
+      medium: "yellow (#FEF3C7 bg, #92400E text)"
+      low: "blue (#DBEAFE bg, #1E40AF text)"
+
+  - path: "apps/frontend/app/(authenticated)/quality/holds/components/AgingIndicator.tsx"
+    description: "Aging warning/critical icons with tooltips"
+    props:
+      heldAt: "string (ISO timestamp)"
+      priority: "HoldPriority"
+    thresholds:
+      critical: "24h -> warning at 12h, critical at 24h"
+      high: "48h -> warning at 24h, critical at 48h"
+      medium: "72h -> warning at 48h, critical at 72h"
+      low: "168h (7d) -> warning at 96h, critical at 168h"
+    display:
+      - "No icon if within threshold"
+      - "Yellow warning icon if approaching"
+      - "Red critical icon if exceeded"
+      - "Tooltip shows exact aging time"
+
+  - path: "apps/frontend/app/(authenticated)/quality/holds/components/HoldStats.tsx"
+    description: "KPI stats cards for dashboard"
+    props:
+      stats: "HoldStatsResponse"
+      isLoading: "boolean"
+    cards:
+      - name: "Active Holds"
+        value: "active_count"
+        subtitle: "% critical"
+        action: "Filter to active"
+      - name: "Released Today"
+        value: "released_today_count"
+        action: "View released"
+      - name: "Critical Priority"
+        value: "critical_active_count"
+        action: "View critical"
+      - name: "Avg Hold Time"
+        value: "avg_hold_time_days (days)"
+        action: "View trends"
+
+# Services
+services:
+  - path: "apps/frontend/lib/hooks/use-holds.ts"
+    description: "React Query hook for holds list"
+    exports:
+      - name: "useHolds"
+        hook: "UseQueryResult<PaginatedResult<QualityHold>>"
+        params: ["params: HoldListParams"]
+  - path: "apps/frontend/lib/hooks/use-hold-detail.ts"
+    description: "React Query hook for hold detail"
+    exports:
+      - name: "useHoldDetail"
+        hook: "UseQueryResult<HoldDetailResponse>"
+        params: ["id: string | null"]
+  - path: "apps/frontend/lib/hooks/use-hold-stats.ts"
+    description: "React Query hook for hold statistics"
+    exports:
+      - name: "useHoldStats"
+        hook: "UseQueryResult<HoldStatsResponse>"
+
+# Validation Schemas
+validation:
+  - path: "apps/frontend/lib/validation/quality-hold.ts"
+    description: "Zod schemas for hold form validation"
+    exports:
+      - name: "createHoldSchema"
+        schema: |
+          z.object({
+            reason: z.string().min(10).max(500),
+            hold_type: z.enum(['qa_pending', 'investigation', 'recall', 'quarantine']),
+            priority: z.enum(['low', 'medium', 'high', 'critical']).default('medium'),
+            items: z.array(z.object({
+              reference_type: z.enum(['lp', 'wo', 'batch']),
+              reference_id: z.string().uuid(),
+              quantity_held: z.number().positive().optional(),
+              uom: z.string().max(20).optional(),
+              notes: z.string().max(500).optional()
+            })).min(1, 'At least one item required')
+          })
+      - name: "releaseHoldSchema"
+        schema: |
+          z.object({
+            disposition: z.enum(['release', 'rework', 'scrap', 'return']),
+            release_notes: z.string().min(10).max(1000)
+          })
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/quality-hold.ts"
+    description: "TypeScript type definitions for quality holds"
+    exports:
+      - "type HoldStatus = 'active' | 'released' | 'disposed'"
+      - "type HoldPriority = 'low' | 'medium' | 'high' | 'critical'"
+      - "type HoldType = 'qa_pending' | 'investigation' | 'recall' | 'quarantine'"
+      - "type Disposition = 'release' | 'rework' | 'scrap' | 'return'"
+      - "type ReferenceType = 'lp' | 'wo' | 'batch'"
+      - "interface QualityHold { ... }"
+      - "interface QualityHoldSummary { ... }"
+      - "interface QualityHoldItem { ... }"
+      - "interface HoldListParams { ... }"
+      - "interface CreateHoldInput { ... }"
+      - "interface ReleaseHoldInput { ... }"
+      - "interface HoldStatsResponse { ... }"
+
+# Constants
+constants:
+  - path: "apps/frontend/lib/constants/quality-hold.ts"
+    exports:
+      - |
+        export const HOLD_TYPE_LABELS = {
+          qa_pending: 'QA Pending',
+          investigation: 'Investigation',
+          recall: 'Recall',
+          quarantine: 'Quarantine'
+        }
+      - |
+        export const PRIORITY_LABELS = {
+          low: 'Low',
+          medium: 'Medium',
+          high: 'High',
+          critical: 'Critical'
+        }
+      - |
+        export const DISPOSITION_LABELS = {
+          release: 'Approve for Use',
+          rework: 'Rework',
+          scrap: 'Scrap',
+          return: 'Return to Supplier'
+        }
+      - |
+        export const AGING_THRESHOLDS = {
+          critical: 24 * 60 * 60 * 1000, // 24 hours
+          high: 48 * 60 * 60 * 1000,     // 48 hours
+          medium: 72 * 60 * 60 * 1000,   // 72 hours
+          low: 168 * 60 * 60 * 1000      // 7 days
+        }
+
+# Performance Considerations
+performance:
+  - "Paginate holds list (20 per page default)"
+  - "Pre-fetch next page on scroll to 80%"
+  - "Debounce search input (300ms)"
+  - "Cache holds list (1 min TTL)"
+  - "Cache hold detail (5 min TTL)"
+  - "Lazy load hold items on detail page open"
+  - "Virtualize table rows for large lists"
+
+# Accessibility
+accessibility:
+  - "Touch targets: 48x48dp minimum (buttons, rows)"
+  - "Color not sole differentiator (use icons for status/priority)"
+  - "Keyboard navigation: Tab, Enter, Space, Escape, Arrow keys"
+  - "ARIA labels on badges, buttons, tables"
+  - "Screen reader: Announce hold count, status changes"
+  - "Focus management: Focus trap in modals"

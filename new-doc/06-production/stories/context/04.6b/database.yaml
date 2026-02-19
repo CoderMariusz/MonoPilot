@@ -1,0 +1,110 @@
+# Story 04.6b - Database Schema
+# No new tables - reuses wo_material_consumptions from 04.6a
+
+tables: []
+# Scanner uses existing wo_material_consumptions table from story 04.6a
+
+views:
+  - name: "v_scanner_wo_summary"
+    description: "Optimized view for scanner WO lookup by barcode"
+    query: |
+      SELECT
+        wo.id,
+        wo.wo_number,
+        wo.status,
+        wo.batch_number,
+        wo.planned_qty,
+        wo.actual_qty,
+        p.name AS product_name,
+        p.sku AS product_sku,
+        l.name AS line_name,
+        (SELECT COUNT(*) FROM wo_materials wm WHERE wm.wo_id = wo.id) AS total_materials,
+        (SELECT COUNT(*) FROM wo_materials wm WHERE wm.wo_id = wo.id AND wm.consumed_qty >= wm.required_qty) AS completed_materials
+      FROM work_orders wo
+      JOIN products p ON wo.product_id = p.id
+      LEFT JOIN production_lines l ON wo.line_id = l.id
+      WHERE wo.status IN ('in_progress', 'started')
+    indexes:
+      - "idx_wo_barcode ON work_orders(wo_number)"
+
+  - name: "v_scanner_lp_details"
+    description: "Optimized view for scanner LP lookup by barcode"
+    query: |
+      SELECT
+        lp.id,
+        lp.lp_number,
+        lp.product_id,
+        p.name AS product_name,
+        p.sku AS product_sku,
+        lp.quantity,
+        lp.uom,
+        lp.batch_number,
+        lp.expiry_date,
+        lp.status,
+        loc.name AS location_name
+      FROM license_plates lp
+      JOIN products p ON lp.product_id = p.id
+      LEFT JOIN locations loc ON lp.location_id = loc.id
+      WHERE lp.status = 'available'
+    indexes:
+      - "idx_lp_barcode ON license_plates(lp_number)"
+
+functions:
+  - name: "get_wo_by_barcode"
+    description: "Get WO by barcode with materials in single query"
+    params:
+      - "p_barcode TEXT"
+      - "p_org_id UUID"
+    returns: "JSONB"
+    body: |
+      SELECT jsonb_build_object(
+        'wo', row_to_json(wo.*),
+        'materials', (
+          SELECT jsonb_agg(jsonb_build_object(
+            'id', wm.id,
+            'material_name', p.name,
+            'required_qty', wm.required_qty,
+            'consumed_qty', wm.consumed_qty,
+            'uom', wm.uom,
+            'consume_whole_lp', wm.consume_whole_lp,
+            'progress_percent', ROUND((wm.consumed_qty / NULLIF(wm.required_qty, 0)) * 100)
+          ) ORDER BY wm.sequence)
+          FROM wo_materials wm
+          JOIN products p ON wm.product_id = p.id
+          WHERE wm.wo_id = wo.id
+        )
+      )
+      FROM work_orders wo
+      WHERE wo.wo_number = p_barcode
+        AND wo.org_id = p_org_id
+
+  - name: "get_lp_by_barcode"
+    description: "Get LP by barcode with validation for material"
+    params:
+      - "p_barcode TEXT"
+      - "p_material_id UUID"
+      - "p_org_id UUID"
+    returns: "JSONB"
+    body: |
+      SELECT jsonb_build_object(
+        'lp', row_to_json(lp.*),
+        'validation', jsonb_build_object(
+          'is_available', lp.status = 'available',
+          'product_match', lp.product_id = wm.product_id,
+          'uom_match', lp.uom = wm.uom,
+          'error_code', CASE
+            WHEN lp.status != 'available' THEN 'LP_NOT_AVAILABLE'
+            WHEN lp.product_id != wm.product_id THEN 'PRODUCT_MISMATCH'
+            WHEN lp.uom != wm.uom THEN 'UOM_MISMATCH'
+            ELSE NULL
+          END
+        )
+      )
+      FROM license_plates lp
+      CROSS JOIN wo_materials wm
+      WHERE lp.lp_number = p_barcode
+        AND lp.org_id = p_org_id
+        AND wm.id = p_material_id
+
+migrations: []
+# No migrations needed - reuses tables from 04.6a

@@ -1,0 +1,83 @@
+# Story 10.5 - Real-Time Machine Dashboard Context
+# Generated: 2025-01-15
+# Phase: 1A (Core OEE)
+
+story:
+  id: "10.5"
+  name: "Real-Time Machine Dashboard"
+  slug: "realtime-machine-dashboard"
+  epic: "10-oee"
+  phase: "1A"
+  complexity: "L"
+  estimate_days: 4-5
+  type: "frontend"
+  state: "ready"
+  priority: "P0"
+
+context_files:
+  - _index.yaml
+  - frontend.yaml
+  - tests.yaml
+
+dependencies:
+  required:
+    - story: "01.1"
+      provides: ["User authentication"]
+    - story: "01.3"
+      provides: ["Machine data"]
+    - story: "01.5"
+      provides: ["Line grouping"]
+    - story: "04.1"
+      provides: ["Current WO display (soft)"]
+    - story: "10.1"
+      provides: ["Target values for comparison"]
+    - story: "10.2"
+      provides: ["Downtime reason display (soft)"]
+    - story: "10.3"
+      provides: ["Active downtime data"]
+    - story: "10.4"
+      provides: ["OEE snapshots, metrics"]
+
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/oee.md"
+    sections: ["FR-OEE-002 - Real-Time Machine Dashboard"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/10-oee/10.5.realtime-machine-dashboard.md"
+  wireframe:
+    path: "docs/3-ARCHITECTURE/ux/wireframes/PROD-001-production-dashboard.md"
+    relevance: "Similar dashboard pattern"
+
+deliverables:
+  - type: "page"
+    count: 2
+    description: "/oee/dashboard, /oee/machines/:id"
+  - type: "components"
+    count: 15
+    description: "KPIs, machine cards, gauges, charts, alerts, timeline"
+  - type: "hooks"
+    count: 2
+    description: "useOEERealtime, useOEETrend"
+  - type: "test"
+    count: 3
+    description: "Component tests, integration, E2E"
+
+technical_notes:
+  - "Real-time updates: WebSocket or polling every 30s"
+  - "Dashboard sections: Header KPIs, Machine Grid, Alerts Panel, Trend Chart"
+  - "Machine status: Running (green), Idle (yellow), Paused (orange), Down (red)"
+  - "OEE gauges: Circular progress with target line"
+  - "Timeline visualization: Gantt-style for downtime events"
+  - "Filters: Production line, shift"
+  - "Responsive: Desktop (4-col grid), Tablet (2-col), Mobile (1-col)"
+  - "Performance: Initial load <2s, auto-refresh <500ms"
+
+business_rules:
+  - rule: "Color Coding Logic"
+    enforcement: "Green (>= target), Yellow (>= critical), Red (< critical)"
+  - rule: "Real-Time Duration Updates"
+    enforcement: "Active downtime durations increment every 60s"
+  - rule: "Dashboard Auto-Refresh"
+    enforcement: "Polling interval configurable, default 30s"
+  - rule: "Alert Prioritization"
+    enforcement: "Critical alerts (red) displayed first in panel"

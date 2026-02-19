@@ -1,0 +1,59 @@
+# Story 03.13 - Database Schema
+# Purpose: Database dependencies and queries (no new tables)
+# Status: COMPLETE - all queries implemented
+
+migrations: []  # No migrations needed
+
+tables_used:
+  - name: "work_orders"
+    source: "03.10"
+    columns: ["id", "organization_id", "status", "bom_id"]
+  - name: "wo_materials"
+    source: "03.11a"
+    columns: ["id", "wo_id", "product_id", "required_qty", "uom", "sequence"]
+  - name: "products"
+    source: "02.1"
+    columns: ["id", "code", "name"]
+  - name: "license_plates"
+    source: "05.1"
+    columns: ["id", "organization_id", "product_id", "qty", "status", "expiry_date"]
+  - name: "planning_settings"
+    source: "03.16"
+    columns: ["org_id", "wo_material_check"]
+
+calculation_logic:
+  coverage_percent:
+    formula: "(available_qty / required_qty) * 100"
+    edge_cases:
+      required_zero: "100%"
+      available_negative: "0%"
+  shortage_qty:
+    formula: "required_qty - available_qty"
+    positive: "shortage"
+    negative: "surplus"
+  status_thresholds:
+    sufficient: ">= 100%"
+    low_stock: "50% to 99%"
+    shortage: "1% to 49%"
+    no_stock: "0%"
+  overall_status:
+    logic: "Worst case wins"
+    priority: ["no_stock", "shortage", "low_stock", "sufficient"]
+
+rls_policies:
+  pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+  tables:
+    - "license_plates: existing Epic 05 policy"
+    - "wo_materials: existing 03.11a policy"
+    - "work_orders: existing 03.10 policy"
+    - "planning_settings: existing 03.16 policy"
+
+indexes_used:
+  - "idx_lp_org_status ON license_plates(org_id, status)"
+  - "idx_lp_org_product ON license_plates(org_id, product_id)"
+  - "idx_wo_materials_wo ON wo_materials(wo_id)"
+
+performance:
+  target_50_materials: "<500ms"
+  target_200_materials: "<2s"
+  cache_ttl: "30 seconds"

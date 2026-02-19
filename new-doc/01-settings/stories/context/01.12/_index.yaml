@@ -1,0 +1,91 @@
+# Story 01.12 - Index File (Entry Point)
+# Generated: 2025-12-16
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "01.12"
+  name: "Allergens Management"
+  slug: "allergens-management"
+  epic: "01-settings"
+  phase: "1A"
+  complexity: "S"
+  estimate_days: 2
+  type: "frontend + backend"
+  state: "ready"
+  priority: "P0"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, seed data (14 EU allergens)
+  - api.yaml         # Endpoints (read-only), auth
+  - frontend.yaml    # Components, icons, multi-language
+  - tests.yaml       # Acceptance criteria, test specifications
+  - gaps.yaml        # Readiness assessment
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides:
+        - "organizations table"
+        - "users table with org_id"
+        - "RLS foundation"
+        - "Authentication required to view allergens"
+  blocked_by: []
+  dependents:
+    - epic: "02"
+      name: "Technical Module"
+      requires: "allergens for product ingredient declarations"
+    - epic: "07"
+      name: "Shipping Module"
+      requires: "allergens for customer allergen restrictions"
+    - epic: "06"
+      name: "Quality Module"
+      requires: "allergens for cross-contamination checks"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/settings.md"
+    sections: ["FR-SET-070", "FR-SET-071", "FR-SET-072", "FR-SET-073"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/settings.md"
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/01-settings/01.12.allergens-management.md"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS for authenticated access (no org isolation - global data)"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "allergens table + 14 EU allergens seed data"
+  - type: "service"
+    count: 1
+    description: "allergen-service.ts (read-only)"
+  - type: "api"
+    count: 2
+    description: "GET /allergens, GET /allergens/:id (read-only)"
+  - type: "component"
+    count: 7
+    description: "AllergensDataTable, AllergenBadge, icons, multi-language support"
+  - type: "asset"
+    count: 14
+    description: "14 SVG allergen icons"
+  - type: "test"
+    count: 3
+    description: "Unit + integration + E2E tests"
+
+# Technical notes
+technical_notes:
+  - "14 EU mandatory allergens per Regulation (EU) No 1169/2011"
+  - "Global reference data (NOT org-scoped)"
+  - "Multi-language: EN, PL, DE, FR"
+  - "Read-only MVP: POST/PUT/DELETE return 405"
+  - "Allergen codes: A01-A14"
+  - "Full-text search across all language name fields"
+  - "No pagination needed (only 14 items)"
+  - "Icons: 24x24 SVG with currentColor for theming"

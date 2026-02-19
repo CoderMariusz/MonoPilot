@@ -1,0 +1,36 @@
+# Story 08.13 - Frontend Specification
+# Purpose: Pilot WO form in handoff wizard
+# Agent: FRONTEND-DEV
+# SEE: Integrated into 08.11 handoff wizard (Steps 4-5)
+
+# NOTE: This story is backend-focused.
+# Frontend components are part of 08.11 Handoff Wizard:
+# - HandoffWizard.tsx → Step 4: Pilot WO Toggle
+# - HandoffWizard.tsx → Step 5: Routing Selection
+# - PilotWOToggleStep.tsx
+# - PilotWOForm.tsx
+# - RoutingSelectionStep.tsx
+# - RoutingSelector.tsx
+
+components_used_from_08_11:
+  - "HandoffWizard.tsx (Steps 4-5)"
+  - "PilotWOToggleStep.tsx"
+  - "PilotWOForm.tsx"
+  - "RoutingSelectionStep.tsx"
+  - "RoutingSelector.tsx"
+
+pilot_wo_form_fields:
+  - "WO Number: Auto-generated (read-only)"
+  - "WO Type: 'pilot' (locked)"
+  - "Product: From Step 2 (read-only)"
+  - "BOM: From Step 3 (read-only)"
+  - "Quantity: Default from formulation (editable)"
+  - "UoM: From product (read-only)"
+  - "Scheduled Date: Date picker (default: +7 days)"
+  - "Routing: Dropdown (optional, default from settings)"
+  - "Assigned To: User selector (default: NPD Lead)"
+
+validation_ui:
+  - "Quantity > 0 validation"
+  - "Scheduled date picker"
+  - "Routing optional indicator"

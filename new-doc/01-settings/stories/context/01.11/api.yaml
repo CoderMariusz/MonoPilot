@@ -1,0 +1,183 @@
+# Story 01.11 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  - method: "GET"
+    path: "/api/v1/settings/production-lines"
+    description: "List production lines with pagination, search, and filtering"
+    file: "apps/frontend/app/api/v1/settings/production-lines/route.ts"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN", "PROD_MANAGER", "QUAL_MANAGER", "WH_MANAGER", "PLANNER", "VIEWER"]
+    query_params:
+      - "warehouse_id: UUID (filter by warehouse)"
+      - "status: 'active' | 'maintenance' | 'inactive' | 'setup'"
+      - "search: string (searches code and name)"
+      - "page: number (default 1)"
+      - "limit: number (default 25, max 100)"
+    response:
+      status: 200
+      schema:
+        lines: "ProductionLine[]"
+        total: "number"
+        page: "number"
+        limit: "number"
+    performance: "< 300ms for 50 lines"
+
+  - method: "POST"
+    path: "/api/v1/settings/production-lines"
+    description: "Create new production line"
+    file: "apps/frontend/app/api/v1/settings/production-lines/route.ts"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN", "PROD_MANAGER", "PLANNER"]
+    request_body:
+      code: "string (required, 2-50 chars, uppercase, unique per org)"
+      name: "string (required, 1-100 chars)"
+      description: "string (optional, max 500 chars)"
+      warehouse_id: "UUID (required)"
+      default_output_location_id: "UUID (optional)"
+      status: "string (optional, default 'active')"
+      machine_ids: "UUID[] (optional, initial machine assignments)"
+      product_ids: "UUID[] (optional, compatible products)"
+    response:
+      status: 201
+      schema:
+        id: "UUID"
+        code: "string"
+        status: "string"
+    errors:
+      - code: 409
+        message: "Line code already exists"
+      - code: 400
+        message: "Invalid warehouse_id or machine_id"
+
+  - method: "GET"
+    path: "/api/v1/settings/production-lines/:id"
+    description: "Get production line detail with machines and compatible products"
+    file: "apps/frontend/app/api/v1/settings/production-lines/[id]/route.ts"
+    auth: true
+    roles: ["*"]
+    response:
+      status: 200
+      schema:
+        id: "UUID"
+        code: "string"
+        name: "string"
+        warehouse: "{ id, code, name }"
+        status: "string"
+        calculated_capacity: "number | null"
+        bottleneck_machine: "{ id, code, capacity } | null"
+        machines: "Array<{ id, code, name, status, capacity_per_hour, sequence_order }>"
+        compatible_products: "Array<{ id, code, name, category }>"
+
+  - method: "PUT"
+    path: "/api/v1/settings/production-lines/:id"
+    description: "Update existing production line"
+    file: "apps/frontend/app/api/v1/settings/production-lines/[id]/route.ts"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN", "PROD_MANAGER", "PLANNER"]
+    request_body:
+      code: "string (optional, read-only if WOs exist)"
+      name: "string (optional)"
+      description: "string (optional)"
+      warehouse_id: "UUID (optional)"
+      default_output_location_id: "UUID | null (optional)"
+      status: "string (optional)"
+      machine_ids: "UUID[] (optional, replaces all assignments)"
+      product_ids: "UUID[] (optional, replaces all compatibility)"
+    errors:
+      - code: 404
+        message: "Line not found"
+      - code: 409
+        message: "Code already exists"
+      - code: 400
+        message: "Code cannot be changed while work orders exist"
+
+  - method: "DELETE"
+    path: "/api/v1/settings/production-lines/:id"
+    description: "Delete production line (if no work orders)"
+    file: "apps/frontend/app/api/v1/settings/production-lines/[id]/route.ts"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN"]
+    response:
+      status: 204
+    errors:
+      - code: 404
+        message: "Line not found"
+      - code: 400
+        message: "Line has active work orders"
+    side_effects:
+      - "Deletes production_line_machines records"
+      - "Deletes production_line_products records"
+      - "Machines remain in system"
+
+  - method: "PATCH"
+    path: "/api/v1/settings/production-lines/:id/machines/reorder"
+    description: "Reorder machines by sequence"
+    file: "apps/frontend/app/api/v1/settings/production-lines/[id]/machines/reorder/route.ts"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN", "PROD_MANAGER"]
+    request_body:
+      machine_orders: "Array<{ machine_id: UUID, sequence_order: number }>"
+    response:
+      status: 200
+      schema:
+        success: true
+    errors:
+      - code: 400
+        message: "Invalid sequence (gaps or duplicates)"
+
+  - method: "GET"
+    path: "/api/v1/settings/production-lines/validate-code"
+    description: "Check code uniqueness"
+    file: "apps/frontend/app/api/v1/settings/production-lines/validate-code/route.ts"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN", "PROD_MANAGER", "PLANNER"]
+    query_params:
+      - "code: string (required)"
+      - "exclude_id: UUID (optional, for edit validation)"
+    response:
+      status: 200
+      schema:
+        valid: "boolean"
+        error: "string | null"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/production-line-service.ts"
+    description: "Production line CRUD, machine assignment, product compatibility, capacity calculation"
+    exports:
+      - name: "ProductionLineService"
+        type: "class"
+        methods:
+          - "static async list(filters): Promise<{ lines, total }>"
+          - "static async getById(id): Promise<ProductionLine>"
+          - "static async create(data): Promise<ProductionLine>"
+          - "static async update(id, data): Promise<ProductionLine>"
+          - "static async delete(id): Promise<void>"
+          - "static async reorderMachines(lineId, orders): Promise<void>"
+          - "static async isCodeUnique(code, excludeId?): Promise<boolean>"
+          - "static calculateBottleneckCapacity(machines): CapacityResult"
+
+# Validation Schemas
+validation:
+  - path: "apps/frontend/lib/validation/production-line-schema.ts"
+    description: "Zod schemas for production line create/update with machine orders and product IDs"
+    schemas:
+      - name: "productionLineCreateSchema"
+        fields:
+          code: "z.string().min(2).max(50).regex(/^[A-Z0-9-]+$/).transform(toUpperCase)"
+          name: "z.string().min(1).max(100)"
+          description: "z.string().max(500).optional()"
+          warehouse_id: "z.string().uuid()"
+          default_output_location_id: "z.string().uuid().nullable().optional()"
+          status: "z.enum(['active', 'maintenance', 'inactive', 'setup']).default('active')"
+          machine_ids: "z.array(z.string().uuid()).max(20).optional()"
+          product_ids: "z.array(z.string().uuid()).optional()"
+
+      - name: "productionLineUpdateSchema"
+        description: "Partial of productionLineCreateSchema"
+
+      - name: "machineReorderSchema"
+        fields:
+          machine_orders: "z.array(z.object({ machine_id: z.string().uuid(), sequence_order: z.number().int().min(1) }))"

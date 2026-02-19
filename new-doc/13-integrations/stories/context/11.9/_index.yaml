@@ -1,0 +1,63 @@
+# Story 11.9 - Index File (Entry Point)
+# Generated: 2026-01-15
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "11.9"
+  name: "EDI INVOIC Outbound"
+  slug: "edi-invoic-outbound"
+  epic: "11-integrations"
+  phase: "2"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "backend"
+  state: "ready"
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["organizations"]
+    - story: "05.15"
+      name: "Shipments"
+      provides: ["shipments", "batch/lot data"]
+    - story: "11.3"
+      name: "Integration Logs"
+      provides: ["Transmission logging"]
+    - story: "11.8"
+      name: "EDI ORDERS"
+      provides: ["EDIFACT parsing patterns"]
+  blocks:
+    - story: "11.10"
+      name: "EDI DESADV"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/integrations.md"
+    sections: ["FR-INT-016"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/11-integrations/11.9.edi-invoic-outbound.md"
+
+# High-level deliverables
+deliverables:
+  - type: "service"
+    count: 1
+    description: "edi-invoic-service.ts (EDIFACT generator)"
+  - type: "api"
+    count: 4
+    description: "Preview, send, mark sent, resend"
+  - type: "page"
+    count: 2
+    description: "Invoice EDI button, EDI outbox"
+  - type: "test"
+    count: 3
+    description: "Unit + integration + E2E tests"
+
+# Technical notes
+technical_notes:
+  - "EDIFACT INVOIC generator (D.96A standard)"
+  - "VAT breakdown per line item"
+  - "Batch/lot traceability included"
+  - "MVP: Manual file download (VAN API in Phase 3)"

@@ -1,0 +1,78 @@
+# Story 10.12 - Database Schema
+# Purpose: Tables, views for dashboard aggregations
+# Agent: BACKEND-DEV (database focus)
+
+# Note: Dashboard uses existing tables and views from previous stories
+# Creates one unified view for dashboard KPIs
+
+views:
+  - name: "dashboard_kpis_today"
+    description: "Aggregated KPIs for dashboard (today)"
+    sql: |
+      CREATE OR REPLACE VIEW dashboard_kpis_today AS
+      SELECT
+          s.org_id,
+          AVG(s.oee_pct) as avg_oee,
+          AVG(s.availability_pct) as avg_availability,
+          AVG(s.performance_pct) as avg_performance,
+          AVG(s.quality_pct) as avg_quality,
+          SUM(s.total_pieces) as total_output,
+          SUM(s.good_pieces) as good_output,
+          SUM(s.rejected_pieces) as rejected_output,
+          CASE WHEN SUM(s.total_pieces) > 0
+            THEN ROUND((SUM(s.rejected_pieces)::numeric / SUM(s.total_pieces) * 100), 2)
+            ELSE 0
+          END as scrap_percentage,
+          COALESCE(SUM(de.duration_minutes), 0) as total_downtime_minutes,
+          COUNT(DISTINCT CASE WHEN a.resolved_at IS NULL THEN a.id END) as active_alerts,
+          COALESCE(SUM(e.energy_kwh), 0) as total_energy_kwh
+      FROM oee_snapshots s
+      LEFT JOIN LATERAL (
+          SELECT SUM(duration_minutes) as duration_minutes
+          FROM oee_downtime_events
+          WHERE org_id = s.org_id
+            AND DATE(start_time) = CURRENT_DATE
+      ) de ON true
+      LEFT JOIN LATERAL (
+          SELECT COUNT(*) as id
+          FROM oee_alerts
+          WHERE org_id = s.org_id
+            AND resolved_at IS NULL
+      ) a ON true
+      LEFT JOIN LATERAL (
+          SELECT SUM(energy_kwh) as energy_kwh
+          FROM oee_energy_readings
+          WHERE org_id = s.org_id
+            AND DATE(reading_time) = CURRENT_DATE
+      ) e ON true
+      WHERE DATE(s.snapshot_time) = CURRENT_DATE
+      GROUP BY s.org_id;
+
+existing_tables:
+  - name: "oee_snapshots"
+    purpose: "OEE, Availability, Performance, Quality metrics"
+  - name: "oee_downtime_events"
+    purpose: "Downtime minutes calculation"
+  - name: "oee_alerts"
+    purpose: "Active alerts count"
+  - name: "oee_energy_readings"
+    purpose: "Energy consumption"
+  - name: "machines"
+    purpose: "Machine status grid"
+
+indexes:
+  - table: "oee_snapshots"
+    name: "idx_snapshots_dashboard"
+    columns: ["org_id", "snapshot_time"]
+    description: "Covers date-based dashboard queries"
+
+migrations: []
+
+rls_notes:
+  - "Dashboard view inherits RLS from underlying tables"
+  - "All aggregations filtered by org_id"
+
+performance:
+  - "Dashboard API aggregates multiple queries in parallel"
+  - "Consider Redis caching for frequently accessed dashboard data"
+  - "Target: full dashboard load < 2 seconds"

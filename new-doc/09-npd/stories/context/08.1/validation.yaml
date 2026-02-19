@@ -1,0 +1,258 @@
+# Story 08.1 - Validation Schemas
+# Purpose: Zod schemas for NPD settings
+# Agent: BACKEND-DEV
+
+# Main validation file
+validation_file:
+  path: "lib/validation/npd-settings.ts"
+  description: "Zod schemas for NPD settings validation"
+
+# Schemas
+schemas:
+  - name: "npdSettingsSchema"
+    description: "Full NPD settings schema (database model)"
+    type: "z.object"
+    fields:
+      - name: "id"
+        type: "z.number().int().positive().optional()"
+        description: "Auto-generated ID"
+
+      - name: "org_id"
+        type: "z.string().uuid()"
+        description: "Organization ID"
+
+      - name: "enable_npd_module"
+        type: "z.boolean()"
+        description: "NPD module activation toggle"
+
+      - name: "npd_only_mode"
+        type: "z.boolean()"
+        description: "NPD-only mode (no production integration)"
+
+      - name: "enable_pilot_wo"
+        type: "z.boolean()"
+        description: "Enable pilot Work Orders"
+
+      - name: "default_pilot_routing"
+        type: "z.number().int().positive().nullable()"
+        description: "Default routing for pilot WOs"
+
+      - name: "require_costing_approval"
+        type: "z.boolean()"
+        description: "Require Finance approval before handoff"
+
+      - name: "cost_variance_warning_pct"
+        type: "z.number().min(0).max(100)"
+        description: "Warning threshold for cost variance (%)"
+        validation: "Warning threshold must be >= 0 and <= 100"
+
+      - name: "cost_variance_blocker_pct"
+        type: "z.number().min(0).max(100)"
+        description: "Blocker threshold for cost variance (%)"
+        validation: "Blocker threshold must be >= 0 and <= 100"
+
+      - name: "require_compliance_docs"
+        type: "z.boolean()"
+        description: "Require compliance documents for handoff"
+
+      - name: "max_formulation_versions"
+        type: "z.number().int().positive().min(1)"
+        description: "Max formulation versions per project"
+        validation: "Must allow at least 1 version"
+
+      - name: "enable_formulation_export"
+        type: "z.boolean()"
+        description: "Allow formulation export to PDF/Excel"
+
+      - name: "event_retention_days"
+        type: "z.number().int().min(0)"
+        description: "Event log retention period (days)"
+        validation: "Must be >= 0 (0 = infinite retention)"
+
+      - name: "created_at"
+        type: "z.string().datetime().optional()"
+        description: "Creation timestamp"
+
+      - name: "updated_at"
+        type: "z.string().datetime().optional()"
+        description: "Last update timestamp"
+
+    refinements:
+      - description: "Ensure warning <= blocker threshold"
+        logic: |
+          .refine(
+            (data) => data.cost_variance_warning_pct <= data.cost_variance_blocker_pct,
+            {
+              message: 'Warning threshold must be <= blocker threshold',
+              path: ['cost_variance_warning_pct'],
+            }
+          )
+
+  - name: "updateNPDSettingsSchema"
+    description: "Schema for updating NPD settings (partial)"
+    type: "npdSettingsSchema.partial().omit()"
+    omitted_fields:
+      - "id"
+      - "org_id"
+      - "created_at"
+      - "updated_at"
+    notes:
+      - "All fields optional (partial update)"
+      - "System-managed fields omitted"
+      - "Inherits refinements from npdSettingsSchema"
+
+  - name: "npdSettingsResponseSchema"
+    description: "Response schema for API endpoints"
+    type: "npdSettingsSchema"
+    notes:
+      - "Same as npdSettingsSchema"
+      - "Used for OpenAPI/TypeScript generation"
+
+# Validation rules summary
+validation_rules:
+  enable_npd_module:
+    type: "boolean"
+    required: true
+    default: false
+    notes: "Controls access to NPD features"
+
+  npd_only_mode:
+    type: "boolean"
+    required: true
+    default: false
+    notes: "For R&D consultancies without production"
+
+  enable_pilot_wo:
+    type: "boolean"
+    required: true
+    default: true
+    notes: "Enable pilot Work Order creation"
+
+  default_pilot_routing:
+    type: "number | null"
+    required: false
+    default: null
+    validation: "Must reference existing routing ID"
+    notes: "Nullable - soft FK to routings table"
+
+  require_costing_approval:
+    type: "boolean"
+    required: true
+    default: true
+    notes: "Finance must approve before handoff"
+
+  cost_variance_warning_pct:
+    type: "number"
+    required: true
+    default: 20.00
+    validation: "Must be >= 0 and <= 100 and <= blocker threshold"
+    notes: "Yellow warning when actual > target by %"
+
+  cost_variance_blocker_pct:
+    type: "number"
+    required: true
+    default: 50.00
+    validation: "Must be >= 0 and <= 100 and >= warning threshold"
+    notes: "Red blocker when actual > target by %"
+
+  require_compliance_docs:
+    type: "boolean"
+    required: true
+    default: true
+    notes: "Require HACCP, label proof for handoff"
+
+  max_formulation_versions:
+    type: "number"
+    required: true
+    default: 10
+    validation: "Must be >= 1"
+    notes: "Max versions per NPD project"
+
+  enable_formulation_export:
+    type: "boolean"
+    required: true
+    default: true
+    notes: "Allow PDF/Excel export"
+
+  event_retention_days:
+    type: "number"
+    required: true
+    default: 90
+    validation: "Must be >= 0 (0 = infinite)"
+    notes: "Event log retention period"
+
+# Custom validation functions
+custom_validators:
+  - name: "validateCostVarianceThresholds"
+    description: "Ensure warning <= blocker"
+    logic: |
+      function validateCostVarianceThresholds(
+        warning: number,
+        blocker: number
+      ): boolean {
+        return warning <= blocker;
+      }
+
+  - name: "validateMaxFormulationVersions"
+    description: "Ensure at least 1 version allowed"
+    logic: |
+      function validateMaxFormulationVersions(max: number): boolean {
+        return max >= 1;
+      }
+
+# Error messages
+error_messages:
+  enable_npd_module:
+    required: "NPD module toggle is required"
+
+  cost_variance_warning_pct:
+    min: "Warning threshold must be >= 0"
+    max: "Warning threshold must be <= 100"
+    order: "Warning threshold must be <= blocker threshold"
+
+  cost_variance_blocker_pct:
+    min: "Blocker threshold must be >= 0"
+    max: "Blocker threshold must be <= 100"
+
+  max_formulation_versions:
+    min: "Must allow at least 1 version"
+    positive: "Must be a positive integer"
+
+  event_retention_days:
+    min: "Must be >= 0 (0 = infinite retention)"
+
+# TypeScript type exports
+typescript_types:
+  - name: "NPDSettings"
+    description: "Inferred from npdSettingsSchema"
+    export: "export type NPDSettings = z.infer<typeof npdSettingsSchema>;"
+
+  - name: "UpdateNPDSettings"
+    description: "Inferred from updateNPDSettingsSchema"
+    export: "export type UpdateNPDSettings = z.infer<typeof updateNPDSettingsSchema>;"
+
+  - name: "NPDSettingsResponse"
+    description: "Inferred from npdSettingsResponseSchema"
+    export: "export type NPDSettingsResponse = z.infer<typeof npdSettingsResponseSchema>;"
+
+# Import dependencies
+imports:
+  - "import { z } from 'zod';"
+
+# Usage examples
+usage_examples:
+  parse_request:
+    description: "Validate PUT request body"
+    code: |
+      const result = updateNPDSettingsSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ errors: result.error.errors });
+      }
+      const updates = result.data;
+
+  create_response:
+    description: "Validate response before sending"
+    code: |
+      const settings = await NPDSettingsService.getSettings(orgId);
+      const validated = npdSettingsResponseSchema.parse(settings);
+      return res.status(200).json(validated);

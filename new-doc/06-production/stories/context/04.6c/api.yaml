@@ -1,0 +1,76 @@
+# Story 04.6c - API Changes
+# Modifies existing POST /consume endpoint from 04.6a
+
+endpoints:
+  - method: "POST"
+    path: "/api/production/work-orders/:woId/consume"
+    file: "apps/frontend/app/api/production/work-orders/[woId]/consume/route.ts"
+    description: "Record material consumption - MODIFIED for 1:1 enforcement"
+    modification: "Add validation for consume_whole_lp enforcement"
+    added_validation:
+      check: "IF wo_material.consume_whole_lp = true AND consume_qty != LP.quantity"
+      action: "Return 400 error before processing"
+    new_error:
+      code: 400
+      error: "FULL_LP_REQUIRED"
+      message: "Full LP consumption required. LP quantity is {lp_qty}"
+      response_body:
+        error: "FULL_LP_REQUIRED"
+        message: "Full LP consumption required. LP quantity is 100"
+        lp_qty: "number - LP's current quantity"
+        requested_qty: "number - User's requested quantity"
+
+services:
+  - path: "apps/frontend/lib/services/consumption-service.ts"
+    modifications:
+      - method: "validateFullLPConsumption"
+        type: "NEW METHOD"
+        params:
+          woMaterialId: "string"
+          lpId: "string"
+          consumeQty: "number"
+        returns: "{ valid: boolean, error?: string, lpQty?: number }"
+        logic: |
+          1. Get wo_material.consume_whole_lp
+          2. Get license_plate.quantity
+          3. If consume_whole_lp AND consumeQty != lp.quantity:
+             Return { valid: false, error: 'FULL_LP_REQUIRED', lpQty: lp.quantity }
+          4. Return { valid: true }
+
+      - method: "recordConsumption"
+        type: "MODIFIED"
+        changes:
+          - "Call validateFullLPConsumption before processing"
+          - "Return error if validation fails"
+          - "Set is_full_lp = true when consumeQty equals LP.qty"
+
+validation:
+  path: "apps/frontend/lib/validation/consumption-schema.ts"
+  modifications:
+    - schema: "consumeRequestSchema"
+      type: "ADD REFINEMENT"
+      refinement: |
+        .refine(async (data, ctx) => {
+          if (data.consume_whole_lp) {
+            const lpQty = await getLPQuantity(data.lp_id);
+            if (data.consume_qty !== lpQty) {
+              ctx.addIssue({
+                code: 'custom',
+                message: `Full LP consumption required. LP quantity is ${lpQty}`,
+                path: ['consume_qty']
+              });
+              return false;
+            }
+          }
+          return true;
+        })
+
+error_handling:
+  FULL_LP_REQUIRED:
+    http_status: 400
+    error_code: "FULL_LP_REQUIRED"
+    message_template: "Full LP consumption required. LP quantity is {lp_qty}"
+    user_action: "Enter full LP quantity or select different LP"
+    frontend_handling:
+      desktop: "Show error banner, highlight qty input, suggest [Use All Available]"
+      scanner: "Show error message, highlight [Full Consumption] button"

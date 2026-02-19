@@ -1,0 +1,168 @@
+# Story 06.31 - Frontend Schema
+# Purpose: Components, pages, types, hooks, UX
+# Agent: FRONTEND-DEV
+
+pages:
+  - path: "app/(authenticated)/quality/capa/page.tsx"
+    description: "CAPA list page with filters and DataTable"
+    components: ["CapaDataTable", "CapaFilters", "CreateCapaButton"]
+
+  - path: "app/(authenticated)/quality/capa/[id]/page.tsx"
+    description: "CAPA detail page"
+    components: ["CapaDetail", "CapaHeader", "CapaActions"]
+
+  - path: "app/(authenticated)/quality/capa/new/page.tsx"
+    description: "Create CAPA form page"
+    components: ["CreateCapaForm"]
+
+components:
+  - name: "CapaDataTable.tsx"
+    path: "components/quality/capa/CapaDataTable.tsx"
+    description: "DataTable with CAPA list, filters, sorting, pagination"
+    props:
+      - { name: "capas", type: "CapaRecord[]" }
+      - { name: "pagination", type: "PaginationInfo" }
+      - { name: "onFilterChange", type: "function" }
+
+  - name: "CapaFilters.tsx"
+    path: "components/quality/capa/CapaFilters.tsx"
+    description: "Filter panel (status, priority, owner, source type, overdue)"
+    props:
+      - { name: "filters", type: "CapaFilters" }
+      - { name: "onChange", type: "function" }
+
+  - name: "CapaStatusBadge.tsx"
+    path: "components/quality/capa/CapaStatusBadge.tsx"
+    description: "Status badge (open=yellow, in_progress=blue, closed=green, cancelled=gray)"
+
+  - name: "CapaPriorityBadge.tsx"
+    path: "components/quality/capa/CapaPriorityBadge.tsx"
+    description: "Priority badge (critical=red, high=orange, medium=blue, low=gray)"
+
+  - name: "CapaTypeBadge.tsx"
+    path: "components/quality/capa/CapaTypeBadge.tsx"
+    description: "Type badge (Corrective/Preventive)"
+
+  - name: "CapaDetail.tsx"
+    path: "components/quality/capa/CapaDetail.tsx"
+    description: "Detail view container with sections"
+
+  - name: "CapaHeader.tsx"
+    path: "components/quality/capa/CapaHeader.tsx"
+    description: "Header with CAPA #, badges, actions"
+
+  - name: "CapaSourceInfo.tsx"
+    path: "components/quality/capa/CapaSourceInfo.tsx"
+    description: "Source type, link to NCR/Audit"
+
+  - name: "CapaOwnerInfo.tsx"
+    path: "components/quality/capa/CapaOwnerInfo.tsx"
+    description: "Owner, assigned by, assigned date"
+
+  - name: "CapaDatesInfo.tsx"
+    path: "components/quality/capa/CapaDatesInfo.tsx"
+    description: "Created, Target, Actual close dates"
+
+  - name: "CapaActions.tsx"
+    path: "components/quality/capa/CapaActions.tsx"
+    description: "Action buttons based on status (Edit, Start, Close, Delete)"
+
+  - name: "CreateCapaForm.tsx"
+    path: "components/quality/capa/CreateCapaForm.tsx"
+    description: "Create CAPA form with validation"
+
+  - name: "CreateCapaFromNcrModal.tsx"
+    path: "components/quality/capa/CreateCapaFromNcrModal.tsx"
+    description: "Modal for creating CAPA from NCR"
+
+  - name: "EditCapaForm.tsx"
+    path: "components/quality/capa/EditCapaForm.tsx"
+    description: "Edit CAPA form (open/in_progress only)"
+
+  - name: "CloseCapaModal.tsx"
+    path: "components/quality/capa/CloseCapaModal.tsx"
+    description: "Close CAPA with actual_close_date and closure_notes"
+
+  - name: "AssignOwnerModal.tsx"
+    path: "components/quality/capa/AssignOwnerModal.tsx"
+    description: "Owner assignment modal"
+
+  - name: "OverdueBadge.tsx"
+    path: "components/quality/capa/OverdueBadge.tsx"
+    description: "Overdue indicator with days overdue"
+
+  - name: "CapaSummaryCard.tsx"
+    path: "components/quality/capa/CapaSummaryCard.tsx"
+    description: "Summary card for dashboard"
+
+types:
+  - name: "CapaRecord"
+    file: "lib/types/quality.ts"
+    fields:
+      - id
+      - org_id
+      - capa_number
+      - source_type
+      - source_id
+      - source_number
+      - title
+      - description
+      - capa_type
+      - priority
+      - status
+      - owner_id
+      - owner_name
+      - assigned_by
+      - assigned_at
+      - created_date
+      - target_close_date
+      - actual_close_date
+      - root_cause
+      - root_cause_method
+      - closed_by
+      - closed_at
+      - closure_notes
+      - created_at
+      - created_by
+      - updated_at
+      - days_overdue
+
+ux_patterns:
+  list_page:
+    layout: "DataTable with filter sidebar"
+    actions: ["Create CAPA", "Filter", "Search", "Sort"]
+    row_click: "Navigate to detail"
+    pagination: "20 per page"
+
+  detail_page:
+    layout: "Three-column (desktop), stacked (mobile)"
+    sections:
+      - "Header (CAPA #, badges, actions)"
+      - "Details (title, description, root cause)"
+      - "Source (type, link)"
+      - "Assignment (owner, assigned by, date)"
+      - "Dates (created, target, actual)"
+      - "Action Items (from 06.32)"
+      - "Effectiveness Checks (from 06.33)"
+
+  create_form:
+    layout: "Multi-step form"
+    steps:
+      - "Source & Type"
+      - "Details"
+      - "Assignment & Dates"
+    validation: "Real-time with Zod"
+    submission: "Create and redirect to detail"
+
+  badges:
+    status:
+      open: "yellow"
+      in_progress: "blue"
+      closed: "green"
+      cancelled: "gray"
+    priority:
+      critical: "red"
+      high: "orange"
+      medium: "blue"
+      low: "gray"
+    overdue: "red"

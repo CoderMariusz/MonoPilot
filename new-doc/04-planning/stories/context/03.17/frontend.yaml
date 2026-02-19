@@ -1,0 +1,302 @@
+# Story 03.17 - Frontend Specification
+# Purpose: Components, hooks, types, UX patterns
+# Agent: FRONTEND-DEV
+
+# Page
+pages:
+  - path: "apps/frontend/app/(authenticated)/settings/planning/page.tsx"
+    type: "server"
+    description: "Planning Settings page - fetches settings and renders form"
+    route: "/settings/planning"
+    layout: "Settings layout with sidebar navigation"
+
+# Components
+components:
+  - path: "apps/frontend/components/settings/planning/PlanningSettingsForm.tsx"
+    type: "client"
+    description: "Main form component with save button and unsaved changes tracking"
+    props:
+      - { name: "initialSettings", type: "PlanningSettings" }
+    features:
+      - "Tracks dirty state for unsaved changes warning"
+      - "beforeunload event handler for navigation warning"
+      - "Save button disabled when no changes"
+      - "Success/error toast notifications"
+      - "Form submission with loading state"
+
+  - path: "apps/frontend/components/settings/planning/POSettingsSection.tsx"
+    type: "client"
+    description: "Purchase Order settings section (7 fields)"
+    props:
+      - { name: "register", type: "UseFormRegister<PlanningSettingsInput>" }
+      - { name: "control", type: "Control<PlanningSettingsInput>" }
+      - { name: "errors", type: "FieldErrors<PlanningSettingsInput>" }
+      - { name: "watch", type: "UseFormWatch<PlanningSettingsInput>" }
+    fields:
+      - { name: "po_require_approval", type: "toggle", label: "Require PO Approval" }
+      - { name: "po_approval_threshold", type: "number", label: "Approval Threshold Amount", depends_on: "po_require_approval" }
+      - { name: "po_approval_roles", type: "multi-select", label: "Approval Roles" }
+      - { name: "po_auto_number_prefix", type: "text", label: "Auto-Numbering Prefix" }
+      - { name: "po_auto_number_format", type: "text", label: "Auto-Numbering Format" }
+      - { name: "po_default_payment_terms", type: "select", label: "Default Payment Terms" }
+      - { name: "po_default_currency", type: "select", label: "Default Currency" }
+
+  - path: "apps/frontend/components/settings/planning/TOSettingsSection.tsx"
+    type: "client"
+    description: "Transfer Order settings section (5 fields)"
+    props:
+      - { name: "register", type: "UseFormRegister<PlanningSettingsInput>" }
+      - { name: "control", type: "Control<PlanningSettingsInput>" }
+      - { name: "errors", type: "FieldErrors<PlanningSettingsInput>" }
+    fields:
+      - { name: "to_allow_partial_shipments", type: "toggle", label: "Allow Partial Shipments" }
+      - { name: "to_require_lp_selection", type: "toggle", label: "Require License Plate Selection" }
+      - { name: "to_auto_number_prefix", type: "text", label: "Auto-Numbering Prefix" }
+      - { name: "to_auto_number_format", type: "text", label: "Auto-Numbering Format" }
+      - { name: "to_default_transit_days", type: "number", label: "Default Transit Days" }
+
+  - path: "apps/frontend/components/settings/planning/WOSettingsSection.tsx"
+    type: "client"
+    description: "Work Order settings section (9 fields)"
+    props:
+      - { name: "register", type: "UseFormRegister<PlanningSettingsInput>" }
+      - { name: "control", type: "Control<PlanningSettingsInput>" }
+      - { name: "errors", type: "FieldErrors<PlanningSettingsInput>" }
+      - { name: "watch", type: "UseFormWatch<PlanningSettingsInput>" }
+    fields:
+      - { name: "wo_material_check", type: "toggle", label: "Check Material Availability on Create" }
+      - { name: "wo_copy_routing", type: "toggle", label: "Copy Routing Operations to WO" }
+      - { name: "wo_auto_select_bom", type: "toggle", label: "Auto-Select Active BOM" }
+      - { name: "wo_require_bom", type: "toggle", label: "Require BOM to Create WO" }
+      - { name: "wo_allow_overproduction", type: "toggle", label: "Allow Overproduction" }
+      - { name: "wo_overproduction_limit", type: "number", label: "Overproduction Limit (%)", depends_on: "wo_allow_overproduction" }
+      - { name: "wo_auto_number_prefix", type: "text", label: "Auto-Numbering Prefix" }
+      - { name: "wo_auto_number_format", type: "text", label: "Auto-Numbering Format" }
+      - { name: "wo_default_scheduling_buffer_hours", type: "number", label: "Default Scheduling Buffer (hours)" }
+
+  - path: "apps/frontend/components/settings/planning/CollapsibleSection.tsx"
+    type: "client"
+    description: "Reusable collapsible section wrapper with icon and title"
+    props:
+      - { name: "title", type: "string" }
+      - { name: "icon", type: "ReactNode" }
+      - { name: "defaultOpen", type: "boolean", default: true }
+      - { name: "storageKey", type: "string", description: "localStorage key for collapse state" }
+      - { name: "children", type: "ReactNode" }
+    features:
+      - "Expand/collapse animation"
+      - "Persist collapse state to localStorage"
+      - "Accessible ARIA attributes"
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-planning-settings.ts"
+    description: "React Query hook for fetching and mutating planning settings"
+    exports:
+      - name: "usePlanningSettings"
+        returns: "UseQueryResult<PlanningSettings>"
+        description: "Fetch planning settings with caching"
+      - name: "useUpdatePlanningSettings"
+        returns: "UseMutationResult<PlanningSettingsResponse>"
+        description: "Mutation hook for updating settings"
+    pattern: |
+      import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+      import type { PlanningSettings, PlanningSettingsResponse } from '@/lib/types/planning-settings';
+      import type { PlanningSettingsInput } from '@/lib/validation/planning-settings-schemas';
+
+      export function usePlanningSettings() {
+        return useQuery<PlanningSettings>({
+          queryKey: ['planning-settings'],
+          queryFn: async () => {
+            const res = await fetch('/api/settings/planning');
+            if (!res.ok) throw new Error('Failed to fetch planning settings');
+            return res.json();
+          },
+          staleTime: 5 * 60 * 1000, // 5 minutes
+        });
+      }
+
+      export function useUpdatePlanningSettings() {
+        const queryClient = useQueryClient();
+
+        return useMutation<PlanningSettingsResponse, Error, Partial<PlanningSettingsInput>>({
+          mutationFn: async (updates) => {
+            const res = await fetch('/api/settings/planning', {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(updates),
+            });
+            if (!res.ok) {
+              const error = await res.json();
+              throw new Error(error.message || 'Failed to update settings');
+            }
+            return res.json();
+          },
+          onSuccess: (data) => {
+            queryClient.setQueryData(['planning-settings'], data.settings);
+          },
+        });
+      }
+
+  - path: "apps/frontend/lib/hooks/use-unsaved-changes.ts"
+    description: "Hook for tracking and warning about unsaved changes"
+    exports:
+      - name: "useUnsavedChanges"
+        params:
+          - { name: "isDirty", type: "boolean" }
+        description: "Adds beforeunload listener when form is dirty"
+    pattern: |
+      import { useEffect } from 'react';
+
+      export function useUnsavedChanges(isDirty: boolean) {
+        useEffect(() => {
+          const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+            if (isDirty) {
+              e.preventDefault();
+              e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+            }
+          };
+
+          window.addEventListener('beforeunload', handleBeforeUnload);
+          return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+        }, [isDirty]);
+      }
+
+# UX Specifications
+ux:
+  wireframes:
+    - id: "PLAN-024"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-024-planning-settings.md"
+      sections:
+        - "Success State - Main form with 3 collapsible sections"
+        - "Loading State - Skeleton loaders in each section"
+        - "Empty State - Initialize defaults button"
+        - "Error State - Retry button"
+        - "Validation Error State - Inline field errors"
+        - "Unsaved Changes Warning Modal"
+        - "Success Toast"
+
+  patterns:
+    form: "react-hook-form with Zod resolver"
+    toggle: "ShadCN Switch component"
+    select: "ShadCN Select component"
+    input: "ShadCN Input component"
+    collapsible: "ShadCN Collapsible component"
+    toast: "ShadCN Toast/Sonner for notifications"
+
+  states:
+    - name: "loading"
+      description: "Skeleton loaders in each section while fetching"
+      component: "Skeleton from ShadCN"
+
+    - name: "empty"
+      description: "Auto-initialize message (should rarely happen due to auto-init on GET)"
+      cta: "Initialize Default Settings"
+
+    - name: "error"
+      description: "Error icon + message + retry button"
+      cta: "Retry"
+
+    - name: "success"
+      description: "Form displayed with current settings"
+      toast: "Planning settings saved successfully"
+
+    - name: "validation_error"
+      description: "Inline errors below invalid fields, field highlighted red"
+
+    - name: "unsaved_changes"
+      description: "Browser confirmation on navigate away"
+
+  accessibility:
+    - "All form fields have labels and aria-describedby for help text"
+    - "Toggle switches have visible labels and aria-checked"
+    - "Collapsible sections use aria-expanded"
+    - "Error messages linked to fields via aria-describedby"
+    - "Focus management on form submission errors"
+
+  responsive:
+    mobile:
+      - "Sections stack vertically"
+      - "Fields full-width"
+      - "Save button sticky at bottom"
+    tablet:
+      - "2-column layout for toggle fields"
+    desktop:
+      - "Max-width container centered"
+      - "Sections with comfortable spacing"
+
+# Form field configurations
+field_configs:
+  toggles:
+    - { name: "po_require_approval", default: false, help: "Require approval before PO confirmation" }
+    - { name: "to_allow_partial_shipments", default: true, help: "Allow transfer orders to be shipped in multiple shipments" }
+    - { name: "to_require_lp_selection", default: false, help: "Require LP assignment when creating transfer order (requires Epic 05 - Warehouse)" }
+    - { name: "wo_material_check", default: true, help: "Verify material stock when creating work order" }
+    - { name: "wo_copy_routing", default: true, help: "Automatically copy routing operations when creating work order" }
+    - { name: "wo_auto_select_bom", default: true, help: "Automatically select active BOM for product when creating WO" }
+    - { name: "wo_require_bom", default: true, help: "Block WO creation if product has no active BOM" }
+    - { name: "wo_allow_overproduction", default: false, help: "Allow actual production quantity to exceed planned quantity" }
+
+  numbers:
+    - { name: "po_approval_threshold", default: null, help: "Require approval for POs above this amount (0 = all orders)", unit: "currency", min: 0 }
+    - { name: "to_default_transit_days", default: 1, help: "Default transit time between warehouses", unit: "days", min: 0, max: 365 }
+    - { name: "wo_overproduction_limit", default: 10, help: "Maximum overproduction allowed when enabled", unit: "%", min: 0, max: 100 }
+    - { name: "wo_default_scheduling_buffer_hours", default: 2, help: "Buffer time added to scheduled end time for planning", unit: "hours", min: 0, max: 168 }
+
+  text:
+    - { name: "po_auto_number_prefix", default: "PO-", help: "Prefix for auto-generated PO numbers", max: 10 }
+    - { name: "po_auto_number_format", default: "YYYY-NNNNN", help: "Format for PO number generation (YYYY=year, NNNNN=sequence)", example: "Example: PO-2025-00123" }
+    - { name: "to_auto_number_prefix", default: "TO-", help: "Prefix for auto-generated TO numbers", max: 10 }
+    - { name: "to_auto_number_format", default: "YYYY-NNNNN", help: "Format for TO number generation", example: "Example: TO-2025-00042" }
+    - { name: "wo_auto_number_prefix", default: "WO-", help: "Prefix for auto-generated WO numbers", max: 10 }
+    - { name: "wo_auto_number_format", default: "YYYY-NNNNN", help: "Format for WO number generation", example: "Example: WO-2025-00078" }
+
+  selects:
+    - name: "po_default_payment_terms"
+      default: "Net 30"
+      help: "Payment terms applied to new purchase orders"
+      options:
+        - { value: "Net 30", label: "Net 30" }
+        - { value: "Net 60", label: "Net 60" }
+        - { value: "Net 90", label: "Net 90" }
+        - { value: "2/10 Net 30", label: "2/10 Net 30" }
+        - { value: "Due on Receipt", label: "Due on Receipt" }
+    - name: "po_default_currency"
+      default: "PLN"
+      help: "Default currency for new purchase orders"
+      options:
+        - { value: "PLN", label: "PLN" }
+        - { value: "EUR", label: "EUR" }
+        - { value: "USD", label: "USD" }
+        - { value: "GBP", label: "GBP" }
+
+  multiselect:
+    - name: "po_approval_roles"
+      default: ["admin", "manager"]
+      help: "Roles that can approve purchase orders"
+      options:
+        - { value: "owner", label: "Owner" }
+        - { value: "admin", label: "Administrator" }
+        - { value: "production_manager", label: "Production Manager" }
+        - { value: "quality_manager", label: "Quality Manager" }
+        - { value: "warehouse_manager", label: "Warehouse Manager" }
+        - { value: "planner", label: "Planner" }
+
+# Dependent field logic
+dependent_fields:
+  - parent: "po_require_approval"
+    child: "po_approval_threshold"
+    condition: "disabled when parent is false"
+    ui: "grayed out, not editable"
+
+  - parent: "wo_allow_overproduction"
+    child: "wo_overproduction_limit"
+    condition: "disabled when parent is false"
+    ui: "grayed out, not editable"
+
+# localStorage keys
+local_storage:
+  - key: "planning_settings_sections_collapsed"
+    type: "string[]"
+    description: "Array of collapsed section IDs"
+    example: '["po", "wo"]'

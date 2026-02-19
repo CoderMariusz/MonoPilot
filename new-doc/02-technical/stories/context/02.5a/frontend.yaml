@@ -1,0 +1,750 @@
+# Story 02.5a - Frontend Specification
+# Purpose: Components, hooks, types, UX patterns
+# Agent: FRONTEND-DEV (UI focus)
+
+# Note: This is a full-stack story with significant frontend work
+is_backend_focused: false
+
+# UX References
+ux:
+  wireframes:
+    - id: "TEC-006a"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-006a-bom-items-detail.md"
+      description: "BOM Items Detail Page - MVP subset only"
+      components:
+        - "BOM Items Table"
+        - "Add/Edit Item Modal (MVP fields)"
+        - "Summary Panel (basic)"
+  patterns:
+    table: "ShadCN DataTable with sub-rows"
+    modal: "ShadCN Dialog with form"
+    combobox: "ShadCN Combobox for product search"
+    select: "ShadCN Select for operation dropdown"
+  states:
+    - "loading"
+    - "empty"
+    - "error"
+    - "success"
+
+# MVP UI Fields (show in modal)
+mvp_ui_fields:
+  - { name: "product_id", label: "Component *", type: "Combobox", required: true }
+  - { name: "quantity", label: "Quantity *", type: "NumberInput", required: true }
+  - { name: "uom", label: "Unit of Measure", type: "ReadOnly", auto_fill: "from product.base_uom" }
+  - { name: "sequence", label: "Sequence", type: "NumberInput", default: "auto (max+10)" }
+  - { name: "operation_seq", label: "Operation Assignment", type: "Select", optional: true }
+  - { name: "scrap_percent", label: "Scrap Allowance %", type: "NumberInput", default: 0 }
+  - { name: "notes", label: "Notes", type: "Textarea", max_length: 500 }
+
+# Hidden UI Fields (Phase 1+)
+hidden_ui_fields:
+  - { name: "line_ids", reason: "Line-specific items (02.5b)" }
+  - { name: "condition_flags", reason: "Conditional items (02.5b)" }
+  - { name: "consume_whole_lp", reason: "LP mode (02.5b)" }
+  - { name: "is_by_product", reason: "Byproducts (02.5b)" }
+  - { name: "yield_percent", reason: "Byproducts (02.5b)" }
+  - { name: "is_output", reason: "Byproducts (02.5b)" }
+
+# TypeScript Types
+types:
+  - path: "apps/frontend/lib/types/bom-items.ts"
+    content: |
+      export interface BOMItem {
+        id: string;
+        bom_id: string;
+        product_id: string;
+        product_code: string;
+        product_name: string;
+        product_type: 'RM' | 'ING' | 'PKG' | 'WIP';
+        product_base_uom: string;
+        quantity: number;
+        uom: string;
+        sequence: number;
+        operation_seq: number | null;
+        operation_name: string | null;
+        scrap_percent: number;
+        notes: string | null;
+        created_at: string;
+        updated_at: string;
+      }
+
+      export interface CreateBOMItemRequest {
+        product_id: string;
+        quantity: number;
+        uom: string;
+        sequence?: number;
+        operation_seq?: number | null;
+        scrap_percent?: number;
+        notes?: string | null;
+      }
+
+      export interface UpdateBOMItemRequest {
+        quantity?: number;
+        uom?: string;
+        sequence?: number;
+        operation_seq?: number | null;
+        scrap_percent?: number;
+        notes?: string | null;
+      }
+
+      export interface BOMItemsListResponse {
+        items: BOMItem[];
+        total: number;
+        bom_output_qty: number;
+        bom_output_uom: string;
+      }
+
+      export interface BOMItemResponse {
+        item: BOMItem;
+        warnings?: Warning[];
+      }
+
+      export interface Warning {
+        code: string;
+        message: string;
+        details?: string;
+      }
+
+# Components
+components:
+  - path: "apps/frontend/components/technical/bom/BOMItemsTable.tsx"
+    description: "DataTable for BOM items with actions"
+    props:
+      - { name: "bomId", type: "string", required: true }
+      - { name: "items", type: "BOMItem[]", required: true }
+      - { name: "onEdit", type: "(item: BOMItem) => void", required: true }
+      - { name: "onDelete", type: "(itemId: string) => void", required: true }
+      - { name: "canEdit", type: "boolean", required: true }
+      - { name: "bomOutputQty", type: "number", required: true }
+      - { name: "bomOutputUom", type: "string", required: true }
+    features:
+      - "Sequence column (sortable)"
+      - "Component column (code + name)"
+      - "Type badge (RM/ING/PKG/WIP)"
+      - "Quantity + UoM"
+      - "Operation assignment display"
+      - "Scrap % display"
+      - "Actions dropdown (Edit, Delete)"
+      - "Total input summary in footer"
+
+  - path: "apps/frontend/components/technical/bom/BOMItemModal.tsx"
+    description: "Add/Edit modal for BOM items (MVP fields)"
+    props:
+      - { name: "open", type: "boolean", required: true }
+      - { name: "onOpenChange", type: "(open: boolean) => void", required: true }
+      - { name: "bomId", type: "string", required: true }
+      - { name: "routingId", type: "string | null", required: true }
+      - { name: "item", type: "BOMItem | null", required: false }
+      - { name: "defaultSequence", type: "number", required: false }
+      - { name: "onSuccess", type: "(item: BOMItem, warnings?: Warning[]) => void", required: true }
+    features:
+      - "Create mode (item = null)"
+      - "Edit mode (item provided)"
+      - "Product search combobox"
+      - "Auto-fill UoM from product"
+      - "Operation dropdown (if routing assigned)"
+      - "Sequence auto-increment"
+      - "Validation with error display"
+      - "UoM mismatch warning display"
+      - "Save & Save & Add Another buttons"
+
+  - path: "apps/frontend/components/technical/bom/BOMItemRow.tsx"
+    description: "Single row component for BOM items table"
+    props:
+      - { name: "item", type: "BOMItem", required: true }
+      - { name: "onEdit", type: "() => void", required: true }
+      - { name: "onDelete", type: "() => void", required: true }
+      - { name: "canEdit", type: "boolean", required: true }
+    features:
+      - "Product type badge color coding"
+      - "Scrap display (if > 0)"
+      - "Operation display (if assigned)"
+      - "Dropdown menu for actions"
+
+# Pages
+pages:
+  - path: "apps/frontend/app/(authenticated)/technical/boms/[id]/page.tsx"
+    description: "BOM detail page (modify existing to add items section)"
+    modifications:
+      - "Add BOMItemsTable component"
+      - "Add BOMItemModal component"
+      - "Add items section below BOM header"
+      - "Fetch items data"
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-bom-items.ts"
+    description: "React Query hooks for BOM items"
+    exports:
+      - name: "useBOMItems"
+        type: "function"
+        params: ["bomId: string"]
+        returns: "UseQueryResult<BOMItemsListResponse>"
+        description: "Fetch items for a BOM"
+
+      - name: "useCreateBOMItem"
+        type: "function"
+        returns: "UseMutationResult"
+        description: "Create BOM item mutation"
+
+      - name: "useUpdateBOMItem"
+        type: "function"
+        returns: "UseMutationResult"
+        description: "Update BOM item mutation"
+
+      - name: "useDeleteBOMItem"
+        type: "function"
+        returns: "UseMutationResult"
+        description: "Delete BOM item mutation"
+
+    pattern: |
+      import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+      import {
+        getBOMItems,
+        createBOMItem,
+        updateBOMItem,
+        deleteBOMItem
+      } from '@/lib/services/bom-items-service';
+
+      export function useBOMItems(bomId: string) {
+        return useQuery({
+          queryKey: ['bom-items', bomId],
+          queryFn: () => getBOMItems(bomId),
+          enabled: !!bomId,
+        });
+      }
+
+      export function useCreateBOMItem(bomId: string) {
+        const queryClient = useQueryClient();
+        return useMutation({
+          mutationFn: (data: CreateBOMItemRequest) => createBOMItem(bomId, data),
+          onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['bom-items', bomId] });
+          },
+        });
+      }
+
+      export function useUpdateBOMItem(bomId: string) {
+        const queryClient = useQueryClient();
+        return useMutation({
+          mutationFn: ({ itemId, data }: { itemId: string; data: UpdateBOMItemRequest }) =>
+            updateBOMItem(bomId, itemId, data),
+          onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['bom-items', bomId] });
+          },
+        });
+      }
+
+      export function useDeleteBOMItem(bomId: string) {
+        const queryClient = useQueryClient();
+        return useMutation({
+          mutationFn: (itemId: string) => deleteBOMItem(bomId, itemId),
+          onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['bom-items', bomId] });
+          },
+        });
+      }
+
+# Validation Schemas (Zod)
+validation:
+  path: "apps/frontend/lib/validation/bom-items.ts"
+  content: |
+    import { z } from 'zod';
+
+    export const bomItemFormSchema = z.object({
+      product_id: z.string()
+        .min(1, 'Component is required')
+        .uuid('Invalid component ID'),
+
+      quantity: z.number({
+        required_error: 'Quantity is required',
+        invalid_type_error: 'Quantity must be a number',
+      })
+        .positive('Quantity must be greater than 0')
+        .refine(val => {
+          const decimals = (val.toString().split('.')[1] || '').length;
+          return decimals <= 6;
+        }, 'Maximum 6 decimal places allowed'),
+
+      uom: z.string()
+        .min(1, 'Unit of measure is required'),
+
+      sequence: z.number()
+        .int('Sequence must be an integer')
+        .min(0, 'Sequence cannot be negative')
+        .optional()
+        .default(0),
+
+      operation_seq: z.number()
+        .int('Operation sequence must be an integer')
+        .nullable()
+        .optional(),
+
+      scrap_percent: z.number()
+        .min(0, 'Scrap % cannot be negative')
+        .max(100, 'Scrap % cannot exceed 100%')
+        .optional()
+        .default(0),
+
+      notes: z.string()
+        .max(500, 'Notes must be less than 500 characters')
+        .nullable()
+        .optional(),
+    });
+
+    export type BOMItemFormValues = z.infer<typeof bomItemFormSchema>;
+
+    // For create - all required fields must be present
+    export const createBOMItemSchema = bomItemFormSchema;
+
+    // For update - all fields optional
+    export const updateBOMItemSchema = bomItemFormSchema.partial();
+
+# Component Implementation Patterns
+patterns:
+  items_table: |
+    // apps/frontend/components/technical/bom/BOMItemsTable.tsx
+    'use client';
+
+    import { DataTable } from '@/components/ui/data-table';
+    import { Badge } from '@/components/ui/badge';
+    import { Button } from '@/components/ui/button';
+    import {
+      DropdownMenu,
+      DropdownMenuContent,
+      DropdownMenuItem,
+      DropdownMenuTrigger,
+    } from '@/components/ui/dropdown-menu';
+    import { MoreHorizontal, Pencil, Trash } from 'lucide-react';
+    import { BOMItem } from '@/lib/types/bom-items';
+    import { ColumnDef } from '@tanstack/react-table';
+
+    interface BOMItemsTableProps {
+      bomId: string;
+      items: BOMItem[];
+      onEdit: (item: BOMItem) => void;
+      onDelete: (itemId: string) => void;
+      canEdit: boolean;
+      bomOutputQty: number;
+      bomOutputUom: string;
+    }
+
+    export function BOMItemsTable({
+      bomId,
+      items,
+      onEdit,
+      onDelete,
+      canEdit,
+      bomOutputQty,
+      bomOutputUom,
+    }: BOMItemsTableProps) {
+      const columns: ColumnDef<BOMItem>[] = [
+        {
+          accessorKey: 'sequence',
+          header: 'Seq',
+          cell: ({ row }) => <span className="font-mono">{row.original.sequence}</span>,
+        },
+        {
+          accessorKey: 'product_code',
+          header: 'Component',
+          cell: ({ row }) => (
+            <div>
+              <div className="font-medium">{row.original.product_code}</div>
+              <div className="text-sm text-muted-foreground">{row.original.product_name}</div>
+            </div>
+          ),
+        },
+        {
+          accessorKey: 'product_type',
+          header: 'Type',
+          cell: ({ row }) => (
+            <Badge variant={getTypeBadgeVariant(row.original.product_type)}>
+              {row.original.product_type}
+            </Badge>
+          ),
+        },
+        {
+          accessorKey: 'quantity',
+          header: 'Quantity',
+          cell: ({ row }) => (
+            <span>{row.original.quantity.toLocaleString(undefined, { maximumFractionDigits: 6 })}</span>
+          ),
+        },
+        {
+          accessorKey: 'uom',
+          header: 'UoM',
+        },
+        {
+          accessorKey: 'operation_name',
+          header: 'Operation',
+          cell: ({ row }) =>
+            row.original.operation_seq
+              ? `Op ${row.original.operation_seq}: ${row.original.operation_name || 'Unknown'}`
+              : '-',
+        },
+        {
+          id: 'actions',
+          cell: ({ row }) =>
+            canEdit ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="h-8 w-8 p-0">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => onEdit(row.original)}>
+                    <Pencil className="mr-2 h-4 w-4" />
+                    Edit
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => onDelete(row.original.id)}
+                    className="text-destructive"
+                  >
+                    <Trash className="mr-2 h-4 w-4" />
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : null,
+        },
+      ];
+
+      // Calculate totals for footer
+      const totalInput = items.reduce((sum, item) => {
+        if (item.uom === bomOutputUom) {
+          return sum + item.quantity;
+        }
+        return sum;
+      }, 0);
+
+      return (
+        <div>
+          <DataTable columns={columns} data={items} />
+          <div className="mt-4 text-sm text-muted-foreground">
+            Total Input: {totalInput.toLocaleString()} {bomOutputUom} |
+            Expected Output: {bomOutputQty.toLocaleString()} {bomOutputUom}
+          </div>
+        </div>
+      );
+    }
+
+    function getTypeBadgeVariant(type: string) {
+      switch (type) {
+        case 'RM': return 'default';
+        case 'ING': return 'secondary';
+        case 'PKG': return 'outline';
+        case 'WIP': return 'destructive';
+        default: return 'default';
+      }
+    }
+
+  item_modal: |
+    // apps/frontend/components/technical/bom/BOMItemModal.tsx
+    'use client';
+
+    import { useState, useEffect } from 'react';
+    import { useForm } from 'react-hook-form';
+    import { zodResolver } from '@hookform/resolvers/zod';
+    import {
+      Dialog,
+      DialogContent,
+      DialogHeader,
+      DialogTitle,
+      DialogFooter,
+    } from '@/components/ui/dialog';
+    import { Button } from '@/components/ui/button';
+    import { Input } from '@/components/ui/input';
+    import { Label } from '@/components/ui/label';
+    import { Textarea } from '@/components/ui/textarea';
+    import {
+      Select,
+      SelectContent,
+      SelectItem,
+      SelectTrigger,
+      SelectValue,
+    } from '@/components/ui/select';
+    import { Alert, AlertDescription } from '@/components/ui/alert';
+    import { ProductCombobox } from '@/components/technical/products/ProductCombobox';
+    import { bomItemFormSchema, BOMItemFormValues } from '@/lib/validation/bom-items';
+    import { BOMItem, Warning } from '@/lib/types/bom-items';
+    import { useCreateBOMItem, useUpdateBOMItem } from '@/lib/hooks/use-bom-items';
+    import { useRoutingOperations } from '@/lib/hooks/use-routings';
+
+    interface BOMItemModalProps {
+      open: boolean;
+      onOpenChange: (open: boolean) => void;
+      bomId: string;
+      routingId: string | null;
+      item?: BOMItem | null;
+      defaultSequence?: number;
+      onSuccess: (item: BOMItem, warnings?: Warning[]) => void;
+    }
+
+    export function BOMItemModal({
+      open,
+      onOpenChange,
+      bomId,
+      routingId,
+      item,
+      defaultSequence = 10,
+      onSuccess,
+    }: BOMItemModalProps) {
+      const [warnings, setWarnings] = useState<Warning[]>([]);
+      const [saveAndAdd, setSaveAndAdd] = useState(false);
+
+      const isEdit = !!item;
+      const createMutation = useCreateBOMItem(bomId);
+      const updateMutation = useUpdateBOMItem(bomId);
+
+      // Fetch operations for dropdown
+      const { data: operations } = useRoutingOperations(routingId || '');
+
+      const form = useForm<BOMItemFormValues>({
+        resolver: zodResolver(bomItemFormSchema),
+        defaultValues: {
+          product_id: item?.product_id || '',
+          quantity: item?.quantity || 0,
+          uom: item?.uom || '',
+          sequence: item?.sequence || defaultSequence,
+          operation_seq: item?.operation_seq || null,
+          scrap_percent: item?.scrap_percent || 0,
+          notes: item?.notes || '',
+        },
+      });
+
+      // Reset form when item changes
+      useEffect(() => {
+        if (item) {
+          form.reset({
+            product_id: item.product_id,
+            quantity: item.quantity,
+            uom: item.uom,
+            sequence: item.sequence,
+            operation_seq: item.operation_seq,
+            scrap_percent: item.scrap_percent,
+            notes: item.notes || '',
+          });
+        } else {
+          form.reset({
+            product_id: '',
+            quantity: 0,
+            uom: '',
+            sequence: defaultSequence,
+            operation_seq: null,
+            scrap_percent: 0,
+            notes: '',
+          });
+        }
+      }, [item, defaultSequence, form]);
+
+      const handleProductSelect = (product: { id: string; base_uom: string }) => {
+        form.setValue('product_id', product.id);
+        form.setValue('uom', product.base_uom);
+      };
+
+      const onSubmit = async (data: BOMItemFormValues) => {
+        setWarnings([]);
+
+        try {
+          let result;
+          if (isEdit) {
+            result = await updateMutation.mutateAsync({
+              itemId: item.id,
+              data: {
+                quantity: data.quantity,
+                uom: data.uom,
+                sequence: data.sequence,
+                operation_seq: data.operation_seq,
+                scrap_percent: data.scrap_percent,
+                notes: data.notes,
+              },
+            });
+          } else {
+            result = await createMutation.mutateAsync(data);
+          }
+
+          if (result.warnings?.length) {
+            setWarnings(result.warnings);
+          }
+
+          onSuccess(result.item, result.warnings);
+
+          if (saveAndAdd) {
+            // Reset for next item
+            form.reset({
+              product_id: '',
+              quantity: 0,
+              uom: '',
+              sequence: (data.sequence || 0) + 10,
+              operation_seq: null,
+              scrap_percent: 0,
+              notes: '',
+            });
+            setSaveAndAdd(false);
+          } else {
+            onOpenChange(false);
+          }
+        } catch (error) {
+          // Error handled by mutation
+        }
+      };
+
+      return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>
+                {isEdit ? 'Edit Component' : 'Add Component to BOM'}
+              </DialogTitle>
+            </DialogHeader>
+
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              {warnings.length > 0 && (
+                <Alert variant="warning">
+                  <AlertDescription>
+                    {warnings.map((w, i) => (
+                      <div key={i}>{w.message}: {w.details}</div>
+                    ))}
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* Component Selector */}
+              <div className="space-y-2">
+                <Label>Component *</Label>
+                <ProductCombobox
+                  value={form.watch('product_id')}
+                  onSelect={handleProductSelect}
+                  filter={{ types: ['RM', 'ING', 'PKG', 'WIP'], status: 'active' }}
+                  disabled={isEdit}
+                />
+                {form.formState.errors.product_id && (
+                  <p className="text-sm text-destructive">
+                    {form.formState.errors.product_id.message}
+                  </p>
+                )}
+              </div>
+
+              {/* Quantity + UoM */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Quantity *</Label>
+                  <Input
+                    type="number"
+                    step="0.000001"
+                    {...form.register('quantity', { valueAsNumber: true })}
+                  />
+                  {form.formState.errors.quantity && (
+                    <p className="text-sm text-destructive">
+                      {form.formState.errors.quantity.message}
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label>Unit of Measure</Label>
+                  <Input {...form.register('uom')} readOnly className="bg-muted" />
+                </div>
+              </div>
+
+              {/* Sequence + Scrap */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Sequence</Label>
+                  <Input
+                    type="number"
+                    {...form.register('sequence', { valueAsNumber: true })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Scrap Allowance %</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    {...form.register('scrap_percent', { valueAsNumber: true })}
+                  />
+                </div>
+              </div>
+
+              {/* Operation Assignment */}
+              <div className="space-y-2">
+                <Label>Operation Assignment</Label>
+                {routingId ? (
+                  <Select
+                    value={form.watch('operation_seq')?.toString() || ''}
+                    onValueChange={(v) => form.setValue('operation_seq', v ? parseInt(v) : null)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select operation..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">None</SelectItem>
+                      {operations?.map((op) => (
+                        <SelectItem key={op.sequence} value={op.sequence.toString()}>
+                          Op {op.sequence}: {op.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Assign routing to BOM first
+                  </p>
+                )}
+              </div>
+
+              {/* Notes */}
+              <div className="space-y-2">
+                <Label>Notes</Label>
+                <Textarea
+                  {...form.register('notes')}
+                  placeholder="Production notes (max 500 chars)"
+                  maxLength={500}
+                />
+              </div>
+
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                  Cancel
+                </Button>
+                {!isEdit && (
+                  <Button
+                    type="submit"
+                    variant="secondary"
+                    onClick={() => setSaveAndAdd(true)}
+                    disabled={createMutation.isPending}
+                  >
+                    Save & Add Another
+                  </Button>
+                )}
+                <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
+                  {isEdit ? 'Save Changes' : 'Save Item'}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      );
+    }
+
+# Accessibility Requirements (WCAG 2.1 AA)
+accessibility:
+  - "All interactive elements keyboard navigable (Tab/Shift+Tab)"
+  - "Close button: aria-label='Close modal'"
+  - "Error messages: aria-live='assertive'"
+  - "Loading states: aria-busy='true'"
+  - "Touch targets >= 48x48dp"
+  - "Color contrast >= 4.5:1 for text"
+  - "Table: role='grid' with proper row/cell labels"
+
+# Error Messages
+error_messages:
+  VALIDATION_ERROR: "Please fix the errors below"
+  DUPLICATE_COMPONENT: "Component already exists in this BOM"
+  INVALID_QUANTITY: "Quantity must be greater than 0"
+  DECIMAL_PRECISION: "Maximum 6 decimal places allowed"
+  INVALID_OPERATION: "Operation does not exist in assigned routing"
+  NO_ROUTING: "Cannot assign operation: BOM has no routing assigned"
+  UOM_MISMATCH: "UoM mismatch: component base UoM is '{{baseUom}}', you entered '{{enteredUom}}'"
+  ITEM_NOT_FOUND: "BOM item not found"
+  PERMISSION_DENIED: "You do not have permission to modify this BOM"

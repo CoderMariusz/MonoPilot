@@ -1,0 +1,14 @@
+# Story 06.35 - Database Schema
+
+tables:
+  - name: "supplier_audits"
+    columns:
+      - id, org_id, supplier_id
+      - audit_number, audit_type (initial/renewal/follow_up/ad_hoc)
+      - audit_date, auditor_id
+      - status (scheduled/in_progress/completed/cancelled)
+      - gmp_score, haccp_score, quality_system_score
+      - overall_score, result (approved/conditional/failed)
+      - next_audit_date, report_url, notes
+      - completed_at, completed_by
+      - created_at, created_by, updated_at

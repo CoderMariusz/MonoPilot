@@ -1,0 +1,672 @@
+# Story 03.2 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  # GET - List supplier's products
+  - method: "GET"
+    path: "/api/planning/suppliers/:supplierId/products"
+    description: "Returns all products assigned to a supplier"
+    file: "apps/frontend/app/api/planning/suppliers/[supplierId]/products/route.ts"
+    auth: "required"
+    roles: ["admin", "owner", "planner", "production_manager", "warehouse_manager", "viewer"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        supplierId:
+          type: "UUID"
+          required: true
+          description: "Supplier ID"
+      query:
+        search:
+          type: "string"
+          required: false
+          description: "Search by product code or name"
+        sort:
+          type: "string"
+          required: false
+          default: "product_code"
+          enum: ["product_code", "product_name", "unit_price", "is_default"]
+        order:
+          type: "string"
+          required: false
+          default: "asc"
+          enum: ["asc", "desc"]
+
+    response:
+      status: 200
+      type: "SupplierProductList"
+      schema:
+        success: true
+        data:
+          - id: "UUID"
+            product:
+              id: "UUID"
+              code: "string"
+              name: "string"
+              uom: "string"
+              supplier_lead_time_days: "number | null"
+            supplier_product_code: "string | null"
+            is_default: "boolean"
+            unit_price: "number | null"
+            currency: "string | null"
+            lead_time_days: "number | null"
+            moq: "number | null"
+            order_multiple: "number | null"
+            last_purchase_date: "string | null"
+            last_purchase_price: "number | null"
+            notes: "string | null"
+            created_at: "string"
+        meta:
+          total: "number"
+          default_count: "number"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token provided"
+      - status: 404
+        code: "SUPPLIER_NOT_FOUND"
+        message: "Supplier not found"
+        when: "Supplier does not exist or belongs to different org"
+
+  # POST - Assign product to supplier
+  - method: "POST"
+    path: "/api/planning/suppliers/:supplierId/products"
+    description: "Assigns a product to a supplier with optional overrides"
+    file: "apps/frontend/app/api/planning/suppliers/[supplierId]/products/route.ts"
+    auth: "required"
+    roles: ["admin", "owner", "planner"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        supplierId:
+          type: "UUID"
+          required: true
+      body:
+        product_id:
+          type: "UUID"
+          required: true
+          description: "Product to assign"
+        is_default:
+          type: "boolean"
+          required: false
+          default: false
+          description: "Set as default supplier for this product"
+        supplier_product_code:
+          type: "string"
+          required: false
+          max_length: 50
+          description: "Supplier's SKU for this product"
+        unit_price:
+          type: "number"
+          required: false
+          validation: "positive"
+          description: "Negotiated unit price"
+        currency:
+          type: "string"
+          required: false
+          enum: ["PLN", "EUR", "USD", "GBP"]
+          description: "Price currency"
+        lead_time_days:
+          type: "integer"
+          required: false
+          validation: "non-negative"
+          description: "Override product lead time"
+        moq:
+          type: "number"
+          required: false
+          validation: "positive"
+          description: "Minimum order quantity"
+        order_multiple:
+          type: "number"
+          required: false
+          validation: "positive"
+          description: "Order in multiples of this"
+        notes:
+          type: "string"
+          required: false
+          max_length: 1000
+          description: "Internal notes"
+
+    response:
+      status: 201
+      type: "SupplierProduct"
+      schema:
+        success: true
+        data:
+          id: "UUID"
+          supplier_id: "UUID"
+          product_id: "UUID"
+          is_default: "boolean"
+          supplier_product_code: "string | null"
+          unit_price: "number | null"
+          currency: "string | null"
+          lead_time_days: "number | null"
+          moq: "number | null"
+          order_multiple: "number | null"
+          notes: "string | null"
+          created_at: "string"
+
+    errors:
+      - status: 400
+        code: "VALIDATION_ERROR"
+        message: "Validation failed"
+        when: "Request body fails Zod validation"
+      - status: 400
+        code: "DUPLICATE_ASSIGNMENT"
+        message: "This product is already assigned to this supplier"
+        when: "supplier_id + product_id already exists"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Insufficient permissions"
+        when: "User role cannot create assignments"
+      - status: 404
+        code: "SUPPLIER_NOT_FOUND"
+        message: "Supplier not found"
+        when: "Supplier does not exist or different org"
+      - status: 404
+        code: "PRODUCT_NOT_FOUND"
+        message: "Product not found"
+        when: "Product does not exist or different org"
+
+  # PUT - Update supplier-product assignment
+  - method: "PUT"
+    path: "/api/planning/suppliers/:supplierId/products/:productId"
+    description: "Updates a supplier-product assignment"
+    file: "apps/frontend/app/api/planning/suppliers/[supplierId]/products/[productId]/route.ts"
+    auth: "required"
+    roles: ["admin", "owner", "planner"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        supplierId:
+          type: "UUID"
+          required: true
+        productId:
+          type: "UUID"
+          required: true
+      body:
+        is_default:
+          type: "boolean"
+          required: false
+        supplier_product_code:
+          type: "string"
+          required: false
+          max_length: 50
+        unit_price:
+          type: "number"
+          required: false
+          validation: "positive"
+        currency:
+          type: "string"
+          required: false
+          enum: ["PLN", "EUR", "USD", "GBP"]
+        lead_time_days:
+          type: "integer"
+          required: false
+          validation: "non-negative"
+        moq:
+          type: "number"
+          required: false
+          validation: "positive"
+        order_multiple:
+          type: "number"
+          required: false
+          validation: "positive"
+        notes:
+          type: "string"
+          required: false
+          max_length: 1000
+
+    response:
+      status: 200
+      type: "SupplierProduct"
+      schema:
+        success: true
+        data:
+          id: "UUID"
+          supplier_id: "UUID"
+          product_id: "UUID"
+          is_default: "boolean"
+          supplier_product_code: "string | null"
+          unit_price: "number | null"
+          currency: "string | null"
+          lead_time_days: "number | null"
+          moq: "number | null"
+          order_multiple: "number | null"
+          notes: "string | null"
+          updated_at: "string"
+
+    errors:
+      - status: 400
+        code: "VALIDATION_ERROR"
+        message: "Validation failed"
+        when: "Request body fails Zod validation"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Insufficient permissions"
+        when: "User role cannot update assignments"
+      - status: 404
+        code: "ASSIGNMENT_NOT_FOUND"
+        message: "Supplier-product assignment not found"
+        when: "No assignment exists for this supplier-product pair"
+
+  # DELETE - Remove product from supplier
+  - method: "DELETE"
+    path: "/api/planning/suppliers/:supplierId/products/:productId"
+    description: "Removes a product assignment from a supplier"
+    file: "apps/frontend/app/api/planning/suppliers/[supplierId]/products/[productId]/route.ts"
+    auth: "required"
+    roles: ["admin", "owner", "planner"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        supplierId:
+          type: "UUID"
+          required: true
+        productId:
+          type: "UUID"
+          required: true
+
+    response:
+      status: 200
+      type: "DeleteResponse"
+      schema:
+        success: true
+        message: "Product assignment removed"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Insufficient permissions"
+        when: "User role cannot delete assignments"
+      - status: 404
+        code: "ASSIGNMENT_NOT_FOUND"
+        message: "Supplier-product assignment not found"
+        when: "No assignment exists for this supplier-product pair"
+
+  # GET - Get default supplier for product
+  - method: "GET"
+    path: "/api/planning/products/:productId/default-supplier"
+    description: "Returns the default supplier for a product"
+    file: "apps/frontend/app/api/planning/products/[productId]/default-supplier/route.ts"
+    auth: "required"
+    roles: ["admin", "owner", "planner", "production_manager", "warehouse_manager", "viewer"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        productId:
+          type: "UUID"
+          required: true
+
+    response:
+      status: 200
+      type: "DefaultSupplierResponse"
+      schema:
+        success: true
+        data:
+          id: "UUID | null"
+          supplier:
+            id: "UUID"
+            code: "string"
+            name: "string"
+            currency: "string"
+          supplier_product_code: "string | null"
+          unit_price: "number | null"
+          currency: "string | null"
+          lead_time_days: "number | null"
+          moq: "number | null"
+          order_multiple: "number | null"
+        # data is null if no default supplier
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token"
+      - status: 404
+        code: "PRODUCT_NOT_FOUND"
+        message: "Product not found"
+        when: "Product does not exist or different org"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/supplier-product-service.ts"
+    description: "Business logic for supplier-product assignments"
+    exports:
+      - name: "getSupplierProducts"
+        type: "async function"
+        params:
+          - "supplierId: string"
+          - "options?: { search?: string; sort?: string; order?: 'asc' | 'desc' }"
+        returns: "Promise<SupplierProduct[]>"
+        description: "Fetch all products assigned to a supplier"
+
+      - name: "assignProductToSupplier"
+        type: "async function"
+        params:
+          - "supplierId: string"
+          - "data: AssignProductInput"
+        returns: "Promise<SupplierProduct>"
+        description: "Create new supplier-product assignment"
+
+      - name: "updateSupplierProduct"
+        type: "async function"
+        params:
+          - "supplierId: string"
+          - "productId: string"
+          - "data: UpdateSupplierProductInput"
+        returns: "Promise<SupplierProduct>"
+        description: "Update existing supplier-product assignment"
+
+      - name: "removeSupplierProduct"
+        type: "async function"
+        params:
+          - "supplierId: string"
+          - "productId: string"
+        returns: "Promise<void>"
+        description: "Delete supplier-product assignment"
+
+      - name: "getDefaultSupplierForProduct"
+        type: "async function"
+        params:
+          - "productId: string"
+        returns: "Promise<SupplierProductWithSupplier | null>"
+        description: "Get the default supplier for a product"
+
+      - name: "updateLastPurchaseData"
+        type: "async function"
+        params:
+          - "supplierId: string"
+          - "productId: string"
+          - "price: number"
+          - "date: Date"
+        returns: "Promise<void>"
+        description: "Update last purchase info (called from PO confirmation)"
+
+# Validation Schemas
+validation:
+  path: "apps/frontend/lib/validation/supplier-product-validation.ts"
+  schemas:
+    - name: "assignProductSchema"
+      fields:
+        product_id: "z.string().uuid('Product ID must be a valid UUID')"
+        is_default: "z.boolean().default(false)"
+        supplier_product_code: "z.string().max(50).optional().nullable()"
+        unit_price: "z.number().positive('Price must be positive').optional().nullable()"
+        currency: "z.enum(['PLN', 'EUR', 'USD', 'GBP']).optional().nullable()"
+        lead_time_days: "z.number().int().nonnegative().optional().nullable()"
+        moq: "z.number().positive('MOQ must be positive').optional().nullable()"
+        order_multiple: "z.number().positive('Order multiple must be positive').optional().nullable()"
+        notes: "z.string().max(1000).optional().nullable()"
+
+    - name: "updateSupplierProductSchema"
+      description: "Same as assignProductSchema but all fields optional, product_id excluded"
+      base: "assignProductSchema.partial().omit({ product_id: true })"
+
+# Types
+types:
+  path: "apps/frontend/lib/types/supplier-product.ts"
+  interfaces:
+    - name: "SupplierProduct"
+      fields:
+        id: "string"
+        supplier_id: "string"
+        product_id: "string"
+        is_default: "boolean"
+        supplier_product_code: "string | null"
+        unit_price: "number | null"
+        currency: "string | null"
+        lead_time_days: "number | null"
+        moq: "number | null"
+        order_multiple: "number | null"
+        last_purchase_date: "string | null"
+        last_purchase_price: "number | null"
+        notes: "string | null"
+        created_at: "string"
+        updated_at: "string"
+
+    - name: "SupplierProductWithProduct"
+      extends: "SupplierProduct"
+      additional_fields:
+        product:
+          id: "string"
+          code: "string"
+          name: "string"
+          uom: "string"
+          supplier_lead_time_days: "number | null"
+
+    - name: "SupplierProductWithSupplier"
+      extends: "SupplierProduct"
+      additional_fields:
+        supplier:
+          id: "string"
+          code: "string"
+          name: "string"
+          currency: "string"
+
+    - name: "AssignProductInput"
+      description: "Input for POST endpoint"
+      source: "z.infer<typeof assignProductSchema>"
+
+    - name: "UpdateSupplierProductInput"
+      description: "Input for PUT endpoint"
+      source: "z.infer<typeof updateSupplierProductSchema>"
+
+# Implementation patterns
+patterns:
+  default_supplier_toggle: |
+    // When is_default is set to true, unset all other defaults for this product
+    async function setDefaultSupplier(supplierId: string, productId: string): Promise<void> {
+      const supabase = createServerClient();
+
+      // Transaction: unset other defaults, then set this one
+      await supabase.rpc('set_default_supplier_product', {
+        p_supplier_id: supplierId,
+        p_product_id: productId
+      });
+    }
+
+    // SQL function for atomic default toggle
+    /*
+    CREATE OR REPLACE FUNCTION set_default_supplier_product(
+      p_supplier_id UUID,
+      p_product_id UUID
+    ) RETURNS void AS $$
+    BEGIN
+      -- Unset all defaults for this product
+      UPDATE supplier_products
+      SET is_default = false, updated_at = NOW()
+      WHERE product_id = p_product_id AND is_default = true;
+
+      -- Set new default
+      UPDATE supplier_products
+      SET is_default = true, updated_at = NOW()
+      WHERE supplier_id = p_supplier_id AND product_id = p_product_id;
+    END;
+    $$ LANGUAGE plpgsql;
+    */
+
+  lead_time_resolution: |
+    // Resolve lead time with fallback to product default
+    function resolveLeadTime(
+      supplierProduct: SupplierProduct,
+      product: Product
+    ): number {
+      return supplierProduct.lead_time_days ?? product.supplier_lead_time_days ?? 0;
+    }
+
+  api_route_example: |
+    // apps/frontend/app/api/planning/suppliers/[supplierId]/products/route.ts
+    import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+    import { cookies } from 'next/headers';
+    import { NextResponse } from 'next/server';
+    import { assignProductSchema } from '@/lib/validation/supplier-product-validation';
+
+    export async function GET(
+      request: Request,
+      { params }: { params: { supplierId: string } }
+    ) {
+      const supabase = createRouteHandlerClient({ cookies });
+      const { supplierId } = params;
+
+      // Verify supplier exists and belongs to user's org (RLS handles this)
+      const { data: supplier, error: supplierError } = await supabase
+        .from('suppliers')
+        .select('id')
+        .eq('id', supplierId)
+        .single();
+
+      if (supplierError || !supplier) {
+        return NextResponse.json(
+          { error: 'Supplier not found' },
+          { status: 404 }
+        );
+      }
+
+      // Fetch supplier products with joined product data
+      const { data, error } = await supabase
+        .from('supplier_products')
+        .select(`
+          id,
+          is_default,
+          supplier_product_code,
+          unit_price,
+          currency,
+          lead_time_days,
+          moq,
+          order_multiple,
+          last_purchase_date,
+          last_purchase_price,
+          notes,
+          created_at,
+          product:products(id, code, name, uom, supplier_lead_time_days)
+        `)
+        .eq('supplier_id', supplierId)
+        .order('product(code)', { ascending: true });
+
+      if (error) {
+        return NextResponse.json(
+          { error: 'Failed to fetch products' },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        data,
+        meta: {
+          total: data.length,
+          default_count: data.filter(sp => sp.is_default).length
+        }
+      });
+    }
+
+    export async function POST(
+      request: Request,
+      { params }: { params: { supplierId: string } }
+    ) {
+      const supabase = createRouteHandlerClient({ cookies });
+      const { supplierId } = params;
+
+      // Parse and validate body
+      const body = await request.json();
+      const validation = assignProductSchema.safeParse(body);
+
+      if (!validation.success) {
+        return NextResponse.json(
+          { error: 'Validation failed', details: validation.error.errors },
+          { status: 400 }
+        );
+      }
+
+      const { product_id, is_default, ...rest } = validation.data;
+
+      // Verify supplier exists
+      const { data: supplier } = await supabase
+        .from('suppliers')
+        .select('id')
+        .eq('id', supplierId)
+        .single();
+
+      if (!supplier) {
+        return NextResponse.json(
+          { error: 'Supplier not found' },
+          { status: 404 }
+        );
+      }
+
+      // Verify product exists
+      const { data: product } = await supabase
+        .from('products')
+        .select('id')
+        .eq('id', product_id)
+        .single();
+
+      if (!product) {
+        return NextResponse.json(
+          { error: 'Product not found' },
+          { status: 404 }
+        );
+      }
+
+      // If setting as default, unset other defaults
+      if (is_default) {
+        await supabase
+          .from('supplier_products')
+          .update({ is_default: false })
+          .eq('product_id', product_id)
+          .eq('is_default', true);
+      }
+
+      // Insert new assignment
+      const { data, error } = await supabase
+        .from('supplier_products')
+        .insert({
+          supplier_id: supplierId,
+          product_id,
+          is_default: is_default ?? false,
+          ...rest
+        })
+        .select()
+        .single();
+
+      if (error) {
+        if (error.code === '23505') { // Unique violation
+          return NextResponse.json(
+            { error: 'This product is already assigned to this supplier' },
+            { status: 400 }
+          );
+        }
+        return NextResponse.json(
+          { error: 'Failed to assign product' },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json({ success: true, data }, { status: 201 });
+    }

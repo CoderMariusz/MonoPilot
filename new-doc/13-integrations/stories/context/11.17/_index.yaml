@@ -1,0 +1,70 @@
+# Story 11.17 - Index File (Entry Point)
+# Generated: 2026-01-15
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "11.17"
+  name: "Custom Integration Builder"
+  slug: "custom-integration-builder"
+  epic: "11-integrations"
+  phase: "3"
+  complexity: "L"
+  estimate_days: 4-5
+  type: "fullstack"
+  state: "ready"
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["organizations"]
+    - story: "11.3"
+      name: "Integration Logs"
+      provides: ["integration_logs table"]
+      status: "ready"
+  soft:
+    - story: "11.4"
+      name: "Webhook Configuration"
+      provides: ["Webhook patterns"]
+      status: "ready"
+  blocks: []
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/integrations.md"
+    sections: ["FR-INT-028"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/11-integrations/11.17.custom-integration-builder.md"
+
+# High-level deliverables
+deliverables:
+  - type: "database"
+    count: 3
+    description: "integration_workflows, workflow_executions, workflow_templates tables"
+  - type: "service"
+    count: 1
+    description: "workflow-execution-service.ts (execute workflows, node logic)"
+  - type: "api"
+    count: 8
+    description: "Workflow CRUD, execute, test, logs, template endpoints"
+  - type: "frontend"
+    count: 9
+    description: "Workflow builder canvas, node palette, properties panel, field mapper, test mode, template browser, logs"
+  - type: "cron"
+    count: 1
+    description: "Cron scheduler for scheduled workflows"
+  - type: "test"
+    count: 5
+    description: "Unit (field mappings, conditionals) + integration + E2E"
+
+# Technical notes
+technical_notes:
+  - "Visual workflow builder using React Flow library"
+  - "Node types: Triggers (schedule, event, manual), Actions (HTTP, transform, conditional), Connectors (REST, SOAP, FTP)"
+  - "Field mapping with drag-drop and transformations (uppercase, date format, etc.)"
+  - "Test mode executes in sandbox (no side effects)"
+  - "Template system for reusable workflows"
+  - "Workflow execution engine with step-by-step logging"
+  - "JSON-based workflow definition schema"

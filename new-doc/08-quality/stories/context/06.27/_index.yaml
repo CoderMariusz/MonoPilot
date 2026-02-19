@@ -1,0 +1,82 @@
+# Story 06.27 - CoA Templates Context (Entry Point)
+# Generated: 2025-01-15
+# Purpose: Story metadata, dependencies, and overview
+# Phase: 3 (CoA & HACCP)
+
+story:
+  id: "06.27"
+  name: "CoA Templates"
+  slug: "coa-templates"
+  epic: "06-quality"
+  phase: "3"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "full-stack"
+  state: "ready"
+  priority: "P0"
+
+context_files:
+  - _index.yaml      # This file
+  - database.yaml    # Tables, migrations, triggers
+  - api.yaml         # Endpoints, schemas
+  - frontend.yaml    # Components, pages, UX
+  - tests.yaml       # Acceptance criteria, tests
+
+dependencies:
+  required:
+    - story: "01.1"
+      provides: ["organizations", "users", "roles"]
+    - story: "02.1"
+      provides: ["products table", "product types"]
+    - story: "06.3"
+      provides: ["quality_specifications"]
+    - story: "06.4"
+      provides: ["quality_spec_parameters"]
+
+  blocks:
+    - story: "06.28"
+      name: "CoA Generation Engine"
+      reason: "Templates required for CoA generation"
+
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/quality.md"
+    sections: ["FR-QA-012", "Section 13.2 - CoA Template Elements"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/06-quality/06.27.coa-templates.md"
+
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "coa_templates + coa_template_versions + sequences"
+  - type: "api"
+    count: 11
+    description: "CRUD + approve + activate + duplicate + upload-logo + preview + versions"
+  - type: "service"
+    count: 1
+    description: "CoATemplateService with 12 methods"
+  - type: "components"
+    count: 13
+    description: "Builder, selectors, preview, version history"
+  - type: "page"
+    count: 3
+    description: "List, detail/edit, new"
+
+technical_notes:
+  - "Template number format: COA-TPL-YYYY-NNNNN"
+  - "JSONB parameters_config for parameter display settings"
+  - "JSONB layout_config for PDF rendering settings"
+  - "Logo upload to S3/Supabase Storage (PNG/JPEG/SVG, max 2MB)"
+  - "Template versioning with approval workflow"
+  - "Only one active template per product_id or product_type"
+  - "Template snapshot created on approval (coa_template_versions)"
+
+business_rules:
+  - rule: "One Active Template per Product/Type"
+    enforcement: "Database trigger deactivates others on activation"
+  - rule: "Template Approval Required"
+    enforcement: "QA_MANAGER role required for approval"
+  - rule: "Version Increment on Edit"
+    enforcement: "Editing approved template creates new version in draft"
+  - rule: "Template Immutability"
+    enforcement: "Approved templates cannot be edited (only new version)"

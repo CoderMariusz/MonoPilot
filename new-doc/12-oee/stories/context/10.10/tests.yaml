@@ -1,0 +1,263 @@
+# Story 10.10 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/utilization-analytics-service.test.ts"
+    type: "unit"
+    description: "Unit tests for UtilizationAnalyticsService methods"
+  - path: "apps/frontend/lib/utils/__tests__/heatmap-colors.test.ts"
+    type: "unit"
+    description: "Unit tests for color utility functions"
+  - path: "apps/frontend/components/oee/analytics/__tests__/UtilizationHeatmap.test.tsx"
+    type: "unit"
+    description: "Unit tests for heatmap component rendering"
+  - path: "apps/frontend/app/api/oee/analytics/utilization/__tests__/api.test.ts"
+    type: "integration"
+    description: "Integration tests for utilization API endpoint"
+  - path: "tests/e2e/oee-utilization-heatmap.spec.ts"
+    type: "e2e"
+    description: "E2E test for heatmap interaction"
+
+# Acceptance Criteria
+acceptance_criteria:
+  # Heatmap Display
+  - id: "AC-01"
+    given: "5 machines on production line"
+    when: "viewing heatmap for today (hourly)"
+    then: "grid displays 5 rows (machines) x 24 columns (hours)"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-02"
+    given: "heatmap displayed"
+    when: "Y-axis inspected"
+    then: "shows machine names in order"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-03"
+    given: "heatmap displayed"
+    when: "X-axis inspected"
+    then: "shows time labels (00:00-23:00 for hourly)"
+    test_type: "e2e"
+    priority: "P0"
+
+  # Color Gradient
+  - id: "AC-04"
+    given: "cell with utilization = 45%"
+    when: "rendering cell"
+    then: "cell color = Red (#ef4444)"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-05"
+    given: "cell with utilization = 75%"
+    when: "rendering cell"
+    then: "cell color = Yellow (#eab308)"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-06"
+    given: "cell with utilization = 92%"
+    when: "rendering cell"
+    then: "cell color = Green (#22c55e)"
+    test_type: "unit"
+    priority: "P0"
+
+  # Hover Tooltip
+  - id: "AC-07"
+    given: "heatmap cell for Mixer-01, 14:00-15:00, 85%"
+    when: "user hovers over cell"
+    then: "tooltip shows: 'Mixer-01, 14:00-15:00, 85% utilized'"
+    test_type: "e2e"
+    priority: "P0"
+
+  # Granularity Switching
+  - id: "AC-08"
+    given: "heatmap with hourly granularity"
+    when: "user selects 'Daily'"
+    then: "grid changes to 7 columns (days)"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-09"
+    given: "heatmap with daily granularity"
+    when: "user selects 'Weekly'"
+    then: "grid changes to 4 columns (weeks)"
+    test_type: "e2e"
+    priority: "P0"
+
+  # API Endpoint
+  - id: "AC-10"
+    given: "authenticated user"
+    when: "GET /api/oee/analytics/utilization?granularity=daily&date_from=2025-01-01&date_to=2025-01-07"
+    then: "returns heatmap data with machines, time_slots, data arrays"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-11"
+    given: "API request"
+    when: "granularity param missing"
+    then: "returns 400 Bad Request"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-12"
+    given: "API request for hourly granularity"
+    when: "date range > 31 days"
+    then: "returns 400 DATE_RANGE_TOO_LARGE"
+    test_type: "integration"
+    priority: "P0"
+
+  # Performance
+  - id: "AC-13"
+    given: "10 machines, 7 days daily data"
+    when: "loading heatmap"
+    then: "response time < 500ms"
+    test_type: "integration"
+    priority: "P1"
+
+  # RLS
+  - id: "AC-14"
+    given: "User A (Org A) and User B (Org B)"
+    when: "both request utilization data"
+    then: "each sees only their org's machines"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+# Unit Test Cases
+unit_tests:
+  utilization_analytics_service:
+    - name: "calculateUtilization() returns correct percentage"
+      setup: "actual=45, planned=60"
+      expected: "75%"
+
+    - name: "calculateUtilization() handles zero planned time"
+      setup: "actual=0, planned=0"
+      expected: "0%"
+
+    - name: "getUtilizationStatus() returns 'low' for <50%"
+      setup: "utilization=45"
+      expected: "'low'"
+
+    - name: "getUtilizationStatus() returns 'medium' for 50-80%"
+      setup: "utilization=65"
+      expected: "'medium'"
+
+    - name: "getUtilizationStatus() returns 'high' for >=80%"
+      setup: "utilization=85"
+      expected: "'high'"
+
+    - name: "aggregateByGranularity() groups hourly data"
+      setup: "12 snapshots for same hour"
+      expected: "Single aggregated entry"
+
+  heatmap_colors:
+    - name: "getUtilizationColor() returns red for low"
+      input: "utilization=30"
+      expected: "#ef4444"
+
+    - name: "getUtilizationColor() returns yellow for medium"
+      input: "utilization=65"
+      expected: "#eab308"
+
+    - name: "getUtilizationColor() returns green for high"
+      input: "utilization=90"
+      expected: "#22c55e"
+
+# Integration Test Cases
+integration_tests:
+  api_endpoints:
+    - name: "GET /api/oee/analytics/utilization returns structured data"
+      setup: "OEE snapshots for 5 machines, 7 days"
+      action: "GET /api/oee/analytics/utilization?granularity=daily&date_from=2025-01-01&date_to=2025-01-07"
+      expected: "200 OK with machines[], time_slots[], data[]"
+
+    - name: "API validates granularity param"
+      action: "GET /api/oee/analytics/utilization?granularity=invalid"
+      expected: "400 INVALID_GRANULARITY"
+
+    - name: "API validates date range"
+      action: "GET /api/oee/analytics/utilization?granularity=hourly&date_from=2025-01-01&date_to=2025-03-01"
+      expected: "400 DATE_RANGE_TOO_LARGE"
+
+    - name: "API filters by line_id"
+      setup: "Machines on Line A and Line B"
+      action: "GET with line_id=LineA"
+      expected: "Only Line A machines returned"
+
+  rls_policies:
+    - name: "RLS isolates utilization data by org"
+      setup: "Org A machines, Org B machines"
+      action: "User A queries utilization"
+      expected: "Only Org A data visible"
+
+# E2E Test Cases
+e2e_tests:
+  - name: "View hourly utilization heatmap"
+    steps:
+      - "Login as production manager"
+      - "Navigate to /oee/analytics/utilization"
+      - "Select granularity: Hourly"
+      - "Select date: Today"
+    expected:
+      - "Grid displays with machines on Y-axis"
+      - "Hours 00:00-23:00 on X-axis"
+      - "Cells color-coded by utilization"
+
+  - name: "Hover to see tooltip"
+    steps:
+      - "Navigate to heatmap page"
+      - "Hover over a cell"
+    expected:
+      - "Tooltip appears with machine name, time, utilization %"
+
+  - name: "Switch granularity"
+    steps:
+      - "View hourly heatmap"
+      - "Click 'Daily' granularity button"
+    expected:
+      - "Grid updates to show daily data"
+      - "X-axis shows dates instead of hours"
+
+# Definition of Done
+definition_of_done:
+  - "GET /api/oee/analytics/utilization returns heatmap data"
+  - "Heatmap grid renders machines x time slots"
+  - "Color gradient works: Red <50%, Yellow 50-80%, Green >80%"
+  - "Tooltips show on hover with correct data"
+  - "Granularity toggle works (hourly/daily/weekly)"
+  - "Date range filter works"
+  - "Performance < 500ms for 7-day daily view"
+  - "RLS enforces org isolation"
+  - "Unit tests achieve >80% coverage"
+  - "E2E test covers main workflow"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    reason: "Calculation logic must be reliable"
+  integration:
+    target: 80
+    reason: "API aggregation must return correct structure"
+  files:
+    - "lib/services/utilization-analytics-service.ts: 80%"
+    - "lib/utils/heatmap-colors.ts: 90%"
+    - "components/oee/analytics/UtilizationHeatmap.tsx: 75%"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "Large date ranges could cause slow queries"
+    mitigation: "Enforce date range limits, add query timeouts"
+    severity: "medium"
+    test_coverage: "integration_tests.api_endpoints"
+
+  - id: "RISK-02"
+    description: "Color accessibility for colorblind users"
+    mitigation: "Add pattern/icon indicators alongside color"
+    severity: "low"
+    test_coverage: "e2e_tests accessibility"

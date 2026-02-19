@@ -1,0 +1,667 @@
+# Skills Registry - Central Manifest
+# Auto-maintained by SKILL-CREATOR and SKILL-VALIDATOR agents
+
+metadata:
+  version: 1.4.0
+  total_skills: 51
+  last_full_audit: 2025-12-10
+  next_scheduled_review: 2025-12-24
+  max_skills_per_task: 3
+
+# Skill status values:
+#   active       - Production ready, validated
+#   needs_review - Source changes detected, requires validation
+#   draft        - New skill, not yet validated
+#   deprecated   - Scheduled for removal
+
+# Confidence levels:
+#   high   - Multiple authoritative sources, tested patterns
+#   medium - Single source or community patterns
+#   low    - Experimental or unverified
+
+# =============================================================================
+# GENERIC SKILLS (Technology-agnostic, reusable across projects)
+# =============================================================================
+generic:
+  # ---------------------------------------------------------------------------
+  # SUPABASE (6 skills)
+  # ---------------------------------------------------------------------------
+  supabase-rls:
+    version: 1.0.0
+    file: generic/supabase-rls.md
+    tokens: 650
+    confidence: high
+    status: active
+    tags: [supabase, security, database]
+    last_validated: 2025-12-10
+    next_review: 2025-12-24
+    validator_verdict: VALID
+
+  supabase-queries:
+    version: 1.0.0
+    file: generic/supabase-queries.md
+    tokens: 700
+    confidence: high
+    status: active
+    tags: [supabase, database, queries]
+    last_validated: 2025-12-10
+    next_review: 2025-12-24
+    validator_verdict: VALID
+
+  supabase-realtime:
+    version: 1.0.0
+    file: generic/supabase-realtime.md
+    tokens: 600
+    confidence: high
+    status: active
+    tags: [supabase, realtime, websocket]
+    last_validated: 2025-12-10
+    next_review: 2025-12-24
+    validator_verdict: VALID
+
+  supabase-auth:
+    version: 1.0.0
+    file: generic/supabase-auth.md
+    tokens: 700
+    confidence: high
+    status: active
+    tags: [supabase, auth, security]
+
+  supabase-storage:
+    version: 1.0.0
+    file: generic/supabase-storage.md
+    tokens: 550
+    confidence: high
+    status: active
+    tags: [supabase, storage, files]
+
+  supabase-edge-functions:
+    version: 1.0.0
+    file: generic/supabase-edge-functions.md
+    tokens: 600
+    confidence: high
+    status: active
+    tags: [supabase, serverless, deno]
+
+  # ---------------------------------------------------------------------------
+  # REACT & FRONTEND (11 skills)
+  # ---------------------------------------------------------------------------
+  react-hooks:
+    version: 1.1.0
+    file: generic/react-hooks.md
+    tokens: 1100
+    confidence: high
+    status: active
+    last_validated: 2025-12-10
+    next_review: 2025-01-24
+    validation_notes: "Updated for React 19.x - added useActionState and useEffectEvent patterns"
+    react_version: "18.2+, 19.x"
+    tags: [react, hooks, frontend]
+
+  react-performance:
+    version: 1.1.0
+    file: generic/react-performance.md
+    tokens: 950
+    confidence: high
+    status: active
+    last_validated: 2025-12-10
+    next_review: 2025-12-24
+    validation_notes: "Updated with React Compiler context for React 19+"
+    react_version: "17+, 19.x with Compiler"
+    tags: [react, performance, optimization]
+
+  react-forms:
+    version: 1.0.0
+    file: generic/react-forms.md
+    tokens: 700
+    confidence: high
+    status: active
+    tags: [react, forms, validation]
+
+  react-state-management:
+    version: 1.0.0
+    file: generic/react-state-management.md
+    tokens: 750
+    confidence: high
+    status: active
+    tags: [react, state, zustand, tanstack-query]
+
+  nextjs-app-router:
+    version: 1.1.0
+    file: generic/nextjs-app-router.md
+    tokens: 950
+    confidence: high
+    status: active
+    last_validated: 2025-12-10
+    next_review: 2025-12-24
+    validation_notes: "Updated for Next.js 16 async params, added searchParams pattern and version context"
+    tags: [nextjs, routing, frontend]
+
+  nextjs-data-fetching:
+    version: 1.0.0
+    file: generic/nextjs-data-fetching.md
+    tokens: 700
+    confidence: high
+    status: active
+    tags: [nextjs, data-fetching, caching]
+
+  nextjs-api-routes:
+    version: 1.0.0
+    file: generic/nextjs-api-routes.md
+    tokens: 650
+    confidence: high
+    status: active
+    tags: [nextjs, api, backend]
+
+  tailwind-patterns:
+    version: 1.0.0
+    file: generic/tailwind-patterns.md
+    tokens: 650
+    confidence: high
+    status: active
+    tags: [tailwind, css, styling]
+
+  nextjs-server-components:
+    version: 1.0.0
+    file: generic/nextjs-server-components.md
+    tokens: 450
+    confidence: high
+    status: active
+    last_validated: 2025-12-10
+    next_review: 2025-12-24
+    validation_notes: "Fully validated against Next.js 16 and React 19"
+    tags: [nextjs, react, rsc, server-components, frontend]
+
+  nextjs-middleware:
+    version: 1.0.0
+    file: generic/nextjs-middleware.md
+    tokens: 400
+    confidence: high
+    status: active
+    tags: [nextjs, middleware, auth, routing, frontend]
+
+  nextjs-server-actions:
+    version: 1.0.0
+    file: generic/nextjs-server-actions.md
+    tokens: 450
+    confidence: high
+    status: active
+    tags: [nextjs, react, forms, server-actions, frontend]
+
+  # ---------------------------------------------------------------------------
+  # TYPESCRIPT (4 skills)
+  # ---------------------------------------------------------------------------
+  typescript-patterns:
+    version: 1.0.0
+    file: generic/typescript-patterns.md
+    tokens: 800
+    confidence: high
+    status: active
+    tags: [typescript, patterns, types]
+
+  typescript-generics:
+    version: 1.0.0
+    file: generic/typescript-generics.md
+    tokens: 650
+    confidence: high
+    status: active
+    tags: [typescript, generics, types]
+
+  typescript-zod:
+    version: 1.0.0
+    file: generic/typescript-zod.md
+    tokens: 650
+    confidence: high
+    status: active
+    tags: [typescript, validation, zod]
+
+  typescript-api-types:
+    version: 1.0.0
+    file: generic/typescript-api-types.md
+    tokens: 600
+    confidence: high
+    status: active
+    tags: [typescript, api, types]
+
+  # ---------------------------------------------------------------------------
+  # TESTING (5 skills)
+  # ---------------------------------------------------------------------------
+  testing-tdd-workflow:
+    version: 1.0.0
+    file: generic/testing-tdd-workflow.md
+    tokens: 600
+    confidence: high
+    status: active
+    tags: [testing, tdd, workflow]
+    last_validated: 2025-12-10
+    next_review: 2025-12-24
+    validator_verdict: VALID
+
+  testing-jest:
+    version: 1.0.0
+    file: generic/testing-jest.md
+    tokens: 650
+    confidence: high
+    status: active
+    tags: [testing, jest, unit-tests]
+    last_validated: 2025-12-10
+    next_review: 2025-12-24
+    validator_verdict: VALID
+
+  testing-react-testing-lib:
+    version: 1.0.0
+    file: generic/testing-react-testing-lib.md
+    tokens: 650
+    confidence: high
+    status: active
+    tags: [testing, react, testing-library, frontend]
+    last_validated: 2025-12-10
+    next_review: 2025-12-24
+    validator_verdict: VALID
+    validation_notes: "RTL 16.3.0 - patterns current, userEvent async approach validated"
+
+  testing-playwright:
+    version: 1.0.0
+    file: generic/testing-playwright.md
+    tokens: 650
+    confidence: high
+    status: active
+    tags: [testing, e2e, playwright, automation]
+    last_validated: 2025-12-10
+    next_review: 2025-12-24
+    validator_verdict: VALID
+    validation_notes: "Playwright 1.57.0 - core patterns unchanged, new methods available but not breaking"
+
+  testing-msw:
+    version: 1.0.0
+    file: generic/testing-msw.md
+    tokens: 600
+    confidence: high
+    status: active
+    tags: [testing, msw, mocking, api]
+    last_validated: 2025-12-10
+    next_review: 2025-12-24
+    validator_verdict: VALID
+    validation_notes: "MSW 2.12.4 - already using v2 API correctly (http, HttpResponse, delay)"
+
+  # ---------------------------------------------------------------------------
+  # API & BACKEND (4 skills)
+  # ---------------------------------------------------------------------------
+  api-rest-design:
+    version: 1.1.0
+    file: generic/api-rest-design.md
+    tokens: 700
+    confidence: high
+    status: active
+    tags: [api, rest, backend]
+    last_validated: 2025-12-10
+    next_review: 2025-12-24
+    validator_verdict: UPDATED
+    validation_notes: "Updated RFC 7231 -> RFC 9110 (backward compatible, HTTP semantics unchanged)"
+
+  api-error-handling:
+    version: 1.1.0
+    file: generic/api-error-handling.md
+    tokens: 650
+    confidence: high
+    status: active
+    tags: [api, error-handling, backend]
+    last_validated: 2025-12-10
+    next_review: 2025-12-24
+    validator_verdict: UPDATED
+    validation_notes: "Updated RFC 7807 -> RFC 9457 (no breaking changes, fully backward compatible)"
+
+  api-validation:
+    version: 1.1.0
+    file: generic/api-validation.md
+    tokens: 700
+    confidence: high
+    status: active
+    tags: [api, validation, zod, backend]
+    last_validated: 2025-12-10
+    next_review: 2025-12-24
+    validator_verdict: UPDATED
+    validation_notes: "Updated for Zod v4 - patterns work in both v3 and v4, added migration notes"
+    zod_version: "4.x"
+
+  api-authentication:
+    version: 1.1.0
+    file: generic/api-authentication.md
+    tokens: 750
+    confidence: high
+    status: active
+    tags: [api, authentication, jwt, security]
+    last_validated: 2025-12-10
+    next_review: 2025-12-24
+    validator_verdict: UPDATED
+    validation_notes: "Added RFC 8725 (JWT Best Practices) - explicit algorithm specification, security section"
+
+  # ---------------------------------------------------------------------------
+  # CODE QUALITY (5 skills)
+  # ---------------------------------------------------------------------------
+  code-review-checklist:
+    version: 1.0.0
+    file: generic/code-review-checklist.md
+    tokens: 500
+    confidence: high
+    status: active
+    tags: [quality, review, checklist]
+    last_validated: 2025-12-10
+    next_review: 2025-12-24
+    validator_verdict: VALID
+    validation_notes: "Google Eng Practices - all sources valid, patterns current, no breaking changes"
+
+  git-workflow:
+    version: 1.0.0
+    file: generic/git-workflow.md
+    tokens: 550
+    confidence: high
+    status: active
+    tags: [git, workflow, branching]
+    last_validated: 2025-12-10
+    next_review: 2025-12-24
+    validator_verdict: VALID
+    validation_notes: "GitHub Flow + Atlassian sources valid, focus on GitHub Flow (current best practice)"
+
+  git-conventional-commits:
+    version: 1.0.0
+    file: generic/git-conventional-commits.md
+    tokens: 400
+    confidence: high
+    status: active
+    tags: [git, commits, conventions]
+    last_validated: 2025-12-10
+    next_review: 2025-12-24
+    validator_verdict: VALID
+    validation_notes: "Conventional Commits v1.0.0 spec + Angular guidelines - spec stable, no changes"
+
+  documentation-patterns:
+    version: 1.0.0
+    file: generic/documentation-patterns.md
+    tokens: 550
+    confidence: high
+    status: active
+    tags: [documentation, jsdoc, readme]
+    last_validated: 2025-12-10
+    next_review: 2025-12-24
+    validator_verdict: VALID
+    validation_notes: "Write the Docs + JSDoc sources valid, timeless patterns, no updates needed"
+
+  refactoring-patterns:
+    version: 1.0.0
+    file: generic/refactoring-patterns.md
+    tokens: 650
+    confidence: high
+    status: active
+    tags: [refactoring, code-quality, patterns]
+    last_validated: 2025-12-10
+    next_review: 2025-12-24
+    validator_verdict: VALID
+    validation_notes: "Refactoring Guru + Martin Fowler sources valid, classic patterns unchanged"
+
+  # ---------------------------------------------------------------------------
+  # DEVOPS & TOOLING (3 skills)
+  # ---------------------------------------------------------------------------
+  ci-github-actions:
+    version: 1.1.0
+    file: generic/ci-github-actions.md
+    tokens: 700
+    confidence: high
+    status: active
+    last_validated: 2025-12-10
+    next_review: 2025-12-24
+    validator_verdict: UPDATED
+    validation_notes: "Updated to actions/checkout@v5, actions/setup-node@v6, Node.js 22 LTS"
+    tags: [ci, github-actions, automation]
+
+  docker-basics:
+    version: 1.1.0
+    file: generic/docker-basics.md
+    tokens: 650
+    confidence: high
+    status: active
+    last_validated: 2025-12-10
+    next_review: 2025-12-24
+    validator_verdict: UPDATED
+    validation_notes: "Updated to Node.js 22, PostgreSQL 16, removed deprecated docker-compose version field"
+    tags: [docker, containers, devops]
+
+  env-configuration:
+    version: 1.0.0
+    file: generic/env-configuration.md
+    tokens: 550
+    confidence: high
+    status: active
+    last_validated: 2025-12-10
+    next_review: 2025-12-24
+    validator_verdict: VALID
+    tags: [configuration, environment, security]
+
+  # ---------------------------------------------------------------------------
+  # UX & SECURITY (3 skills)
+  # ---------------------------------------------------------------------------
+  accessibility-checklist:
+    version: 1.1.0
+    file: generic/accessibility-checklist.md
+    tokens: 450
+    confidence: high
+    status: active
+    last_validated: 2025-12-10
+    next_review: 2025-12-24
+    validator_verdict: UPDATED
+    validation_notes: "Updated WCAG 2.1 to 2.2 (Oct 2023 standard), added focus-not-obscured and CAPTCHA guidance"
+    tags: [accessibility, a11y, frontend, ux]
+
+  security-backend-checklist:
+    version: 1.1.0
+    file: generic/security-backend-checklist.md
+    tokens: 550
+    confidence: high
+    status: active
+    last_validated: 2025-12-10
+    next_review: 2025-12-24
+    validator_verdict: UPDATED
+    validation_notes: "Added access control pattern, supply chain risk, and OWASP 2025 RC context"
+    tags: [security, backend, api, owasp]
+
+  ui-ux-patterns:
+    version: 1.0.0
+    file: generic/ui-ux-patterns.md
+    tokens: 550
+    confidence: high
+    status: active
+    last_validated: 2025-12-10
+    next_review: 2025-12-24
+    validator_verdict: VALID
+    tags: [ui, ux, design, frontend]
+
+  # ---------------------------------------------------------------------------
+  # PLANNING & PROCESS (7 skills)
+  # ---------------------------------------------------------------------------
+  invest-stories:
+    version: 1.0.0
+    file: generic/invest-stories.md
+    tokens: 400
+    confidence: high
+    status: active
+    tags: [agile, stories, planning, product]
+
+  discovery-interview-patterns:
+    version: 1.0.0
+    file: generic/discovery-interview-patterns.md
+    tokens: 450
+    confidence: high
+    status: active
+    tags: [discovery, requirements, interview, planning]
+
+  prd-structure:
+    version: 1.0.0
+    file: generic/prd-structure.md
+    tokens: 400
+    confidence: high
+    status: active
+    tags: [product, prd, requirements, planning]
+
+  architecture-adr:
+    version: 1.0.0
+    file: generic/architecture-adr.md
+    tokens: 400
+    confidence: high
+    status: active
+    tags: [architecture, adr, decisions, documentation]
+
+  requirements-clarity-scoring:
+    version: 1.0.0
+    file: generic/requirements-clarity-scoring.md
+    tokens: 350
+    confidence: high
+    status: active
+    tags: [requirements, discovery, clarity, planning]
+
+  qa-bug-reporting:
+    version: 1.0.0
+    file: generic/qa-bug-reporting.md
+    tokens: 400
+    confidence: high
+    status: active
+    tags: [qa, bugs, testing, reporting]
+
+  agile-retrospective:
+    version: 1.0.0
+    file: generic/agile-retrospective.md
+    tokens: 300
+    confidence: high
+    status: active
+    tags: [agile, retrospective, scrum, planning]
+
+  # ---------------------------------------------------------------------------
+  # SKILLS META (3 skills) - For SKILL-CREATOR and SKILL-VALIDATOR
+  # ---------------------------------------------------------------------------
+  research-source-evaluation:
+    version: 1.0.0
+    file: generic/research-source-evaluation.md
+    tokens: 400
+    confidence: high
+    status: active
+    tags: [research, sources, validation, skills]
+    last_validated: 2025-12-10
+    next_review: 2025-12-24
+    validator_verdict: VALID
+    validation_notes: "Google helpful content guide (2025-09), W3C specs (Dec 2025) - all sources accessible and current"
+
+  version-changelog-patterns:
+    version: 1.0.0
+    file: generic/version-changelog-patterns.md
+    tokens: 350
+    confidence: high
+    status: active
+    tags: [versioning, changelog, updates, skills]
+    last_validated: 2025-12-10
+    next_review: 2025-12-24
+    validator_verdict: VALID
+    validation_notes: "SemVer 2.0.0 stable, Keep a Changelog 1.1.0 active - no breaking changes, patterns current"
+
+  skill-quality-standards:
+    version: 1.1.0
+    file: generic/skill-quality-standards.md
+    tokens: 420
+    confidence: high
+    status: active
+    tags: [skills, quality, standards, meta]
+    last_validated: 2025-12-10
+    next_review: 2025-12-24
+    validator_verdict: UPDATED
+    validation_notes: "Added explicit sources section requirement in frontmatter, clarified anti-patterns"
+
+# =============================================================================
+# DOMAIN SKILLS (Industry/domain specific patterns)
+# =============================================================================
+domain: {}
+  # Example:
+  # food-industry:
+  #   version: 1.0.0
+  #   file: domain/food-industry.md
+  #   tokens: 800
+  #   confidence: medium
+  #   status: draft
+
+# =============================================================================
+# REVIEW QUEUE (Skills pending validation)
+# =============================================================================
+review_queue: []
+
+# =============================================================================
+# SKILL INDEX (Quick reference for agents - ~200 tokens)
+# =============================================================================
+# This section is auto-generated for ORCHESTRATOR context loading
+skill_index:
+  # Supabase
+  supabase-rls: "Row Level Security patterns for Supabase"
+  supabase-queries: "Supabase query patterns and best practices"
+  supabase-realtime: "Real-time subscriptions and presence"
+  supabase-auth: "Authentication flows and session management"
+  supabase-storage: "File upload and storage patterns"
+  supabase-edge-functions: "Serverless edge functions in Deno"
+
+  # React & Frontend
+  react-hooks: "React hooks patterns and rules (React 18.2+, 19.x - includes useActionState, useEffectEvent)"
+  react-performance: "Performance optimization with React Compiler (React 19+) and manual memoization"
+  react-forms: "Form handling with react-hook-form and Zod"
+  react-state-management: "State management with Zustand and TanStack Query"
+  nextjs-app-router: "Next.js App Router patterns (13-16, async params)"
+  nextjs-data-fetching: "Server-side data fetching and caching"
+  nextjs-api-routes: "API route handlers in Next.js"
+  nextjs-server-components: "RSC patterns, 'use client' directive, composition"
+  nextjs-middleware: "Auth redirects, headers, matcher patterns"
+  nextjs-server-actions: "Form handling, Zod validation, useFormState"
+  tailwind-patterns: "Tailwind CSS utility patterns"
+
+  # TypeScript
+  typescript-patterns: "TypeScript idioms and type patterns"
+  typescript-generics: "Generic types and constraints"
+  typescript-zod: "Zod schema validation patterns"
+  typescript-api-types: "API request/response type patterns"
+
+  # Testing
+  testing-tdd-workflow: "TDD red-green-refactor workflow"
+  testing-jest: "Jest testing patterns and mocking"
+  testing-react-testing-lib: "React Testing Library patterns"
+  testing-playwright: "E2E testing with Playwright"
+  testing-msw: "API mocking with MSW"
+
+  # API & Backend
+  api-rest-design: "RESTful API design principles (RFC 9110 HTTP semantics)"
+  api-error-handling: "Consistent error response patterns (RFC 9457 Problem Details)"
+  api-validation: "Request validation with Zod v4"
+  api-authentication: "JWT and auth middleware patterns (RFC 8725 best practices)"
+
+  # Code Quality
+  code-review-checklist: "Code review best practices"
+  git-workflow: "Git branching and PR workflow"
+  git-conventional-commits: "Conventional commits format"
+  documentation-patterns: "JSDoc and README patterns"
+  refactoring-patterns: "Common refactoring techniques"
+
+  # DevOps
+  ci-github-actions: "GitHub Actions CI/CD workflows (v5/v6 actions, Node 22)"
+  docker-basics: "Dockerfile and docker-compose patterns (Node 22, PostgreSQL 16)"
+  env-configuration: "Environment variable management"
+
+  # UX & Security
+  accessibility-checklist: "WCAG 2.2 checklist for keyboard, screen reader, focus, contrast"
+  security-backend-checklist: "OWASP security patterns for backend APIs (2021 standard, 2025 RC context)"
+  ui-ux-patterns: "UI patterns for layouts, forms, feedback, states"
+
+  # Planning & Process
+  invest-stories: "INVEST criteria for user stories"
+  discovery-interview-patterns: "Requirements gathering interview patterns"
+  prd-structure: "PRD structure with MoSCoW and requirements"
+  architecture-adr: "Architecture Decision Record format"
+  requirements-clarity-scoring: "Clarity scoring (1-5) for requirements gathering"
+  qa-bug-reporting: "Bug report structure and severity levels"
+  agile-retrospective: "Start/Stop/Continue retrospective format"
+
+  # Skills Meta
+  research-source-evaluation: "How to find and verify authoritative sources"
+  version-changelog-patterns: "How to check versions and detect breaking changes"
+  skill-quality-standards: "Quality standards for creating/validating skills"

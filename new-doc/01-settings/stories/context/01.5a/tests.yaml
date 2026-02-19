@@ -1,0 +1,419 @@
+# Story 01.5a - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/user-service.test.ts"
+    type: "unit"
+    description: "Unit tests for user-service CRUD and self-protection logic"
+    coverage_target: 95
+
+  - path: "apps/frontend/app/api/v1/settings/users/__tests__/route.test.ts"
+    type: "integration"
+    description: "Integration tests for user API endpoints"
+    coverage_target: 90
+
+  - path: "apps/frontend/components/settings/users/__tests__/UsersDataTable.test.tsx"
+    type: "component"
+    description: "Component tests for DataTable with search/filter/pagination"
+    coverage_target: 85
+
+  - path: "apps/frontend/components/settings/users/__tests__/UserModal.test.tsx"
+    type: "component"
+    description: "Component tests for create/edit modal"
+    coverage_target: 85
+
+  - path: "e2e/settings/users.spec.ts"
+    type: "e2e"
+    description: "End-to-end tests for user management flow"
+
+# Acceptance Criteria
+acceptance_criteria:
+  - id: "AC-01"
+    given: "admin navigates to /settings/users"
+    when: "page loads"
+    then: "user list displays within 500ms for up to 1000 users"
+    test_type: "e2e"
+    priority: "P0"
+    performance: true
+
+  - id: "AC-02"
+    given: "user list has 500 users"
+    when: "admin applies search 'john'"
+    then: "filtered results display within 300ms"
+    test_type: "integration"
+    priority: "P0"
+    performance: true
+
+  - id: "AC-03"
+    given: "user list displayed"
+    when: "admin filters by role 'PROD_OPERATOR'"
+    then: "only Production Operators appear"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-04"
+    given: "user list displayed"
+    when: "admin filters by status 'inactive'"
+    then: "only deactivated users appear"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-05"
+    given: "user list displayed"
+    when: "role column rendered"
+    then: "role name (not code) displays (e.g., 'Production Manager' not 'PROD_MANAGER')"
+    test_type: "component"
+    priority: "P0"
+
+  - id: "AC-06"
+    given: "admin clicks 'Add User'"
+    when: "modal opens"
+    then: "form displays: email, first name, last name, role fields (NO warehouse access in MVP)"
+    test_type: "component"
+    priority: "P0"
+
+  - id: "AC-07"
+    given: "valid user data (email: 'new@company.com', name: 'John Doe', role: 'VIEWER')"
+    when: "'Create' clicked"
+    then: "user created and appears in list within 1 second"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-08"
+    given: "duplicate email 'existing@company.com'"
+    when: "save attempted"
+    then: "error 'Email already exists' displays inline"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-09"
+    given: "invalid email format 'invalid@'"
+    when: "save attempted"
+    then: "error 'Invalid email format' displays inline"
+    test_type: "component"
+    priority: "P0"
+
+  - id: "AC-10"
+    given: "admin clicks edit on existing user"
+    when: "modal opens"
+    then: "current user data pre-populates form (NO warehouse access field in MVP)"
+    test_type: "component"
+    priority: "P0"
+
+  - id: "AC-11"
+    given: "admin updates user name from 'John' to 'Jonathan'"
+    when: "save completes"
+    then: "updated name displays immediately in list"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-12"
+    given: "admin clicks 'Deactivate' on active user"
+    when: "confirmation dialog accepted"
+    then: "user status changes to 'inactive' within 500ms"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-13"
+    given: "admin attempts to delete/deactivate self"
+    when: "action attempted"
+    then: "error 'Cannot delete your own account' displays"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-14"
+    given: "only 1 Super Admin exists"
+    when: "deactivation attempted on that user"
+    then: "error 'Cannot deactivate the only Super Admin' displays"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-15"
+    given: "user has no permission to manage users (e.g., PROD_OPERATOR)"
+    when: "/settings/users accessed"
+    then: "redirect to dashboard with 'Access Denied'"
+    test_type: "e2e"
+    priority: "P0"
+    security: true
+
+  - id: "AC-16"
+    given: "user with VIEWER role"
+    when: "users page loaded"
+    then: "'Add User' button hidden, edit/deactivate actions hidden"
+    test_type: "component"
+    priority: "P0"
+
+# Unit Test Cases
+unit_tests:
+  user_service:
+    - name: "getUsers returns paginated list"
+      setup: "Mock Supabase response with 25 users"
+      expected: "Returns UsersListResponse with users array and total count"
+
+    - name: "getUsers with search filters results"
+      setup: "Mock Supabase with search parameter"
+      expected: "Query includes OR condition for first_name, last_name, email"
+
+    - name: "createUser validates email format"
+      setup: "Invalid email format"
+      expected: "Throws validation error"
+
+    - name: "createUser checks duplicate email"
+      setup: "Mock duplicate email constraint error (23505)"
+      expected: "Returns 409 with 'Email already exists' message"
+
+    - name: "updateUser allows partial updates"
+      setup: "Only first_name provided"
+      expected: "Updates only first_name field"
+
+    - name: "canDeactivate blocks self-deactivation"
+      setup: "userId === currentUserId"
+      expected: "Returns { allowed: false, reason: 'Cannot delete your own account' }"
+
+    - name: "canDeactivate blocks last Super Admin"
+      setup: "User is SUPER_ADMIN, count of active Super Admins = 1"
+      expected: "Returns { allowed: false, reason: 'Cannot deactivate the only Super Admin' }"
+
+    - name: "canDeactivate allows valid deactivation"
+      setup: "userId != currentUserId, user is ADMIN, multiple admins exist"
+      expected: "Returns { allowed: true }"
+
+# Integration Test Cases
+integration_tests:
+  api_users:
+    - name: "GET /api/v1/settings/users returns users for org"
+      setup: |
+        - Create Org A with 3 users
+        - Create Org B with 2 users
+        - Authenticate as Org A admin
+      action: "GET /api/v1/settings/users"
+      expected: "Returns only Org A's 3 users"
+
+    - name: "GET /api/v1/settings/users with pagination"
+      setup: "Create 50 users, set limit=25"
+      action: "GET /api/v1/settings/users?page=1&limit=25"
+      expected: "Returns first 25 users, total=50"
+
+    - name: "GET /api/v1/settings/users with search"
+      setup: "Create users: 'John Doe', 'Jane Smith', 'Johnny Walker'"
+      action: "GET /api/v1/settings/users?search=john"
+      expected: "Returns 'John Doe' and 'Johnny Walker'"
+
+    - name: "GET /api/v1/settings/users with role filter"
+      setup: "Create 2 ADMIN users, 3 VIEWER users"
+      action: "GET /api/v1/settings/users?role=ADMIN"
+      expected: "Returns 2 ADMIN users"
+
+    - name: "POST /api/v1/settings/users creates user"
+      setup: "Valid CreateUserRequest payload"
+      action: "POST /api/v1/settings/users"
+      expected: "Returns 201 with created user, user appears in subsequent GET"
+
+    - name: "POST /api/v1/settings/users duplicate email"
+      setup: "User with email 'test@company.com' already exists"
+      action: "POST /api/v1/settings/users with same email"
+      expected: "Returns 409 with 'Email already exists' error"
+
+    - name: "PUT /api/v1/settings/users/:id updates user"
+      setup: "Existing user with id=abc"
+      action: "PUT /api/v1/settings/users/abc with { first_name: 'Updated' }"
+      expected: "Returns 200 with updated user"
+
+    - name: "PUT /api/v1/settings/users/:id cross-tenant blocked"
+      setup: "User from Org A attempts to update user from Org B"
+      action: "PUT /api/v1/settings/users/org-b-user-id"
+      expected: "Returns 404 (not 403) per ADR-013"
+
+    - name: "PATCH /api/v1/settings/users/:id/deactivate blocks self"
+      setup: "Admin user id=xyz"
+      action: "PATCH /api/v1/settings/users/xyz/deactivate"
+      expected: "Returns 400 with 'Cannot delete your own account'"
+
+    - name: "PATCH /api/v1/settings/users/:id/deactivate blocks last Super Admin"
+      setup: "Only 1 active Super Admin"
+      action: "PATCH /api/v1/settings/users/super-admin-id/deactivate"
+      expected: "Returns 400 with 'Cannot deactivate the only Super Admin'"
+
+    - name: "PATCH /api/v1/settings/users/:id/deactivate succeeds"
+      setup: "Valid deactivation request"
+      action: "PATCH /api/v1/settings/users/user-id/deactivate"
+      expected: "Returns 200, user.is_active = false"
+
+    - name: "PATCH /api/v1/settings/users/:id/activate reactivates user"
+      setup: "Inactive user"
+      action: "PATCH /api/v1/settings/users/user-id/activate"
+      expected: "Returns 200, user.is_active = true"
+
+# Component Test Cases
+component_tests:
+  users_data_table:
+    - name: "Renders loading skeleton state"
+      setup: "isLoading = true"
+      expected: "Displays 5 skeleton rows"
+
+    - name: "Renders empty state"
+      setup: "users = [], isLoading = false"
+      expected: "Displays 'No users found' with 'Add User' button"
+
+    - name: "Renders user rows with data"
+      setup: "users = [user1, user2]"
+      expected: "Displays 2 rows with name, email, role name, status"
+
+    - name: "Search input triggers debounced search"
+      setup: "Type 'john' in search input"
+      expected: "onSearch called after 300ms debounce"
+
+    - name: "Role filter updates query"
+      setup: "Select 'ADMIN' in role filter"
+      expected: "onFilter called with role='ADMIN'"
+
+    - name: "Pagination navigation works"
+      setup: "Click page 2"
+      expected: "onPageChange called with page=2"
+
+    - name: "Edit action opens modal"
+      setup: "Click edit on user row"
+      expected: "UserModal opens with mode='edit' and user data"
+
+    - name: "Deactivate action shows confirmation"
+      setup: "Click deactivate on user row"
+      expected: "DeactivateConfirmDialog opens"
+
+  user_modal:
+    - name: "Create mode shows empty form"
+      setup: "mode='create', user=null"
+      expected: "All fields empty, email enabled"
+
+    - name: "Edit mode pre-populates form"
+      setup: "mode='edit', user={...}"
+      expected: "Form fields populated, email disabled"
+
+    - name: "Email validation shows error"
+      setup: "Enter 'invalid@' and submit"
+      expected: "Error 'Invalid email format' displays below email field"
+
+    - name: "Required field validation"
+      setup: "Leave first_name empty and submit"
+      expected: "Error 'First name is required' displays"
+
+    - name: "Role dropdown shows role names"
+      setup: "Open role dropdown"
+      expected: "Shows 'Administrator', 'Viewer' etc., not 'ADMIN', 'VIEWER'"
+
+    - name: "Warehouse access field hidden in MVP"
+      setup: "Open modal"
+      expected: "No warehouse access multi-select visible"
+
+    - name: "Success callback fires on create"
+      setup: "Submit valid form in create mode"
+      expected: "onSuccess called with created user"
+
+# E2E Test Cases
+e2e_tests:
+  user_management_flow:
+    - name: "Full user CRUD flow"
+      steps:
+        - "Navigate to /settings/users"
+        - "Click 'Add User'"
+        - "Fill form: email, name, role=VIEWER"
+        - "Click 'Create'"
+        - "Verify user appears in list"
+        - "Click 'Edit' on new user"
+        - "Change role to ADMIN"
+        - "Click 'Save'"
+        - "Verify role updated in list"
+        - "Click 'Deactivate'"
+        - "Confirm deactivation"
+        - "Verify status badge shows 'Inactive'"
+      expected: "All steps complete without errors"
+
+    - name: "Search and filter flow"
+      steps:
+        - "Navigate to /settings/users"
+        - "Type 'john' in search"
+        - "Verify filtered results"
+        - "Select role filter 'ADMIN'"
+        - "Verify results show only admins named 'john'"
+        - "Clear search"
+        - "Verify full list returns"
+      expected: "Search and filters work correctly"
+
+    - name: "Permission enforcement flow"
+      steps:
+        - "Login as VIEWER user"
+        - "Navigate to /settings/users"
+        - "Verify 'Add User' button hidden"
+        - "Verify edit/deactivate actions hidden in rows"
+        - "Logout"
+        - "Login as ADMIN"
+        - "Navigate to /settings/users"
+        - "Verify 'Add User' button visible"
+        - "Verify edit/deactivate actions visible"
+      expected: "UI adapts to user permissions"
+
+# Definition of Done
+definition_of_done:
+  - "User list page loads within 500ms for 1000 users"
+  - "Create user with role assignment works end-to-end"
+  - "Edit user updates immediately in UI"
+  - "Deactivate blocks login, terminates sessions"
+  - "Self-deletion/deactivation prevented"
+  - "Last Super Admin deactivation prevented"
+  - "Role names (not codes) display in user list"
+  - "Permission checks hide unauthorized actions"
+  - "Search and filter work within 300ms"
+  - "Warehouse access field HIDDEN in modal (Phase 1B)"
+  - "All API endpoints have integration tests"
+  - "Unit tests cover user-service (>95% coverage)"
+  - "Component tests for DataTable and Modal (>85% coverage)"
+  - "E2E test covers full CRUD flow"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 95
+    reason: "Business logic and self-protection are critical"
+  integration:
+    target: 90
+    reason: "API endpoints must be thoroughly tested"
+  component:
+    target: 85
+    reason: "UI components need good coverage"
+  e2e:
+    target: 80
+    reason: "Cover main user flows"
+  files:
+    - "lib/services/user-service.ts: 95%"
+    - "app/api/v1/settings/users/route.ts: 90%"
+    - "components/settings/users/UsersDataTable.tsx: 85%"
+    - "components/settings/users/UserModal.tsx: 85%"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "Self-protection logic could be bypassed via direct API calls"
+    mitigation: "Backend validates self-protection, frontend is UI only"
+    severity: "medium"
+    test_coverage: "integration_tests.api_users.self_deactivation"
+
+  - id: "RISK-02"
+    description: "Cross-tenant data leak if RLS misconfigured"
+    mitigation: "Integration tests verify org isolation"
+    severity: "high"
+    test_coverage: "integration_tests.api_users.cross_tenant_blocked"
+
+  - id: "RISK-03"
+    description: "Performance degradation with >1000 users"
+    mitigation: "Pagination + indexes on org_id, email, is_active"
+    severity: "low"
+    test_coverage: "acceptance_criteria.AC-01"
+
+  - id: "RISK-04"
+    description: "Warehouse access field accidentally enabled in MVP"
+    mitigation: "Component tests verify field is hidden"
+    severity: "medium"
+    test_coverage: "component_tests.user_modal.warehouse_access_hidden"

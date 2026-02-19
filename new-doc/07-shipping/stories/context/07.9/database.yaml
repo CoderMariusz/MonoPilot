@@ -1,0 +1,361 @@
+# Story 07.9 - Pick Confirmation Desktop Database Context
+# Status: Ready for Implementation
+# Last Updated: 2025-12-18
+
+# Tables Used (No New Tables in This Story)
+# All tables are from Story 07.8 and earlier epics
+
+tables:
+  pick_lists:
+    description: "Pick list header - from Story 07.8, no changes needed"
+    columns:
+      - name: "id"
+        type: "uuid"
+        notes: "Primary key"
+      - name: "org_id"
+        type: "uuid"
+        notes: "Multi-tenant isolation"
+      - name: "pick_list_number"
+        type: "text"
+        notes: "PL-YYYY-NNNNN format"
+      - name: "status"
+        type: "text"
+        notes: "pending → assigned → in_progress → completed"
+      - name: "assigned_to"
+        type: "uuid"
+        notes: "User ID of assigned picker"
+      - name: "started_at"
+        type: "timestamptz"
+        notes: "Timestamp when picker starts picking"
+      - name: "completed_at"
+        type: "timestamptz"
+        notes: "Timestamp when all lines picked"
+    updates_in_story:
+      - "UPDATE status: 'assigned' → 'in_progress' when picker clicks Start"
+      - "UPDATE status: 'in_progress' → 'completed' when all lines picked/short"
+      - "UPDATE completed_at: Set to NOW() on completion"
+
+  pick_list_lines:
+    description: "Pick list items - from Story 07.8, updated during pick confirmation"
+    columns:
+      - name: "id"
+        type: "uuid"
+        notes: "Primary key"
+      - name: "org_id"
+        type: "uuid"
+        notes: "Multi-tenant isolation"
+      - name: "pick_list_id"
+        type: "uuid"
+        notes: "FK to pick_lists"
+      - name: "sales_order_line_id"
+        type: "uuid"
+        notes: "FK to sales_order_lines"
+      - name: "license_plate_id"
+        type: "uuid"
+        notes: "Suggested LP (from allocation)"
+      - name: "location_id"
+        type: "uuid"
+        notes: "Suggested location"
+      - name: "product_id"
+        type: "uuid"
+        notes: "FK to products"
+      - name: "quantity_to_pick"
+        type: "decimal(15,4)"
+        notes: "Allocated quantity"
+      - name: "quantity_picked"
+        type: "decimal(15,4)"
+        notes: "Updated during pick confirmation"
+      - name: "status"
+        type: "text"
+        notes: "pending → picked | short"
+      - name: "picked_license_plate_id"
+        type: "uuid"
+        notes: "Actual LP picked from (may differ from suggested)"
+      - name: "picked_at"
+        type: "timestamptz"
+        notes: "Timestamp when picker confirmed pick"
+      - name: "picked_by"
+        type: "uuid"
+        notes: "FK to users - who confirmed the pick"
+      - name: "notes"
+        type: "text"
+        notes: "Short pick reason + additional notes"
+    updates_in_story:
+      - "UPDATE quantity_picked: Set to picker-entered quantity"
+      - "UPDATE picked_license_plate_id: Set to LP actually picked from"
+      - "UPDATE status: Set to 'picked' | 'short' based on quantity match"
+      - "UPDATE picked_at: Set to NOW()"
+      - "UPDATE picked_by: Set to current user_id"
+      - "UPDATE notes: Set short pick reason (if applicable)"
+
+  inventory_allocations:
+    description: "Allocation tracking - from Story 07.7, updated on pick confirmation"
+    columns:
+      - name: "id"
+        type: "uuid"
+        notes: "Primary key"
+      - name: "org_id"
+        type: "uuid"
+        notes: "Multi-tenant isolation"
+      - name: "sales_order_line_id"
+        type: "uuid"
+        notes: "FK to sales_order_lines"
+      - name: "license_plate_id"
+        type: "uuid"
+        notes: "FK to license_plates"
+      - name: "quantity_allocated"
+        type: "decimal(15,4)"
+        notes: "Original allocated qty (unchanged)"
+      - name: "quantity_picked"
+        type: "decimal(15,4)"
+        notes: "Updated as picker confirms"
+    updates_in_story:
+      - "UPDATE quantity_picked: Increment by picker-entered quantity"
+
+  sales_order_lines:
+    description: "SO line tracking - from Story 07.4, updated as picks confirmed"
+    columns:
+      - name: "id"
+        type: "uuid"
+        notes: "Primary key"
+      - name: "org_id"
+        type: "uuid"
+        notes: "Multi-tenant isolation"
+      - name: "sales_order_id"
+        type: "uuid"
+        notes: "FK to sales_orders"
+      - name: "quantity_ordered"
+        type: "decimal(15,4)"
+        notes: "Original order qty (unchanged)"
+      - name: "quantity_picked"
+        type: "decimal(15,4)"
+        notes: "Updated as picks confirmed"
+      - name: "backorder_quantity"
+        type: "decimal(15,4)"
+        notes: "Set if short pick results in unfulfilled qty"
+    updates_in_story:
+      - "UPDATE quantity_picked: Increment by picker-entered quantity"
+      - "UPDATE backorder_quantity: Set if short pick created"
+
+  sales_orders:
+    description: "Sales order header - from Story 07.3, status updated on completion"
+    columns:
+      - name: "id"
+        type: "uuid"
+        notes: "Primary key"
+      - name: "org_id"
+        type: "uuid"
+        notes: "Multi-tenant isolation"
+      - name: "status"
+        type: "text"
+        notes: "picking → packing | partial (after pick completion)"
+    updates_in_story:
+      - "UPDATE status: 'picking' → 'packing' if all lines fully picked"
+      - "UPDATE status: 'picking' → 'partial' if any lines have short picks"
+
+  license_plates:
+    description: "License plates - from Story 05.1, quantity_on_hand decremented"
+    columns:
+      - name: "id"
+        type: "uuid"
+        notes: "Primary key"
+      - name: "org_id"
+        type: "uuid"
+        notes: "Multi-tenant isolation"
+      - name: "quantity_on_hand"
+        type: "decimal(15,4)"
+        notes: "Decremented as picks confirmed"
+      - name: "allocated_quantity"
+        type: "decimal(15,4)"
+        notes: "May be decremented if allocation released"
+    updates_in_story:
+      - "UPDATE quantity_on_hand: Decrement by picker-entered quantity"
+      - "UPDATE allocated_quantity: Decrement by picker-entered quantity"
+
+  customers:
+    description: "Customer data - from Story 07.1, read for allergen restrictions"
+    columns:
+      - name: "id"
+        type: "uuid"
+        notes: "Primary key"
+      - name: "org_id"
+        type: "uuid"
+        notes: "Multi-tenant isolation"
+      - name: "allergen_restrictions"
+        type: "jsonb"
+        notes: "Array of allergen IDs customer cannot receive"
+    read_in_story:
+      - "SELECT allergen_restrictions to check for conflicts with product allergens"
+
+  products:
+    description: "Product data - from Story 02.1, read for allergen info"
+    columns:
+      - name: "id"
+        type: "uuid"
+        notes: "Primary key"
+      - name: "allergens"
+        type: "jsonb"
+        notes: "Array of allergen IDs in product"
+    read_in_story:
+      - "SELECT allergens to display in UI and check conflicts with customer restrictions"
+
+# RLS Policies (Enforce Multi-Tenancy)
+rls_policies:
+  pick_lists_isolation:
+    table: "pick_lists"
+    description: "Users can only access pick lists from their organization"
+    policy: |
+      CREATE POLICY "pick_lists_org_isolation" ON pick_lists
+      FOR ALL USING (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+    enforcement:
+      - "Applies to SELECT, INSERT, UPDATE, DELETE on pick_lists"
+      - "403 Forbidden if user attempts cross-tenant access"
+      - "Per ADR-013: Return 404 (not 403) to hide organization existence"
+
+  pick_list_lines_isolation:
+    table: "pick_list_lines"
+    description: "Users can only access lines from their organization"
+    policy: |
+      CREATE POLICY "pick_list_lines_org_isolation" ON pick_list_lines
+      FOR ALL USING (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+    enforcement:
+      - "Applies to SELECT, INSERT, UPDATE, DELETE on pick_list_lines"
+      - "Cascade protection: Cannot update lines from different orgs"
+
+  inventory_allocations_isolation:
+    table: "inventory_allocations"
+    description: "Allocations restricted to org context"
+    policy: |
+      CREATE POLICY "allocations_org_isolation" ON inventory_allocations
+      FOR ALL USING (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+
+  sales_order_lines_isolation:
+    table: "sales_order_lines"
+    description: "SO lines restricted to org context"
+    policy: |
+      CREATE POLICY "so_lines_org_isolation" ON sales_order_lines
+      FOR ALL USING (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+
+  license_plates_isolation:
+    table: "license_plates"
+    description: "LPs restricted to org context"
+    policy: |
+      CREATE POLICY "lps_org_isolation" ON license_plates
+      FOR ALL USING (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+
+# Indexes (Existing + Required)
+indexes:
+  existing_pick_list_indexes:
+    description: "From Story 07.8, support filtering and queries"
+    indexes:
+      - "idx_pick_lists_org_status ON pick_lists(org_id, status)"
+      - "idx_pick_lists_assigned ON pick_lists(assigned_to)"
+      - "idx_pick_list_lines_list ON pick_list_lines(pick_list_id)"
+      - "idx_pick_list_lines_status ON pick_list_lines(status)"
+      - "idx_pick_list_lines_location ON pick_list_lines(location_id)"
+
+  new_performance_indexes:
+    description: "Optimize queries for pick confirmation workflow"
+    required:
+      - index: "idx_pick_lists_started_completed"
+        table: "pick_lists"
+        columns: ["started_at", "completed_at"]
+        reason: "Support pick list progress queries"
+      - index: "idx_pick_list_lines_by_sequence"
+        table: "pick_list_lines"
+        columns: ["pick_list_id", "pick_sequence"]
+        reason: "Display lines in correct order"
+      - index: "idx_inventory_allocations_so_line"
+        table: "inventory_allocations"
+        columns: ["sales_order_line_id"]
+        reason: "Find allocations for a specific SO line"
+
+# Transactions (ACID Guarantees)
+transactions:
+  confirm_pick_transaction:
+    description: "Atomically update 4 tables on pick confirmation"
+    steps:
+      - "Step 1: UPDATE pick_list_lines (qty_picked, status, timestamps)"
+      - "Step 2: UPDATE inventory_allocations (qty_picked)"
+      - "Step 3: UPDATE sales_order_lines (qty_picked)"
+      - "Step 4: UPDATE license_plates (qty_on_hand, allocated_qty)"
+    isolation_level: "SERIALIZABLE or READ_COMMITTED with locks"
+    error_handling: |
+      If any step fails:
+      - Rollback entire transaction
+      - No partial updates
+      - Return error to frontend
+      - User can retry
+
+  confirm_short_pick_transaction:
+    description: "Update pick with short quantity + create backorder signal"
+    steps:
+      - "Step 1: UPDATE pick_list_lines (qty_picked < qty_required, status=short, reason)"
+      - "Step 2: UPDATE inventory_allocations (qty_picked)"
+      - "Step 3: UPDATE sales_order_lines (qty_picked, backorder_quantity)"
+      - "Step 4: UPDATE license_plates (qty_on_hand, allocated_qty)"
+      - "Step 5: INSERT backorder signal (future Epic 03 integration)"
+    isolation_level: "SERIALIZABLE"
+
+  complete_pick_list_transaction:
+    description: "Mark pick list complete + update SO status"
+    steps:
+      - "Step 1: Validate all lines are 'picked' or 'short'"
+      - "Step 2: UPDATE pick_lists (status=completed, completed_at)"
+      - "Step 3: UPDATE sales_orders (status=packing or partial)"
+    isolation_level: "READ_COMMITTED"
+
+# Migration File (Reference Only - Not Implemented Here)
+migration_notes: |
+  No new tables or columns required for this story.
+
+  The following tables exist from previous stories:
+  - pick_lists (07.8)
+  - pick_list_lines (07.8)
+  - inventory_allocations (07.7)
+  - sales_order_lines (07.4)
+  - sales_orders (07.3)
+  - license_plates (05.1)
+  - customers (07.1)
+  - products (02.1)
+
+  Optional: Add columns to pick_lists for better UX tracking
+  - estimated_completion_time: INTERVAL (calculated in app)
+  - actual_start_time: TIMESTAMPTZ (user clicks Start button)
+
+  No migration needed - logic implemented in application layer.
+
+# Data Integrity Constraints
+constraints:
+  quantity_validation:
+    description: "Quantity picked must not exceed quantity allocated"
+    enforcement: "Check constraint + API validation"
+    constraint: |
+      -- Database-level check (optional)
+      ALTER TABLE pick_list_lines ADD CONSTRAINT
+      check_pick_qty_le_allocated CHECK (quantity_picked <= quantity_to_pick);
+
+  allocated_quantity_constraint:
+    description: "Cannot pick more than LP has on hand"
+    enforcement: "API validation before update"
+    check: |
+      IF quantity_picked > license_plate.quantity_on_hand THEN
+        RAISE ERROR 'Cannot pick more than available in LP'
+      END IF;
+
+  status_transition_constraint:
+    description: "Only valid status transitions allowed"
+    enforcement: "API validation"
+    valid_transitions:
+      pending: ["picked", "short"]
+      picked: []  # Terminal state
+      short: []   # Terminal state
+
+# Data Consistency Notes
+consistency_notes:
+  - "Inventory is decremented only when picker confirms (not on allocation)"
+  - "If pick confirmation fails, inventory remains unchanged (transaction rollback)"
+  - "Multiple pickers can work simultaneously on different pick lists (isolated via pick_list_id)"
+  - "Same license plate can be picked from multiple pick lists (quantity_on_hand must be sufficient)"
+  - "Short pick does not create backorder automatically; requires confirmation from picker"
+  - "Backorder creation is application-driven, not database-driven (for future flexibility)"

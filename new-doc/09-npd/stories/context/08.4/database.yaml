@@ -1,0 +1,311 @@
+# Database Schema for Story 08.4
+# Formulations CRUD & Versioning
+
+tables:
+  npd_formulations:
+    description: "Formulation versions during NPD development (recipe precursor to BOM)"
+    columns:
+      - name: id
+        type: SERIAL PRIMARY KEY
+        nullable: false
+        description: "Unique formulation ID"
+
+      - name: org_id
+        type: UUID
+        nullable: false
+        references: organizations(id)
+        description: "Organization ID (multi-tenancy)"
+
+      - name: npd_project_id
+        type: INTEGER
+        nullable: false
+        references: npd_projects(id)
+        description: "Parent NPD project"
+
+      - name: formulation_number
+        type: VARCHAR(20)
+        nullable: false
+        description: "Version number (v1.0, v1.1, v2.0)"
+
+      - name: status
+        type: VARCHAR(20)
+        nullable: false
+        default: "'draft'"
+        check: "status IN ('draft', 'approved', 'locked')"
+        description: "Formulation status"
+
+      - name: effective_from
+        type: DATE
+        nullable: true
+        description: "Start date (optional)"
+
+      - name: effective_to
+        type: DATE
+        nullable: true
+        description: "End date (optional, NULL = no end)"
+
+      - name: parent_formulation_id
+        type: INTEGER
+        nullable: true
+        references: npd_formulations(id)
+        description: "Previous version (lineage tracking)"
+
+      - name: total_qty
+        type: DECIMAL(15,4)
+        nullable: false
+        check: "total_qty > 0"
+        description: "Total formulation quantity"
+
+      - name: uom
+        type: VARCHAR(20)
+        nullable: false
+        description: "Unit of measure (kg, L, etc.)"
+
+      - name: notes
+        type: TEXT
+        nullable: true
+        description: "Formulation notes"
+
+      - name: approved_by
+        type: UUID
+        nullable: true
+        references: users(id)
+        description: "Who approved"
+
+      - name: approved_at
+        type: TIMESTAMPTZ
+        nullable: true
+        description: "When approved"
+
+      - name: created_at
+        type: TIMESTAMPTZ
+        nullable: false
+        default: NOW()
+        description: "Creation timestamp"
+
+      - name: updated_at
+        type: TIMESTAMPTZ
+        nullable: false
+        default: NOW()
+        description: "Last update timestamp"
+
+      - name: created_by
+        type: UUID
+        nullable: true
+        references: users(id)
+        description: "Who created"
+
+      - name: updated_by
+        type: UUID
+        nullable: true
+        references: users(id)
+        description: "Who last updated"
+
+    constraints:
+      - type: UNIQUE
+        columns: [npd_project_id, formulation_number]
+        description: "Unique version per project"
+
+    indexes:
+      - name: idx_npd_formulations_org_project
+        columns: [org_id, npd_project_id]
+        description: "Fast lookup by org and project"
+
+      - name: idx_npd_formulations_status
+        columns: [status]
+        description: "Fast filter by status"
+
+      - name: idx_npd_formulations_parent
+        columns: [parent_formulation_id]
+        description: "Fast lineage queries"
+
+    rls:
+      enabled: true
+      policies:
+        - name: npd_formulations_org_isolation
+          operation: SELECT
+          using: "org_id = current_setting('app.current_org_id')::uuid"
+
+        - name: npd_formulations_org_insert
+          operation: INSERT
+          with_check: "org_id = current_setting('app.current_org_id')::uuid"
+
+        - name: npd_formulations_org_update
+          operation: UPDATE
+          using: "org_id = current_setting('app.current_org_id')::uuid"
+
+        - name: npd_formulations_org_delete
+          operation: DELETE
+          using: "org_id = current_setting('app.current_org_id')::uuid"
+
+  npd_formulation_items:
+    description: "Formulation items (ingredients)"
+    columns:
+      - name: id
+        type: SERIAL PRIMARY KEY
+        nullable: false
+        description: "Unique item ID"
+
+      - name: formulation_id
+        type: INTEGER
+        nullable: false
+        references: npd_formulations(id)
+        on_delete: CASCADE
+        description: "Parent formulation"
+
+      - name: product_id
+        type: UUID
+        nullable: false
+        references: products(id)
+        description: "Ingredient product"
+
+      - name: quantity
+        type: DECIMAL(15,4)
+        nullable: false
+        check: "quantity > 0"
+        description: "Ingredient quantity"
+
+      - name: uom
+        type: VARCHAR(20)
+        nullable: false
+        description: "Unit of measure"
+
+      - name: percentage
+        type: DECIMAL(5,2)
+        nullable: true
+        description: "Auto-calculated percentage (quantity / total_qty * 100)"
+
+      - name: notes
+        type: TEXT
+        nullable: true
+        description: "Item notes"
+
+      - name: created_at
+        type: TIMESTAMPTZ
+        nullable: false
+        default: NOW()
+        description: "Creation timestamp"
+
+      - name: updated_at
+        type: TIMESTAMPTZ
+        nullable: false
+        default: NOW()
+        description: "Last update timestamp"
+
+    indexes:
+      - name: idx_npd_formulation_items_formulation
+        columns: [formulation_id]
+        description: "Fast lookup by formulation"
+
+      - name: idx_npd_formulation_items_product
+        columns: [product_id]
+        description: "Fast lookup by product"
+
+    rls:
+      enabled: false
+      reason: "Items inherit org_id via formulation_id; no direct RLS needed"
+
+triggers:
+  check_formulation_date_overlap:
+    table: npd_formulations
+    timing: BEFORE INSERT OR UPDATE
+    for_each: ROW
+    function: check_formulation_date_overlap()
+    description: "Prevent date range overlaps for same project"
+    sql: |
+      CREATE OR REPLACE FUNCTION check_formulation_date_overlap()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        -- Allow NULL dates (no overlap check)
+        IF NEW.effective_from IS NULL AND NEW.effective_to IS NULL THEN
+          RETURN NEW;
+        END IF;
+
+        IF EXISTS (
+          SELECT 1 FROM npd_formulations
+          WHERE org_id = NEW.org_id
+            AND npd_project_id = NEW.npd_project_id
+            AND id != COALESCE(NEW.id, 0)
+            AND (
+              -- Both have date ranges
+              (NEW.effective_from IS NOT NULL AND NEW.effective_to IS NOT NULL
+               AND effective_from IS NOT NULL AND effective_to IS NOT NULL
+               AND daterange(effective_from, effective_to, '[]') &&
+                   daterange(NEW.effective_from, NEW.effective_to, '[]'))
+              OR
+              -- Both have no end date
+              (NEW.effective_to IS NULL AND effective_to IS NULL)
+            )
+        ) THEN
+          RAISE EXCEPTION 'Date range overlaps with existing formulation for this project';
+        END IF;
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+
+  auto_calculate_percentage:
+    table: npd_formulation_items
+    timing: BEFORE INSERT OR UPDATE
+    for_each: ROW
+    function: auto_calculate_formulation_item_percentage()
+    description: "Auto-calculate percentage based on item quantity / total formulation quantity"
+    sql: |
+      CREATE OR REPLACE FUNCTION auto_calculate_formulation_item_percentage()
+      RETURNS TRIGGER AS $$
+      DECLARE
+        v_total_qty DECIMAL(15,4);
+      BEGIN
+        SELECT total_qty INTO v_total_qty
+        FROM npd_formulations
+        WHERE id = NEW.formulation_id;
+
+        IF v_total_qty > 0 THEN
+          NEW.percentage := (NEW.quantity / v_total_qty) * 100;
+        ELSE
+          NEW.percentage := 0;
+        END IF;
+
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+
+  prevent_locked_formulation_update:
+    table: npd_formulations
+    timing: BEFORE UPDATE
+    for_each: ROW
+    function: prevent_locked_formulation_changes()
+    description: "Prevent updates to locked formulations"
+    sql: |
+      CREATE OR REPLACE FUNCTION prevent_locked_formulation_changes()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        IF OLD.status = 'locked' THEN
+          RAISE EXCEPTION 'Cannot modify locked formulation';
+        END IF;
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+
+  prevent_locked_formulation_delete:
+    table: npd_formulations
+    timing: BEFORE DELETE
+    for_each: ROW
+    function: prevent_locked_formulation_changes()
+    description: "Prevent deletion of locked formulations"
+    sql: |
+      -- Uses same function as update trigger
+
+migration_notes:
+  - "Migration file: supabase/migrations/XXX_create_npd_formulations.sql"
+  - "Create npd_formulations table first"
+  - "Create npd_formulation_items table second (FK dependency)"
+  - "Create trigger functions BEFORE triggers"
+  - "Create RLS policies AFTER tables"
+  - "Ensure organizations, npd_projects, products tables exist (dependencies)"
+  - "Use ON DELETE CASCADE for npd_formulation_items to auto-delete items when formulation is deleted"
+
+rollback_strategy:
+  - "DROP TRIGGER IF EXISTS on all triggers"
+  - "DROP FUNCTION IF EXISTS on all functions"
+  - "DROP TABLE IF EXISTS npd_formulation_items CASCADE"
+  - "DROP TABLE IF EXISTS npd_formulations CASCADE"

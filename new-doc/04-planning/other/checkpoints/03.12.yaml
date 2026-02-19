@@ -1,0 +1,465 @@
+# Story 03.12 - WO Operations (Routing Copy)
+# Type: fullstack
+# Epic: 03-planning
+# Audit Date: 2026-01-08
+# Completion Date: 2026-01-09
+# Status: COMPLETE
+
+# =============================================================================
+# STORY SUMMARY
+# =============================================================================
+
+story:
+  id: "03.12"
+  name: "WO Operations (Routing Copy)"
+  epic: "03-planning"
+  type: fullstack
+  complexity: M
+  estimate_days: 3-4
+  actual_days: 2
+
+description: |
+  Implements Work Order Operations - routing snapshot copied to wo_operations
+  on WO release. Creates immutable record of production steps with status
+  tracking, expected/actual duration and yield metrics.
+
+# =============================================================================
+# IMPLEMENTATION ARTIFACTS
+# =============================================================================
+
+files_implemented:
+  database:
+    - path: "supabase/migrations/080_create_wo_operations_table.sql"
+      type: migration
+      description: "wo_operations table, RLS policies, copy_routing_to_wo function, triggers"
+
+  api:
+    - path: "apps/frontend/app/api/planning/work-orders/[id]/operations/route.ts"
+      type: api
+      methods: [GET]
+      description: "List operations for WO ordered by sequence"
+
+    - path: "apps/frontend/app/api/planning/work-orders/[id]/operations/[opId]/route.ts"
+      type: api
+      methods: [GET]
+      description: "Get single operation detail with variances"
+
+    - path: "apps/frontend/app/api/planning/work-orders/[id]/copy-routing/route.ts"
+      type: api
+      methods: [POST]
+      description: "Manual routing copy trigger (admin only)"
+
+  services:
+    - path: "apps/frontend/lib/services/wo-operations-service.ts"
+      type: service
+      description: "WOOperationsService with copyRoutingToWO, getOperationsForWO, getOperationById"
+
+  validation:
+    - path: "apps/frontend/lib/validation/wo-operations-schemas.ts"
+      type: validation
+      description: "6 Zod schemas for operations input validation"
+
+  components:
+    - path: "apps/frontend/components/planning/work-orders/WOOperationsTimeline.tsx"
+      type: component
+      description: "Operations timeline display component"
+
+    - path: "apps/frontend/components/planning/work-orders/WOOperationCard.tsx"
+      type: component
+      description: "Single operation card in timeline"
+
+    - path: "apps/frontend/components/planning/work-orders/WOOperationStatusBadge.tsx"
+      type: component
+      description: "Status badge with color coding"
+
+  types:
+    - path: "apps/frontend/lib/types/wo-operation.ts"
+      type: types
+      description: "TypeScript type definitions"
+
+  hooks:
+    - path: "apps/frontend/lib/hooks/use-wo-operations.ts"
+      type: hook
+      description: "React hook for fetching WO operations"
+
+  tests:
+    - path: "apps/frontend/lib/services/__tests__/wo-operations-service.test.ts"
+      type: test
+      count: 27
+      description: "Service layer unit tests"
+
+    - path: "apps/frontend/lib/validation/__tests__/wo-operations-schemas.test.ts"
+      type: test
+      count: 57
+      description: "Validation schema unit tests"
+
+# =============================================================================
+# API DOCUMENTATION
+# =============================================================================
+
+api_endpoints:
+  - method: GET
+    path: "/api/planning/work-orders/:wo_id/operations"
+    auth: required
+    roles: all authenticated (RLS enforced)
+    description: "List all operations for a work order"
+    response: |
+      {
+        "success": true,
+        "data": {
+          "operations": [
+            {
+              "id": "uuid",
+              "wo_id": "uuid",
+              "sequence": 1,
+              "operation_name": "Mixing",
+              "description": "Mix ingredients",
+              "machine_id": "uuid | null",
+              "machine_code": "MX-001 | null",
+              "machine_name": "Mixer A | null",
+              "line_id": "uuid | null",
+              "line_code": "L-001 | null",
+              "line_name": "Line 1 | null",
+              "expected_duration_minutes": 45,
+              "expected_yield_percent": 95.5,
+              "actual_duration_minutes": null,
+              "actual_yield_percent": null,
+              "status": "pending",
+              "started_at": null,
+              "completed_at": null,
+              "started_by": null,
+              "completed_by": null,
+              "started_by_user": null,
+              "completed_by_user": null,
+              "skip_reason": null,
+              "notes": null,
+              "created_at": "2026-01-09T10:00:00Z"
+            }
+          ],
+          "total": 3
+        }
+      }
+
+  - method: GET
+    path: "/api/planning/work-orders/:wo_id/operations/:op_id"
+    auth: required
+    roles: all authenticated (RLS enforced)
+    description: "Get single operation with full details and variances"
+    response: |
+      {
+        "success": true,
+        "data": {
+          "id": "uuid",
+          "wo_id": "uuid",
+          "sequence": 1,
+          "operation_name": "Mixing",
+          "description": "Mix ingredients for 15 minutes",
+          "instructions": "Step 1: Add dry ingredients...",
+          "machine": { "id": "uuid", "code": "MX-001", "name": "Mixer A" },
+          "line": { "id": "uuid", "code": "L-001", "name": "Line 1" },
+          "expected_duration_minutes": 45,
+          "expected_yield_percent": 95.5,
+          "actual_duration_minutes": 50,
+          "actual_yield_percent": 93.2,
+          "duration_variance_minutes": 5,
+          "yield_variance_percent": -2.3,
+          "status": "completed",
+          "started_at": "2026-01-09T10:00:00Z",
+          "completed_at": "2026-01-09T10:50:00Z",
+          "started_by_user": { "id": "uuid", "name": "John Operator" },
+          "completed_by_user": { "id": "uuid", "name": "John Operator" },
+          "skip_reason": null,
+          "notes": "Minor delay due to ingredient prep",
+          "created_at": "2026-01-09T09:00:00Z",
+          "updated_at": "2026-01-09T10:50:00Z"
+        }
+      }
+
+  - method: POST
+    path: "/api/planning/work-orders/:wo_id/copy-routing"
+    auth: required
+    roles: ["SUPER_ADMIN", "ADMIN"]
+    description: "Manually trigger routing copy to WO (idempotent)"
+    request: "{}"
+    response: |
+      {
+        "success": true,
+        "data": {
+          "operations_created": 3,
+          "message": "Successfully copied 3 operations from routing."
+        }
+      }
+    notes: |
+      - Admin-only endpoint
+      - Idempotent: returns existing count if operations already copied
+      - Returns 0 if WO has no routing assigned
+
+# =============================================================================
+# VALIDATION SCHEMAS
+# =============================================================================
+
+validation_schemas:
+  woOperationStatusEnum:
+    description: "Valid operation statuses"
+    values: ["pending", "in_progress", "completed", "skipped"]
+
+  copyRoutingSchema:
+    description: "Manual routing copy trigger"
+    fields:
+      wo_id: "UUID - Work Order ID"
+
+  updateWOOperationSchema:
+    description: "Update operation (Epic 04)"
+    fields:
+      status: "optional - pending|in_progress|completed|skipped"
+      actual_duration_minutes: "optional - non-negative integer"
+      actual_yield_percent: "optional - 0-100 decimal"
+      skip_reason: "optional - max 500 chars"
+      notes: "optional - max 2000 chars"
+
+  startOperationSchema:
+    description: "Start operation (Epic 04)"
+    fields:
+      started_at: "optional - ISO 8601 datetime (defaults to NOW)"
+
+  completeOperationSchema:
+    description: "Complete operation (Epic 04)"
+    fields:
+      completed_at: "optional - ISO 8601 datetime (defaults to NOW)"
+      actual_yield_percent: "optional - 0-100 decimal"
+      notes: "optional - max 2000 chars"
+
+  skipOperationSchema:
+    description: "Skip operation (Epic 04)"
+    fields:
+      skip_reason: "required - 1-500 chars"
+
+  operationsQuerySchema:
+    description: "Query params for list endpoint"
+    fields:
+      status: "optional - filter by status"
+      include_completed: "optional - 'true'|'false'"
+      include_skipped: "optional - 'true'|'false'"
+
+# =============================================================================
+# DATABASE SCHEMA
+# =============================================================================
+
+database:
+  table: wo_operations
+  columns:
+    - id: "UUID PRIMARY KEY"
+    - wo_id: "UUID FK work_orders ON DELETE CASCADE"
+    - organization_id: "UUID FK organizations ON DELETE CASCADE"
+    - sequence: "INTEGER NOT NULL"
+    - operation_name: "TEXT NOT NULL"
+    - description: "TEXT"
+    - instructions: "TEXT"
+    - machine_id: "UUID FK machines ON DELETE SET NULL"
+    - line_id: "UUID FK production_lines ON DELETE SET NULL"
+    - expected_duration_minutes: "INTEGER"
+    - expected_yield_percent: "DECIMAL(5,2)"
+    - actual_duration_minutes: "INTEGER"
+    - actual_yield_percent: "DECIMAL(5,2)"
+    - status: "TEXT DEFAULT 'pending' CHECK IN (pending,in_progress,completed,skipped)"
+    - started_at: "TIMESTAMPTZ"
+    - completed_at: "TIMESTAMPTZ"
+    - started_by: "UUID FK users ON DELETE SET NULL"
+    - completed_by: "UUID FK users ON DELETE SET NULL"
+    - skip_reason: "TEXT"
+    - notes: "TEXT"
+    - created_at: "TIMESTAMPTZ DEFAULT NOW()"
+    - updated_at: "TIMESTAMPTZ DEFAULT NOW()"
+
+  constraints:
+    - "UNIQUE(wo_id, sequence)"
+    - "CHECK expected_duration_minutes > 0 OR NULL"
+    - "CHECK actual_duration_minutes >= 0 OR NULL"
+    - "CHECK expected_yield_percent BETWEEN 0 AND 100 OR NULL"
+    - "CHECK actual_yield_percent BETWEEN 0 AND 100 OR NULL"
+
+  indexes:
+    - idx_wo_ops_wo_id: "wo_id"
+    - idx_wo_ops_org_id: "organization_id"
+    - idx_wo_ops_status: "status"
+    - idx_wo_ops_machine: "machine_id WHERE NOT NULL"
+    - idx_wo_ops_line: "line_id WHERE NOT NULL"
+    - idx_wo_ops_sequence: "(wo_id, sequence)"
+
+  rls_policies:
+    - wo_ops_select: "SELECT for authenticated WHERE org_id matches user"
+    - wo_ops_insert: "INSERT for SUPER_ADMIN, ADMIN, PLANNER, PROD_MANAGER"
+    - wo_ops_update: "UPDATE for SUPER_ADMIN, ADMIN, PLANNER, PROD_MANAGER, OPERATOR"
+    - wo_ops_delete: "DELETE for SUPER_ADMIN, ADMIN only"
+
+  functions:
+    - name: copy_routing_to_wo(p_wo_id UUID, p_org_id UUID)
+      returns: INTEGER
+      description: "Copies routing_operations to wo_operations. Idempotent - returns existing count if already copied."
+      security: DEFINER
+
+  triggers:
+    - tr_wo_ops_update_timestamp: "BEFORE UPDATE - sets updated_at = NOW()"
+    - tr_wo_ops_calculate_duration: "BEFORE UPDATE OF status,completed_at - calculates actual_duration_minutes"
+
+# =============================================================================
+# TEST COVERAGE
+# =============================================================================
+
+test_summary:
+  total_tests: 84
+  all_passing: true
+  service_tests: 27
+  validation_tests: 57
+
+service_tests:
+  calculateExpectedDuration:
+    - "should sum duration + setup_time + cleanup_time"
+    - "should handle null setup_time as 0"
+    - "should handle null cleanup_time as 0"
+    - "should handle null duration as 0"
+    - "should handle all values null as 0"
+    - "should calculate for large values"
+    - "should handle zero values"
+    - "should handle undefined values as 0"
+
+  validateOperationSequence:
+    - "should return true for unique sequences"
+    - "should return false when sequences contain duplicates"
+    - "should handle empty array"
+    - "should handle single operation"
+    - "should detect duplicate at start"
+    - "should detect duplicate at end"
+    - "should handle non-sequential sequences"
+    - "should detect multiple duplicates"
+
+  copyRoutingToWO:
+    - "should call RPC function and return count"
+    - "should return 0 when no operations copied"
+    - "should throw error on RPC failure"
+    - "should return existing count on idempotent call"
+
+  getOperationsForWO:
+    - "should return operations ordered by sequence"
+    - "should throw error when WO not found"
+    - "should return empty array when WO has no operations"
+
+  getOperationById:
+    - "should return operation with calculated variances"
+    - "should return null variances when actuals not set"
+    - "should return null when operation not found"
+    - "should include machine and line data"
+
+validation_tests:
+  woOperationStatusEnum: 6 tests
+  copyRoutingSchema: 4 tests
+  updateWOOperationSchema: 18 tests
+  startOperationSchema: 7 tests
+  completeOperationSchema: 8 tests
+  skipOperationSchema: 6 tests
+  operationsQuerySchema: 8 tests
+
+# =============================================================================
+# QA VALIDATION
+# =============================================================================
+
+qa_results:
+  date: "2026-01-09"
+  acceptance_criteria: "10/10 PASSED"
+  bugs_found: 0
+  decision: "PASS"
+
+  ac_validation:
+    AC-1: "PASS - Routing copy on WO release works correctly"
+    AC-2: "PASS - Data mapping preserves sequence, name, machine, line, duration"
+    AC-3: "PASS - Status lifecycle (pending -> in_progress -> completed/skipped)"
+    AC-4: "PASS - Operations timeline UI displays correctly"
+    AC-5: "PASS - API endpoints return correct data formats"
+    AC-6: "PASS - Service layer methods work as specified"
+    AC-7: "PASS - Validation handles all error cases"
+    AC-8: "PASS - Multi-tenancy RLS policies enforce org isolation"
+    AC-9: "PASS - Integration with WO release action"
+    AC-10: "PASS - Settings wo_copy_routing toggle works"
+
+# =============================================================================
+# DEVELOPER USAGE GUIDE
+# =============================================================================
+
+usage:
+  service_layer: |
+    import { WOOperationsService } from '@/lib/services/wo-operations-service'
+
+    // List operations for a WO
+    const { operations, total } = await WOOperationsService.getOperationsForWO(supabase, woId)
+
+    // Get single operation detail
+    const operation = await WOOperationsService.getOperationById(supabase, woId, opId)
+
+    // Copy routing to WO (admin action)
+    const count = await WOOperationsService.copyRoutingToWO(supabase, woId, orgId)
+
+    // Calculate expected duration
+    const duration = WOOperationsService.calculateExpectedDuration({
+      duration: 60,
+      setup_time: 15,
+      cleanup_time: 10
+    }) // Returns 85
+
+  validation: |
+    import {
+      copyRoutingSchema,
+      updateWOOperationSchema,
+      startOperationSchema,
+      completeOperationSchema,
+      skipOperationSchema
+    } from '@/lib/validation/wo-operations-schemas'
+
+    // Validate input before API call
+    const result = updateWOOperationSchema.safeParse(input)
+    if (!result.success) {
+      throw new Error(result.error.message)
+    }
+
+  api_calls: |
+    // List operations
+    const response = await fetch(`/api/planning/work-orders/${woId}/operations`)
+
+    // Get operation detail
+    const response = await fetch(`/api/planning/work-orders/${woId}/operations/${opId}`)
+
+    // Manual routing copy (admin only)
+    const response = await fetch(`/api/planning/work-orders/${woId}/copy-routing`, {
+      method: 'POST'
+    })
+
+# =============================================================================
+# KNOWN ISSUES
+# =============================================================================
+
+known_issues: []
+
+# =============================================================================
+# FUTURE PHASES (DEFERRED)
+# =============================================================================
+
+deferred_to_epic_04:
+  - "PUT /api/.../operations/[opId] - Update operation"
+  - "POST /api/.../operations/[opId]/start - Start operation"
+  - "POST /api/.../operations/[opId]/complete - Complete operation"
+  - "POST /api/.../operations/[opId]/skip - Skip operation"
+  - "Actual time/yield tracking UI"
+  - "Duration variance alerts"
+
+# =============================================================================
+# PHASE CHECKPOINTS
+# =============================================================================
+
+status: COMPLETE
+next_phase: NONE
+
+P3: ✓ backend-dev 10:41 files:4 tests:84/84
+P4: ✓ senior-dev 12:27 refactored:3 complexity:reduced
+P5: ✓ code-reviewer 13:15 issues:0 decision:approved
+P6: ✓ qa-agent 13:18 ac:10/10 bugs:0 decision:pass
+P7: ✓ tech-writer 13:45 report:done docs:updated
+P7: ✓ tech-writer 13:49 report:done docs:updated

@@ -1,0 +1,60 @@
+# Story 10.19 - API Specification
+# Purpose: Benchmarking and TPM endpoints
+# Agent: BACKEND-DEV
+
+endpoints:
+  - method: "GET"
+    path: "/api/oee/benchmarks"
+    description: "Get industry benchmarks"
+    auth: "required"
+    query_params:
+      industry: "string (optional)"
+    response:
+      benchmarks:
+        - industry: "string"
+          typical: "number"
+          world_class: "number"
+
+  - method: "GET"
+    path: "/api/oee/benchmarks/compare"
+    description: "Compare org OEE to benchmarks"
+    auth: "required"
+    response:
+      org_oee: "number"
+      typical_benchmark: "number"
+      world_class_benchmark: "number"
+      gap_to_typical: "number"
+      gap_to_world_class: "number"
+      internal_best: "number"
+      recommendations: "string[]"
+
+  - method: "GET"
+    path: "/api/oee/benchmarks/internal"
+    description: "Get internal best-in-class"
+    auth: "required"
+    response:
+      best_line: "{ name, oee }"
+      best_shift: "{ name, oee }"
+      best_day: "{ date, oee }"
+
+  - method: "GET"
+    path: "/api/oee/improvement"
+    description: "Track improvement vs baseline"
+    auth: "required"
+    query_params:
+      baseline_date: "string (YYYY-MM-DD)"
+    response:
+      baseline_oee: "number"
+      current_oee: "number"
+      improvement_pct: "number"
+      trend: "TrendPoint[]"
+
+services:
+  - path: "apps/frontend/lib/services/benchmark-service.ts"
+    exports:
+      - name: "BenchmarkService"
+        methods:
+          - "getBenchmarks"
+          - "compareToIndustry"
+          - "getInternalBest"
+          - "trackImprovement"

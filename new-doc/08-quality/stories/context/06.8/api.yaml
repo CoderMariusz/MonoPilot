@@ -1,0 +1,363 @@
+# Story 06.8 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  - method: "POST"
+    path: "/api/quality/scanner/quick-inspection"
+    description: "Quick pass/fail for scanner workflow (simplified version of complete inspection)"
+    file: "apps/frontend/app/api/quality/scanner/quick-inspection/route.ts"
+    auth: "required"
+    roles: ["QA_INSPECTOR", "QA_MANAGER", "SUPER_ADMIN"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+        Content-Type: "application/json"
+      body:
+        inspection_id: "string UUID (required, must exist and be pending)"
+        result: "string enum: 'pass' | 'fail' (required)"
+        result_notes: "string (optional, max 2000 chars for fail reason)"
+        defects_found: "number (optional, int 0-1000)"
+        inspection_method: "string literal: 'scanner' (required)"
+        scanner_device_id: "string (optional, max 100 chars, device identifier)"
+        scanner_location: "string (optional, max 100 chars, GPS coordinates)"
+      example: |
+        {
+          "inspection_id": "uuid-ins-001",
+          "result": "pass",
+          "inspection_method": "scanner",
+          "scanner_device_id": "device-uuid-123"
+        }
+
+    response:
+      status: 200
+      type: "QuickInspectionResponse"
+      schema:
+        inspection: "QualityInspection"
+        lp_status_updated: "boolean"
+        lp_new_status: "string enum: 'passed' | 'failed'"
+      example: |
+        {
+          "inspection": {
+            "id": "uuid-ins-001",
+            "inspection_number": "INS-2025-00001",
+            "result": "pass",
+            "status": "completed",
+            "inspection_method": "scanner",
+            "created_at": "2025-12-17T10:15:00Z"
+          },
+          "lp_status_updated": true,
+          "lp_new_status": "passed"
+        }
+
+    errors:
+      - status: 400
+        code: "VALIDATION_ERROR"
+        message: "Invalid request body"
+        when: "Zod schema validation fails"
+      - status: 400
+        code: "INVALID_RESULT"
+        message: "Result must be 'pass' or 'fail'"
+        when: "Result value not in enum"
+      - status: 400
+        code: "INSPECTION_ALREADY_COMPLETED"
+        message: "Inspection already completed"
+        when: "Inspection status not 'in_progress'"
+      - status: 404
+        code: "NOT_FOUND"
+        message: "Inspection not found"
+        when: "Inspection ID doesn't exist or belongs to different org"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Insufficient permissions"
+        when: "User not QA_INSPECTOR role or higher"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token"
+
+  - method: "POST"
+    path: "/api/quality/scanner/sync-offline"
+    description: "Bulk sync offline actions from mobile device"
+    file: "apps/frontend/app/api/quality/scanner/sync-offline/route.ts"
+    auth: "required"
+    roles: ["QA_INSPECTOR", "QA_MANAGER", "SUPER_ADMIN"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+        Content-Type: "application/json"
+      body:
+        actions: "array of OfflineAction objects (required, min 1, max 100)"
+        actions[].id: "string UUID (local ID)"
+        actions[].type: "string enum: 'quick_inspection' | 'test_result'"
+        actions[].payload: "object (union of request types)"
+        actions[].timestamp: "string ISO 8601 timestamp"
+      example: |
+        {
+          "actions": [
+            {
+              "id": "local-uuid-1",
+              "type": "quick_inspection",
+              "payload": {
+                "inspection_id": "uuid-ins-001",
+                "result": "pass",
+                "inspection_method": "scanner",
+                "scanner_device_id": "device-123"
+              },
+              "timestamp": "2025-12-17T10:30:00Z"
+            },
+            {
+              "id": "local-uuid-2",
+              "type": "quick_inspection",
+              "payload": {
+                "inspection_id": "uuid-ins-002",
+                "result": "fail",
+                "result_notes": "Color off",
+                "inspection_method": "scanner"
+              },
+              "timestamp": "2025-12-17T10:35:00Z"
+            }
+          ]
+        }
+
+    response:
+      status: 200
+      type: "SyncOfflineResponse"
+      schema:
+        success: "number (count of synced actions)"
+        failed: "number (count of failed actions)"
+        errors: "array of error details"
+      example: |
+        {
+          "success": 2,
+          "failed": 0,
+          "errors": []
+        }
+
+    errors:
+      - status: 400
+        code: "VALIDATION_ERROR"
+        message: "Invalid request body"
+        when: "Schema validation fails"
+      - status: 400
+        code: "TOO_MANY_ACTIONS"
+        message: "Maximum 100 actions per sync"
+        when: "actions array exceeds 100"
+      - status: 400
+        code: "EMPTY_ACTIONS"
+        message: "At least 1 action required"
+        when: "actions array is empty"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Insufficient permissions"
+        when: "User lacks permission"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token"
+      - status: 207
+        code: "PARTIAL_SUCCESS"
+        message: "Some actions succeeded, some failed"
+        when: "Mix of successes and failures"
+        note: "Still returns 200 with success/failed counts"
+
+  - method: "GET"
+    path: "/api/quality/inspections/by-lp/:lpId"
+    description: "Get pending inspection for LP (optimized for scanner)"
+    file: "apps/frontend/app/api/quality/inspections/by-lp/[lpId]/route.ts"
+    auth: "required"
+    roles: ["QA_INSPECTOR", "QA_MANAGER", "SUPER_ADMIN", "VIEWER"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        lpId: "UUID (license plate ID)"
+
+    response:
+      status: 200
+      type: "InspectionByLPResponse"
+      schema:
+        inspection: "QualityInspection | null"
+        lp: "LicensePlate"
+        has_pending_inspection: "boolean"
+      example: |
+        {
+          "inspection": {
+            "id": "uuid-ins-001",
+            "inspection_number": "INS-2025-00001",
+            "type": "incoming",
+            "status": "in_progress",
+            "result": null,
+            "product_id": "uuid-prod-sugar",
+            "lp_id": "uuid-lp-001",
+            "batch_number": "BATCH-001"
+          },
+          "lp": {
+            "id": "uuid-lp-001",
+            "lp_number": "LP-2025-08902",
+            "batch_number": "BATCH-001",
+            "qa_status": "pending",
+            "received_date": "2025-12-14"
+          },
+          "has_pending_inspection": true
+        }
+
+    errors:
+      - status: 404
+        code: "NOT_FOUND"
+        message: "License plate not found"
+        when: "LP ID doesn't exist or belongs to different org"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Insufficient permissions"
+        when: "User not authorized"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/scanner-qa-service.ts"
+    description: "Scanner QA operations (lookup, quick decision, sync)"
+    exports:
+      - name: "ScannerQAService"
+        type: "class"
+        methods:
+          - name: "lookupLPForInspection"
+            params:
+              - "barcode: string"
+            returns: "Promise<{ lp: LicensePlate; inspection: QualityInspection | null }>"
+            description: "Lookup LP and check for pending inspection"
+
+          - name: "quickInspection"
+            params:
+              - "input: QuickInspectionRequest"
+            returns: "Promise<QuickInspectionResponse>"
+            description: "Quick pass/fail inspection (simplified workflow)"
+
+          - name: "syncOfflineActions"
+            params:
+              - "actions: OfflineAction[]"
+            returns: "Promise<SyncOfflineResponse>"
+            description: "Sync offline actions in bulk"
+
+          - name: "getOfflineQueue"
+            returns: "Promise<OfflineAction[]>"
+            description: "Get offline queue from IndexedDB"
+
+          - name: "queueOfflineAction"
+            params:
+              - "action: Omit<OfflineAction, 'id' | 'synced'>"
+            returns: "Promise<void>"
+            description: "Queue action for offline sync"
+
+          - name: "clearSyncedActions"
+            params:
+              - "actionIds: string[]"
+            returns: "Promise<void>"
+            description: "Clear synced actions from queue"
+
+  - path: "apps/frontend/lib/services/audio-feedback-service.ts"
+    description: "Audio feedback for scanner events"
+    exports:
+      - name: "AudioFeedbackService"
+        type: "class"
+        methods:
+          - name: "playSuccessBeep"
+            returns: "void"
+            description: "Play success beep (440 Hz, 100ms)"
+
+          - name: "playErrorBeep"
+            returns: "void"
+            description: "Play error beep (220 Hz, 200ms)"
+
+          - name: "playSuccessChime"
+            returns: "void"
+            description: "Play success chime (ascending tone)"
+
+          - name: "playAlertTone"
+            returns: "void"
+            description: "Play alert tone (descending tone)"
+
+          - name: "isMuted"
+            returns: "boolean"
+            description: "Check if audio is muted"
+
+          - name: "toggleMute"
+            returns: "void"
+            description: "Toggle audio mute"
+
+  - path: "apps/frontend/lib/services/offline-sync-service.ts"
+    description: "IndexedDB and connectivity management for offline mode"
+    exports:
+      - name: "OfflineSyncService"
+        type: "class"
+        methods:
+          - name: "init"
+            returns: "Promise<void>"
+            description: "Initialize IndexedDB for offline queue"
+
+          - name: "isOnline"
+            returns: "boolean"
+            description: "Check if device is online"
+
+          - name: "onConnectivityChange"
+            params:
+              - "callback: (online: boolean) => void"
+            returns: "() => void (unsubscribe function)"
+            description: "Listen for online/offline events"
+
+          - name: "syncNow"
+            returns: "Promise<SyncOfflineResponse>"
+            description: "Trigger sync of offline queue"
+
+          - name: "getQueueCount"
+            returns: "Promise<number>"
+            description: "Get queue count"
+
+# Validation Schemas (Zod)
+validation:
+  - path: "apps/frontend/lib/validation/quality-scanner-schemas.ts"
+    description: "Zod validation schemas for scanner QA operations"
+    schemas:
+      - name: "quickInspectionSchema"
+        type: "z.object"
+        fields:
+          inspection_id: "z.string().uuid('Invalid inspection ID')"
+          result: "z.enum(['pass', 'fail'])"
+          result_notes: "z.string().max(2000).optional()"
+          defects_found: "z.number().int().min(0).max(1000).optional()"
+          inspection_method: "z.literal('scanner')"
+          scanner_device_id: "z.string().max(100).optional()"
+          scanner_location: "z.string().max(100).optional()"
+
+      - name: "syncOfflineSchema"
+        type: "z.object"
+        fields:
+          actions: "z.array(offlineActionSchema).min(1).max(100)"
+
+      - name: "offlineActionSchema"
+        type: "z.object"
+        fields:
+          id: "z.string().uuid()"
+          type: "z.enum(['quick_inspection', 'test_result'])"
+          payload: "z.record(z.any())"
+          timestamp: "z.string().datetime()"
+
+# Implementation Notes
+implementation_notes:
+  scan_performance: "LP lookup should complete in <500ms"
+  quick_inspection: "API call should complete in <1s (online)"
+  offline_queue: "Action queued in <100ms (instant feedback)"
+  bulk_sync: "50 actions should sync in <10s"
+  duplicate_prevention: "API checks inspection not already completed"
+  audit_trail: "All actions logged with device_id, timestamp, online/offline status"
+  response_times:
+    lp_lookup: "<500ms"
+    quick_inspection_online: "<1s"
+    offline_queue_action: "<100ms"
+    bulk_sync_50_actions: "<10s"

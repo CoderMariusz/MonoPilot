@@ -1,0 +1,138 @@
+# Story 05.8 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "05.8"
+  name: "ASN CRUD + Items"
+  slug: "asn-crud-items"
+  epic: "05-warehouse"
+  phase: "Phase 1 (P1)"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "full-stack"
+  state: "ready"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, RLS, seed data
+  - api.yaml         # Endpoints, services, validation schemas
+  - frontend.yaml    # Pages, components, wireframe references
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["org_id context", "RLS patterns", "permission checks"]
+    - story: "01.8"
+      name: "Warehouses CRUD"
+      provides: ["warehouses table", "warehouse_id FK"]
+    - story: "02.1"
+      name: "Products CRUD"
+      provides: ["products table", "product_id FK"]
+    - story: "03.1"
+      name: "Suppliers CRUD"
+      provides: ["suppliers table", "supplier_id FK"]
+    - story: "03.3"
+      name: "PO CRUD + Lines"
+      provides: ["purchase_orders table", "purchase_order_lines table", "po_id FK", "auto-populate pattern"]
+    - story: "05.0"
+      name: "Warehouse Settings"
+      provides: ["warehouse_settings table", "enable_asn toggle"]
+    - story: "05.1"
+      name: "LP Table + Basic Service"
+      provides: ["license_plates table", "LP creation service"]
+
+  soft:
+    - story: "05.10"
+      name: "GRN CRUD + Items"
+      provides: ["grns table", "grn_items table", "GRN pre-fill from ASN"]
+
+  blocks:
+    - story: "05.9"
+      name: "ASN Receive Workflow"
+      reason: "Uses ASN data to create GRN and LPs"
+    - story: "05.7"
+      name: "Warehouse Dashboard"
+      reason: "Shows Expected Today ASNs widget"
+    - story: "05.19"
+      name: "Scanner Receive"
+      reason: "Scanner-based receiving from ASN"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/warehouse.md"
+    sections:
+      - "WH-FR-015"  # ASN Processing
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/warehouse.md"
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/05-warehouse/05.8.asn-crud-items.md"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-004-po-list.md"
+      note: "Use PO list pattern for ASN list"
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-005-po-create-edit-modal.md"
+      note: "Use PO master-detail pattern for ASN form"
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-006-po-detail.md"
+      note: "Use PO detail pattern for ASN detail"
+  patterns:
+    - path: "docs/2-MANAGEMENT/epics/current/03-planning/03.3.po-crud-lines.md"
+      note: "Reference PO CRUD pattern for ASN implementation"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for asns and asn_items"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 4
+    description: "asns table, asn_items table, warehouse_settings.enable_asn column, RLS policies"
+  - type: "service"
+    count: 1
+    description: "asn-service.ts with full CRUD + status transitions + ASN-from-PO workflow"
+  - type: "validation"
+    count: 1
+    description: "warehouse-schemas.ts Zod schemas for ASN header + items"
+  - type: "api"
+    count: 11
+    description: "CRUD + status actions + items operations + workflows endpoints"
+  - type: "pages"
+    count: 3
+    description: "ASN list page, ASN detail page, ASN create page"
+  - type: "components"
+    count: 8
+    description: "AsnList, AsnForm, AsnItemsTable, AsnItemForm, AsnStatusBadge, etc."
+  - type: "tests"
+    count: 4
+    description: "Unit + integration + E2E tests"
+
+# Technical notes
+technical_notes:
+  - "Master-Detail pattern: ASN header + items in atomic transactions (same as PO pattern)"
+  - "Use ADR-013 RLS pattern: org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+  - "ASN items RLS via FK to asns (no direct org_id)"
+  - "ASN number auto-generated as ASN-YYYY-NNNNN per org/year"
+  - "Status lifecycle: pending -> partial -> received | cancelled"
+  - "ASN-to-PO linkage: Auto-populate items from PO lines (expected_qty = ordered - received)"
+  - "Return 404 (not 403) for cross-tenant access"
+  - "Settings toggle: enable_asn must be true for ASN features"
+  - "GRN pre-fill: When creating GRN from ASN, copy item details"
+  - "Expected Today widget: Query asns WHERE expected_date = CURRENT_DATE AND status IN ('pending', 'partial')"
+  - "Duplicate product prevention: Same product_id cannot appear twice on same ASN"
+
+# PRD Coverage Map
+prd_coverage:
+  - fr_id: "WH-FR-015"
+    requirement: "ASN Processing"
+    coverage: "Full - create ASN with PO linkage, items auto-populate, status lifecycle, GRN pre-fill"
+    acceptance_criteria:
+      - "enable_asn toggle controls ASN feature visibility"
+      - "ASN linked to PO with items auto-populated from PO lines"
+      - "Expected Today dashboard widget shows pending/partial ASNs"
+      - "GRN pre-populated with ASN item details"
+      - "ASN status transitions: pending -> partial -> received"
+      - "Carrier and tracking number fields stored and displayed"

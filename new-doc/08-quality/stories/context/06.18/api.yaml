@@ -1,0 +1,69 @@
+# Story 06.18 - API Context
+# Generated: 2026-01-15
+# Purpose: Test result trending API endpoints
+
+base_path: "/api/quality/test-results"
+
+# =============================================================================
+# ENDPOINTS
+# =============================================================================
+
+endpoints:
+  - method: GET
+    path: /trends
+    description: "Get test result trends with aggregation"
+    auth: required
+    roles: ["*"]
+
+    query_params:
+      product_id: string (UUID, required)
+      parameter_ids: string[] (UUIDs, max 6)
+      date_from: string (ISO date, required)
+      date_to: string (ISO date, required)
+      aggregation: enum (daily/weekly/monthly, default: daily)
+
+    response:
+      status: 200
+      schema:
+        trends:
+          - parameter_id: string
+            parameter_name: string
+            unit: string
+            spec_min: number | null
+            spec_max: number | null
+            spec_target: number | null
+            data_points:
+              - date: string
+                avg_value: number
+                min_value: number
+                max_value: number
+                test_count: number
+                pass_count: number
+                fail_count: number
+        trend_analysis:
+          - parameter_id: string
+            slope: number (linear regression)
+            direction: enum (improving/degrading/stable)
+            r_squared: number
+
+    errors:
+      - status: 400
+        code: TOO_MANY_PARAMETERS
+        message: "Max 6 parameters allowed per chart"
+      - status: 400
+        code: DATE_RANGE_TOO_LARGE
+        message: "Date range exceeds 1000 data points"
+
+  - method: GET
+    path: /trends/export
+    description: "Export trend chart as PNG/PDF/CSV"
+    auth: required
+    roles: ["*"]
+
+    query_params:
+      Same as /trends
+      format: enum (png/pdf/csv)
+
+    response:
+      status: 200
+      content_type: image/png | application/pdf | text/csv

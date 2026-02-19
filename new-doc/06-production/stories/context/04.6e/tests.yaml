@@ -1,0 +1,353 @@
+# Story 04.6e - Test Specification
+# Purpose: Acceptance criteria, test cases for over-consumption control
+# Agent: QA / DEV (testing focus)
+
+# Acceptance Criteria (from PRD FR-PROD-010)
+acceptance_criteria:
+  - id: "AC1"
+    description: "GIVEN allow_over_consumption = false AND required = 100 AND consumed = 100, WHEN user attempts to consume additional 10, THEN approval request modal displays"
+    type: "functional"
+    test_type: "e2e"
+
+  - id: "AC2"
+    description: "GIVEN allow_over_consumption = true AND required = 100 AND consumed = 100, WHEN user consumes additional 10, THEN consumption proceeds with variance = +10%"
+    type: "functional"
+    test_type: "integration"
+
+  - id: "AC3"
+    description: "GIVEN material has variance > 0%, WHEN displayed in materials table, THEN variance indicator shows in red with percentage (e.g., '+10%')"
+    type: "ui"
+    test_type: "unit"
+
+  - id: "AC4"
+    description: "GIVEN material has variance = 0%, WHEN displayed in materials table, THEN variance indicator shows in green with '0%'"
+    type: "ui"
+    test_type: "unit"
+
+  - id: "AC5"
+    description: "GIVEN over-consumption approval requested, WHEN manager approves, THEN consumption proceeds and audit trail records approval"
+    type: "functional"
+    test_type: "integration"
+
+  - id: "AC6"
+    description: "GIVEN over-consumption approval requested, WHEN manager rejects with reason 'Investigate waste', THEN consumption is blocked and rejection reason is recorded"
+    type: "functional"
+    test_type: "integration"
+
+  - id: "AC7"
+    description: "GIVEN WO has any material with variance > 10%, WHEN dashboard loads, THEN WO is flagged in 'High Variance' alert section"
+    type: "functional"
+    test_type: "integration"
+
+  - id: "AC8"
+    description: "GIVEN allow_over_consumption = false, WHEN approval is pending, THEN operator sees 'Awaiting manager approval' status"
+    type: "ui"
+    test_type: "e2e"
+
+# Unit Tests
+unit_tests:
+  - file: "apps/frontend/components/production/consumption/__tests__/VarianceIndicator.test.tsx"
+    tests:
+      - name: "renders green indicator for 0% variance"
+        description: "Exact match - AC4"
+        input: "variancePercent: 0"
+        assertions:
+          - "Shows '0%' text"
+          - "Uses green color class"
+          - "Renders CheckCircle icon"
+
+      - name: "renders yellow indicator for 1-10% variance"
+        description: "Acceptable variance"
+        input: "variancePercent: 5"
+        assertions:
+          - "Shows '+5%' text"
+          - "Uses yellow color class"
+          - "Renders AlertTriangle icon"
+
+      - name: "renders red indicator for >10% variance"
+        description: "High variance - AC3"
+        input: "variancePercent: 15"
+        assertions:
+          - "Shows '+15%' text"
+          - "Uses red color class"
+          - "Renders XCircle icon"
+
+      - name: "formats decimal variance correctly"
+        input: "variancePercent: 7.5"
+        assertions:
+          - "Shows '+7.5%' text"
+
+  - file: "apps/frontend/lib/validation/__tests__/production-schemas.test.ts"
+    tests:
+      - name: "overConsumptionRequestSchema validates required fields"
+        assertions:
+          - "Rejects empty object"
+          - "Rejects missing wo_material_id"
+          - "Rejects missing lp_id"
+          - "Rejects missing requested_qty"
+          - "Accepts valid request"
+
+      - name: "overConsumptionRejectionSchema requires reason"
+        assertions:
+          - "Rejects missing reason"
+          - "Rejects empty reason"
+          - "Accepts valid reason"
+
+  - file: "apps/frontend/lib/services/__tests__/over-consumption-service.test.ts"
+    tests:
+      - name: "checkOverConsumption returns true when exceeds BOM"
+        setup: "required=100, consumed=95, requested=10"
+        assertions:
+          - "Returns isOverConsumption: true"
+          - "Returns overQty: 5"
+          - "Returns variancePercent: 5"
+
+      - name: "checkOverConsumption returns false when within BOM"
+        setup: "required=100, consumed=80, requested=10"
+        assertions:
+          - "Returns isOverConsumption: false"
+
+      - name: "checkOverConsumption returns false when exactly meets BOM"
+        setup: "required=100, consumed=90, requested=10"
+        assertions:
+          - "Returns isOverConsumption: false"
+
+# Integration Tests
+integration_tests:
+  - file: "apps/frontend/app/api/production/work-orders/[woId]/over-consumption/request/__tests__/route.test.ts"
+    tests:
+      - name: "returns 201 when over-consumption request created"
+        setup: |
+          allow_over_consumption = false
+          required = 100, consumed = 100
+          requested_qty = 10
+        assertions:
+          - "Status 201"
+          - "Response.status = 'pending'"
+          - "Response.variance_percent = 10"
+          - "Response.over_consumption_qty = 10"
+
+      - name: "returns 400 when not actually over-consumption"
+        setup: |
+          required = 100, consumed = 50
+          requested_qty = 10
+        assertions:
+          - "Status 400"
+          - "Error: 'This consumption does not exceed the BOM requirement'"
+
+      - name: "returns 400 when over-consumption is allowed"
+        setup: |
+          allow_over_consumption = true
+          required = 100, consumed = 100
+          requested_qty = 10
+        assertions:
+          - "Status 400"
+          - "Error: 'Over-consumption is allowed by settings'"
+
+      - name: "returns 400 when pending request already exists"
+        setup: "Create pending request first, then try to create another"
+        assertions:
+          - "Status 400"
+          - "Error: 'A pending approval request already exists'"
+
+  - file: "apps/frontend/app/api/production/work-orders/[woId]/over-consumption/approve/__tests__/route.test.ts"
+    tests:
+      - name: "returns 403 for Operator role"
+        setup: "Authenticated as Operator"
+        assertions:
+          - "Status 403"
+          - "Error: 'Only Managers and Admins can approve'"
+
+      - name: "returns 200 for Manager role and creates consumption"
+        description: "AC5 - Approval creates consumption"
+        setup: |
+          Authenticated as Manager
+          Valid pending request exists
+        assertions:
+          - "Status 200"
+          - "Response.status = 'approved'"
+          - "Response.consumption_id is UUID"
+          - "Consumption record created in database"
+          - "LP qty decreased"
+          - "Audit log entry created"
+
+      - name: "returns 400 for already decided request"
+        setup: "Request already approved"
+        assertions:
+          - "Status 400"
+          - "Error: 'This request has already been approved or rejected'"
+
+  - file: "apps/frontend/app/api/production/work-orders/[woId]/over-consumption/reject/__tests__/route.test.ts"
+    tests:
+      - name: "returns 200 for Manager rejection with reason"
+        description: "AC6 - Rejection blocks consumption"
+        setup: |
+          Authenticated as Manager
+          Valid pending request
+          reason = "Investigate waste"
+        assertions:
+          - "Status 200"
+          - "Response.status = 'rejected'"
+          - "Response.reason = 'Investigate waste'"
+          - "No consumption record created"
+          - "LP qty unchanged"
+
+      - name: "returns 400 when reason missing"
+        setup: "No reason provided"
+        assertions:
+          - "Status 400"
+          - "Error: 'Rejection reason is required'"
+
+  - file: "apps/frontend/lib/services/__tests__/dashboard-service.test.ts"
+    tests:
+      - name: "getHighVarianceWOs returns WOs with >10% variance"
+        description: "AC7 - Dashboard high variance alert"
+        setup: |
+          WO-001: Material A variance = 5%
+          WO-002: Material B variance = 15%
+          WO-003: Material C variance = 0%
+        assertions:
+          - "Returns only WO-002"
+          - "Includes material details"
+          - "Includes variance_percent = 15"
+
+# E2E Tests
+e2e_tests:
+  - file: "e2e/production/over-consumption.spec.ts"
+    tests:
+      - name: "Over-consumption shows approval modal when setting OFF"
+        description: "Full flow - AC1, AC8"
+        steps:
+          - "Set allow_over_consumption = false in settings"
+          - "Login as Operator"
+          - "Navigate to WO consumption page"
+          - "Consume material up to BOM requirement (e.g., 100 kg)"
+          - "Attempt to consume additional 10 kg"
+          - "Verify approval modal appears"
+          - "Verify modal shows variance calculation"
+          - "Verify 'Awaiting Manager Approval' status"
+
+      - name: "Over-consumption proceeds when setting ON"
+        description: "AC2"
+        steps:
+          - "Set allow_over_consumption = true in settings"
+          - "Login as Operator"
+          - "Consume material up to BOM requirement"
+          - "Consume additional 10 kg"
+          - "Verify consumption proceeds without modal"
+          - "Verify variance indicator shows +10%"
+          - "Verify materials table updated"
+
+      - name: "Manager can approve over-consumption"
+        description: "AC5"
+        steps:
+          - "Set allow_over_consumption = false"
+          - "Operator creates over-consumption request"
+          - "Login as Manager"
+          - "Navigate to WO consumption page"
+          - "Find pending approval in modal"
+          - "Enter optional reason"
+          - "Click Approve"
+          - "Verify success toast"
+          - "Verify consumption created"
+          - "Verify LP qty decreased"
+
+      - name: "Manager can reject over-consumption"
+        description: "AC6"
+        steps:
+          - "Operator creates over-consumption request"
+          - "Login as Manager"
+          - "Open approval modal"
+          - "Click Reject"
+          - "Enter reason 'Investigate waste'"
+          - "Confirm rejection"
+          - "Verify rejection recorded"
+          - "Verify consumption NOT created"
+          - "Operator sees rejection reason"
+
+      - name: "Variance indicator displays correctly"
+        description: "AC3, AC4"
+        steps:
+          - "Navigate to WO with materials at various consumption levels"
+          - "Verify 0% variance shows green"
+          - "Verify 5% variance shows yellow"
+          - "Verify 15% variance shows red"
+
+      - name: "Dashboard shows high variance alert"
+        description: "AC7"
+        steps:
+          - "Create WO with material consumed to +15% variance"
+          - "Navigate to production dashboard"
+          - "Verify WO appears in 'High Variance' alert section"
+          - "Verify alert shows material and variance %"
+
+# Performance Tests
+performance_tests:
+  - name: "Over-consumption check response time"
+    target: "<200ms"
+    description: "Quick check during consumption flow"
+
+  - name: "Approval modal load time"
+    target: "<300ms"
+    description: "Modal render with all data"
+
+  - name: "Approval/Rejection API response"
+    target: "<500ms"
+    description: "Full approval transaction including consumption creation"
+
+  - name: "High variance WOs query"
+    target: "<1s"
+    description: "Dashboard alert calculation"
+
+# Test Data Requirements
+test_data:
+  settings:
+    - org_id: "test-org"
+      allow_over_consumption: false
+    - org_id: "test-org-allowed"
+      allow_over_consumption: true
+  work_orders:
+    - wo_number: "WO-OVER-001"
+      status: "in_progress"
+      materials:
+        - product_code: "RM-001"
+          required_qty: 100
+          consumed_qty: 100  # At BOM limit
+        - product_code: "RM-002"
+          required_qty: 50
+          consumed_qty: 40   # Below limit
+  users:
+    - role: "operator"
+      name: "Test Operator"
+    - role: "production_manager"
+      name: "Test Manager"
+  approval_requests:
+    - status: "pending"
+      variance_percent: 10
+    - status: "approved"
+      variance_percent: 15
+    - status: "rejected"
+      variance_percent: 20
+      rejection_reason: "Excessive waste"
+
+# Edge Cases
+edge_cases:
+  - name: "Multiple pending requests for different materials"
+    description: "Each material can have its own pending request"
+    expected: "Independent approval workflow per material"
+
+  - name: "Concurrent approval attempts"
+    description: "Two managers try to approve same request"
+    expected: "First approval succeeds, second gets 'already decided' error"
+
+  - name: "Operator cancels pending request"
+    description: "Operator changes mind before manager decides"
+    expected: "Request status = 'cancelled', can create new request"
+
+  - name: "Exact boundary at 10% variance"
+    description: "Variance exactly 10%"
+    expected: "Yellow indicator (not red), no dashboard alert"
+
+  - name: "Setting changed while request pending"
+    description: "allow_over_consumption toggled to true"
+    expected: "Existing pending requests still require decision"

@@ -1,0 +1,136 @@
+# Story 01.16 - API Specification
+# Purpose: Invitation management endpoints
+# Agent: BACKEND-DEV (API focus)
+
+base_path: "/api/v1/settings/users"
+
+endpoints:
+  - method: "POST"
+    path: "/api/v1/settings/users/invite"
+    description: "Send new invitation"
+    auth: "required"
+    roles: ["SUPER_ADMIN", "ADMIN"]
+    request:
+      type: "InviteUserRequest"
+      schema:
+        email: "string (email format)"
+        role_id: "string (UUID)"
+    response:
+      status: 201
+      type: "InviteUserResponse"
+      schema:
+        invitation_id: "uuid"
+        email: "string"
+        expires_at: "ISO timestamp"
+    errors:
+      - { status: 400, code: "USER_EXISTS", message: "User with this email already exists" }
+      - { status: 400, code: "PENDING_INVITATION", message: "Invitation already pending for this email" }
+      - { status: 403, code: "ROLE_RESTRICTED", message: "Only Super Admin can invite Super Admin" }
+
+  - method: "GET"
+    path: "/api/v1/settings/users/invitations"
+    description: "List pending invitations"
+    auth: "required"
+    roles: ["SUPER_ADMIN", "ADMIN"]
+    response:
+      status: 200
+      type: "ListInvitationsResponse"
+      schema:
+        invitations: "Invitation[]"
+        total: "number"
+
+  - method: "POST"
+    path: "/api/v1/settings/users/invitations/:id/resend"
+    description: "Resend invitation (resets expiry and token)"
+    auth: "required"
+    roles: ["SUPER_ADMIN", "ADMIN"]
+    response:
+      status: 200
+      type: "ResendInvitationResponse"
+      schema:
+        invitation_id: "uuid"
+        new_expires_at: "ISO timestamp"
+
+  - method: "DELETE"
+    path: "/api/v1/settings/users/invitations/:id"
+    description: "Cancel/revoke invitation"
+    auth: "required"
+    roles: ["SUPER_ADMIN", "ADMIN"]
+    response:
+      status: 204
+
+  - method: "POST"
+    path: "/api/auth/accept-invitation"
+    description: "Accept invitation and create account (PUBLIC)"
+    auth: "none"
+    request:
+      type: "AcceptInvitationRequest"
+      schema:
+        token: "string (64 chars)"
+        password: "string (min 8, uppercase, lowercase, number, special)"
+    response:
+      status: 200
+      type: "AcceptInvitationResponse"
+      schema:
+        user_id: "uuid"
+        access_token: "string"
+        org_name: "string"
+    errors:
+      - { status: 404, code: "INVALID_TOKEN", message: "Invitation not found or expired" }
+      - { status: 400, code: "WEAK_PASSWORD", message: "Password does not meet requirements" }
+
+  - method: "GET"
+    path: "/api/auth/invitation/:token"
+    description: "Get invitation details for accept page (PUBLIC)"
+    auth: "none"
+    response:
+      status: 200
+      type: "GetInvitationResponse"
+      schema:
+        email: "string"
+        role_name: "string"
+        org_name: "string"
+        expires_at: "ISO timestamp"
+        is_expired: "boolean"
+    errors:
+      - { status: 404, code: "INVALID_TOKEN", message: "Invitation not found" }
+
+# Services
+services:
+  - path: "lib/services/invitation-service.ts"
+    exports:
+      - "createInvitation(orgId, invitedBy, data): Promise<Invitation>"
+      - "listInvitations(orgId, status?): Promise<Invitation[]>"
+      - "resendInvitation(invitationId, orgId): Promise<Invitation>"
+      - "cancelInvitation(invitationId, orgId): Promise<void>"
+      - "getInvitationByToken(token): Promise<InvitationDetails | null>"
+      - "acceptInvitation(token, password): Promise<{ user, accessToken }>"
+      - "validateEmail(orgId, email): Promise<{ valid, reason? }>"
+      - "expireOldInvitations(): Promise<number>"
+
+  - path: "lib/services/email-service.ts"
+    exports:
+      - "sendInvitationEmail(params): Promise<{ success, messageId? }>"
+    integration: "Resend API"
+    env_vars:
+      - "RESEND_API_KEY"
+      - "INVITATION_BASE_URL"
+
+# Email Template
+email_template:
+  subject: "You're invited to join {{orgName}} on MonoPilot"
+  body: |
+    Hi there,
+
+    {{inviterName}} has invited you to join {{orgName}} on MonoPilot as a {{roleName}}.
+
+    Click the button below to set up your account:
+
+    [Accept Invitation]({{inviteUrl}})
+
+    This invitation will expire on {{expiryDate}}.
+
+    If you didn't expect this invitation, you can safely ignore this email.
+
+    Best regards,
+    The MonoPilot Team

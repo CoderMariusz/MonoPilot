@@ -1,0 +1,187 @@
+# Story 04.7a: Output Registration Desktop - Test Specifications
+
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/output-service.test.ts"
+    type: "unit"
+  - path: "apps/frontend/lib/services/__tests__/by-product-service.test.ts"
+    type: "unit"
+  - path: "apps/frontend/lib/services/__tests__/yield-service.test.ts"
+    type: "unit"
+  - path: "apps/frontend/lib/validation/__tests__/output.test.ts"
+    type: "unit"
+  - path: "apps/frontend/app/api/production/outputs/__tests__/route.test.ts"
+    type: "integration"
+  - path: "apps/frontend/e2e/production/output-registration.spec.ts"
+    type: "e2e"
+
+unit_tests:
+  - fr_id: "FR-011"
+    service: "OutputService"
+    tests:
+      - name: "createOutput creates LP with correct metadata"
+        input:
+          wo_id: "uuid-wo-156"
+          quantity: 500
+          qa_status: "approved"
+        expected: "LP created with source='production', wo_id set, quantity=500"
+      - name: "createOutput links genealogy to consumed materials"
+        input:
+          wo_id: "uuid-wo-156"
+          consumed_lps: ["LP-001", "LP-002"]
+        expected: "lp_genealogy records created for each parent LP"
+      - name: "calculateExpiryDate adds shelf_life_days to today"
+        input:
+          shelf_life_days: 30
+          today: "2025-01-01"
+        expected: "2025-01-31"
+
+  - fr_id: "FR-013"
+    service: "ByProductService"
+    tests:
+      - name: "calculateExpectedQty returns correct percentage"
+        input:
+          planned_qty: 1000
+          yield_percent: 5
+        expected: 50
+      - name: "generateByProductBatch formats correctly"
+        input:
+          main_batch: "B-2025-0156"
+          product_code: "GERM"
+        expected: "B-2025-0156-BP-GERM"
+      - name: "autoCreateByProducts creates LPs for all by-products"
+        input:
+          wo_id: "uuid-wo-156"
+          by_products: ["BP-1", "BP-2", "BP-3"]
+        expected: "3 LPs created with correct quantities"
+
+  - fr_id: "FR-014"
+    service: "YieldService"
+    tests:
+      - name: "calculateOutputYield returns percentage"
+        input:
+          output_qty: 950
+          planned_qty: 1000
+        expected: 95.0
+      - name: "calculateMaterialYield handles division correctly"
+        input:
+          planned_material: 100
+          actual_consumed: 110
+        expected: 90.9
+      - name: "getYieldColor returns green for >= 95%"
+        input:
+          yield_percent: 95
+        expected: "green"
+      - name: "getYieldColor returns yellow for 80-94%"
+        input:
+          yield_percent: 85
+        expected: "yellow"
+      - name: "getYieldColor returns red for < 80%"
+        input:
+          yield_percent: 75
+        expected: "red"
+
+  - fr_id: "FR-011"
+    service: "Validation"
+    tests:
+      - name: "registerOutputSchema rejects quantity <= 0"
+        input:
+          quantity: 0
+        expected: "Validation error: Quantity must be greater than 0"
+      - name: "registerOutputSchema accepts valid output data"
+        input:
+          quantity: 500
+          batch_number: "B-2025-0156"
+          location_id: "uuid-loc-1"
+          expiry_date: "2025-01-31"
+        expected: "Validation passes"
+
+integration_tests:
+  - ac_id: "AC-011-01"
+    scenario: "Register output creates LP and updates WO"
+    steps:
+      - "POST /api/production/outputs with valid data"
+      - "Assert LP created in database with correct fields"
+      - "Assert WO.output_qty increased"
+      - "Assert genealogy records created"
+    expected_status: 201
+    expected_response:
+      lp:
+        qty: 500
+        qa_status: "approved"
+        source: "production"
+      wo_updated:
+        output_qty: "increased by 500"
+
+  - ac_id: "AC-011-07"
+    scenario: "Output registration creates genealogy links"
+    steps:
+      - "Setup: WO has consumed LP-001 and LP-002"
+      - "POST /api/production/outputs"
+      - "Query lp_genealogy for new LP"
+    expected:
+      genealogy_records: 2
+      parent_lps: ["LP-001", "LP-002"]
+
+  - ac_id: "AC-014-01"
+    scenario: "GET outputs returns correct yield calculation"
+    steps:
+      - "Setup: WO with planned_qty=1000, outputs totaling 950"
+      - "GET /api/production/outputs/:woId"
+    expected_response:
+      yields:
+        output_yield: 95.0
+
+  - ac_id: "AC-011-04"
+    scenario: "Validation rejects missing QA status when required"
+    steps:
+      - "Setup: require_qa_on_output=true"
+      - "POST /api/production/outputs without qa_status"
+    expected_status: 400
+    expected_error: "QA status is required"
+
+e2e_tests:
+  - name: "Register output flow"
+    description: "Complete flow from opening modal to LP creation"
+    steps:
+      - "Navigate to /production/outputs/:woId"
+      - "Click [Register Output] button"
+      - "Fill quantity: 500"
+      - "Select QA status: Approved"
+      - "Select location from dropdown"
+      - "Verify expiry date auto-calculated"
+      - "Click [Confirm Registration]"
+      - "Verify success toast displayed"
+      - "Verify output appears in history table"
+      - "Verify WO progress updated"
+
+  - name: "By-product registration flow"
+    description: "Register by-product after main output"
+    steps:
+      - "Register main output"
+      - "Click [Register Now] on unregistered by-product"
+      - "Verify expected qty pre-filled"
+      - "Adjust actual qty if needed"
+      - "Confirm registration"
+      - "Verify by-product LP created"
+      - "Verify genealogy linked to main output"
+
+  - name: "Output history filtering and sorting"
+    description: "Test table interactions"
+    steps:
+      - "Load page with multiple outputs"
+      - "Filter by QA status: Approved"
+      - "Verify only approved outputs shown"
+      - "Sort by Created At desc"
+      - "Verify order correct"
+      - "Click [Export CSV]"
+      - "Verify CSV downloaded"
+
+  - name: "Validation error handling"
+    description: "Test form validation feedback"
+    steps:
+      - "Open Register Output Modal"
+      - "Submit with quantity=0"
+      - "Verify error message: Quantity must be greater than 0"
+      - "Verify Confirm button disabled"
+      - "Enter valid quantity"
+      - "Verify error clears and button enabled"

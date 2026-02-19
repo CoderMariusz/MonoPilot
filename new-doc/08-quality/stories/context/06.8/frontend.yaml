@@ -1,0 +1,422 @@
+# Story 06.8 - Frontend Specification
+# Purpose: Components, hooks, types, pages
+# Agent: FRONTEND-DEV
+
+is_fullstack: true  # Both frontend and backend work
+
+# Pages to Create
+pages:
+  - path: "apps/frontend/app/(authenticated)/scanner/qa/page.tsx"
+    description: "Scanner QA home with quick actions and recent inspections"
+    wireframe: "QA-025 (Step 1)"
+    layout: "Scanner layout (minimal chrome, dark theme)"
+    performance: "Load within 500ms"
+    features:
+      - "Dark theme (slate-900 background)"
+      - "Quick action buttons: Record Inspection, CCP Monitoring (Phase 2), Checkpoint (Phase 2)"
+      - "Recent inspections list (today's completions)"
+      - "Pending tasks count badge"
+      - "Sync status indicator (online/offline/syncing)"
+      - "Queue count badge (if offline)"
+
+  - path: "apps/frontend/app/(authenticated)/scanner/qa/inspection/[id]/page.tsx"
+    description: "Inspection detail for quick pass/fail"
+    wireframe: "QA-025 (Step 2)"
+    layout: "Scanner layout"
+    performance: "Load within 500ms"
+    features:
+      - "Product info card (product name, batch, LP number)"
+      - "QA status badge (large, color-coded)"
+      - "Quick pass/fail buttons (56px height, large touch targets)"
+      - "Optional: Test parameters display (Phase 2)"
+      - "Success/fail feedback (checkmark, error icon)"
+
+# Components to Create
+components:
+  - path: "apps/frontend/components/scanner/ScannerLayout.tsx"
+    description: "Base scanner layout with dark theme, minimal chrome"
+    props:
+      children: "React.ReactNode"
+      title: "string (page title)"
+      showSyncStatus: "boolean (default: true)"
+    features:
+      - "Dark background (slate-900)"
+      - "Large header with title"
+      - "Sync status badge (online/offline/syncing)"
+      - "Queue count badge (if offline)"
+      - "Back button (navigation)"
+      - "Footer with metadata"
+    ui_states:
+      - "Online: green sync status"
+      - "Offline: orange offline badge with queue count"
+      - "Syncing: blue syncing indicator"
+
+  - path: "apps/frontend/components/scanner/qa/QAScannerHome.tsx"
+    description: "QA scanner home screen with quick actions"
+    wireframe: "QA-025 (Step 1)"
+    props:
+      pending_tasks_count: "number"
+      recent_inspections: "InspectionSummary[]"
+      onStartInspection: "() => void"
+    features:
+      - "Quick action buttons (72dp height, full width)"
+      - "Recent inspections list (64dp rows)"
+      - "Empty state: 'No pending inspections'"
+      - "Loading state: skeleton list"
+    ui_states:
+      - "loading: Skeleton rows"
+      - "empty: 'All inspections complete' message"
+      - "success: Recent inspections list + quick actions"
+
+  - path: "apps/frontend/components/scanner/qa/ScanInput.tsx"
+    description: "Barcode scan input with audio feedback"
+    props:
+      onScan: "(barcode: string) => void"
+      placeholder: "string"
+      autofocus: "boolean (default: true)"
+    features:
+      - "Hardware scanner integration (text input)"
+      - "Auto-focus for scanner readiness"
+      - "Success beep on valid scan"
+      - "Error beep on invalid barcode"
+      - "Debounce duplicate scans (2s window)"
+    ui_states:
+      - "idle: Empty input, ready to scan"
+      - "scanning: Input focused, waiting"
+      - "success: Beep sound, proceed to next screen"
+      - "error: Error message, clear input"
+
+  - path: "apps/frontend/components/scanner/qa/QuickInspectionDetail.tsx"
+    description: "Inspection detail for scanner (optimized for touch)"
+    wireframe: "QA-025 (Step 2)"
+    props:
+      inspection: "QualityInspection"
+      lp: "LicensePlate"
+      product: "Product"
+      onPass: "() => void"
+      onFail: "() => void"
+    features:
+      - "Product info card (large text 24px)"
+      - "QA status badge (color-coded: pending=yellow, passed=green, failed=red)"
+      - "LP number display (large 24px)"
+      - "Batch number (if available)"
+      - "Large pass/fail buttons (56px height)"
+    ui_states:
+      - "loading: Skeleton content"
+      - "success: Full inspection display"
+      - "error: Error message with retry"
+
+  - path: "apps/frontend/components/scanner/qa/QuickPassFailButtons.tsx"
+    description: "Large pass/fail button pair (touch-optimized)"
+    props:
+      onPass: "() => void"
+      onFail: "() => void"
+      disabled: "boolean (default: false)"
+    features:
+      - "Primary color: Green (pass), Red (fail)"
+      - "Button height: 56px"
+      - "Button width: 48% each with 4% gap"
+      - "Touch-friendly spacing"
+      - "Ripple effect on press"
+    accessibility:
+      - "High contrast colors (WCAG AAA)"
+      - "Clear labels: 'Quick Pass', 'Quick Fail'"
+      - "Minimum 48px touch target"
+
+  - path: "apps/frontend/components/scanner/qa/QuickPassConfirmDialog.tsx"
+    description: "Confirmation dialog for quick pass"
+    props:
+      inspection: "QualityInspection"
+      product: "Product"
+      open: "boolean"
+      onClose: "() => void"
+      onConfirm: "() => void"
+    content:
+      title: "Confirm Pass (24px)"
+      message: "Mark inspection as PASSED?"
+      details: "Product: {name}, LP: {number}"
+      actions: ["Cancel (48px)", "Confirm Pass (56px, green)"]
+    features:
+      - "Large touch targets (48px minimum)"
+      - "Clear confirmation message"
+      - "Product/LP summary"
+      - "Modal focus trap"
+
+  - path: "apps/frontend/components/scanner/qa/QuickFailConfirmDialog.tsx"
+    description: "Confirmation dialog for quick fail with optional notes"
+    props:
+      inspection: "QualityInspection"
+      product: "Product"
+      open: "boolean"
+      onClose: "() => void"
+      onConfirm: "(notes?: string, defects?: number) => void"
+    fields:
+      - name: "result_notes"
+        type: "textarea"
+        required: false
+        placeholder: "Reason for failure (optional)"
+        max_length: 500
+      - name: "defects_found"
+        type: "number"
+        required: false
+        placeholder: "Number of defects found"
+    features:
+      - "Optional notes field (4 rows)"
+      - "Optional defect count input (numeric keypad)"
+      - "Large buttons (56px)"
+      - "Modal focus trap"
+    accessibility:
+      - "High contrast text (WCAG AAA)"
+      - "Clear input labels"
+      - "Error states for required fields"
+
+  - path: "apps/frontend/components/scanner/qa/InspectionSuccessScreen.tsx"
+    description: "Success feedback screen after inspection completion"
+    props:
+      inspection: "QualityInspection"
+      result: "'pass' | 'fail'"
+      autoClose: "boolean (default: true, 3s timeout)"
+      onDone: "() => void"
+    features:
+      - "Large green checkmark (pass) or red X (fail)"
+      - "Success message: 'Inspection Passed' or 'Inspection Failed'"
+      - "Inspection record ID display"
+      - "Success chime audio feedback"
+      - "Success haptic vibration (100ms pulse)"
+      - "Auto-redirect after 3s (or manual close)"
+    ui_states:
+      - "success_pass: Green checkmark, success message"
+      - "success_fail: Red X, failure message"
+      - "countdown: Show 3s countdown"
+
+  - path: "apps/frontend/components/scanner/qa/InspectionFailScreen.tsx"
+    description: "Failure feedback screen with error details"
+    props:
+      inspection: "QualityInspection"
+      error: "string"
+      onRetry: "() => void"
+      onCancel: "() => void"
+    features:
+      - "Error icon (red)"
+      - "Error message display"
+      - "Retry button (reload inspection)"
+      - "Cancel button (return to home)"
+      - "Error tone audio feedback"
+      - "Error haptic vibration (double 100ms pulse)"
+
+  - path: "apps/frontend/components/scanner/SyncStatusBadge.tsx"
+    description: "Online/offline/syncing status indicator (small badge)"
+    props:
+      status: "'online' | 'offline' | 'syncing'"
+      queueCount: "number (optional, shown if offline)"
+    features:
+      - "Online: Green badge, 'Synced'"
+      - "Offline: Orange badge, 'Offline' + queue count"
+      - "Syncing: Blue badge, 'Syncing...'"
+      - "Small badge (24px height)"
+      - "Footer placement"
+    accessibility:
+      - "ARIA label for status"
+      - "Color + text for clarity"
+
+  - path: "apps/frontend/components/scanner/OfflineBadge.tsx"
+    description: "Queue count badge for offline mode"
+    props:
+      count: "number"
+      maxCount: "number (default: 50)"
+    features:
+      - "Displays queue count: '3 actions queued'"
+      - "Warning if approaching limit (>40)"
+      - "Error state if full (= 50)"
+      - "Click to view queue details"
+    ui_states:
+      - "normal: Gray badge, count display"
+      - "warning: Orange badge, count + warning"
+      - "error: Red badge, count + error"
+
+  - path: "apps/frontend/components/scanner/AudioFeedback.tsx"
+    description: "Audio feedback player (beeps, chimes, tones)"
+    props:
+      type: "'success' | 'error' | 'alarm' | 'chime'"
+      volume: "number (0-100, default: 80)"
+      isMuted: "boolean"
+    features:
+      - "Success beep: 440 Hz, 100ms"
+      - "Error beep: 220 Hz, 200ms"
+      - "Alarm tone: 880 Hz, repeating"
+      - "Success chime: Ascending tone"
+      - "Mute toggle (persistent in localStorage)"
+      - "Graceful degradation if audio not supported"
+
+# Hooks to Create
+hooks:
+  - path: "apps/frontend/lib/hooks/use-scanner-qa.ts"
+    description: "React hook for scanner QA operations"
+    exports:
+      - name: "useScannerQA"
+        returns: "{ lookupLP, quickInspection, syncOffline, isOnline }"
+        features:
+          - "LP barcode lookup with error handling"
+          - "Quick inspection submission"
+          - "Offline queue management"
+          - "Connectivity detection"
+
+  - path: "apps/frontend/lib/hooks/use-offline-queue.ts"
+    description: "Hook for managing offline action queue"
+    exports:
+      - name: "useOfflineQueue"
+        returns: "{ queue, queueCount, addAction, clearQueue, syncNow }"
+        features:
+          - "Queue operations (add, clear)"
+          - "Queue count tracking"
+          - "Manual sync trigger"
+          - "Auto-sync on online event"
+
+  - path: "apps/frontend/lib/hooks/use-audio-feedback.ts"
+    description: "Hook for audio feedback playback"
+    exports:
+      - name: "useAudioFeedback"
+        returns: "{ playSuccessBeep, playErrorBeep, playAlarm, toggleMute }"
+        features:
+          - "Multiple feedback types"
+          - "Mute toggle (localStorage persistent)"
+          - "Graceful fallback if audio unavailable"
+
+# Types to Create
+types:
+  - path: "apps/frontend/lib/types/scanner.ts"
+    description: "Scanner-specific TypeScript interfaces"
+    exports:
+      - name: "OfflineAction"
+        fields:
+          - "id: string (local UUID)"
+          - "type: 'quick_inspection' | 'test_result'"
+          - "payload: QuickInspectionRequest | TestResultRequest"
+          - "timestamp: Date"
+          - "synced: boolean"
+          - "retry_count: number"
+
+      - name: "QuickInspectionRequest"
+        fields:
+          - "inspection_id: string"
+          - "result: 'pass' | 'fail'"
+          - "result_notes?: string"
+          - "defects_found?: number"
+          - "inspection_method: 'scanner'"
+          - "scanner_device_id?: string"
+          - "scanner_location?: string"
+
+      - name: "QuickInspectionResponse"
+        fields:
+          - "inspection: QualityInspection"
+          - "lp_status_updated: boolean"
+          - "lp_new_status: 'passed' | 'failed'"
+
+      - name: "InspectionSummary"
+        fields:
+          - "id: string"
+          - "inspection_id: string"
+          - "type: 'product_inspection' | 'ccp_monitoring' | 'checkpoint'"
+          - "product_name: string"
+          - "batch_or_lp: string"
+          - "result: 'pass' | 'fail' | 'pending_review'"
+          - "timestamp: Date"
+          - "operator: string"
+
+      - name: "ScannerState"
+        fields:
+          - "isOnline: boolean"
+          - "queueCount: number"
+          - "isSyncing: boolean"
+          - "lastSync: Date | null"
+
+# UX Implementation
+ux:
+  wireframes:
+    - id: "QA-025"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/QA-025-scanner-qa.md"
+      components:
+        - "QAScannerHome"
+        - "ScanInput"
+        - "QuickInspectionDetail"
+        - "QuickPassFailButtons"
+        - "QuickPassConfirmDialog"
+        - "QuickFailConfirmDialog"
+        - "InspectionSuccessScreen"
+        - "InspectionFailScreen"
+        - "SyncStatusBadge"
+        - "OfflineBadge"
+      states:
+        - "Home: Quick actions + recent inspections"
+        - "Scan: Input focused, waiting for barcode"
+        - "Inspection Detail: Product info + pass/fail buttons"
+        - "Pass Confirm: Confirmation dialog"
+        - "Success: Green checkmark + auto-redirect"
+        - "Fail: Red X + error feedback"
+        - "Offline: Orange banner + queued operations"
+
+  patterns:
+    layout: "Dark theme (slate-900), minimal chrome"
+    buttons: "Large touch targets (56px primary, 48px secondary)"
+    forms: "Numeric keypad for values, text area for notes"
+    feedback: "Audio + haptic + visual (multi-modal)"
+    offline: "IndexedDB queue, FIFO sync, local validation"
+
+  accessibility:
+    - "Touch targets: 72dp (actions), 56dp (buttons), 48dp minimum"
+    - "Contrast: 4.5:1 (text), 7:1 (critical alerts)"
+    - "Haptic: Success, error, warning pulses"
+    - "Screen reader: All elements labeled"
+    - "Keyboard: Tab navigation, Enter to submit"
+
+  responsive:
+    - "Mobile Portrait (320-480px): Primary mode, stack all"
+    - "Mobile Landscape (480-800px): Side-by-side layout"
+    - "Tablet (768-1024px): Enhanced spacing"
+
+# Permission Enforcement
+permissions:
+  view_scanner:
+    roles: ["QA_INSPECTOR", "QA_MANAGER", "SUPER_ADMIN"]
+    action: "Can access scanner QA"
+    ui_effect: "Show scanner QA in navigation"
+
+  record_inspection:
+    roles: ["QA_INSPECTOR", "QA_MANAGER", "SUPER_ADMIN"]
+    action: "Can record quick pass/fail"
+    ui_effect: "Show quick actions on home"
+
+  offline_sync:
+    roles: ["QA_INSPECTOR", "QA_MANAGER", "SUPER_ADMIN"]
+    action: "Can sync offline queue"
+    ui_effect: "Auto-sync, manual retry button"
+
+# Performance Targets
+performance:
+  page_load: "500ms for QA home"
+  lp_lookup: "200ms for barcode scan"
+  quick_inspection: "1s for online submission"
+  offline_queue: "100ms for action queue"
+  offline_sync: "10s for 50 actions"
+
+# Error Handling
+error_messages:
+  barcode_not_found: "Barcode not recognized. Scan again or enter manually."
+  inspection_not_found: "No inspection found for this LP."
+  invalid_barcode: "Invalid barcode format."
+  network_error: "Network error. Working offline."
+  queue_full: "Offline queue full (50). Connect to sync."
+  inspection_already_completed: "This inspection already completed."
+
+# Testing Focus
+testing_focus:
+  - "Barcode scanning triggers correct product lookup"
+  - "Quick pass/fail submission completes in <1s"
+  - "Offline queue queues action in <100ms"
+  - "Auto-sync when online, maintains FIFO order"
+  - "Audio feedback plays for each action"
+  - "Touch targets are 48px minimum"
+  - "Dark theme provides WCAG AAA contrast"
+  - "Offline mode shows queue count"
+  - "Success/fail screens auto-close after 3s"
+  - "Scanner device tracking works for analytics"

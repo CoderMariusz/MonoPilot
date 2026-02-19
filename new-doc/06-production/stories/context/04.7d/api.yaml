@@ -1,0 +1,247 @@
+# Story 04.7d - API Specification
+# Purpose: Endpoints for output list and progress tracking
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  - method: "GET"
+    path: "/api/production/work-orders/:id/outputs"
+    description: "Get all outputs for a WO with pagination"
+    file: "apps/frontend/app/api/production/work-orders/[id]/outputs/route.ts"
+    auth: "required"
+    roles: ["operator", "production_manager", "admin", "owner"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        id: "UUID - Work Order ID"
+      query:
+        page: "integer - default 1"
+        limit: "integer - default 20, max 100"
+        qa_status: "string - filter by qa_status (approved/pending/rejected)"
+        location_id: "UUID - filter by location"
+        sort: "string - created_at (default), qty, lp_number"
+        order: "string - desc (default), asc"
+
+    response:
+      status: 200
+      type: "OutputsListResponse"
+      schema:
+        outputs: "array of output objects"
+        summary:
+          total_outputs: "integer"
+          total_qty: "decimal"
+          approved_count: "integer"
+          approved_qty: "decimal"
+          pending_count: "integer"
+          pending_qty: "decimal"
+          rejected_count: "integer"
+          rejected_qty: "decimal"
+        pagination:
+          total: "integer"
+          page: "integer"
+          limit: "integer"
+          pages: "integer"
+      example:
+        outputs:
+          - id: "uuid-output-1"
+            lp_id: "uuid-lp-482"
+            lp_number: "LP-2025-05482"
+            quantity: 500
+            uom: "kg"
+            batch_number: "B-2025-0156"
+            qa_status: "approved"
+            location_id: "uuid-loc-1"
+            location_name: "WH-A / Zone 1 / Rack 2"
+            expiry_date: "2025-01-13"
+            created_at: "2025-12-14T08:15:00Z"
+            created_by_name: "John Smith"
+        summary:
+          total_outputs: 6
+          total_qty: 3200
+          approved_count: 4
+          approved_qty: 2550
+          pending_count: 1
+          pending_qty: 600
+          rejected_count: 1
+          rejected_qty: 50
+        pagination:
+          total: 6
+          page: 1
+          limit: 20
+          pages: 1
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 404
+        code: "WO_NOT_FOUND"
+        message: "Work order not found"
+
+  - method: "GET"
+    path: "/api/production/work-orders/:id/progress"
+    description: "Get WO output progress summary"
+    file: "apps/frontend/app/api/production/work-orders/[id]/progress/route.ts"
+    auth: "required"
+    roles: ["operator", "production_manager", "admin", "owner"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        id: "UUID - Work Order ID"
+
+    response:
+      status: 200
+      type: "WOProgressResponse"
+      schema:
+        wo_id: "UUID"
+        wo_number: "string"
+        planned_qty: "decimal"
+        output_qty: "decimal"
+        progress_percent: "decimal"
+        remaining_qty: "decimal"
+        outputs_count: "integer"
+        is_complete: "boolean"
+        auto_complete_enabled: "boolean"
+        status: "string"
+      example:
+        wo_id: "456e4567-e89b-12d3-a456-426614174111"
+        wo_number: "WO-2025-0156"
+        planned_qty: 5000
+        output_qty: 3200
+        progress_percent: 64.0
+        remaining_qty: 1800
+        outputs_count: 6
+        is_complete: false
+        auto_complete_enabled: true
+        status: "in_progress"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/output-aggregation-service.ts"
+    description: "Output aggregation and progress calculation service"
+    exports:
+      - name: "getOutputsForWO"
+        type: "async function"
+        params:
+          - "woId: string"
+          - "options?: OutputQueryOptions"
+        returns: "Promise<OutputsListResponse>"
+        description: "Get paginated outputs with filters"
+
+      - name: "getWOProgress"
+        type: "async function"
+        params:
+          - "woId: string"
+        returns: "Promise<WOProgressResponse>"
+        description: "Get WO progress summary"
+
+      - name: "calculateProgress"
+        type: "function"
+        params:
+          - "outputQty: number"
+          - "plannedQty: number"
+        returns: "number"
+        description: "Calculate progress percentage"
+        implementation: |
+          if (plannedQty <= 0) return 0;
+          return (outputQty / plannedQty) * 100;
+
+      - name: "getOutputsSummary"
+        type: "async function"
+        params:
+          - "woId: string"
+        returns: "Promise<OutputsSummary>"
+        description: "Get aggregated output statistics"
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/production.ts"
+    exports:
+      - name: "OutputQueryOptions"
+        type: "interface"
+        fields:
+          - "page?: number"
+          - "limit?: number"
+          - "qa_status?: 'approved' | 'pending' | 'rejected'"
+          - "location_id?: string"
+          - "sort?: 'created_at' | 'qty' | 'lp_number'"
+          - "order?: 'asc' | 'desc'"
+
+      - name: "OutputItem"
+        type: "interface"
+        fields:
+          - "id: string"
+          - "lp_id: string"
+          - "lp_number: string"
+          - "quantity: number"
+          - "uom: string"
+          - "batch_number: string"
+          - "qa_status: QAStatus"
+          - "location_id: string"
+          - "location_name: string"
+          - "expiry_date: string | null"
+          - "created_at: string"
+          - "created_by_name: string"
+          - "notes: string | null"
+
+      - name: "OutputsSummary"
+        type: "interface"
+        fields:
+          - "total_outputs: number"
+          - "total_qty: number"
+          - "approved_count: number"
+          - "approved_qty: number"
+          - "pending_count: number"
+          - "pending_qty: number"
+          - "rejected_count: number"
+          - "rejected_qty: number"
+
+      - name: "WOProgressResponse"
+        type: "interface"
+        fields:
+          - "wo_id: string"
+          - "wo_number: string"
+          - "planned_qty: number"
+          - "output_qty: number"
+          - "progress_percent: number"
+          - "remaining_qty: number"
+          - "outputs_count: number"
+          - "is_complete: boolean"
+          - "auto_complete_enabled: boolean"
+          - "status: WOStatus"
+
+      - name: "OutputsListResponse"
+        type: "interface"
+        fields:
+          - "outputs: OutputItem[]"
+          - "summary: OutputsSummary"
+          - "pagination: Pagination"
+
+# Validation
+validation:
+  - path: "apps/frontend/lib/validation/production-schemas.ts"
+    exports:
+      - name: "outputQuerySchema"
+        type: "zod schema"
+        schema: |
+          z.object({
+            page: z.coerce.number().int().min(1).default(1),
+            limit: z.coerce.number().int().min(1).max(100).default(20),
+            qa_status: z.enum(['approved', 'pending', 'rejected']).optional(),
+            location_id: z.string().uuid().optional(),
+            sort: z.enum(['created_at', 'qty', 'lp_number']).default('created_at'),
+            order: z.enum(['asc', 'desc']).default('desc')
+          })
+
+# Auto-Complete Logic
+auto_complete:
+  trigger: "Database trigger on work_orders.output_qty UPDATE"
+  condition: "auto_complete_wo = true AND output_qty >= planned_qty AND status = 'in_progress'"
+  action: "Set status = 'completed', completed_at = NOW()"
+  notes:
+    - "Trigger runs within same transaction as output registration"
+    - "Manual completion still available when auto_complete_wo = false"
+    - "Over-production does not prevent auto-complete"

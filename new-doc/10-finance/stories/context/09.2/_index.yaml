@@ -1,0 +1,64 @@
+story:
+  id: "09.2"
+  name: "Standard Cost Definition"
+  epic: "09-finance"
+  phase: "1"
+  complexity: "M"
+  estimate_days: 4
+
+dependencies:
+  required:
+    - story: "01.1"
+      provides: ["organizations", "users"]
+    - story: "02.1"
+      provides: ["products"]
+    - story: "09.1"
+      provides: ["finance_settings", "base_currency"]
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/finance.md"
+  prd_sections: ["FR-9.1.4"]
+  story: "docs/2-MANAGEMENT/epics/current/09-finance/09.2.standard-cost-definition.md"
+
+files_to_create:
+  database:
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_create_currencies_and_tax_codes.sql"
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_create_standard_costs.sql"
+  api:
+    - path: "apps/frontend/app/api/finance/standard-costs/route.ts"
+    - path: "apps/frontend/app/api/finance/standard-costs/[id]/route.ts"
+    - path: "apps/frontend/app/api/finance/standard-costs/[id]/approve/route.ts"
+    - path: "apps/frontend/app/api/finance/currencies/route.ts"
+    - path: "apps/frontend/app/api/finance/tax-codes/route.ts"
+  services:
+    - path: "apps/frontend/lib/services/standard-cost-service.ts"
+    - path: "apps/frontend/lib/services/currency-service.ts"
+    - path: "apps/frontend/lib/services/tax-code-service.ts"
+
+database:
+  tables:
+    - name: "currencies"
+      columns: ["id", "org_id", "code", "name", "symbol", "is_base", "exchange_rate"]
+      rls: true
+    - name: "tax_codes"
+      columns: ["id", "org_id", "code", "name", "rate_percent", "country_code"]
+      rls: true
+    - name: "standard_costs"
+      columns: ["id", "org_id", "item_id", "effective_from", "material_cost", "labor_cost", "overhead_cost", "total_cost", "status"]
+      rls: true
+
+api_endpoints:
+  - method: "POST"
+    path: "/api/finance/standard-costs"
+    roles: ["admin", "finance_manager", "cost_accountant"]
+  - method: "POST"
+    path: "/api/finance/standard-costs/:id/approve"
+    roles: ["admin", "finance_manager"]
+
+acceptance_checklist:
+  - "standard_costs table with effective dates"
+  - "Approval workflow (draft → approved → active)"
+  - "Cost history tracking"
+  - "Currency and tax code CRUD"
+  - "RLS enforced"
+  - "UI form functional"

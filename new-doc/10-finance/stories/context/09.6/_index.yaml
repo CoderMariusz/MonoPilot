@@ -1,0 +1,169 @@
+story:
+  id: "09.6"
+  name: "WO Cost Summary"
+  epic: "09-finance"
+  phase: "1"
+  complexity: "M"
+  estimate_days: 4
+  type: "fullstack"
+  state: "ready"
+
+dependencies:
+  required:
+    - story: "01.1"
+      provides: ["organizations", "users", "roles"]
+    - story: "02.1"
+      provides: ["products table"]
+    - story: "04.1"
+      provides: ["work_orders table", "WO service"]
+    - story: "04.4"
+      provides: ["material_consumption for material costs"]
+    - story: "04.5"
+      provides: ["operation_labor for labor costs"]
+  within_epic:
+    - story: "09.8"
+      type: "HARD"
+      provides: ["currencies table", "currency conversion"]
+    - story: "09.9"
+      type: "SOFT"
+      provides: ["tax_codes for VAT"]
+    - story: "09.10"
+      type: "SOFT"
+      provides: ["cost_centers for cost allocation"]
+  provides_to:
+    - story: "09.11"
+      provides: "Cost Variance Analysis - actual cost baseline"
+    - story: "09.12"
+      provides: "Overhead Allocation - cost summary integration"
+    - story: "09.13"
+      provides: "Operation Costing - WO cost structure"
+    - story: "09.14"
+      provides: "Scrap Costing - total cost reference"
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/finance.md"
+  prd_sections: ["FR-9.3.4", "FR-9.3.6"]
+  architecture: "docs/1-BASELINE/architecture/modules/finance.md"
+  story: "docs/2-MANAGEMENT/epics/current/09-finance/09.6.wo-cost-summary.md"
+  patterns:
+    - "apps/frontend/components/production/WODetailCard.tsx"
+
+files_to_create:
+  database:
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_create_work_order_costs.sql"
+      type: "migration"
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_create_material_consumption_costs.sql"
+      type: "migration"
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_create_labor_costs.sql"
+      type: "migration"
+  api:
+    - path: "apps/frontend/app/api/finance/work-order-costs/[id]/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/finance/work-order-costs/[id]/material/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/finance/work-order-costs/[id]/labor/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/finance/work-order-costs/[id]/recalculate/route.ts"
+      methods: ["POST"]
+    - path: "apps/frontend/app/api/finance/work-order-costs/[id]/export/route.ts"
+      methods: ["GET"]
+  services:
+    - path: "apps/frontend/lib/services/work-order-cost-service.ts"
+  validation:
+    - path: "apps/frontend/lib/validation/work-order-cost-schema.ts"
+  components:
+    - path: "apps/frontend/components/finance/WOCostSummaryCard.tsx"
+    - path: "apps/frontend/components/finance/WOCostBreakdownChart.tsx"
+    - path: "apps/frontend/components/finance/WOCostStatusBadge.tsx"
+    - path: "apps/frontend/components/finance/MaterialCostsTable.tsx"
+    - path: "apps/frontend/components/finance/LaborCostsTable.tsx"
+    - path: "apps/frontend/components/finance/CostExportButton.tsx"
+
+database:
+  tables:
+    - name: "work_order_costs"
+      columns: ["id", "org_id", "work_order_id", "material_cost_actual", "labor_cost_actual", "overhead_cost_actual", "total_cost_actual", "material_cost_standard", "labor_cost_standard", "overhead_cost_standard", "total_cost_standard", "material_variance", "labor_variance", "overhead_variance", "total_variance", "quantity_planned", "quantity_produced", "quantity_scrapped", "unit_cost_actual", "unit_cost_standard", "currency_id", "cost_center_id", "costing_date", "costing_method", "status", "last_calculated_at", "calculated_by"]
+      rls: true
+      indexes: ["org_id", "work_order_id", "status", "cost_center_id", "costing_date"]
+    - name: "material_consumption_costs"
+      columns: ["id", "org_id", "consumption_id", "work_order_id", "product_id", "quantity", "uom", "unit_cost", "total_cost", "currency_id", "cost_method", "cost_layer_id", "cost_center_id", "transaction_date"]
+      rls: true
+      indexes: ["org_id", "work_order_id", "consumption_id", "product_id", "transaction_date"]
+    - name: "labor_costs"
+      columns: ["id", "org_id", "work_order_id", "operation_id", "user_id", "hours_actual", "hours_standard", "hourly_rate", "total_cost", "currency_id", "cost_center_id", "transaction_date"]
+      rls: true
+      indexes: ["org_id", "work_order_id", "operation_id", "user_id", "transaction_date"]
+  functions:
+    - name: "calculate_work_order_costs"
+      params: ["p_work_order_id UUID"]
+      returns: "void"
+  triggers:
+    - name: "trigger_recalc_costs_after_consumption"
+      table: "material_consumption_costs"
+      event: "AFTER INSERT OR UPDATE"
+    - name: "trigger_recalc_costs_after_labor"
+      table: "labor_costs"
+      event: "AFTER INSERT OR UPDATE"
+
+api_endpoints:
+  - method: "GET"
+    path: "/api/finance/work-order-costs/:id"
+    auth: true
+    roles: ["admin", "finance_manager", "production_manager", "viewer"]
+  - method: "GET"
+    path: "/api/finance/work-order-costs/:id/material"
+    auth: true
+    roles: ["admin", "finance_manager", "production_manager"]
+  - method: "GET"
+    path: "/api/finance/work-order-costs/:id/labor"
+    auth: true
+    roles: ["admin", "finance_manager", "production_manager"]
+  - method: "POST"
+    path: "/api/finance/work-order-costs/:id/recalculate"
+    auth: true
+    roles: ["admin", "finance_manager"]
+  - method: "GET"
+    path: "/api/finance/work-order-costs/:id/export"
+    auth: true
+    roles: ["admin", "finance_manager", "production_manager", "viewer"]
+
+validation_rules:
+  quantity: "number, positive"
+  unit_cost: "number, >= 0"
+  total_cost: "number, >= 0"
+  cost_method: "enum: fifo, average, standard"
+  status: "enum: pending, calculated, approved"
+  hours_actual: "number, >= 0"
+  hourly_rate: "number, positive"
+
+patterns:
+  rls: "ADR-013"
+  api: "REST with org_id filter"
+  service: "class-based with static methods"
+  validation: "zod schemas"
+
+acceptance_checklist:
+  - "work_order_costs table created with all columns"
+  - "material_consumption_costs table created"
+  - "labor_costs table created"
+  - "All indexes created for performance"
+  - "RLS policies enforce org isolation"
+  - "Auto-recalculation triggers work correctly"
+  - "Unit cost calculation handles division by zero"
+  - "Cost summary card displays on WO detail page"
+  - "Cost breakdown chart renders correctly"
+  - "CSV export generates valid file"
+  - "Real-time updates within 5 seconds"
+
+output_artifacts:
+  - "work_order_costs table migration"
+  - "material_consumption_costs table migration"
+  - "labor_costs table migration"
+  - "calculate_work_order_costs() function"
+  - "Auto-recalculation triggers"
+  - "WorkOrderCostService with 9 methods"
+  - "Cost summary API endpoints"
+  - "WOCostSummaryCard component"
+  - "WOCostBreakdownChart component"
+  - "WOCostStatusBadge component"
+  - "Validation schemas"

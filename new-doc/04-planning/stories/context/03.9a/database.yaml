@@ -1,0 +1,102 @@
+# Story 03.9a - Database Schema
+# Purpose: Tables, columns, indexes (no new tables - extends existing)
+# Agent: BACKEND-DEV (database focus)
+
+# No new migrations - uses existing schema
+migrations: []
+
+# Existing tables used (no changes needed)
+tables:
+  - name: "transfer_orders"
+    description: "TO header - existing table from 03.8"
+    columns_used:
+      - { name: "status", type: "TEXT", description: "Status values: draft, planned, partially_shipped, shipped, partially_received, received, closed, cancelled" }
+      - { name: "actual_ship_date", type: "DATE", description: "Set on first shipment (immutable after)" }
+      - { name: "actual_receive_date", type: "DATE", description: "Set on first receipt (immutable after)" }
+      - { name: "shipped_by", type: "UUID", description: "User who performed first shipment" }
+      - { name: "received_by", type: "UUID", description: "User who performed first receipt" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", description: "Auto-updated on changes" }
+      - { name: "updated_by", type: "UUID", description: "User who last updated" }
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+  - name: "transfer_order_lines"
+    description: "TO lines - existing table from 03.8"
+    columns_used:
+      - { name: "quantity", type: "DECIMAL(15,4)", description: "Ordered quantity" }
+      - { name: "shipped_qty", type: "DECIMAL(15,4)", description: "Total shipped (cumulative)" }
+      - { name: "received_qty", type: "DECIMAL(15,4)", description: "Total received (cumulative)" }
+    rls: true
+    rls_pattern: "EXISTS (SELECT 1 FROM transfer_orders WHERE id = to_id AND org_id = ...)"
+
+  - name: "planning_settings"
+    description: "Planning module settings - existing table"
+    columns_used:
+      - { name: "to_allow_partial_shipments", type: "BOOLEAN", description: "Toggle for partial shipment feature, default true" }
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+# Status values enum (for reference)
+status_enum:
+  values:
+    - { status: "draft", description: "TO created but not released" }
+    - { status: "planned", description: "TO released for shipping" }
+    - { status: "partially_shipped", description: "Some lines shipped, not all fully shipped" }
+    - { status: "shipped", description: "All lines fully shipped (shipped_qty >= quantity)" }
+    - { status: "partially_received", description: "Some lines received, not all fully received" }
+    - { status: "received", description: "All lines fully received (received_qty >= shipped_qty)" }
+    - { status: "closed", description: "TO completed and archived" }
+    - { status: "cancelled", description: "TO cancelled" }
+
+# Status transition rules
+status_transitions:
+  - from: "planned"
+    to: ["partially_shipped", "shipped"]
+    trigger: "Ship action"
+    condition: "At least one line has ship_qty > 0"
+
+  - from: "partially_shipped"
+    to: ["shipped", "partially_shipped"]
+    trigger: "Ship action (additional)"
+    condition: "Remaining lines shipped"
+
+  - from: "shipped"
+    to: ["partially_received", "received"]
+    trigger: "Receive action"
+    condition: "At least one line has receive_qty > 0"
+
+  - from: "partially_shipped"
+    to: ["partially_received"]
+    trigger: "Receive action"
+    condition: "Can receive while still partially shipped"
+
+  - from: "partially_received"
+    to: ["received"]
+    trigger: "Receive action (additional)"
+    condition: "All lines fully received"
+
+# Quantity validation rules
+quantity_rules:
+  ship:
+    - rule: "shipped_qty + ship_qty <= quantity"
+      error: "Cannot ship more than ordered quantity"
+    - rule: "ship_qty > 0 for at least one line"
+      error: "At least one line must have quantity > 0"
+
+  receive:
+    - rule: "received_qty + receive_qty <= shipped_qty"
+      error: "Cannot receive more than shipped quantity"
+    - rule: "receive_qty > 0 for at least one line"
+      error: "At least one line must have quantity > 0"
+
+# Audit trail fields
+audit_fields:
+  first_shipment:
+    - { field: "actual_ship_date", behavior: "Set on first shipment, immutable" }
+    - { field: "shipped_by", behavior: "Set on first shipment, immutable" }
+  first_receipt:
+    - { field: "actual_receive_date", behavior: "Set on first receipt, immutable" }
+    - { field: "received_by", behavior: "Set on first receipt, immutable" }
+  every_action:
+    - { field: "updated_at", behavior: "Auto-updated" }
+    - { field: "updated_by", behavior: "Current user" }

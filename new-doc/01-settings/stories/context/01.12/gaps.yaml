@@ -1,0 +1,186 @@
+# Story 01.12 - GAP Analysis vs Codebase
+# Generated: 2025-12-16
+# Purpose: What exists vs what needs to be built
+
+gap_summary:
+  overall_readiness: "0%"
+  critical_blockers: 2
+  components_done: 0
+  components_partial: 0
+  components_missing: 16
+
+# Database Gaps
+database_gaps:
+  - component: "allergens table"
+    expected: "Table with multi-language name fields"
+    found: "NOT FOUND"
+    status: "MISSING"
+    priority: "P0-BLOCKER"
+
+  - component: "allergens seed data"
+    expected: "14 EU allergens with all translations"
+    found: "NOT FOUND"
+    status: "MISSING"
+    priority: "P0-BLOCKER"
+
+  - component: "allergens RLS policy"
+    expected: "Authenticated read access (no org isolation)"
+    found: "NOT FOUND"
+    status: "MISSING"
+    priority: "P0"
+
+  - component: "Full-text search index"
+    expected: "GIN index on all language name fields"
+    found: "NOT FOUND"
+    status: "MISSING"
+    priority: "P1"
+
+# API Gaps
+api_gaps:
+  - component: "GET /api/v1/settings/allergens"
+    found: "NOT FOUND"
+    status: "MISSING"
+    priority: "P0"
+
+  - component: "GET /api/v1/settings/allergens/:id"
+    found: "NOT FOUND"
+    status: "MISSING"
+    priority: "P0"
+
+  - component: "Read-only enforcement (405 for POST/PUT/DELETE)"
+    found: "NOT FOUND"
+    status: "MISSING"
+    priority: "P1"
+
+# Service Gaps
+service_gaps:
+  - component: "allergen-service.ts"
+    expected: "Read-only service with multi-language support"
+    found: "NOT FOUND"
+    status: "MISSING"
+    priority: "P0"
+
+# Validation Gaps
+validation_gaps:
+  - component: "allergen-schema.ts"
+    expected: "Zod schemas for responses"
+    found: "NOT FOUND"
+    status: "MISSING"
+    priority: "P1"
+
+# Frontend Gaps
+frontend_gaps:
+  - component: "allergens/page.tsx"
+    expected: "apps/frontend/app/(authenticated)/settings/allergens/page.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    priority: "P0"
+
+  - component: "AllergensDataTable.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    priority: "P0"
+
+  - component: "AllergenIcon.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    priority: "P1"
+
+  - component: "AllergenBadge.tsx (reusable)"
+    found: "NOT FOUND"
+    status: "MISSING"
+    priority: "P1"
+    notes: "Will be used in Technical/Shipping/Quality modules"
+
+  - component: "AllergenReadOnlyBanner.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    priority: "P2"
+
+# Asset Gaps
+asset_gaps:
+  - component: "14 SVG allergen icons"
+    expected: "public/icons/allergens/ directory with 14 SVG files"
+    found: "NOT FOUND"
+    status: "MISSING"
+    priority: "P1"
+    files:
+      - "gluten.svg"
+      - "crustaceans.svg"
+      - "eggs.svg"
+      - "fish.svg"
+      - "peanuts.svg"
+      - "soybeans.svg"
+      - "milk.svg"
+      - "nuts.svg"
+      - "celery.svg"
+      - "mustard.svg"
+      - "sesame.svg"
+      - "sulphites.svg"
+      - "lupin.svg"
+      - "molluscs.svg"
+
+# Implementation Order
+implementation_order:
+  phase_1_database:
+    - "055_create_allergens_table.sql (table + seed 14 allergens + indexes + RLS)"
+
+  phase_2_validation:
+    - "lib/validation/allergen-schema.ts"
+
+  phase_3_services:
+    - "lib/services/allergen-service.ts (read-only methods)"
+
+  phase_4_api:
+    - "app/api/v1/settings/allergens/route.ts (GET only, 405 for POST/PUT/DELETE)"
+    - "app/api/v1/settings/allergens/[id]/route.ts (GET only, 405 for PUT/DELETE)"
+
+  phase_5_types:
+    - "lib/types/allergen.ts"
+
+  phase_6_assets:
+    - "Create/obtain 14 SVG allergen icons"
+    - "Add to public/icons/allergens/"
+
+  phase_7_components:
+    - "AllergenIcon.tsx (with fallback)"
+    - "AllergenBadge.tsx (reusable)"
+    - "AllergensDataTable.tsx"
+    - "AllergenDetailPanel.tsx"
+    - "AllergenReadOnlyBanner.tsx"
+
+  phase_8_pages:
+    - "app/(authenticated)/settings/allergens/page.tsx"
+
+  phase_9_tests:
+    - "Unit tests for allergen-service"
+    - "Integration tests for API routes"
+    - "E2E tests for search and multi-language"
+
+# Validation Checklist
+validation_checklist:
+  - "[ ] Allergens table created with all language columns"
+  - "[ ] 14 EU allergens seeded with correct translations"
+  - "[ ] RLS policy allows all authenticated users to read"
+  - "[ ] Full-text search works across all language fields"
+  - "[ ] Search for 'milk' returns A07 (English)"
+  - "[ ] Search for 'mleko' returns A07 (Polish)"
+  - "[ ] POST/PUT/DELETE return 405 Method Not Allowed"
+  - "[ ] Icons display correctly (24x24 in list, 48x48 in detail)"
+  - "[ ] Fallback icon shows when icon_url is null"
+  - "[ ] Multi-language tooltip shows all 4 translations"
+  - "[ ] Read-only banner displays"
+  - "[ ] Page loads within 200ms"
+  - "[ ] AllergenBadge component is reusable across modules"
+
+# Out of Scope
+out_of_scope:
+  - requirement: "Custom allergen addition"
+    reason: "Requires org-scoped allergens table extension"
+    target_phase: "Phase 3"
+  - requirement: "Allergen editing"
+    reason: "EU allergens are regulatory constants"
+    target_phase: "Never"
+  - requirement: "Additional languages beyond PL/EN/DE/FR"
+    reason: "Can be added later via migration"
+    target_phase: "Phase 3"

@@ -1,0 +1,370 @@
+# Story 01.6 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/__tests__/components/settings/users/RoleSelector.test.tsx"
+    type: "unit"
+    description: "Unit tests for RoleSelector component"
+  - path: "apps/frontend/__tests__/hooks/usePermissions.test.ts"
+    type: "unit"
+    description: "Unit tests for usePermissions hook"
+  - path: "apps/frontend/__tests__/services/permission-service.test.ts"
+    type: "unit"
+    description: "Unit tests for permission service"
+  - path: "apps/frontend/__tests__/api/settings/roles.test.ts"
+    type: "integration"
+    description: "Integration tests for roles API"
+  - path: "supabase/tests/rls-roles.test.sql"
+    type: "integration"
+    description: "RLS tests for roles table"
+
+# Acceptance Criteria (from story)
+acceptance_criteria:
+  - id: "AC-1"
+    title: "Role Assignment - Dropdown Display"
+    given: "role dropdown in user modal"
+    when: "opened"
+    then: "exactly 10 roles display with names"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-1.1"
+    title: "Role Names Display"
+    given: "role dropdown in user modal"
+    when: "roles listed"
+    then: "display name shown (not code): 'Production Manager' not 'PROD_MANAGER'"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-1.2"
+    title: "Role Assignment Success"
+    given: "Super Admin assigning role to user"
+    when: "any of 10 roles selected"
+    then: "role assignment succeeds"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-1.3"
+    title: "Owner Role Assignment Restriction"
+    given: "non-owner (e.g., admin)"
+    when: "attempting to assign owner role"
+    then: "error 'Only owner can assign owner role' displays"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-1.4"
+    title: "Role Change Takes Effect"
+    given: "role changed from viewer to admin"
+    when: "user's next request made"
+    then: "new permissions active immediately"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-2"
+    title: "Permission Enforcement - Module Level"
+    given: "user with owner role"
+    when: "accessing any module"
+    then: "full CRUD access granted"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-2.1"
+    title: "Viewer Cannot Create"
+    given: "user with viewer role"
+    when: "attempting to create anything"
+    then: "action blocked, create button hidden"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-2.2"
+    title: "Operator Read-Create Quality"
+    given: "user with production_operator role"
+    when: "accessing Quality module"
+    then: "read and create access (CR - no update/delete)"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-2.3"
+    title: "Inspector No Integrations Access"
+    given: "user with quality_inspector role"
+    when: "accessing Integrations module"
+    then: "access denied (redirect)"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-3"
+    title: "API Permission Enforcement - POST Denied"
+    given: "API request to /api/production/work-orders by viewer"
+    when: "POST attempted"
+    then: "403 Forbidden returns"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-3.1"
+    title: "API Permission Enforcement - DELETE Denied"
+    given: "API request to /api/quality/inspections by production_operator"
+    when: "DELETE attempted"
+    then: "403 Forbidden returns"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-3.2"
+    title: "API Permission Enforcement - No Module Access"
+    given: "API request to /api/integrations/connections by quality_inspector"
+    when: "GET attempted"
+    then: "403 Forbidden returns (no module access)"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-4"
+    title: "UI Permission Rendering - No Delete"
+    given: "user with CRU permission (no Delete)"
+    when: "delete button rendered"
+    then: "button hidden or disabled"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-4.1"
+    title: "UI Permission Rendering - Read Only"
+    given: "user with R permission only"
+    when: "page loads"
+    then: "'Create' and 'Edit' buttons hidden"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-4.2"
+    title: "UI Permission Rendering - Full Access"
+    given: "user with CRUD permission"
+    when: "page loads"
+    then: "all action buttons visible"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-5"
+    title: "Permission Caching"
+    given: "user permissions cached"
+    when: "admin updates user's role"
+    then: "user's next request uses updated permissions (no stale cache beyond 1 minute)"
+    test_type: "integration"
+    priority: "P1"
+
+# Unit Test Cases
+unit_tests:
+  RoleSelector:
+    - name: "renders all 10 roles"
+      setup: "Mount component with roles list"
+      expected: "10 options displayed"
+
+    - name: "displays role names not codes"
+      setup: "Mount with production_manager role"
+      expected: "'Production Manager' displayed, not 'production_manager'"
+
+    - name: "disables owner role for non-owner users"
+      setup: "currentUserRole = 'admin'"
+      expected: "owner option disabled with tooltip"
+
+    - name: "enables owner role for owner users"
+      setup: "currentUserRole = 'owner'"
+      expected: "owner option enabled"
+
+    - name: "onChange callback fires on selection"
+      setup: "Mock onChange, select role"
+      expected: "onChange called with role code"
+
+  usePermissions:
+    - name: "can() returns true for allowed action"
+      setup: "Context with permissions { settings: 'CRUD' }"
+      params: ["'settings'", "'R'"]
+      expected: "Returns true"
+
+    - name: "can() returns false for denied action"
+      setup: "Context with permissions { settings: 'R' }"
+      params: ["'settings'", "'D'"]
+      expected: "Returns false"
+
+    - name: "can() returns false for dash permission"
+      setup: "Context with permissions { settings: '-' }"
+      params: ["'settings'", "'R'"]
+      expected: "Returns false"
+
+    - name: "canAny() returns true for read-only"
+      setup: "Context with permissions { settings: 'R' }"
+      params: ["'settings'"]
+      expected: "Returns true"
+
+    - name: "canAny() returns false for no access"
+      setup: "Context with permissions { settings: '-' }"
+      params: ["'settings'"]
+      expected: "Returns false"
+
+    - name: "hasRole() returns true when user has role"
+      setup: "Context with role_code: 'admin'"
+      params: ["['admin', 'owner']"]
+      expected: "Returns true"
+
+    - name: "isAdmin returns true for admin roles"
+      setup: "Context with role_code: 'admin'"
+      expected: "isAdmin = true"
+
+    - name: "isOwner returns true only for owner"
+      setup: "Context with role_code: 'owner'"
+      expected: "isOwner = true"
+
+  permission_service:
+    - name: "hasPermission() checks CRUD correctly"
+      setup: "User with production_manager role"
+      params: ["user", "'production'", "'C'"]
+      expected: "Returns true"
+
+    - name: "hasPermission() denies operator delete"
+      setup: "User with production_operator role (RU)"
+      params: ["user", "'production'", "'D'"]
+      expected: "Returns false"
+
+    - name: "canAssignRole() blocks owner assignment"
+      setup: "currentUserRole = 'admin'"
+      params: ["'admin'", "'owner'"]
+      expected: "Returns false"
+
+    - name: "canAssignRole() allows owner to assign owner"
+      setup: "currentUserRole = 'owner'"
+      params: ["'owner'", "'owner'"]
+      expected: "Returns true"
+
+# Integration Test Cases
+integration_tests:
+  api_endpoints:
+    - name: "GET /roles returns all system roles"
+      setup: "Seed 10 system roles"
+      action: "GET /api/settings/roles"
+      expected: "200 response with 10 roles array"
+
+    - name: "GET /roles returns roles sorted by display_order"
+      setup: "Seed roles"
+      action: "GET /api/settings/roles"
+      expected: "Roles sorted: owner first, viewer last"
+
+    - name: "GET /roles accessible to all authenticated users"
+      setup: "Authenticated as viewer"
+      action: "GET /api/settings/roles"
+      expected: "200 response"
+
+  rls_enforcement:
+    - name: "All users can read system roles"
+      setup: "Create User A with viewer role"
+      action: "User A queries roles table"
+      expected: "All system roles returned"
+
+    - name: "System roles are immutable"
+      setup: "User attempts to update admin role permissions"
+      action: "UPDATE roles SET permissions = ..."
+      expected: "RLS blocks update"
+
+  permission_enforcement:
+    - name: "viewer blocked from creating users"
+      setup: "Authenticated as viewer"
+      action: "POST /api/settings/users"
+      expected: "403 Forbidden"
+
+    - name: "admin can create users"
+      setup: "Authenticated as admin"
+      action: "POST /api/settings/users"
+      expected: "200 OK, user created"
+
+    - name: "production_operator cannot delete work orders"
+      setup: "Authenticated as production_operator"
+      action: "DELETE /api/production/work-orders/:id"
+      expected: "403 Forbidden"
+
+    - name: "quality_inspector cannot access integrations"
+      setup: "Authenticated as quality_inspector"
+      action: "GET /api/integrations/connections"
+      expected: "403 Forbidden"
+
+    - name: "Role change invalidates permission cache"
+      setup: |
+        - Create User C as viewer
+        - User C makes request (viewer permissions)
+        - admin changes User C to admin
+      action: "User C makes request after <1 min"
+      expected: "admin permissions active"
+
+# E2E Test Cases
+e2e_tests:
+  - name: "Create user and assign role"
+    steps:
+      - "Admin navigates to /settings/users"
+      - "Click 'Add User'"
+      - "Fill in email, name"
+      - "Select 'Production Manager' role"
+      - "Click 'Create'"
+    expected: "User created with production_manager role"
+
+  - name: "Admin cannot assign owner"
+    steps:
+      - "Admin opens user modal"
+      - "Attempt to select 'Owner'"
+    expected: "Option is disabled with tooltip"
+
+  - name: "Viewer sees no create buttons"
+    steps:
+      - "Login as viewer"
+      - "Navigate to /settings/users"
+    expected: "'Add User' button is hidden"
+
+  - name: "Permission-based UI rendering"
+    steps:
+      - "Login as production_operator"
+      - "Navigate to /production/work-orders"
+      - "Open work order details"
+    expected: "No delete button visible (operator has RU not D)"
+
+# Definition of Done
+definition_of_done:
+  - "10 roles seeded in database with correct permissions"
+  - "hasPermission() correctly checks module + action"
+  - "API middleware enforces permissions, returns 403"
+  - "usePermissions hook works for UI conditional rendering"
+  - "Role dropdown displays names (not codes) in user modal"
+  - "Super Admin role assignment restricted to Super Admins"
+  - "Role changes take effect within 1 minute"
+  - "Integration tests cover all role x module x action combinations"
+  - "Unit tests for permission-service >= 80% coverage"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    reason: "Permission checks are security-critical"
+  integration:
+    target: 80
+    reason: "Permission enforcement must be thoroughly tested"
+  files:
+    - "components/settings/users/RoleSelector.tsx: 80%"
+    - "lib/hooks/usePermissions.ts: 90%"
+    - "lib/services/permission-service.ts: 95%"
+    - "RLS policies: 100% of scenarios tested"
+
+# Security Test Cases
+security_tests:
+  - id: "SEC-1"
+    description: "System roles cannot be modified"
+    test: "Attempt to UPDATE roles WHERE is_system = true"
+    expected: "RLS blocks update"
+
+  - id: "SEC-2"
+    description: "Non-owner cannot assign owner role"
+    test: "admin attempts to assign owner role"
+    expected: "403 Forbidden"
+
+  - id: "SEC-3"
+    description: "Permission checks cannot be bypassed"
+    test: "viewer sends POST request with forged permissions"
+    expected: "403 Forbidden (server-side check)"
+
+  - id: "SEC-4"
+    description: "Cross-tenant role assignment blocked"
+    test: "admin from Org A tries to assign role from Org B"
+    expected: "404 (role not found for org)"

@@ -1,0 +1,628 @@
+# Story 07.9 - Pick Confirmation Desktop API Context
+# Status: Ready for Implementation
+# Last Updated: 2025-12-18
+
+# API Endpoints
+api_endpoints:
+  start_pick_list:
+    method: "POST"
+    path: "/api/shipping/pick-lists/:id/start"
+    description: "Start picking - transition pick list from 'assigned' to 'in_progress'"
+    auth: true
+    roles: ["Picker", "Warehouse", "Manager", "Admin"]
+    request:
+      body: "empty"
+      params:
+        - name: "id"
+          type: "uuid"
+          description: "Pick list ID"
+    response:
+      status: 200
+      schema: |
+        {
+          success: boolean;
+          started_at: string (ISO timestamp);
+          pick_list: {
+            id: string;
+            status: "in_progress";
+            started_at: string;
+          };
+        }
+    errors:
+      - code: 404
+        message: "Pick list not found"
+        reason: "RLS policy blocks cross-tenant access or ID invalid"
+      - code: 403
+        message: "Access denied - not assigned to this pick list"
+        reason: "User is not the assigned picker and not Warehouse+ role"
+      - code: 409
+        message: "Invalid status transition"
+        reason: "Pick list not in 'assigned' status"
+    implementation_notes: |
+      1. Check current user is assigned_to or has Warehouse+ role
+      2. Validate pick_list.status = 'assigned'
+      3. Update pick_lists SET status='in_progress', started_at=NOW()
+      4. Return updated pick_list
+
+  confirm_pick:
+    method: "PUT"
+    path: "/api/shipping/pick-lists/:id/lines/:lineId/pick"
+    description: "Confirm picking full or partial quantity, mark line as picked"
+    auth: true
+    roles: ["Picker", "Warehouse", "Manager", "Admin"]
+    request:
+      body:
+        schema: |
+          {
+            quantity_picked: number;           // Units picked (> 0, <= quantity_to_pick)
+            picked_license_plate_id?: string;  // LP actually picked from (may differ from suggested)
+          }
+    response:
+      status: 200
+      schema: |
+        {
+          success: boolean;
+          line: {
+            id: string;
+            status: "picked";
+            quantity_picked: number;
+            picked_at: string (ISO timestamp);
+          };
+          progress: {
+            picked_count: number;
+            short_count: number;
+            total_count: number;
+            percentage: number;
+          };
+        }
+    errors:
+      - code: 404
+        message: "Pick list or line not found"
+      - code: 403
+        message: "Access denied"
+        reason: "User not assigned to this pick list"
+      - code: 400
+        message: "Quantity exceeds allocated amount"
+        reason: "quantity_picked > quantity_to_pick"
+      - code: 400
+        message: "Insufficient quantity in license plate"
+        reason: "LP.quantity_on_hand < quantity_picked"
+      - code: 409
+        message: "Pick list not in progress"
+        reason: "pick_list.status != 'in_progress'"
+    implementation_notes: |
+      TRANSACTION (SERIALIZABLE):
+        1. Validate quantity_picked <= quantity_to_pick
+        2. Validate LP.quantity_on_hand >= quantity_picked
+        3. UPDATE pick_list_lines:
+           - quantity_picked = :qty
+           - picked_license_plate_id = :lp_id
+           - status = 'picked'
+           - picked_at = NOW()
+           - picked_by = auth.uid()
+        4. UPDATE inventory_allocations:
+           - quantity_picked = :qty
+        5. UPDATE sales_order_lines:
+           - quantity_picked += :qty
+        6. UPDATE license_plates:
+           - quantity_on_hand -= :qty
+           - allocated_quantity -= :qty
+        7. Calculate progress and return
+
+  short_pick:
+    method: "POST"
+    path: "/api/shipping/pick-lists/:id/lines/:lineId/short-pick"
+    description: "Confirm short pick with reason, create backorder if needed"
+    auth: true
+    roles: ["Picker", "Warehouse", "Manager", "Admin"]
+    request:
+      body:
+        schema: |
+          {
+            quantity_picked: number;                              // Units actually picked (< quantity_to_pick)
+            reason: "insufficient_inventory" | "damaged" |
+                    "expired" | "location_empty" | "quality_hold" | "other";
+            notes?: string;                                       // Additional notes (max 500 chars)
+            picked_license_plate_id?: string;                     // LP picked from
+          }
+    response:
+      status: 200
+      schema: |
+        {
+          success: boolean;
+          line: {
+            id: string;
+            status: "short";
+            quantity_picked: number;
+            picked_at: string;
+          };
+          short_quantity: number;
+          backorder_created: boolean;
+          backorder_quantity?: number;
+          progress: {
+            picked_count: number;
+            short_count: number;
+            total_count: number;
+            percentage: number;
+          };
+        }
+    errors:
+      - code: 400
+        message: "Quantity must be less than required"
+        reason: "quantity_picked >= quantity_to_pick"
+      - code: 400
+        message: "Reason is required"
+        reason: "reason field missing or empty"
+      - code: 404
+        message: "Pick list or line not found"
+      - code: 403
+        message: "Access denied"
+    implementation_notes: |
+      TRANSACTION (SERIALIZABLE):
+        1. Validate quantity_picked < quantity_to_pick
+        2. Validate reason is in allowed enum
+        3. UPDATE pick_list_lines:
+           - quantity_picked = :qty
+           - status = 'short'
+           - picked_at = NOW()
+           - picked_by = auth.uid()
+           - notes = :reason || ' - ' || :notes
+           - picked_license_plate_id = :lp_id
+        4. UPDATE inventory_allocations:
+           - quantity_picked = :qty
+        5. UPDATE sales_order_lines:
+           - quantity_picked += :qty
+        6. UPDATE license_plates:
+           - quantity_on_hand -= :qty
+           - allocated_quantity -= :qty
+        7. Check if backorder needed:
+           IF (quantity_picked + previous_quantity_picked) < quantity_ordered THEN
+             - Set backorder_quantity on SO line
+             - Create backorder signal (future integration)
+             - Return backorder_created = true
+        8. Return updated line + progress
+
+  complete_pick_list:
+    method: "POST"
+    path: "/api/shipping/pick-lists/:id/complete"
+    description: "Mark entire pick list as complete, validate all lines picked/short"
+    auth: true
+    roles: ["Picker", "Warehouse", "Manager", "Admin"]
+    request:
+      body: "empty"
+      params:
+        - name: "id"
+          type: "uuid"
+          description: "Pick list ID"
+    response:
+      status: 200
+      schema: |
+        {
+          success: boolean;
+          pick_list: {
+            id: string;
+            status: "completed";
+            completed_at: string (ISO timestamp);
+          };
+          summary: {
+            total_lines: number;
+            picked_lines: number;
+            short_lines: number;
+            total_units_picked: number;
+          };
+          sales_orders_updated: [
+            {
+              id: string;
+              order_number: string;
+              status: "packing" | "partial";
+            }
+          ];
+        }
+    errors:
+      - code: 404
+        message: "Pick list not found"
+      - code: 403
+        message: "Access denied"
+      - code: 409
+        message: "Cannot complete pick list - some lines still pending"
+        reason: "Any pick_list_line.status = 'pending'"
+      - code: 409
+        message: "Pick list not in progress"
+        reason: "pick_list.status != 'in_progress'"
+    implementation_notes: |
+      TRANSACTION:
+        1. Fetch all pick_list_lines for this pick_list
+        2. Validate all lines have status IN ('picked', 'short')
+        3. Count picked vs short lines
+        4. UPDATE pick_lists:
+           - status = 'completed'
+           - completed_at = NOW()
+        5. For each unique sales_order linked to pick_list_lines:
+           - Fetch all SO lines and sum quantity_picked vs quantity_ordered
+           - IF all SO lines fully picked THEN status = 'packing'
+           - ELSE status = 'partial'
+           - UPDATE sales_orders SET status = (calculated)
+        6. Return summary with SO status updates
+
+  get_pick_list_detail:
+    method: "GET"
+    path: "/api/shipping/pick-lists/:id"
+    description: "Get pick list with lines for confirmation workflow"
+    auth: true
+    query_params:
+      - name: "include"
+        type: "string"
+        description: "Comma-separated: lines,allocations,products,allergens,customers"
+    response:
+      status: 200
+      schema: |
+        {
+          pick_list: {
+            id: string;
+            pick_list_number: string;
+            status: string;
+            priority: string;
+            assigned_to: string (user_id);
+            assigned_user_name: string;
+            started_at: string | null;
+            completed_at: string | null;
+            created_at: string;
+          };
+          lines: [
+            {
+              id: string;
+              pick_list_id: string;
+              sales_order_line_id: string;
+              license_plate_id: string;
+              location_id: string;
+              product_id: string;
+              product_name: string;
+              product_sku: string;
+              product_allergens: string[];
+              quantity_to_pick: number;
+              quantity_picked: number;
+              status: "pending" | "picked" | "short";
+              lot_number: string;
+              best_before_date: string;
+              pick_sequence: number;
+              location: {
+                zone: string;
+                aisle: string;
+                bin: string;
+                name: string;
+              };
+              lp: {
+                id: string;
+                lp_number: string;
+                quantity_on_hand: number;
+              };
+            }
+          ];
+          sales_orders: [
+            {
+              id: string;
+              order_number: string;
+              customer_name: string;
+              customer_id: string;
+              allergen_restrictions: string[];
+            }
+          ];
+          progress: {
+            picked_count: number;
+            short_count: number;
+            total_count: number;
+            percentage: number;
+          };
+        }
+    errors:
+      - code: 404
+        message: "Pick list not found"
+        reason: "RLS policy blocks access or invalid ID"
+    implementation_notes: |
+      1. SELECT pick_lists WHERE id = :id AND org_id = (user's org)
+      2. SELECT pick_list_lines WITH joins to:
+         - products (name, sku, allergens)
+         - locations (zone, aisle, bin, name)
+         - license_plates (lp_number, quantity_on_hand)
+         - sales_order_lines (for allergen validation)
+      3. SELECT sales_orders (customer, allergen_restrictions)
+      4. Calculate progress from line statuses
+      5. Return assembled response
+
+  get_pick_lines:
+    method: "GET"
+    path: "/api/shipping/pick-lists/:id/lines"
+    description: "Get just the pick lines (for table refresh without full reload)"
+    auth: true
+    response:
+      status: 200
+      schema: |
+        {
+          lines: [
+            {
+              id: string;
+              status: "pending" | "picked" | "short";
+              quantity_to_pick: number;
+              quantity_picked: number;
+              pick_sequence: number;
+              product_name: string;
+              location: string;
+              lp_number: string;
+              picked_at: string | null;
+            }
+          ];
+          progress: {
+            picked_count: number;
+            short_count: number;
+            total_count: number;
+            percentage: number;
+          };
+        }
+    implementation_notes: |
+      Lightweight endpoint for real-time progress updates
+
+# Service Layer
+services:
+  pick_confirmation_service:
+    path: "lib/services/pick-confirmation-service.ts"
+    methods:
+      - name: "startPickList"
+        signature: "(pickListId: string) => Promise<void>"
+        description: "Update pick_list status to in_progress"
+        logic: |
+          1. Fetch pick_list WHERE id = :id AND org_id = current_org
+          2. Validate current user is assigned_to OR has Warehouse+ role
+          3. Validate status = 'assigned'
+          4. UPDATE pick_lists SET status='in_progress', started_at=NOW()
+
+      - name: "confirmPick"
+        signature: "(params: ConfirmPickInput) => Promise<PickConfirmationResult>"
+        description: "Update pick line and related tables atomically"
+        logic: |
+          TRANSACTION LOGIC:
+            1. Validate quantity_picked <= quantity_to_pick
+            2. Validate LP.quantity_on_hand >= quantity_picked
+            3. UPDATE 4 tables in sequence (see confirm_pick endpoint notes)
+            4. Handle errors with rollback
+            5. Calculate progress and return
+
+      - name: "confirmShortPick"
+        signature: "(params: ShortPickInput) => Promise<ShortPickResult>"
+        description: "Handle short pick with reason"
+        logic: |
+          TRANSACTION LOGIC:
+            1. Validate quantity_picked < quantity_to_pick
+            2. Validate reason in enum
+            3. UPDATE 4 tables (same as confirmPick)
+            4. Check if backorder needed
+            5. Create backorder signal
+            6. Return result with backorder flag
+
+      - name: "completePickList"
+        signature: "(pickListId: string) => Promise<CompletionResult>"
+        description: "Mark pick list complete and update SO statuses"
+        logic: |
+          TRANSACTION LOGIC:
+            1. Validate all lines are picked or short
+            2. UPDATE pick_lists SET status='completed'
+            3. For each SO, determine status (packing vs partial)
+            4. UPDATE sales_orders
+            5. Return summary
+
+      - name: "validatePickQuantity"
+        signature: "(quantity: number, maxAllowed: number) => { valid: boolean; error?: string }"
+        description: "Validate picked quantity rules"
+        logic: |
+          - quantity > 0 ✓
+          - quantity <= maxAllowed ✓
+          - quantity is numeric (not null/NaN) ✓
+
+      - name: "checkAllergenConflict"
+        signature: "(productAllergens: string[], customerRestrictions: string[]) => boolean"
+        description: "Determine if allergen conflict exists"
+        logic: |
+          return productAllergens.some(a => customerRestrictions.includes(a))
+
+      - name: "calculateProgress"
+        signature: "(lines: PickListLine[]) => ProgressMetrics"
+        description: "Calculate progress from line statuses"
+        logic: |
+          picked = lines.filter(l => l.status === 'picked').length
+          short = lines.filter(l => l.status === 'short').length
+          total = lines.length
+          percentage = Math.round((picked + short) / total * 100)
+          return { picked, short, total, percentage }
+
+# Validation Schemas
+validation:
+  confirm_pick_schema:
+    path: "lib/validation/pick-confirmation-schema.ts"
+    schema: |
+      export const confirmPickSchema = z.object({
+        quantity_picked: z.number()
+          .positive('Quantity must be positive')
+          .max(999999, 'Quantity too large'),
+        picked_license_plate_id: z.string().uuid('Invalid license plate ID')
+      });
+
+      export type ConfirmPickInput = z.infer<typeof confirmPickSchema>;
+
+  short_pick_schema:
+    schema: |
+      export const shortPickSchema = z.object({
+        quantity_picked: z.number()
+          .positive('Quantity must be positive'),
+        reason: z.enum([
+          'insufficient_inventory',
+          'damaged',
+          'expired',
+          'location_empty',
+          'quality_hold',
+          'other'
+        ]),
+        notes: z.string()
+          .max(500, 'Notes max 500 characters')
+          .optional(),
+        picked_license_plate_id: z.string().uuid().optional()
+      });
+
+      export type ShortPickInput = z.infer<typeof shortPickSchema>;
+
+# Error Handling
+error_handling:
+  validation_errors:
+    - status: 400
+      scenarios:
+        - "Quantity exceeds allocated"
+        - "Quantity is zero or negative"
+        - "Reason is required for short pick"
+        - "Notes exceed max length"
+    handling: |
+      1. Return detailed error message to frontend
+      2. Highlight affected field in UI
+      3. Don't update database
+      4. Allow user to retry
+
+  permission_errors:
+    - status: 403
+      scenarios:
+        - "User not assigned to pick list"
+        - "User lacks Picker or Warehouse role"
+    handling: |
+      1. Log access attempt
+      2. Return 404 (not 403) per ADR-013 to hide org structure
+      3. Redirect to pick list list page
+
+  database_errors:
+    - status: 500
+      scenarios:
+        - "Transaction deadlock"
+        - "Constraint violation"
+        - "Database connection loss"
+    handling: |
+      1. Log full error server-side
+      2. Return generic error to frontend
+      3. User should retry
+      4. Alert should inform user to contact support if persists
+
+  business_logic_errors:
+    - status: 409
+      scenarios:
+        - "Pick list not in progress"
+        - "Line already picked"
+        - "Cannot complete with pending lines"
+    handling: |
+      1. Return error message explaining constraint
+      2. Provide actionable next steps
+      3. Refresh UI to show current state
+
+# Request/Response Examples
+examples:
+  start_pick_list:
+    request: |
+      POST /api/shipping/pick-lists/pl-uuid-123/start
+      Authorization: Bearer token
+
+    response: |
+      {
+        "success": true,
+        "started_at": "2025-12-15T10:30:00Z",
+        "pick_list": {
+          "id": "pl-uuid-123",
+          "status": "in_progress",
+          "started_at": "2025-12-15T10:30:00Z"
+        }
+      }
+
+  confirm_pick:
+    request: |
+      PUT /api/shipping/pick-lists/pl-uuid-123/lines/line-uuid-1/pick
+      Authorization: Bearer token
+      Content-Type: application/json
+
+      {
+        "quantity_picked": 50,
+        "picked_license_plate_id": "lp-uuid-456"
+      }
+
+    response: |
+      {
+        "success": true,
+        "line": {
+          "id": "line-uuid-1",
+          "status": "picked",
+          "quantity_picked": 50,
+          "picked_at": "2025-12-15T10:35:22Z"
+        },
+        "progress": {
+          "picked_count": 1,
+          "short_count": 0,
+          "total_count": 12,
+          "percentage": 8
+        }
+      }
+
+  short_pick:
+    request: |
+      POST /api/shipping/pick-lists/pl-uuid-123/lines/line-uuid-6/short-pick
+      Authorization: Bearer token
+
+      {
+        "quantity_picked": 70,
+        "reason": "insufficient_inventory",
+        "notes": "LP only had 70 units available",
+        "picked_license_plate_id": "lp-uuid-789"
+      }
+
+    response: |
+      {
+        "success": true,
+        "line": {
+          "id": "line-uuid-6",
+          "status": "short",
+          "quantity_picked": 70,
+          "picked_at": "2025-12-15T11:05:00Z"
+        },
+        "short_quantity": 10,
+        "backorder_created": true,
+        "backorder_quantity": 10,
+        "progress": {
+          "picked_count": 8,
+          "short_count": 1,
+          "total_count": 12,
+          "percentage": 75
+        }
+      }
+
+  complete_pick_list:
+    request: |
+      POST /api/shipping/pick-lists/pl-uuid-123/complete
+      Authorization: Bearer token
+
+    response: |
+      {
+        "success": true,
+        "pick_list": {
+          "id": "pl-uuid-123",
+          "status": "completed",
+          "completed_at": "2025-12-15T12:45:00Z"
+        },
+        "summary": {
+          "total_lines": 12,
+          "picked_lines": 10,
+          "short_lines": 2,
+          "total_units_picked": 685
+        },
+        "sales_orders_updated": [
+          {
+            "id": "so-uuid-1",
+            "order_number": "SO-002450",
+            "status": "packing"
+          },
+          {
+            "id": "so-uuid-2",
+            "order_number": "SO-002451",
+            "status": "partial"
+          }
+        ]
+      }

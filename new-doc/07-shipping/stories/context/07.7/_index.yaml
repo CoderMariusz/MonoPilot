@@ -1,0 +1,236 @@
+# Story 07.7 - Inventory Allocation (FIFO/FEFO) Context (Entry Point)
+# Generated: 2025-12-18
+# Purpose: Story metadata, dependencies, and overview - read this first
+# Phase: 1B (Shipping - Picking/Packing/Shipping)
+
+story:
+  id: "07.7"
+  name: "Inventory Allocation Engine (FIFO/FEFO + Backorders)"
+  slug: "inventory-allocation"
+  epic: "07-shipping"
+  phase: "1B"
+  complexity: "L"
+  estimate_days: 5-7
+  type: "full-stack"
+  state: "ready"
+  priority: "P0"
+  prd_sections: ["FR-7.12", "FR-7.16", "FR-7.18"]
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies, overview
+  - database.yaml    # Tables, RLS, migrations, triggers, indexes
+  - api.yaml         # Endpoints, request/response schemas, services
+  - frontend.yaml    # Components, pages, types, hooks, UX
+  - tests.yaml       # Acceptance criteria, test specifications, E2E scenarios
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["org_id context", "RLS pattern", "users table"]
+
+    - story: "02.1"
+      name: "Products CRUD"
+      provides: ["products table", "product.picking_strategy field"]
+
+    - story: "02.2"
+      name: "Product Settings"
+      provides: ["shelf_life_days", "picking_strategy enum (FIFO/FEFO)"]
+
+    - epic: "05"
+      name: "Warehouse Module (License Plates)"
+      provides: ["license_plates table", "lp_reservations table", "LP status workflow"]
+
+    - story: "05.1"
+      name: "License Plate Table + CRUD"
+      provides: ["license_plates schema", "LP service", "LP context"]
+
+    - story: "05.3"
+      name: "LP Reservations"
+      provides: ["lp_reservations table", "reservation logic for partial LPs"]
+
+    - story: "05.4"
+      name: "FIFO/FEFO Query Patterns"
+      provides: ["FIFO/FEFO query templates", "LP availability query patterns"]
+
+    - story: "07.2"
+      name: "Sales Orders CRUD"
+      provides: ["sales_orders table", "sales_order_lines table", "SO status field"]
+
+    - story: "07.3"
+      name: "SO Status Workflow"
+      provides: ["status transitions: draft → confirmed → allocated → picking", "SO status enum"]
+
+  blocked_by: []
+
+  blocks:
+    - story: "07.8"
+      name: "Pick List Generation"
+      reason: "Uses inventory_allocations to create pick lines"
+
+    - story: "07.15"
+      name: "Shipping Dashboard"
+      reason: "Displays backorder alerts from allocations"
+
+    - epic: "03"
+      name: "Planning Module"
+      reason: "Consumes backorder.created events for PO creation"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/shipping.md"
+    sections: ["FR-7.12 (Allocation)", "FR-7.16 (Holding/Release)", "FR-7.18 (Backorders)"]
+
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/shipping.md"
+    sections: ["Allocation Engine", "FIFO/FEFO Strategy", "Backorder Logic"]
+
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/07-shipping/07.7.inventory-allocation.md"
+
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "PRIMARY - RLS policy pattern for inventory_allocations table"
+
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-001-multi-tenancy-isolation.md"
+      relevance: "Multi-tenancy isolation for all allocation tables"
+
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/SHIP-008-inventory-allocation.md"
+      relevance: "Allocation modal, FIFO/FEFO selector, LP table, undo workflow"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 2
+    description: "inventory_allocations table + shipping_settings table with RLS"
+
+  - type: "trigger/function"
+    count: 2
+    description: "Triggers for allocation release on SO cancel + LP status updates"
+
+  - type: "service"
+    count: 2
+    description: "AllocationService (FIFO/FEFO logic) + BackorderService"
+
+  - type: "validation"
+    count: 2
+    description: "allocateRequestSchema, releaseAllocationSchema"
+
+  - type: "api"
+    count: 3
+    description: "POST /api/shipping/sales-orders/:id/allocate, POST /release-allocation, GET /allocations"
+
+  - type: "components"
+    count: 8
+    description: "AllocationModal, AllocationTable, AllocationProgress, BackorderAlert, etc."
+
+  - type: "page"
+    count: 1
+    description: "Allocation modal triggered from SO detail page"
+
+  - type: "test"
+    count: 3
+    description: "Unit tests (allocation algorithm), Integration tests (API), E2E tests (full workflow)"
+
+# Technical notes
+technical_notes:
+  - "Allocation table: inventory_allocations (SO line → LP with qty)"
+  - "Allocation strategy: FIFO (receipt_date ASC) vs FEFO (expiry_date ASC)"
+  - "Strategy determined by product.picking_strategy field"
+  - "Partial allocation supported: allocate available qty, create backorder for shortfall"
+  - "Allocation threshold: 80% of SO line quantity for 'allocated' status (configurable)"
+  - "Concurrency: SELECT FOR UPDATE SKIP LOCKED to prevent race conditions"
+  - "Transaction isolation: SERIALIZABLE for allocation consistency"
+  - "Backorder: Create backorder.created event for Planning module"
+  - "Release: Delete allocation records, restore LP status to 'available'"
+  - "RLS: All tables org_id filtered per org_id context"
+  - "Auto-allocation: Configurable setting (auto_allocate_on_confirm)"
+  - "Allocation freshness: Timestamp on fetch, optional auto-refresh (default OFF)"
+  - "Undo workflow: 5-minute window after allocation confirmation"
+
+# Business Rules
+business_rules:
+  - rule: "Allocation Prerequisites"
+    description: "SO must be in 'confirmed' status, cannot be 'allocated' unless force=true"
+    enforcement: "API validation checks SO.status before allocation"
+
+  - rule: "LP Eligibility"
+    description: "LP must have status='available', qa_status='passed', qty > 0, expiry > today"
+    enforcement: "WHERE clause filters on all conditions"
+
+  - rule: "FIFO Strategy"
+    description: "Allocate oldest LPs first (ORDER BY created_at ASC)"
+    enforcement: "AllocationService.allocateLine() with FIFO query"
+
+  - rule: "FEFO Strategy"
+    description: "Allocate shortest shelf-life first (ORDER BY expiry_date ASC, created_at ASC)"
+    enforcement: "AllocationService.allocateLine() with FEFO query"
+
+  - rule: "Product-Level Strategy"
+    description: "product.picking_strategy determines FIFO vs FEFO (default: FIFO)"
+    enforcement: "Query products table for strategy before allocation"
+
+  - rule: "Partial Allocation Support"
+    description: "Allocate available qty, create backorder for shortfall"
+    enforcement: "Calculate remaining qty after each LP, set backorder_flag if short"
+
+  - rule: "Allocation Threshold"
+    description: "SO status → 'allocated' only if all lines >= allocation_threshold_pct (default 80%)"
+    enforcement: "calculateFulfillmentPct() checks threshold per org setting"
+
+  - rule: "Backorder Creation"
+    description: "Publish backorder.created event when qty_allocated < qty_required"
+    enforcement: "BackorderService.createBackorderSignal() on allocation shortfall"
+
+  - rule: "Concurrency Protection"
+    description: "SELECT FOR UPDATE SKIP LOCKED prevents duplicate allocations"
+    enforcement: "Database transaction with SERIALIZABLE isolation level"
+
+  - rule: "Allocation Release"
+    description: "Delete allocation records, restore LP status to 'available'"
+    enforcement: "POST /release-allocation endpoint with reason tracking"
+
+  - rule: "Undo Window"
+    description: "5-minute window to undo allocation after confirmation"
+    enforcement: "Track undo_until timestamp, check before allowing release"
+
+# Context Summary
+summary: |
+  Story 07.7 implements the inventory allocation engine that reserves License Plates (LPs)
+  against confirmed Sales Order (SO) lines using FIFO or FEFO strategies.
+
+  MVP SCOPE (This Story):
+  - inventory_allocations table (SO line → LP with qty, qty_picked)
+  - shipping_settings table for org-level allocation configuration
+  - AllocationService with FIFO/FEFO algorithm
+  - Partial allocation UI (inline or modal qty edit)
+  - Auto-allocation on SO confirmation (configurable)
+  - Manual allocation endpoint for manager override
+  - Allocation release (cancel/deallocate) with 5-minute undo window
+  - Backorder creation on insufficient inventory
+  - Allocation view component for SO detail
+  - Real-time inventory freshness indicator + [Refresh] button
+  - FEFO expiry warning threshold (configurable, default 7 days)
+  - Batch number display (responsive: desktop/tooltip, tablet/tooltip, mobile/inline)
+  - Keyboard focus trap specification (aria-modal)
+  - Concurrent allocation protection (SELECT FOR UPDATE SKIP LOCKED)
+
+  DEFERRED (Phase 2+/Story 07.7b):
+  - Cross-dock allocation (from incoming POs)
+  - Multi-warehouse allocation
+  - Wave picking optimization
+  - Allocation priority queues
+  - Predictive allocation (pre-SO reservation)
+  - Real-time inventory WebSocket updates
+
+  KEY INTEGRATION POINTS:
+  - Triggered by SO confirmation (Epic 07)
+  - Uses LP data from Warehouse module (Epic 05)
+  - Creates backorder events for Planning module (Epic 03)
+  - Updates SO status workflow (confirmed → allocated)
+  - Feeds into Pick List generation (Story 07.8)
+  - Displays in Shipping dashboard (Story 07.15)

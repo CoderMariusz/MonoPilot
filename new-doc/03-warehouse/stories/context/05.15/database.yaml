@@ -1,0 +1,215 @@
+# Story 05.15 - Database Schema
+# Purpose: Tables, RLS policies, indexes, migrations
+# Agent: BACKEND-DEV (database focus)
+
+migrations:
+  - path: "supabase/migrations/XXX_add_over_receipt_settings.sql"
+    type: "migration"
+    description: "Add over-receipt columns to warehouse_settings"
+    sql: |
+      -- Add over-receipt settings to warehouse_settings table
+      ALTER TABLE warehouse_settings
+      ADD COLUMN IF NOT EXISTS allow_over_receipt BOOLEAN NOT NULL DEFAULT false,
+      ADD COLUMN IF NOT EXISTS over_receipt_tolerance_pct NUMERIC(5,2) NOT NULL DEFAULT 0.00
+        CHECK (over_receipt_tolerance_pct >= 0 AND over_receipt_tolerance_pct <= 100);
+
+      COMMENT ON COLUMN warehouse_settings.allow_over_receipt IS 'Allow receiving more than ordered quantity';
+      COMMENT ON COLUMN warehouse_settings.over_receipt_tolerance_pct IS 'Maximum over-receipt percentage allowed (0-100)';
+
+  - path: "supabase/migrations/XXX_create_over_receipt_approvals.sql"
+    type: "migration"
+    description: "Create over_receipt_approvals table with RLS"
+    sql: |
+      -- Over-Receipt Approvals Table
+      CREATE TABLE over_receipt_approvals (
+        -- Identity
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+
+        -- PO Reference
+        po_id UUID NOT NULL REFERENCES purchase_orders(id),
+        po_line_id UUID NOT NULL REFERENCES purchase_order_lines(id),
+        product_id UUID NOT NULL REFERENCES products(id),
+
+        -- Quantities
+        ordered_qty DECIMAL(15,4) NOT NULL,
+        already_received_qty DECIMAL(15,4) NOT NULL DEFAULT 0,
+        requesting_qty DECIMAL(15,4) NOT NULL,
+        total_after_receipt DECIMAL(15,4) NOT NULL,
+
+        -- Over-Receipt Calculation
+        over_receipt_pct NUMERIC(5,2) NOT NULL,
+        tolerance_pct NUMERIC(5,2) NOT NULL,
+
+        -- Request Details
+        reason TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending'
+          CHECK (status IN ('pending', 'approved', 'rejected')),
+
+        -- Audit
+        requested_by UUID NOT NULL REFERENCES users(id),
+        requested_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        reviewed_by UUID REFERENCES users(id),
+        reviewed_at TIMESTAMPTZ,
+        review_notes TEXT,
+
+        -- Timestamps
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+        -- Constraints
+        CONSTRAINT over_receipt_qty_positive CHECK (requesting_qty > 0),
+        CONSTRAINT total_exceeds_ordered CHECK (total_after_receipt > ordered_qty)
+      );
+
+      -- Indexes
+      CREATE INDEX idx_over_receipt_org_status ON over_receipt_approvals(org_id, status);
+      CREATE INDEX idx_over_receipt_po_line ON over_receipt_approvals(po_line_id);
+      CREATE INDEX idx_over_receipt_requested_at ON over_receipt_approvals(requested_at DESC);
+      CREATE INDEX idx_over_receipt_requested_by ON over_receipt_approvals(requested_by);
+      CREATE INDEX idx_over_receipt_product ON over_receipt_approvals(product_id);
+
+      -- Unique constraint: only one pending approval per PO line
+      CREATE UNIQUE INDEX idx_over_receipt_pending_unique
+        ON over_receipt_approvals(po_line_id)
+        WHERE status = 'pending';
+
+      -- Enable RLS
+      ALTER TABLE over_receipt_approvals ENABLE ROW LEVEL SECURITY;
+
+      -- RLS Policies (ADR-013 pattern)
+      CREATE POLICY "over_receipt_select_org" ON over_receipt_approvals
+        FOR SELECT TO authenticated
+        USING (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+
+      CREATE POLICY "over_receipt_insert_org" ON over_receipt_approvals
+        FOR INSERT TO authenticated
+        WITH CHECK (
+          org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+          AND requested_by = auth.uid()
+        );
+
+      CREATE POLICY "over_receipt_update_manager" ON over_receipt_approvals
+        FOR UPDATE TO authenticated
+        USING (org_id = (SELECT org_id FROM users WHERE id = auth.uid()))
+        WITH CHECK (
+          -- Only managers can update (approve/reject)
+          EXISTS (
+            SELECT 1 FROM users u
+            JOIN roles r ON u.role_id = r.id
+            WHERE u.id = auth.uid()
+            AND r.code IN ('warehouse_manager', 'admin', 'owner')
+          )
+        );
+
+      -- Trigger for updated_at
+      CREATE TRIGGER over_receipt_approvals_updated_at
+        BEFORE UPDATE ON over_receipt_approvals
+        FOR EACH ROW
+        EXECUTE FUNCTION update_updated_at_column();
+
+  - path: "supabase/migrations/XXX_add_grn_items_approval_fk.sql"
+    type: "migration"
+    description: "Add over_receipt_approval_id to grn_items"
+    sql: |
+      -- Add FK to grn_items for tracking approved over-receipts
+      ALTER TABLE grn_items
+      ADD COLUMN IF NOT EXISTS over_receipt_approval_id UUID REFERENCES over_receipt_approvals(id);
+
+      CREATE INDEX idx_grn_items_approval ON grn_items(over_receipt_approval_id)
+        WHERE over_receipt_approval_id IS NOT NULL;
+
+      COMMENT ON COLUMN grn_items.over_receipt_approval_id IS 'Reference to approved over-receipt request if applicable';
+
+tables:
+  - name: "over_receipt_approvals"
+    description: "Approval workflow for over-tolerance receipts"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id)" }
+      - { name: "po_id", type: "UUID", constraints: "NOT NULL REFERENCES purchase_orders(id)" }
+      - { name: "po_line_id", type: "UUID", constraints: "NOT NULL REFERENCES purchase_order_lines(id)" }
+      - { name: "product_id", type: "UUID", constraints: "NOT NULL REFERENCES products(id)" }
+      - { name: "ordered_qty", type: "DECIMAL(15,4)", constraints: "NOT NULL" }
+      - { name: "already_received_qty", type: "DECIMAL(15,4)", constraints: "NOT NULL DEFAULT 0" }
+      - { name: "requesting_qty", type: "DECIMAL(15,4)", constraints: "NOT NULL" }
+      - { name: "total_after_receipt", type: "DECIMAL(15,4)", constraints: "NOT NULL" }
+      - { name: "over_receipt_pct", type: "NUMERIC(5,2)", constraints: "NOT NULL" }
+      - { name: "tolerance_pct", type: "NUMERIC(5,2)", constraints: "NOT NULL" }
+      - { name: "reason", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "status", type: "TEXT", constraints: "NOT NULL DEFAULT 'pending' CHECK (IN pending/approved/rejected)" }
+      - { name: "requested_by", type: "UUID", constraints: "NOT NULL REFERENCES users(id)" }
+      - { name: "requested_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT NOW()" }
+      - { name: "reviewed_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "reviewed_at", type: "TIMESTAMPTZ", constraints: "" }
+      - { name: "review_notes", type: "TEXT", constraints: "" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT NOW()" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT NOW()" }
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_over_receipt_org_status ON over_receipt_approvals(org_id, status)"
+      - "idx_over_receipt_po_line ON over_receipt_approvals(po_line_id)"
+      - "idx_over_receipt_requested_at ON over_receipt_approvals(requested_at DESC)"
+      - "idx_over_receipt_requested_by ON over_receipt_approvals(requested_by)"
+      - "idx_over_receipt_product ON over_receipt_approvals(product_id)"
+    unique_constraints:
+      - "idx_over_receipt_pending_unique: Only one pending per po_line_id"
+    check_constraints:
+      - "status IN ('pending', 'approved', 'rejected')"
+      - "requesting_qty > 0"
+      - "total_after_receipt > ordered_qty"
+
+# Schema changes to existing tables
+schema_changes:
+  warehouse_settings:
+    new_columns:
+      - { name: "allow_over_receipt", type: "BOOLEAN", default: "false" }
+      - { name: "over_receipt_tolerance_pct", type: "NUMERIC(5,2)", default: "0.00", check: "0-100" }
+  grn_items:
+    new_columns:
+      - { name: "over_receipt_approval_id", type: "UUID", fk: "over_receipt_approvals(id)" }
+
+# RLS Policies (ADR-013)
+rls_policies:
+  pattern: "Users Table Lookup"
+  pattern_sql: "(SELECT org_id FROM users WHERE id = auth.uid())"
+
+  policies:
+    - table: "over_receipt_approvals"
+      name: "over_receipt_select_org"
+      operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+    - table: "over_receipt_approvals"
+      name: "over_receipt_insert_org"
+      operation: "INSERT"
+      with_check: "org_id = current_user_org AND requested_by = auth.uid()"
+
+    - table: "over_receipt_approvals"
+      name: "over_receipt_update_manager"
+      operation: "UPDATE"
+      using: "org_id = current_user_org"
+      with_check: "user has role warehouse_manager/admin/owner"
+      role_requirement: ["warehouse_manager", "admin", "owner"]
+
+# Performance considerations
+performance:
+  indexes:
+    - name: "idx_over_receipt_org_status"
+      purpose: "Fast filtering by status (pending approvals page)"
+      expected_queries: ["SELECT * WHERE org_id=? AND status='pending'"]
+    - name: "idx_over_receipt_po_line"
+      purpose: "Check existing approval for PO line"
+      expected_queries: ["SELECT * WHERE po_line_id=? AND status='pending'"]
+    - name: "idx_over_receipt_requested_at"
+      purpose: "Sort by most recent"
+      expected_queries: ["SELECT * ORDER BY requested_at DESC"]
+
+  query_targets:
+    - query: "Pending approvals list"
+      target_ms: 200
+    - query: "Check existing pending for PO line"
+      target_ms: 50
+    - query: "Approval status lookup"
+      target_ms: 50

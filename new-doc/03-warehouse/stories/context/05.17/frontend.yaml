@@ -1,0 +1,287 @@
+# Story 05.17 - Frontend Specification
+# Purpose: Components, UI states, UX patterns
+# Agent: FRONTEND-DEV
+
+# Wireframe reference
+wireframes:
+  - id: "WH-008"
+    path: "docs/3-ARCHITECTURE/ux/wireframes/WH-008-lp-split-modal.md"
+    description: "LP Split Modal - complete wireframe with all states"
+    components:
+      - "Source LP Info Display"
+      - "Split Quantity Input"
+      - "Destination Location Selector"
+      - "New LP Number Display"
+      - "Split Preview Panel"
+      - "Action Buttons"
+
+# Pages modified
+pages_modified:
+  - path: "apps/frontend/app/(authenticated)/warehouse/license-plates/[id]/page.tsx"
+    modification: "Add 'Split LP' button to actions menu"
+    condition: "LP.status === 'available' && settings.enable_split_merge"
+
+# Components to create
+components:
+  - path: "apps/frontend/app/(authenticated)/warehouse/license-plates/[id]/components/LPSplitModal.tsx"
+    description: "Main split modal component"
+    type: "Modal/Dialog"
+    props:
+      - "lpId: string"
+      - "onSuccess: (result: SplitLPResult) => void"
+      - "onClose: () => void"
+    state:
+      - "isOpen: boolean"
+      - "splitQty: number"
+      - "destinationLocationId: string | null"
+      - "isLoading: boolean"
+      - "error: string | null"
+      - "sourceLp: LicensePlate | null"
+    features:
+      - "Fetches LP data on open"
+      - "Real-time preview calculation"
+      - "Form validation with Zod"
+      - "Loading states"
+      - "Error handling"
+      - "Success feedback"
+
+  - path: "apps/frontend/app/(authenticated)/warehouse/license-plates/[id]/components/LPSplitPreview.tsx"
+    description: "Preview panel showing before/after state"
+    type: "Display component"
+    props:
+      - "sourceLp: LicensePlate"
+      - "splitQty: number"
+      - "newLpNumber: string"
+      - "destinationLocation: Location | null"
+    display:
+      - "Source LP remaining quantity"
+      - "New LP quantity and location"
+      - "Inherited fields list"
+      - "Genealogy record preview"
+
+  - path: "apps/frontend/app/(authenticated)/warehouse/license-plates/[id]/components/LPSplitQuantityInput.tsx"
+    description: "Validated quantity input with max constraint"
+    type: "Form input"
+    props:
+      - "value: number"
+      - "onChange: (value: number) => void"
+      - "maxValue: number"
+      - "uom: string"
+      - "error: string | null"
+    features:
+      - "Number input with step support"
+      - "Max value display"
+      - "Real-time validation"
+      - "Error message display"
+      - "Decimal precision (4 decimal places)"
+
+  - path: "apps/frontend/app/(authenticated)/warehouse/license-plates/[id]/components/LPLocationSelector.tsx"
+    description: "Location dropdown for destination selection"
+    type: "Select/Combobox"
+    props:
+      - "value: string | null"
+      - "onChange: (locationId: string) => void"
+      - "defaultLocationId: string"
+      - "warehouseId: string"
+    features:
+      - "Searchable dropdown"
+      - "Grouped by warehouse/zone"
+      - "Default to source location"
+      - "Location capacity warning (if enabled)"
+
+# UI States
+states:
+  loading_fetch_lp:
+    description: "Initial modal open, fetching LP data"
+    display:
+      - "Skeleton loaders for source LP info"
+      - "Form fields disabled"
+      - "Cancel button only"
+
+  success_form_ready:
+    description: "LP loaded, form ready for input"
+    display:
+      - "Source LP info populated"
+      - "Split quantity input enabled"
+      - "Location selector enabled"
+      - "Preview updates on input change"
+      - "Split button enabled when valid"
+
+  loading_submit:
+    description: "Split operation in progress"
+    display:
+      - "Spinner on Split button"
+      - "Button text: 'Splitting...'"
+      - "Form inputs disabled"
+      - "Cancel disabled"
+      - "Modal cannot be closed"
+
+  success_complete:
+    description: "Split completed successfully"
+    display:
+      - "Success icon and message"
+      - "Source LP card with updated quantity"
+      - "New LP card with new quantity"
+      - "Genealogy record info"
+      - "Actions: View Details, Print Label, Close, Split Another"
+
+  error_validation:
+    description: "Form validation errors"
+    display:
+      - "Error banner at top"
+      - "Inline field errors"
+      - "Submit button disabled"
+      - "Form editable to correct"
+
+  error_api_failure:
+    description: "API/server error"
+    display:
+      - "Error banner with details"
+      - "Error code and message"
+      - "Retry button"
+      - "Cancel button"
+      - "Form re-enabled"
+
+  error_lp_not_available:
+    description: "LP status changed before split"
+    display:
+      - "Error message: LP consumed/blocked"
+      - "Reason if available"
+      - "Close button only"
+      - "Cannot retry"
+
+# Status badge colors
+badges:
+  lp_status:
+    available:
+      background: "#D1FAE5"
+      text: "#065F46"
+      border: "#6EE7B7"
+      icon: "Check"
+    reserved:
+      background: "#DBEAFE"
+      text: "#1E40AF"
+      border: "#93C5FD"
+      icon: "Lock"
+    consumed:
+      background: "#E5E7EB"
+      text: "#1F2937"
+      border: "#9CA3AF"
+      icon: "Archive"
+    blocked:
+      background: "#FEE2E2"
+      text: "#991B1B"
+      border: "#FCA5A5"
+      icon: "Block"
+
+  qa_status:
+    pending:
+      background: "#FEF3C7"
+      text: "#92400E"
+      border: "#FCD34D"
+      icon: "Clock"
+    passed:
+      background: "#D1FAE5"
+      text: "#065F46"
+      border: "#6EE7B7"
+      icon: "Check"
+    failed:
+      background: "#FEE2E2"
+      text: "#991B1B"
+      border: "#FCA5A5"
+      icon: "X"
+    quarantine:
+      background: "#FED7AA"
+      text: "#9A3412"
+      border: "#FDBA74"
+      icon: "Warning"
+
+# Responsive breakpoints
+responsive:
+  desktop:
+    breakpoint: ">1024px"
+    modal_width: "900px"
+    layout: "Full modal, 4-column grid for source LP info"
+
+  tablet:
+    breakpoint: "768-1024px"
+    modal_width: "700px"
+    layout: "2-column grid, condensed preview"
+
+  mobile:
+    breakpoint: "<768px"
+    modal_width: "full-screen"
+    layout: "Single column, sticky submit, collapsible preview"
+    features:
+      - "Slides up from bottom"
+      - "Sticky header with close"
+      - "Numeric keyboard for quantity"
+      - "Collapsible preview section"
+
+# Accessibility
+accessibility:
+  touch_targets: "48dp minimum"
+  contrast: "4.5:1 minimum (WCAG 2.1 AA)"
+  keyboard:
+    - "Tab: Move focus forward"
+    - "Shift+Tab: Move focus backward"
+    - "Enter: Submit form (on submit button)"
+    - "Escape: Close modal"
+    - "Arrow keys: Navigate dropdown"
+  focus:
+    - "On open: Focus split quantity input"
+    - "On error: Focus first error field"
+    - "On success: Focus 'View Details' button"
+    - "On close: Return focus to trigger element"
+  aria:
+    - 'role="dialog"'
+    - 'aria-labelledby="split-modal-title"'
+    - 'aria-modal="true"'
+    - 'aria-live="polite" on preview'
+    - 'aria-live="assertive" on errors'
+  screen_reader:
+    modal_open: "Split License Plate dialog opened. Source license plate: {lpNumber}, {productName}, current quantity {qty} {uom}."
+    form_fields: "Split quantity, required. Number input. Must be less than {qty} {uom}."
+    preview: "Split preview. Source LP will have {remainingQty}. New LP will have {splitQty}."
+    success: "Split successful. New LP {lpNumber} created with {qty} {uom}."
+    error: "Error. {message}. Form cannot be submitted."
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-lp-split.ts"
+    description: "React Query mutation hook for LP split"
+    exports:
+      - name: "useLPSplit"
+        returns: "UseMutationResult<SplitLPResult, Error, SplitLPRequest>"
+    pattern: |
+      import { useMutation, useQueryClient } from '@tanstack/react-query';
+      import { splitLicensePlate } from '@/lib/services/lp-split-service';
+
+      export function useLPSplit() {
+        const queryClient = useQueryClient();
+
+        return useMutation({
+          mutationFn: splitLicensePlate,
+          onSuccess: (data, variables) => {
+            // Invalidate LP list and detail queries
+            queryClient.invalidateQueries({ queryKey: ['license-plates'] });
+            queryClient.invalidateQueries({ queryKey: ['license-plate', variables.lpId] });
+            // Invalidate genealogy queries
+            queryClient.invalidateQueries({ queryKey: ['lp-genealogy', variables.lpId] });
+          },
+        });
+      }
+
+  - path: "apps/frontend/lib/hooks/use-next-lp-number.ts"
+    description: "Fetch next LP number for preview"
+    exports:
+      - name: "useNextLPNumber"
+        returns: "UseQueryResult<{ nextLpNumber: string }>"
+
+# Performance targets
+performance:
+  modal_open: "<500ms (fetch LP data)"
+  preview_update: "<50ms (client-side calculation)"
+  lp_number_validation: "<300ms (debounced uniqueness check)"
+  split_submission: "<300ms (PRD requirement)"
+  success_render: "<100ms"

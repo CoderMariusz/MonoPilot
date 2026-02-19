@@ -1,0 +1,80 @@
+# Story 11.16 - Index File (Entry Point)
+# Generated: 2026-01-15
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "11.16"
+  name: "Comarch Payment Reconciliation"
+  slug: "comarch-payment-reconciliation"
+  epic: "11-integrations"
+  phase: "3"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "backend"
+  state: "ready"
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["organizations"]
+    - story: "09.1"
+      name: "Invoices CRUD"
+      provides: ["invoices table"]
+      status: "planned"
+    - story: "11.3"
+      name: "Integration Logs"
+      provides: ["integration_logs table"]
+      status: "ready"
+    - story: "11.6"
+      name: "Comarch Basic"
+      provides: ["comarch_optima_config"]
+      status: "ready"
+    - story: "11.13"
+      name: "Comarch Advanced"
+      provides: ["Comarch API patterns"]
+      status: "ready"
+  blocks: []
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/integrations.md"
+    sections: ["FR-INT-027"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/11-integrations/11.16.comarch-payment-reconciliation.md"
+  patterns:
+    - "docs/2-MANAGEMENT/epics/current/11-integrations/11.6.supplier-portal-comarch-basic.md"
+    - "docs/2-MANAGEMENT/epics/current/11-integrations/11.13.comarch-advanced.md"
+
+# High-level deliverables
+deliverables:
+  - type: "database"
+    count: 1
+    description: "payment_transactions table"
+  - type: "service"
+    count: 1
+    description: "comarch-payment-service.ts (sync, match, reconciliation)"
+  - type: "api"
+    count: 5
+    description: "Sync, list, match, unmatch, reconciliation report endpoints"
+  - type: "cron"
+    count: 1
+    description: "Daily payment sync"
+  - type: "frontend"
+    count: 5
+    description: "Payment list, match modal, reconciliation dashboard, unmatched queue"
+  - type: "test"
+    count: 5
+    description: "Unit (matching algorithm) + integration + E2E"
+
+# Technical notes
+technical_notes:
+  - "Sync payments from Comarch Optima /api/platnosci"
+  - "Auto-match by invoice number + amount (high confidence)"
+  - "Auto-suggest by customer + amount (low confidence)"
+  - "Manual matching UI for unmatched payments"
+  - "Update invoice.payment_status (unpaid/partial/paid)"
+  - "Duplicate prevention by external_payment_id"
+  - "Reconciliation report with matched/unmatched metrics"

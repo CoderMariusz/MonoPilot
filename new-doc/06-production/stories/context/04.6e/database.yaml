@@ -1,0 +1,362 @@
+# Story 04.6e - Database Schema
+# Purpose: Tables, RLS policies, indexes for over-consumption control
+# Agent: BACKEND-DEV (database focus)
+
+migrations:
+  - path: "supabase/migrations/XXX_add_over_consumption_approvals.sql"
+    type: "migration"
+    description: "Create over_consumption_approvals table + RLS + indexes"
+
+# Tables Created
+tables_created:
+  - name: "over_consumption_approvals"
+    description: "Over-consumption approval requests and decisions"
+    columns:
+      - name: "id"
+        type: "UUID"
+        constraints: "PRIMARY KEY DEFAULT gen_random_uuid()"
+      - name: "org_id"
+        type: "UUID"
+        constraints: "NOT NULL REFERENCES organizations(id)"
+      - name: "wo_id"
+        type: "UUID"
+        constraints: "NOT NULL REFERENCES work_orders(id)"
+      - name: "wo_material_id"
+        type: "UUID"
+        constraints: "NOT NULL REFERENCES wo_materials(id)"
+      - name: "lp_id"
+        type: "UUID"
+        constraints: "NOT NULL REFERENCES license_plates(id)"
+      - name: "requested_qty"
+        type: "DECIMAL(15,4)"
+        constraints: "NOT NULL"
+        description: "Quantity attempting to consume"
+      - name: "current_consumed_qty"
+        type: "DECIMAL(15,4)"
+        constraints: "NOT NULL"
+        description: "Already consumed at time of request"
+      - name: "required_qty"
+        type: "DECIMAL(15,4)"
+        constraints: "NOT NULL"
+        description: "BOM requirement for this material"
+      - name: "total_after_qty"
+        type: "DECIMAL(15,4)"
+        constraints: "NOT NULL"
+        description: "Total consumption if approved (current + requested)"
+      - name: "over_consumption_qty"
+        type: "DECIMAL(15,4)"
+        constraints: "NOT NULL"
+        description: "Amount over BOM requirement (total - required)"
+      - name: "variance_percent"
+        type: "DECIMAL(8,2)"
+        constraints: "NOT NULL"
+        description: "Percentage variance ((over_qty / required_qty) * 100)"
+      - name: "requested_by"
+        type: "UUID"
+        constraints: "NOT NULL REFERENCES users(id)"
+        description: "User who requested approval (Operator)"
+      - name: "requested_at"
+        type: "TIMESTAMPTZ"
+        constraints: "NOT NULL DEFAULT NOW()"
+      - name: "status"
+        type: "TEXT"
+        constraints: "NOT NULL DEFAULT 'pending'"
+        valid_values: ["pending", "approved", "rejected", "cancelled"]
+      - name: "decided_by"
+        type: "UUID"
+        constraints: "REFERENCES users(id)"
+        description: "Manager/Admin who made decision"
+      - name: "decided_at"
+        type: "TIMESTAMPTZ"
+        description: "Timestamp of approval/rejection"
+      - name: "approval_reason"
+        type: "TEXT"
+        description: "Optional reason for approval"
+      - name: "rejection_reason"
+        type: "TEXT"
+        description: "Required reason for rejection"
+      - name: "consumption_id"
+        type: "UUID"
+        constraints: "REFERENCES material_consumptions(id)"
+        description: "Created consumption record (after approval)"
+      - name: "created_at"
+        type: "TIMESTAMPTZ"
+        constraints: "NOT NULL DEFAULT NOW()"
+      - name: "updated_at"
+        type: "TIMESTAMPTZ"
+        constraints: "NOT NULL DEFAULT NOW()"
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_over_consumption_approvals_org_status ON over_consumption_approvals(org_id, status)"
+      - "idx_over_consumption_approvals_wo ON over_consumption_approvals(wo_id, status)"
+      - "idx_over_consumption_approvals_pending ON over_consumption_approvals(org_id) WHERE status = 'pending'"
+
+# Tables Modified
+tables_modified:
+  - name: "wo_materials"
+    description: "WO materials table - track variance"
+    existing_table: true
+    source: "Epic 03 - Planning Module"
+    read_columns:
+      - name: "quantity"
+        type: "DECIMAL(15,4)"
+        description: "Required quantity from BOM"
+    computed_columns:
+      - name: "consumed_qty"
+        calculation: "SUM(material_consumptions.quantity) WHERE reversed = false"
+      - name: "variance_qty"
+        calculation: "consumed_qty - quantity"
+      - name: "variance_percent"
+        calculation: "((consumed_qty - quantity) / quantity) * 100"
+
+  - name: "production_settings"
+    description: "Settings table - read over-consumption control setting"
+    existing_table: true
+    source: "Story 04.5 - Production Settings"
+    read_columns:
+      - name: "allow_over_consumption"
+        type: "BOOLEAN"
+        default: "false"
+        description: "When false, over-consumption requires manager approval"
+
+# Migration SQL
+migration_sql: |
+  -- Create over_consumption_approvals table
+  CREATE TABLE IF NOT EXISTS over_consumption_approvals (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id UUID NOT NULL REFERENCES organizations(id),
+    wo_id UUID NOT NULL REFERENCES work_orders(id),
+    wo_material_id UUID NOT NULL REFERENCES wo_materials(id),
+    lp_id UUID NOT NULL REFERENCES license_plates(id),
+
+    -- Quantity tracking
+    requested_qty DECIMAL(15,4) NOT NULL,
+    current_consumed_qty DECIMAL(15,4) NOT NULL,
+    required_qty DECIMAL(15,4) NOT NULL,
+    total_after_qty DECIMAL(15,4) NOT NULL,
+    over_consumption_qty DECIMAL(15,4) NOT NULL,
+    variance_percent DECIMAL(8,2) NOT NULL,
+
+    -- Request info
+    requested_by UUID NOT NULL REFERENCES users(id),
+    requested_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    -- Status and decision
+    status TEXT NOT NULL DEFAULT 'pending'
+      CHECK (status IN ('pending', 'approved', 'rejected', 'cancelled')),
+    decided_by UUID REFERENCES users(id),
+    decided_at TIMESTAMPTZ,
+    approval_reason TEXT,
+    rejection_reason TEXT,
+
+    -- Linked consumption (after approval)
+    consumption_id UUID REFERENCES material_consumptions(id),
+
+    -- Timestamps
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+
+  -- Indexes
+  CREATE INDEX idx_over_consumption_approvals_org_status
+    ON over_consumption_approvals(org_id, status);
+
+  CREATE INDEX idx_over_consumption_approvals_wo
+    ON over_consumption_approvals(wo_id, status);
+
+  CREATE INDEX idx_over_consumption_approvals_pending
+    ON over_consumption_approvals(org_id)
+    WHERE status = 'pending';
+
+  -- RLS Policies
+  ALTER TABLE over_consumption_approvals ENABLE ROW LEVEL SECURITY;
+
+  -- SELECT: All users in org can view approvals
+  CREATE POLICY over_consumption_approvals_select ON over_consumption_approvals
+    FOR SELECT USING (
+      org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+    );
+
+  -- INSERT: Any production user can request approval
+  CREATE POLICY over_consumption_approvals_insert ON over_consumption_approvals
+    FOR INSERT WITH CHECK (
+      org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+      AND requested_by = auth.uid()
+    );
+
+  -- UPDATE: Only Manager/Admin can approve/reject
+  CREATE POLICY over_consumption_approvals_update ON over_consumption_approvals
+    FOR UPDATE USING (
+      org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+      AND EXISTS (
+        SELECT 1 FROM users u
+        JOIN roles r ON r.id = u.role_id
+        WHERE u.id = auth.uid()
+        AND (r.name = 'admin' OR r.name = 'production_manager' OR r.name = 'owner')
+      )
+    );
+
+  -- Trigger to update updated_at
+  CREATE TRIGGER update_over_consumption_approvals_updated_at
+    BEFORE UPDATE ON over_consumption_approvals
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+# RLS Policies Summary
+rls_policies:
+  pattern: "Users Table Lookup"
+  policies:
+    - table: "over_consumption_approvals"
+      name: "over_consumption_approvals_select"
+      operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      note: "All org users can view approval requests"
+
+    - table: "over_consumption_approvals"
+      name: "over_consumption_approvals_insert"
+      operation: "INSERT"
+      with_check: "org_id = org_context AND requested_by = auth.uid()"
+      note: "Users can only create requests for themselves"
+
+    - table: "over_consumption_approvals"
+      name: "over_consumption_approvals_update"
+      operation: "UPDATE"
+      using: "org_id = org_context AND user is Manager/Admin"
+      note: "Only Manager/Admin can approve/reject"
+
+# Data Queries
+queries:
+  check_over_consumption: |
+    -- Check if consumption would exceed BOM requirement
+    SELECT
+      wm.id as wo_material_id,
+      wm.quantity as required_qty,
+      COALESCE(SUM(mc.quantity) FILTER (WHERE mc.reversed = false), 0) as consumed_qty,
+      :requested_qty as requested_qty,
+      COALESCE(SUM(mc.quantity) FILTER (WHERE mc.reversed = false), 0) + :requested_qty as total_after,
+      (COALESCE(SUM(mc.quantity) FILTER (WHERE mc.reversed = false), 0) + :requested_qty) - wm.quantity as over_qty
+    FROM wo_materials wm
+    LEFT JOIN material_consumptions mc ON mc.wo_material_id = wm.id
+    WHERE wm.id = :wo_material_id
+    AND wm.org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+    GROUP BY wm.id, wm.quantity
+    HAVING (COALESCE(SUM(mc.quantity) FILTER (WHERE mc.reversed = false), 0) + :requested_qty) > wm.quantity
+
+  create_approval_request: |
+    INSERT INTO over_consumption_approvals (
+      org_id,
+      wo_id,
+      wo_material_id,
+      lp_id,
+      requested_qty,
+      current_consumed_qty,
+      required_qty,
+      total_after_qty,
+      over_consumption_qty,
+      variance_percent,
+      requested_by
+    ) VALUES (
+      (SELECT org_id FROM users WHERE id = auth.uid()),
+      :wo_id,
+      :wo_material_id,
+      :lp_id,
+      :requested_qty,
+      :current_consumed_qty,
+      :required_qty,
+      :total_after_qty,
+      :over_consumption_qty,
+      :variance_percent,
+      auth.uid()
+    )
+    RETURNING *
+
+  approve_request: |
+    UPDATE over_consumption_approvals
+    SET
+      status = 'approved',
+      decided_by = auth.uid(),
+      decided_at = NOW(),
+      approval_reason = :approval_reason,
+      updated_at = NOW()
+    WHERE id = :request_id
+    AND org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+    AND status = 'pending'
+    RETURNING *
+
+  reject_request: |
+    UPDATE over_consumption_approvals
+    SET
+      status = 'rejected',
+      decided_by = auth.uid(),
+      decided_at = NOW(),
+      rejection_reason = :rejection_reason,
+      updated_at = NOW()
+    WHERE id = :request_id
+    AND org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+    AND status = 'pending'
+    RETURNING *
+
+  get_pending_requests: |
+    SELECT
+      oca.*,
+      wo.wo_number,
+      p.code as product_code,
+      p.name as product_name,
+      lp.lp_number,
+      u.name as requested_by_name
+    FROM over_consumption_approvals oca
+    JOIN work_orders wo ON wo.id = oca.wo_id
+    JOIN wo_materials wm ON wm.id = oca.wo_material_id
+    JOIN products p ON p.id = wm.product_id
+    JOIN license_plates lp ON lp.id = oca.lp_id
+    JOIN users u ON u.id = oca.requested_by
+    WHERE oca.org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+    AND oca.status = 'pending'
+    ORDER BY oca.requested_at DESC
+
+  get_materials_with_variance: |
+    -- For dashboard high variance alerts
+    SELECT
+      wo.id as wo_id,
+      wo.wo_number,
+      wm.id as wo_material_id,
+      p.code as product_code,
+      wm.quantity as required_qty,
+      COALESCE(SUM(mc.quantity) FILTER (WHERE mc.reversed = false), 0) as consumed_qty,
+      ((COALESCE(SUM(mc.quantity) FILTER (WHERE mc.reversed = false), 0) - wm.quantity) / wm.quantity * 100) as variance_percent
+    FROM work_orders wo
+    JOIN wo_materials wm ON wm.wo_id = wo.id
+    JOIN products p ON p.id = wm.product_id
+    LEFT JOIN material_consumptions mc ON mc.wo_material_id = wm.id
+    WHERE wo.org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+    AND wo.status = 'in_progress'
+    GROUP BY wo.id, wo.wo_number, wm.id, p.code, wm.quantity
+    HAVING ((COALESCE(SUM(mc.quantity) FILTER (WHERE mc.reversed = false), 0) - wm.quantity) / wm.quantity * 100) > 10
+
+# Variance Calculation
+variance_calculation:
+  formula: "((consumed_qty - required_qty) / required_qty) * 100"
+  thresholds:
+    - range: "= 0%"
+      color: "green"
+      icon: "check-circle"
+      description: "Exact match"
+    - range: "1% - 10%"
+      color: "yellow"
+      icon: "alert-triangle"
+      description: "Acceptable variance"
+    - range: "> 10%"
+      color: "red"
+      icon: "x-circle"
+      description: "High variance - dashboard alert"
+  examples:
+    - required: 100
+      consumed: 100
+      variance: "0% (green)"
+    - required: 100
+      consumed: 105
+      variance: "+5% (yellow)"
+    - required: 100
+      consumed: 115
+      variance: "+15% (red)"

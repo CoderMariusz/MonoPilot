@@ -1,0 +1,187 @@
+# Story 05.9 - Database Schema
+# Purpose: Tables, columns, indexes, RLS policies
+# Agent: BACKEND-DEV (database focus)
+
+migrations:
+  - path: "supabase/migrations/XXX_add_asn_items_variance_columns.sql"
+    type: "migration"
+    description: "Add variance tracking columns to asn_items table"
+    sql: |
+      -- Add variance columns to asn_items
+      ALTER TABLE asn_items
+        ADD COLUMN variance_reason TEXT,
+        ADD COLUMN variance_notes TEXT,
+        ADD COLUMN last_received_at TIMESTAMPTZ;
+
+      -- Check constraint for variance_reason
+      ALTER TABLE asn_items
+        ADD CONSTRAINT asn_items_variance_reason_check
+        CHECK (variance_reason IS NULL OR variance_reason IN ('damaged', 'short-shipped', 'over-shipped', 'other'));
+
+      -- Index for variance tracking queries
+      CREATE INDEX idx_asn_items_variance
+        ON asn_items(asn_id)
+        WHERE received_qty != expected_qty;
+
+      -- Comment for documentation
+      COMMENT ON COLUMN asn_items.variance_reason IS 'Reason for qty variance: damaged, short-shipped, over-shipped, other';
+      COMMENT ON COLUMN asn_items.variance_notes IS 'Additional notes explaining variance';
+      COMMENT ON COLUMN asn_items.last_received_at IS 'Timestamp of last receive operation against this item';
+
+# Existing tables referenced (from 05.8)
+tables_referenced:
+  - name: "asns"
+    description: "ASN header table (created in 05.8)"
+    relevant_columns:
+      - { name: "id", type: "UUID", usage: "Primary key for ASN lookup" }
+      - { name: "org_id", type: "UUID", usage: "Org isolation (RLS)" }
+      - { name: "asn_number", type: "TEXT", usage: "Display reference" }
+      - { name: "po_id", type: "UUID", usage: "Link to purchase order" }
+      - { name: "supplier_id", type: "UUID", usage: "Supplier reference" }
+      - { name: "expected_date", type: "DATE", usage: "Expected delivery date" }
+      - { name: "actual_date", type: "DATE", usage: "Set on receive completion" }
+      - { name: "status", type: "TEXT", usage: "pending|partial|received|cancelled" }
+
+  - name: "asn_items"
+    description: "ASN line items table (created in 05.8, extended in 05.9)"
+    columns:
+      # Existing columns (from 05.8)
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "asn_id", type: "UUID", constraints: "NOT NULL REFERENCES asns(id) ON DELETE CASCADE" }
+      - { name: "product_id", type: "UUID", constraints: "NOT NULL REFERENCES products(id)" }
+      - { name: "po_line_id", type: "UUID", constraints: "REFERENCES purchase_order_lines(id)" }
+      - { name: "expected_qty", type: "DECIMAL(15,4)", constraints: "NOT NULL CHECK (expected_qty > 0)" }
+      - { name: "received_qty", type: "DECIMAL(15,4)", constraints: "DEFAULT 0 CHECK (received_qty >= 0)" }
+      - { name: "uom", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "supplier_lp_number", type: "TEXT", constraints: "" }
+      - { name: "supplier_batch_number", type: "TEXT", constraints: "" }
+      - { name: "gtin", type: "TEXT", constraints: "" }
+      - { name: "expiry_date", type: "DATE", constraints: "" }
+      - { name: "notes", type: "TEXT", constraints: "" }
+      # New columns (05.9)
+      - { name: "variance_reason", type: "TEXT", constraints: "CHECK (IN ('damaged', 'short-shipped', 'over-shipped', 'other'))" }
+      - { name: "variance_notes", type: "TEXT", constraints: "" }
+      - { name: "last_received_at", type: "TIMESTAMPTZ", constraints: "" }
+    rls: true
+    rls_pattern: "Via asns.org_id join"
+
+  - name: "grns"
+    description: "Goods Receipt Note header (created in 05.10/05.11)"
+    relevant_columns:
+      - { name: "id", type: "UUID", usage: "Primary key" }
+      - { name: "org_id", type: "UUID", usage: "Org isolation (RLS)" }
+      - { name: "grn_number", type: "TEXT", usage: "Auto-generated GRN number" }
+      - { name: "source_type", type: "TEXT", usage: "po|to|asn|return" }
+      - { name: "asn_id", type: "UUID", usage: "Link to ASN (key for this story)" }
+      - { name: "po_id", type: "UUID", usage: "Link to PO" }
+      - { name: "warehouse_id", type: "UUID", usage: "Receipt warehouse" }
+      - { name: "location_id", type: "UUID", usage: "Receipt location" }
+      - { name: "status", type: "TEXT", usage: "draft|completed|cancelled" }
+      - { name: "receipt_date", type: "TIMESTAMPTZ", usage: "When receipt occurred" }
+      - { name: "received_by", type: "UUID", usage: "User who received" }
+
+  - name: "grn_items"
+    description: "GRN line items"
+    relevant_columns:
+      - { name: "id", type: "UUID", usage: "Primary key" }
+      - { name: "grn_id", type: "UUID", usage: "Link to GRN header" }
+      - { name: "product_id", type: "UUID", usage: "Product received" }
+      - { name: "asn_item_id", type: "UUID", usage: "Link to ASN item (key for variance)" }
+      - { name: "received_qty", type: "DECIMAL(15,4)", usage: "Quantity received" }
+      - { name: "batch_number", type: "TEXT", usage: "Internal batch number" }
+      - { name: "supplier_batch_number", type: "TEXT", usage: "Supplier batch" }
+      - { name: "expiry_date", type: "DATE", usage: "Product expiry" }
+      - { name: "lp_id", type: "UUID", usage: "Created LP reference" }
+
+  - name: "license_plates"
+    description: "LP table (created in 05.1)"
+    relevant_columns:
+      - { name: "id", type: "UUID", usage: "Primary key" }
+      - { name: "grn_id", type: "UUID", usage: "Link to GRN" }
+      - { name: "asn_id", type: "UUID", usage: "Link to ASN" }
+      - { name: "source", type: "TEXT", usage: "receipt (from ASN receive)" }
+
+# New indexes for 05.9
+indexes:
+  - name: "idx_asn_items_variance"
+    table: "asn_items"
+    columns: ["asn_id"]
+    where: "received_qty != expected_qty"
+    purpose: "Fast lookup of items with variance for reporting"
+
+  - name: "idx_grns_asn_id"
+    table: "grns"
+    columns: ["asn_id"]
+    where: "asn_id IS NOT NULL"
+    purpose: "Find GRNs linked to specific ASN"
+
+  - name: "idx_grn_items_asn_item"
+    table: "grn_items"
+    columns: ["asn_item_id"]
+    where: "asn_item_id IS NOT NULL"
+    purpose: "Find GRN items linked to ASN items"
+
+# RLS policies (inherit from parent tables)
+rls_policies:
+  note: "ASN receive operations go through asns and asn_items tables which have existing RLS"
+  policies:
+    - table: "asns"
+      inherited: true
+      policy: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - table: "asn_items"
+      inherited: true
+      policy: "Via asns join on org_id"
+    - table: "grns"
+      inherited: true
+      policy: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - table: "license_plates"
+      inherited: true
+      policy: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+# Database transaction for receive workflow
+transaction_pattern:
+  name: "ASN Receive Transaction"
+  description: "Atomic operation for receiving from ASN"
+  steps:
+    - step: 1
+      action: "Validate ASN exists and status in (pending, partial)"
+      table: "asns"
+    - step: 2
+      action: "Validate each item against over-receipt tolerance"
+      table: "asn_items"
+    - step: 3
+      action: "Create GRN header with source_type='asn'"
+      table: "grns"
+    - step: 4
+      action: "Create GRN items linked to ASN items"
+      table: "grn_items"
+    - step: 5
+      action: "Create LP for each GRN item"
+      table: "license_plates"
+    - step: 6
+      action: "Update asn_items.received_qty (cumulative)"
+      table: "asn_items"
+    - step: 7
+      action: "Update asn_items.variance_reason if applicable"
+      table: "asn_items"
+    - step: 8
+      action: "Update ASN status (pending|partial|received)"
+      table: "asns"
+    - step: 9
+      action: "Set asns.actual_date if fully received"
+      table: "asns"
+  rollback: "On any failure, rollback entire transaction"
+
+# Variance calculation
+variance_logic:
+  formula: "variance = received_qty - expected_qty"
+  percent_formula: "variance_percent = (variance / expected_qty) * 100"
+  indicators:
+    - { indicator: "under", condition: "variance < 0", description: "Under-received" }
+    - { indicator: "over", condition: "variance > 0", description: "Over-received" }
+    - { indicator: "exact", condition: "variance = 0", description: "Exact match" }
+  reasons:
+    - "damaged"
+    - "short-shipped"
+    - "over-shipped"
+    - "other"

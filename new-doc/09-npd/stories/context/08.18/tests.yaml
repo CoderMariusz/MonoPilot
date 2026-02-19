@@ -1,0 +1,323 @@
+# Tests Context: 08.18 - Access Control & Audit Trail
+
+unit_tests:
+  service: "NPDAuditService"
+  file: "lib/services/__tests__/npd-audit-service.test.ts"
+  coverage_target: ">80%"
+  tests:
+    - name: "getAuditTrail - returns all audit logs"
+      scenario: "Fetch audit trail without filters"
+      assertions:
+        - "Returns all audit logs for org"
+        - "Sorted by created_at DESC"
+        - "Includes user details (name, email)"
+        - "Includes changed_fields array for UPDATE actions"
+
+    - name: "getAuditTrail - filters by project_id"
+      scenario: "Fetch audit trail for specific project"
+      assertions:
+        - "Returns only entries for project and related entities (formulations, costing)"
+
+    - name: "getAuditTrail - filters by user_id"
+      scenario: "Fetch audit trail for specific user"
+      assertions:
+        - "Returns only entries where user_id matches"
+
+    - name: "getAuditTrail - filters by entity_type"
+      scenario: "Fetch audit trail for formulations only"
+      assertions:
+        - "Returns only entries where entity_type = 'npd_formulations'"
+
+    - name: "getAuditTrail - filters by action"
+      scenario: "Fetch audit trail for UPDATE actions only"
+      assertions:
+        - "Returns only UPDATE entries"
+
+    - name: "getAuditTrail - filters by date range"
+      scenario: "Fetch audit trail from Jan 1-15"
+      assertions:
+        - "Returns only entries within date range"
+
+    - name: "getAuditTrail - pagination works"
+      scenario: "50 audit logs, page 2, limit 20"
+      assertions:
+        - "Returns 20 entries (rows 21-40)"
+        - "Pagination metadata: total=50, page=2, pages=3"
+
+    - name: "getEntityAuditTrail - returns entity-specific audit logs"
+      scenario: "Fetch audit trail for formulation ID 5"
+      assertions:
+        - "Returns only entries where entity_type='npd_formulations' AND entity_id=5"
+        - "Sorted by created_at DESC"
+
+integration_tests:
+  file: "app/api/npd/audit-trail/__tests__/audit-api.test.ts"
+  tests:
+    - name: "GET /api/npd/audit-trail - returns audit logs"
+      setup:
+        - "Create 10 audit log entries"
+        - "Login as ADMIN user"
+      request:
+        method: "GET"
+        path: "/api/npd/audit-trail"
+      assertions:
+        - "Status 200"
+        - "Returns array of 10 audit logs"
+        - "Each entry has required fields"
+
+    - name: "GET /api/npd/audit-trail - filters work"
+      setup:
+        - "Create 5 INSERT, 3 UPDATE, 2 DELETE entries"
+        - "Login as ADMIN user"
+      request:
+        method: "GET"
+        path: "/api/npd/audit-trail?action=UPDATE"
+      assertions:
+        - "Returns only 3 UPDATE entries"
+
+    - name: "GET /api/npd/audit-trail - non-admin gets 403"
+      setup:
+        - "Login as R&D user (not ADMIN)"
+      request:
+        method: "GET"
+        path: "/api/npd/audit-trail"
+      assertions:
+        - "Status 403"
+        - "Error: 'Admin or Quality Director role required'"
+
+  file: "app/api/npd/__tests__/rls-policies.test.ts"
+  description: "Integration tests for RLS policies"
+  tests:
+    - name: "NPD_LEAD can CRUD own projects"
+      setup:
+        - "Create NPD_LEAD user"
+        - "Create project owned by NPD_LEAD"
+      assertions:
+        - "NPD_LEAD can SELECT project"
+        - "NPD_LEAD can UPDATE project"
+        - "NPD_LEAD can DELETE project"
+
+    - name: "R&D can view assigned formulations only"
+      setup:
+        - "Create R&D user"
+        - "Create formulation assigned to R&D user"
+        - "Create formulation assigned to different user"
+      assertions:
+        - "R&D user can SELECT assigned formulation"
+        - "R&D user CANNOT SELECT other formulation (RLS blocks)"
+
+    - name: "R&D can edit assigned formulations (if not locked)"
+      setup:
+        - "Create formulation assigned to R&D user, status='draft'"
+      assertions:
+        - "R&D user can UPDATE formulation"
+
+    - name: "R&D cannot edit locked formulations"
+      setup:
+        - "Create formulation assigned to R&D user, status='locked'"
+      assertions:
+        - "R&D user CANNOT UPDATE formulation (RLS blocks)"
+
+    - name: "REGULATORY can upload compliance documents"
+      setup:
+        - "Create REGULATORY user"
+      assertions:
+        - "REGULATORY can INSERT npd_compliance_documents"
+        - "REGULATORY can DELETE npd_compliance_documents"
+
+    - name: "FINANCE can view all costing"
+      setup:
+        - "Create FINANCE user"
+        - "Create 3 costing records (various projects)"
+      assertions:
+        - "FINANCE can SELECT all 3 costing records"
+
+    - name: "FINANCE can approve submitted costing"
+      setup:
+        - "Create costing with status='submitted'"
+      assertions:
+        - "FINANCE can UPDATE costing to status='approved'"
+
+    - name: "FINANCE cannot approve draft costing"
+      setup:
+        - "Create costing with status='draft'"
+      assertions:
+        - "FINANCE CANNOT UPDATE costing (RLS blocks)"
+
+    - name: "PRODUCTION can view launched projects only"
+      setup:
+        - "Create project with status='launched'"
+        - "Create project with status='development'"
+      assertions:
+        - "PRODUCTION can SELECT launched project"
+        - "PRODUCTION CANNOT SELECT development project (RLS blocks)"
+
+  file: "app/api/npd/__tests__/audit-triggers.test.ts"
+  description: "Integration tests for audit triggers"
+  tests:
+    - name: "Formulation INSERT triggers audit log"
+      setup:
+        - "Login as NPD_LEAD"
+      actions:
+        - "INSERT formulation"
+      assertions:
+        - "Audit log entry created"
+        - "event_type = 'NPD.npd_formulations.INSERT'"
+        - "action = 'INSERT'"
+        - "new_values contains formulation data"
+        - "old_values = NULL"
+        - "user_id = NPD_LEAD user ID"
+
+    - name: "Formulation UPDATE triggers audit log"
+      setup:
+        - "Create formulation with target_cost=10.00"
+        - "Login as NPD_LEAD"
+      actions:
+        - "UPDATE formulation.target_cost = 12.00"
+      assertions:
+        - "Audit log entry created"
+        - "action = 'UPDATE'"
+        - "old_values.target_cost = 10.00"
+        - "new_values.target_cost = 12.00"
+        - "changed_fields = ['target_cost']"
+
+    - name: "Formulation DELETE triggers audit log"
+      setup:
+        - "Create formulation"
+        - "Login as NPD_LEAD"
+      actions:
+        - "DELETE formulation"
+      assertions:
+        - "Audit log entry created"
+        - "action = 'DELETE'"
+        - "old_values contains formulation data"
+        - "new_values = NULL"
+
+    - name: "Gate advance triggers audit log"
+      setup:
+        - "Create project at gate G2"
+        - "Login as NPD_LEAD"
+      actions:
+        - "UPDATE project.current_gate = 'G3'"
+      assertions:
+        - "Audit log entry created"
+        - "old_values.current_gate = 'G2'"
+        - "new_values.current_gate = 'G3'"
+        - "changed_fields includes 'current_gate'"
+
+    - name: "Costing approval triggers audit log"
+      setup:
+        - "Create costing with status='submitted'"
+        - "Login as FINANCE user"
+      actions:
+        - "UPDATE costing.status = 'approved'"
+      assertions:
+        - "Audit log entry created"
+        - "old_values.status = 'submitted'"
+        - "new_values.status = 'approved'"
+        - "changed_fields includes 'status', 'approved_by_id', 'approved_at'"
+
+    - name: "Audit log is immutable (no UPDATE)"
+      setup:
+        - "Create audit log entry"
+      actions:
+        - "Attempt UPDATE on audit log entry"
+      assertions:
+        - "Update blocked by database rule"
+        - "Audit log entry unchanged"
+
+    - name: "Audit log is immutable (no DELETE)"
+      setup:
+        - "Create audit log entry"
+      actions:
+        - "Attempt DELETE on audit log entry"
+      assertions:
+        - "Delete blocked by database rule"
+        - "Audit log entry still exists"
+
+e2e_tests:
+  file: "e2e/npd/audit-trail.spec.ts"
+  framework: "Playwright"
+  tests:
+    - name: "Admin views audit trail"
+      steps:
+        - "Login as ADMIN user"
+        - "Navigate to /npd/audit-trail"
+      assertions:
+        - "Audit trail table visible"
+        - "Shows all audit log entries"
+        - "Sorted by timestamp (newest first)"
+
+    - name: "Audit trail filters work"
+      steps:
+        - "Login as ADMIN user"
+        - "Navigate to /npd/audit-trail"
+        - "Select entity type filter = 'Formulations'"
+      assertions:
+        - "Only formulation audit logs visible"
+        - "Filter chip shows 'Entity Type: Formulations'"
+
+    - name: "Click audit row opens modal"
+      steps:
+        - "Login as ADMIN user"
+        - "Navigate to /npd/audit-trail"
+        - "Click first audit log row"
+      assertions:
+        - "Modal opens"
+        - "Shows event details (user, action, entity, timestamp)"
+        - "Shows old/new values (JSON syntax highlighted)"
+
+    - name: "Audit trail captures formulation change"
+      steps:
+        - "Login as NPD_LEAD"
+        - "Navigate to /npd/projects/1/formulations/1"
+        - "Change target_cost from 10.00 to 12.00"
+        - "Save"
+        - "Login as ADMIN"
+        - "Navigate to /npd/audit-trail"
+        - "Filter by entity type = 'Formulations'"
+      assertions:
+        - "Audit log entry visible for formulation update"
+        - "Changed fields shows 'target_cost'"
+        - "Old value: 10.00, New value: 12.00"
+
+    - name: "Non-admin cannot access audit trail"
+      steps:
+        - "Login as R&D user"
+        - "Attempt to navigate to /npd/audit-trail"
+      assertions:
+        - "Redirected to 403 error page"
+        - "Error: 'Admin or Quality Director role required'"
+
+performance_tests:
+  file: "e2e/npd/audit-performance.spec.ts"
+  tests:
+    - name: "Audit trigger performance"
+      setup:
+        - "Create formulation"
+      steps:
+        - "Update formulation"
+        - "Measure trigger execution time"
+      assertions:
+        - "Trigger completes < 50ms"
+        - "Main transaction not blocked"
+
+    - name: "Audit trail query performance"
+      setup:
+        - "Create 10,000 audit log entries"
+      steps:
+        - "GET /api/npd/audit-trail"
+        - "Measure response time"
+      assertions:
+        - "Response < 500ms"
+        - "Pagination limits result set"
+
+test_data:
+  - name: "audit_logs"
+    count: 50
+    fields:
+      - "Mix of INSERT, UPDATE, DELETE actions"
+      - "Various entity types (npd_projects, npd_formulations, npd_costing)"
+      - "Various users"
+      - "Dates: Jan 1-15, 2025"
+      - "UPDATE actions have changed_fields array"

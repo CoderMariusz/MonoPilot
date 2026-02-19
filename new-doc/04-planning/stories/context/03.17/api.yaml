@@ -1,0 +1,405 @@
+# Story 03.17 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  - method: "GET"
+    path: "/api/settings/planning"
+    description: "Get planning settings for current org (auto-initialize if missing)"
+    file: "apps/frontend/app/api/settings/planning/route.ts"
+    auth: "required"
+    roles: ["*"]  # All authenticated users can read settings
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      query_params: []
+      body: null
+
+    response:
+      status: 200
+      type: "PlanningSettings"
+      schema:
+        id: "UUID"
+        org_id: "UUID"
+        # PO Settings
+        po_require_approval: "boolean"
+        po_approval_threshold: "number | null"
+        po_approval_roles: "string[]"
+        po_auto_number_prefix: "string"
+        po_auto_number_format: "string"
+        po_default_payment_terms: "string"
+        po_default_currency: "string"
+        # TO Settings
+        to_allow_partial_shipments: "boolean"
+        to_require_lp_selection: "boolean"
+        to_auto_number_prefix: "string"
+        to_auto_number_format: "string"
+        to_default_transit_days: "number"
+        # WO Settings
+        wo_material_check: "boolean"
+        wo_copy_routing: "boolean"
+        wo_auto_select_bom: "boolean"
+        wo_require_bom: "boolean"
+        wo_allow_overproduction: "boolean"
+        wo_overproduction_limit: "number"
+        wo_auto_number_prefix: "string"
+        wo_auto_number_format: "string"
+        wo_default_scheduling_buffer_hours: "number"
+        # Audit
+        created_at: "ISO8601 timestamp"
+        updated_at: "ISO8601 timestamp"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token provided"
+      - status: 500
+        code: "INTERNAL_ERROR"
+        message: "Failed to fetch planning settings"
+        when: "Database error or unexpected failure"
+
+    behavior:
+      - "Auto-initialize: If no settings exist for org, create with defaults and return"
+      - "RLS automatically filters by org_id via users table lookup"
+
+  - method: "PATCH"
+    path: "/api/settings/planning"
+    description: "Update planning settings for current org (partial update)"
+    file: "apps/frontend/app/api/settings/planning/route.ts"
+    auth: "required"
+    roles: ["owner", "admin"]  # Only admins can update settings
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+        Content-Type: "application/json"
+      body:
+        type: "Partial<PlanningSettingsInput>"
+        description: "Partial update - only send changed fields"
+        example:
+          po_require_approval: true
+          po_approval_threshold: 5000.00
+          wo_allow_overproduction: true
+          wo_overproduction_limit: 15
+
+    response:
+      status: 200
+      type: "PlanningSettingsResponse"
+      schema:
+        success: "boolean"
+        message: "string"
+        settings: "PlanningSettings"
+
+    errors:
+      - status: 400
+        code: "VALIDATION_ERROR"
+        message: "Validation failed"
+        when: "Invalid input data"
+        details: "Zod validation errors with field-level messages"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token provided"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Insufficient permissions"
+        when: "User is not admin/owner"
+      - status: 500
+        code: "INTERNAL_ERROR"
+        message: "Failed to update planning settings"
+        when: "Database error or unexpected failure"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/planning-settings-service.ts"
+    description: "Planning settings CRUD with org scoping and auto-initialization"
+    exports:
+      - name: "getPlanningSettings"
+        type: "async function"
+        params:
+          - { name: "orgId", type: "string" }
+        returns: "Promise<PlanningSettings>"
+        description: "Get settings for org, auto-initialize if missing"
+
+      - name: "updatePlanningSettings"
+        type: "async function"
+        params:
+          - { name: "orgId", type: "string" }
+          - { name: "updates", type: "Partial<PlanningSettingsInput>" }
+        returns: "Promise<PlanningSettings>"
+        description: "Update settings, returns updated record"
+
+      - name: "initializePlanningSettings"
+        type: "async function"
+        params:
+          - { name: "orgId", type: "string" }
+        returns: "Promise<PlanningSettings>"
+        description: "Create settings with defaults for new org"
+
+      - name: "PlanningSettings"
+        type: "interface"
+        description: "Full settings type from database"
+
+      - name: "PlanningSettingsInput"
+        type: "type"
+        description: "Input type for updates (Zod inferred)"
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/planning-settings.ts"
+    description: "Planning settings TypeScript interfaces"
+    content: |
+      export interface PlanningSettings {
+        id: string;
+        org_id: string;
+        // PO Settings
+        po_require_approval: boolean;
+        po_approval_threshold: number | null;
+        po_approval_roles: string[];
+        po_auto_number_prefix: string;
+        po_auto_number_format: string;
+        po_default_payment_terms: PaymentTerms;
+        po_default_currency: Currency;
+        // TO Settings
+        to_allow_partial_shipments: boolean;
+        to_require_lp_selection: boolean;
+        to_auto_number_prefix: string;
+        to_auto_number_format: string;
+        to_default_transit_days: number;
+        // WO Settings
+        wo_material_check: boolean;
+        wo_copy_routing: boolean;
+        wo_auto_select_bom: boolean;
+        wo_require_bom: boolean;
+        wo_allow_overproduction: boolean;
+        wo_overproduction_limit: number;
+        wo_auto_number_prefix: string;
+        wo_auto_number_format: string;
+        wo_default_scheduling_buffer_hours: number;
+        // Audit
+        created_at: string;
+        updated_at: string;
+      }
+
+      export type PaymentTerms = 'Net 30' | 'Net 60' | 'Net 90' | '2/10 Net 30' | 'Due on Receipt';
+      export type Currency = 'PLN' | 'EUR' | 'USD' | 'GBP';
+
+      export interface PlanningSettingsResponse {
+        success: boolean;
+        message: string;
+        settings: PlanningSettings;
+      }
+
+# Validation Schemas (Zod)
+validation:
+  path: "apps/frontend/lib/validation/planning-settings-schemas.ts"
+  description: "Zod schemas for planning settings validation"
+  content: |
+    import { z } from 'zod';
+
+    // Auto-number format must contain both YYYY and NNNNN
+    const autoNumberFormatRegex = /YYYY.*NNNNN|NNNNN.*YYYY/;
+
+    // Prefix: 1-10 chars, alphanumeric + dash only
+    const prefixRegex = /^[A-Za-z0-9-]+$/;
+
+    export const planningSettingsSchema = z.object({
+      // PO Settings
+      po_require_approval: z.boolean(),
+      po_approval_threshold: z.number().min(0).nullable(),
+      po_approval_roles: z.array(z.string()).min(1, 'At least one approval role required'),
+      po_auto_number_prefix: z.string()
+        .min(1, 'Prefix cannot be empty')
+        .max(10, 'Prefix max 10 characters')
+        .regex(prefixRegex, 'Prefix must be alphanumeric with dashes only'),
+      po_auto_number_format: z.string()
+        .regex(autoNumberFormatRegex, 'Format must contain both YYYY (year) and NNNNN (sequence)'),
+      po_default_payment_terms: z.enum(['Net 30', 'Net 60', 'Net 90', '2/10 Net 30', 'Due on Receipt']),
+      po_default_currency: z.enum(['PLN', 'EUR', 'USD', 'GBP']),
+
+      // TO Settings
+      to_allow_partial_shipments: z.boolean(),
+      to_require_lp_selection: z.boolean(),
+      to_auto_number_prefix: z.string()
+        .min(1, 'Prefix cannot be empty')
+        .max(10, 'Prefix max 10 characters')
+        .regex(prefixRegex, 'Prefix must be alphanumeric with dashes only'),
+      to_auto_number_format: z.string()
+        .regex(autoNumberFormatRegex, 'Format must contain both YYYY (year) and NNNNN (sequence)'),
+      to_default_transit_days: z.number().int().min(0).max(365, 'Transit days max 365'),
+
+      // WO Settings
+      wo_material_check: z.boolean(),
+      wo_copy_routing: z.boolean(),
+      wo_auto_select_bom: z.boolean(),
+      wo_require_bom: z.boolean(),
+      wo_allow_overproduction: z.boolean(),
+      wo_overproduction_limit: z.number().min(0).max(100, 'Overproduction limit must be 0-100%'),
+      wo_auto_number_prefix: z.string()
+        .min(1, 'Prefix cannot be empty')
+        .max(10, 'Prefix max 10 characters')
+        .regex(prefixRegex, 'Prefix must be alphanumeric with dashes only'),
+      wo_auto_number_format: z.string()
+        .regex(autoNumberFormatRegex, 'Format must contain both YYYY (year) and NNNNN (sequence)'),
+      wo_default_scheduling_buffer_hours: z.number().int().min(0).max(168, 'Buffer max 168 hours (1 week)'),
+    }).partial(); // Allow partial updates
+
+    export const planningSettingsUpdateSchema = planningSettingsSchema;
+
+    export type PlanningSettingsInput = z.infer<typeof planningSettingsSchema>;
+
+# Implementation patterns
+patterns:
+  api_route_get: |
+    // apps/frontend/app/api/settings/planning/route.ts
+    import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+    import { cookies } from 'next/headers';
+    import { NextResponse } from 'next/server';
+    import { getPlanningSettings } from '@/lib/services/planning-settings-service';
+    import { getOrgContext } from '@/lib/services/org-context-service';
+
+    export async function GET() {
+      try {
+        const context = await getOrgContext();
+        if (!context) {
+          return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const settings = await getPlanningSettings(context.org_id);
+        return NextResponse.json(settings);
+      } catch (error) {
+        console.error('Failed to fetch planning settings:', error);
+        return NextResponse.json(
+          { error: 'Failed to fetch planning settings' },
+          { status: 500 }
+        );
+      }
+    }
+
+  api_route_patch: |
+    // apps/frontend/app/api/settings/planning/route.ts (continued)
+    import { planningSettingsUpdateSchema } from '@/lib/validation/planning-settings-schemas';
+    import { updatePlanningSettings } from '@/lib/services/planning-settings-service';
+    import { hasRole } from '@/lib/services/permission-service';
+
+    export async function PATCH(request: Request) {
+      try {
+        const context = await getOrgContext();
+        if (!context) {
+          return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        // Check admin permission
+        if (!hasRole(context, ['owner', 'admin'])) {
+          return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
+        }
+
+        const body = await request.json();
+
+        // Validate input
+        const parseResult = planningSettingsUpdateSchema.safeParse(body);
+        if (!parseResult.success) {
+          return NextResponse.json(
+            { error: 'Validation failed', details: parseResult.error.flatten() },
+            { status: 400 }
+          );
+        }
+
+        const settings = await updatePlanningSettings(context.org_id, parseResult.data);
+
+        return NextResponse.json({
+          success: true,
+          message: 'Planning settings saved successfully',
+          settings,
+        });
+      } catch (error) {
+        console.error('Failed to update planning settings:', error);
+        return NextResponse.json(
+          { error: 'Failed to update planning settings' },
+          { status: 500 }
+        );
+      }
+    }
+
+  service_pattern: |
+    // apps/frontend/lib/services/planning-settings-service.ts
+    import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
+    import { cookies } from 'next/headers';
+    import type { PlanningSettings, PlanningSettingsInput } from '@/lib/types/planning-settings';
+
+    const DEFAULT_SETTINGS: Omit<PlanningSettings, 'id' | 'org_id' | 'created_at' | 'updated_at'> = {
+      // PO defaults
+      po_require_approval: false,
+      po_approval_threshold: null,
+      po_approval_roles: ['admin', 'manager'],
+      po_auto_number_prefix: 'PO-',
+      po_auto_number_format: 'YYYY-NNNNN',
+      po_default_payment_terms: 'Net 30',
+      po_default_currency: 'PLN',
+      // TO defaults
+      to_allow_partial_shipments: true,
+      to_require_lp_selection: false,
+      to_auto_number_prefix: 'TO-',
+      to_auto_number_format: 'YYYY-NNNNN',
+      to_default_transit_days: 1,
+      // WO defaults
+      wo_material_check: true,
+      wo_copy_routing: true,
+      wo_auto_select_bom: true,
+      wo_require_bom: true,
+      wo_allow_overproduction: false,
+      wo_overproduction_limit: 10,
+      wo_auto_number_prefix: 'WO-',
+      wo_auto_number_format: 'YYYY-NNNNN',
+      wo_default_scheduling_buffer_hours: 2,
+    };
+
+    export async function getPlanningSettings(orgId: string): Promise<PlanningSettings> {
+      const supabase = createServerComponentClient({ cookies });
+
+      const { data, error } = await supabase
+        .from('planning_settings')
+        .select('*')
+        .eq('org_id', orgId)
+        .single();
+
+      if (error && error.code === 'PGRST116') {
+        // No record found - auto-initialize
+        return initializePlanningSettings(orgId);
+      }
+
+      if (error) throw error;
+      return data;
+    }
+
+    export async function updatePlanningSettings(
+      orgId: string,
+      updates: Partial<PlanningSettingsInput>
+    ): Promise<PlanningSettings> {
+      const supabase = createServerComponentClient({ cookies });
+
+      const { data, error } = await supabase
+        .from('planning_settings')
+        .update(updates)
+        .eq('org_id', orgId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    }
+
+    export async function initializePlanningSettings(orgId: string): Promise<PlanningSettings> {
+      const supabase = createServerComponentClient({ cookies });
+
+      const { data, error } = await supabase
+        .from('planning_settings')
+        .insert({ org_id: orgId, ...DEFAULT_SETTINGS })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    }

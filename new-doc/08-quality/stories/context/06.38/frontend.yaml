@@ -1,0 +1,140 @@
+# Story 06.38 - Audit Trail Frontend Context
+
+pages:
+  - path: /quality/audit-trail
+    description: "Audit trail list page with filters"
+    components:
+      - AuditTrailDataTable
+      - AuditTrailFilters
+      - AuditTrailSearchBox
+      - AuditTrailExportButtons
+
+  - path: /quality/audit-trail/[id]
+    description: "Audit trail detail page (modal or separate page)"
+    components:
+      - AuditTrailDetailModal
+      - AuditTrailDiff
+
+components:
+  - name: AuditTrailDataTable
+    path: components/quality/audit-trail/AuditTrailDataTable.tsx
+    description: "DataTable for audit log list"
+    columns:
+      - Timestamp (ISO datetime with timezone)
+      - Entity Type (badge: Inspection, NCR, CAPA, etc.)
+      - Entity ID (link to entity detail)
+      - Action (badge: create, update, approve, etc.)
+      - Field (field_name if update, otherwise '-')
+      - User (name with role badge)
+      - Change Reason (truncated to 50 chars, tooltip on hover)
+      - Actions (View detail button)
+    pagination: 50 per page
+    sorting: action_timestamp DESC (default)
+    row_click: Open detail modal
+
+  - name: AuditTrailFilters
+    path: components/quality/audit-trail/AuditTrailFilters.tsx
+    description: "Filter panel for audit trail"
+    filters:
+      - Entity Type: dropdown (all, inspection, ncr, capa, etc.)
+      - Action: dropdown (all, create, update, delete, approve, etc.)
+      - User: user selector (autocomplete)
+      - Date From: date picker
+      - Date To: date picker
+      - Include Archived: checkbox (default false)
+    apply_button: Filter button (triggers refetch)
+    clear_button: Clear all filters
+
+  - name: AuditTrailSearchBox
+    path: components/quality/audit-trail/AuditTrailSearchBox.tsx
+    description: "Full-text search on change_reason and notes"
+    debounce: 300ms
+    placeholder: "Search change reason or notes..."
+    icon: Search icon
+
+  - name: AuditTrailDetailModal
+    path: components/quality/audit-trail/AuditTrailDetailModal.tsx
+    description: "Detail modal showing audit log entry"
+    sections:
+      - Entity: Type, ID, link to entity
+      - Action: Action type, timestamp
+      - User: Name, email, role, IP address
+      - Change: Old value vs new value (side-by-side diff)
+      - Reason: Change reason, notes
+    layout: Modal with tabs or sections
+    close_button: X button or backdrop click
+
+  - name: AuditTrailDiff
+    path: components/quality/audit-trail/AuditTrailDiff.tsx
+    description: "Side-by-side diff of old_value vs new_value"
+    layout: Two columns (Before | After)
+    formatting:
+      - Removed values: Red text with strikethrough
+      - Added values: Green text with highlight
+      - Unchanged values: Gray text
+      - JSON values: Pretty-printed and syntax highlighted
+    library: diff-match-patch or react-diff-viewer
+
+  - name: AuditTrailChangeHistory
+    path: components/quality/audit-trail/AuditTrailChangeHistory.tsx
+    description: "Timeline view of all changes for entity"
+    used_in: Entity detail pages (inspection, NCR, CAPA)
+    layout: Vertical timeline (newest first)
+    timeline_items:
+      - User avatar + name
+      - Action + timestamp
+      - Expandable: Old/new values diff
+      - Change reason
+    interactions:
+      - Click to expand/collapse
+      - Click user → navigate to user profile
+
+  - name: AuditTrailExportButtons
+    path: components/quality/audit-trail/AuditTrailExportButtons.tsx
+    description: "CSV and PDF export buttons"
+    buttons:
+      - Export CSV: Downloads CSV with current filters
+      - Export PDF: Downloads PDF report with current filters
+    permissions: QA_MANAGER, QUALITY_DIRECTOR only
+    loading_state: Spinner during export generation
+
+  - name: AuditTrailActionBadge
+    path: components/quality/audit-trail/AuditTrailActionBadge.tsx
+    description: "Badge for action type"
+    colors:
+      - create: blue
+      - update: yellow
+      - delete: red
+      - approve: green
+      - reject: orange
+      - cancel: gray
+
+  - name: AuditTrailEntityLink
+    path: components/quality/audit-trail/AuditTrailEntityLink.tsx
+    description: "Link to entity detail page"
+    logic: |
+      - If entity_type = 'inspection' → /quality/inspections/{entity_id}
+      - If entity_type = 'ncr' → /quality/ncr/{entity_id}
+      - If entity_type = 'capa' → /quality/capa/{entity_id}
+      - If entity_type = 'specification' → /technical/specifications/{entity_id}
+
+ux_patterns:
+  - pattern: "Loading states"
+    description: "Skeleton UI while data loading"
+  - pattern: "Empty state"
+    description: "Helpful message when no audit logs found"
+  - pattern: "Diff highlighting"
+    description: "Color-coded diff for old/new values"
+  - pattern: "Tooltip on hover"
+    description: "Full text on hover for truncated fields"
+  - pattern: "Mobile responsive"
+    description: "Table becomes scrollable on mobile"
+
+responsive_design:
+  desktop:
+    - Table: All columns visible
+    - Modal: 800px width
+  mobile:
+    - Table: Horizontal scroll
+    - Modal: Full screen
+    - Filters: Collapsible accordion

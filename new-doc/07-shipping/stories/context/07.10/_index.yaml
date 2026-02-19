@@ -1,0 +1,141 @@
+# Story 07.10 - Index File (Entry Point)
+# Generated: 2025-12-18
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "07.10"
+  name: "Pick Scanner"
+  slug: "pick-scanner"
+  epic: "07-shipping"
+  phase: "1C"
+  complexity: "L"
+  estimate_days: 4
+  type: "frontend + backend + mobile"
+  state: "ready"
+
+# Files in this context folder
+context_files:
+  - _index.yaml          # This file - metadata, dependencies
+  - database.yaml        # No new tables (uses 07.8 pick_lists, pick_list_lines)
+  - api.yaml             # 3 endpoints for scanner pick operations
+  - frontend.yaml        # Scanner mobile components, pages, services, hooks
+  - tests.yaml           # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "07.8"
+      name: "Pick List Generation"
+      provides:
+        - "pick_lists table"
+        - "pick_list_lines table (with quantity_picked, status, picked_at, picked_by)"
+        - "pick list status enum (assigned/in_progress/completed)"
+    - story: "07.9"
+      name: "Pick Confirmation Desktop"
+      provides:
+        - "Pick confirmation logic and validation"
+        - "Short pick handling and backorder flow"
+        - "FIFO/FEFO warning patterns"
+        - "Allergen alert patterns"
+    - story: "05.3"
+      name: "LP Reservations/Allocations"
+      provides:
+        - "inventory_allocations table"
+        - "Allocation suggestions for picks"
+    - story: "05.1"
+      name: "License Plates"
+      provides:
+        - "license_plates table"
+        - "LP lookup by barcode"
+    - story: "01.9"
+      name: "Locations"
+      provides:
+        - "locations table (zone, aisle, bin hierarchy)"
+    - story: "02.1"
+      name: "Products"
+      provides:
+        - "products table"
+        - "Product information for display"
+    - story: "02.3"
+      name: "Allergens"
+      provides:
+        - "product allergens"
+        - "customer allergen restrictions"
+  blocked_by: []
+  blocks:
+    - story: "07.11"
+      name: "Packing Station Workflow"
+      reason: "Picks feed into packing workflow"
+    - story: "07.12"
+      name: "Pack Confirmation Scanner"
+      reason: "Reuses pick scanner patterns"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/shipping.md"
+    sections: ["FR-7.25 (Scanner Pick)", "FR-7.26 (FIFO/FEFO)", "FR-7.27 (Allergen)", "FR-7.28 (Mobile)"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/shipping.md"
+    sections: ["Scanner Integration (507-517)", "Pick Confirmation (630-641)", "Mobile UX (1050-1072)"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/07-shipping/07.10.pick-scanner.md"
+  wireframes:
+    - id: "SHIP-015"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SHIP-015-pick-scanner.md"
+      description: "Scanner pick workflow (7 main screens + error states)"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-006-scanner-first-mobile-ux.md"
+      relevance: "Scanner-first design, minimal chrome, large touch targets (48-64dp)"
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policies for multi-tenancy"
+  patterns:
+    - "apps/frontend/components/ui/progress.tsx"
+    - "apps/frontend/lib/services/offline-sync-service.ts (from 06.8)"
+
+# High-level deliverables
+deliverables:
+  - type: "database"
+    count: 0
+    description: "No new tables (uses existing pick_lists, pick_list_lines)"
+  - type: "api"
+    count: 3
+    description: "POST scanner/pick, GET scanner/lookup/lp, GET scanner/suggest-pick"
+  - type: "page"
+    count: 1
+    description: "Scanner pick page (/scanner/shipping/pick)"
+  - type: "component"
+    count: 12
+    description: "MyPicksList, PickLineCard, LocationCard, ProductCard, QuantityCard, ScanInput, NumberPad, ShortPickModal, AllergenBanner, FifoWarning, ProgressBar, PickComplete"
+  - type: "service"
+    count: 1
+    description: "ScannerPickService with LP lookup, pick confirmation, short pick handling"
+  - type: "hooks"
+    count: 4
+    description: "useAudioFeedback, useVibration, useScanInput, usePickProgress"
+  - type: "validation"
+    count: 1
+    description: "scannerPickSchema with short pick refinement"
+  - type: "test"
+    count: 3
+    description: "Unit tests (ScannerPickService), integration tests (API), E2E tests (full workflow)"
+
+# Technical notes
+technical_notes:
+  - "Mobile-first design: 320-480px portrait primary, landscape support (480-800px)"
+  - "Touch targets: 48px minimum, 64px for number pad buttons, 56px for primary actions"
+  - "Offline-capable: Deferred to Phase 2 (story mentions offline support)"
+  - "Audio feedback: Success beep (880Hz), error beep (220Hz), victory sweep (440->880Hz)"
+  - "Vibration feedback: 100ms success, [200,100,200] error, [100,50,100] complete"
+  - "Visual feedback: Green flash (#22C55E) success, red flash (#EF4444) error, amber (#F59E0B) warning"
+  - "Performance targets: <100ms scan feedback, <200ms API response, <500ms page load"
+  - "FIFO/FEFO enforcement: Warn if picking newer/later expiry (allow with confirmation)"
+  - "Allergen integration: Show red banner for customer allergen conflicts, require checkbox acknowledgment"
+  - "Short pick: Capture reason + optional notes, trigger backorder creation"
+  - "Barcode scanner: Hardware scanner (focus on input field) + camera scan support"
+  - "Progress tracking: Pick sequence, running count (X of Y), real-time updates"
+  - "Scan input: Auto-focus after each action, debounce duplicates within 2s"
+  - "Auto-advance: After pick confirmation, load next pending line by pick_sequence"
+  - "Completion: Show celebration screen with summary (total qty, duration, items/hr)"
+  - "RLS: All queries filtered by org_id, prevent cross-org access"
+  - "Accessibility: WCAG 2.1 AA, semantic HTML, ARIA labels, screen reader support"

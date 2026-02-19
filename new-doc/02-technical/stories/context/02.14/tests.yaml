@@ -1,0 +1,651 @@
+# Story 02.14 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# ==========================================================================
+# Test Files to Create
+# ==========================================================================
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/bom-advanced.test.ts"
+    type: "unit"
+    description: "Unit tests for BOM comparison, explosion, scaling algorithms"
+
+  - path: "apps/frontend/app/api/technical/boms/__tests__/compare.test.ts"
+    type: "integration"
+    description: "Integration tests for comparison endpoint"
+
+  - path: "apps/frontend/app/api/technical/boms/__tests__/explosion.test.ts"
+    type: "integration"
+    description: "Integration tests for multi-level explosion endpoint"
+
+  - path: "apps/frontend/app/api/technical/boms/__tests__/scale.test.ts"
+    type: "integration"
+    description: "Integration tests for scaling endpoint"
+
+  - path: "apps/frontend/app/api/technical/boms/__tests__/yield.test.ts"
+    type: "integration"
+    description: "Integration tests for yield endpoint"
+
+  - path: "apps/frontend/components/technical/bom/__tests__/BOMComparisonModal.test.tsx"
+    type: "component"
+    description: "Component tests for comparison modal"
+
+  - path: "e2e/technical/bom-advanced.spec.ts"
+    type: "e2e"
+    description: "End-to-end tests for advanced BOM features"
+
+# ==========================================================================
+# Acceptance Criteria - BOM Version Comparison (FR-2.25)
+# ==========================================================================
+acceptance_criteria:
+  comparison:
+    - id: "AC-14.1"
+      given: "BOM 'Wheat Bread' has versions v2 and v3"
+      when: "user clicks 'Compare Versions'"
+      then: "version selector dropdowns appear"
+      test_type: "e2e"
+      priority: "P0"
+      fr_reference: "FR-2.25"
+
+    - id: "AC-14.2"
+      given: "user selects v2 and v3 for comparison"
+      when: "comparison loads"
+      then: "side-by-side view shows both versions"
+      test_type: "e2e"
+      priority: "P0"
+      fr_reference: "FR-2.25"
+
+    - id: "AC-14.3"
+      given: "comparison view displayed"
+      when: "ingredient 'Butter' is in v2 at 8kg and v3 at 6kg"
+      then: "difference shows '-2kg (-25%)' highlighted in yellow"
+      test_type: "e2e"
+      priority: "P0"
+      fr_reference: "FR-2.25"
+
+    - id: "AC-14.4"
+      given: "comparison view displayed"
+      when: "ingredient 'Whole Wheat Flour' is in v3 but not v2"
+      then: "row shows as 'Added' with green highlight"
+      test_type: "e2e"
+      priority: "P0"
+      fr_reference: "FR-2.25"
+
+    - id: "AC-14.5"
+      given: "comparison view displayed"
+      when: "ingredient 'Regular Sugar' is in v2 but not v3"
+      then: "row shows as 'Removed' with red highlight"
+      test_type: "e2e"
+      priority: "P0"
+      fr_reference: "FR-2.25"
+
+    - id: "AC-14.6"
+      given: "comparison view displayed"
+      when: "totals calculated"
+      then: "summary shows 'v3 has 2 fewer ingredients, 5kg less total weight'"
+      test_type: "e2e"
+      priority: "P1"
+      fr_reference: "FR-2.25"
+
+    - id: "AC-14.7"
+      given: "comparison requested for same version"
+      when: "submitted"
+      then: "error shows 'Cannot compare version to itself'"
+      test_type: "integration"
+      priority: "P0"
+      fr_reference: "FR-2.25"
+
+    - id: "AC-14.8"
+      given: "comparison requested for versions from different products"
+      when: "submitted"
+      then: "error shows 'Versions must be from same product'"
+      test_type: "integration"
+      priority: "P0"
+      fr_reference: "FR-2.25"
+
+  # ==========================================================================
+  # Multi-Level Explosion (FR-2.29)
+  # ==========================================================================
+  explosion:
+    - id: "AC-14.10"
+      given: "BOM with WIP component that has its own BOM"
+      when: "user views explosion"
+      then: "tree shows Level 1 items and Level 2 (sub-BOM) items"
+      test_type: "e2e"
+      priority: "P0"
+      fr_reference: "FR-2.29"
+
+    - id: "AC-14.11"
+      given: "multi-level explosion displayed"
+      when: "user expands WIP node"
+      then: "sub-BOM items are shown indented with correct quantities"
+      test_type: "e2e"
+      priority: "P0"
+      fr_reference: "FR-2.29"
+
+    - id: "AC-14.12"
+      given: "explosion with 3 levels deep"
+      when: "cumulative quantities calculated"
+      then: "raw material totals account for all intermediate conversions"
+      test_type: "unit"
+      priority: "P0"
+      fr_reference: "FR-2.29"
+
+    - id: "AC-14.13"
+      given: "BOM with circular reference (A -> B -> A)"
+      when: "explosion attempted"
+      then: "error shows 'Circular BOM reference detected'"
+      test_type: "integration"
+      priority: "P0"
+      fr_reference: "FR-2.29"
+
+    - id: "AC-14.14"
+      given: "explosion exceeds 10 levels"
+      when: "query executed"
+      then: "stops at level 10 and returns partial results"
+      test_type: "integration"
+      priority: "P1"
+      fr_reference: "FR-2.29"
+
+    - id: "AC-14.15"
+      given: "explosion complete"
+      when: "raw materials summary displayed"
+      then: "shows aggregated quantities for each raw material across all levels"
+      test_type: "e2e"
+      priority: "P0"
+      fr_reference: "FR-2.29"
+
+  # ==========================================================================
+  # BOM Yield Calculation (FR-2.34)
+  # ==========================================================================
+  yield:
+    - id: "AC-14.20"
+      given: "BOM detail page open"
+      when: "yield section displays"
+      then: "theoretical yield shows (output_qty / total_input_qty * 100)%"
+      test_type: "e2e"
+      priority: "P0"
+      fr_reference: "FR-2.34"
+
+    - id: "AC-14.21"
+      given: "BOM has 500kg input and 475kg output_qty"
+      when: "yield calculated"
+      then: "theoretical yield shows 95%"
+      test_type: "unit"
+      priority: "P0"
+      fr_reference: "FR-2.34"
+
+    - id: "AC-14.22"
+      given: "BOM yield section displayed"
+      when: "user clicks 'Configure Yield'"
+      then: "yield configuration modal opens"
+      test_type: "e2e"
+      priority: "P0"
+      fr_reference: "FR-2.34"
+
+    - id: "AC-14.23"
+      given: "yield config modal open"
+      when: "user enters expected yield=95%"
+      then: "configuration saves successfully"
+      test_type: "integration"
+      priority: "P0"
+      fr_reference: "FR-2.34"
+
+    - id: "AC-14.24"
+      given: "yield variance >5%"
+      when: "displayed"
+      then: "warning indicator shows 'Yield variance exceeds threshold'"
+      test_type: "e2e"
+      priority: "P1"
+      fr_reference: "FR-2.34"
+
+  # ==========================================================================
+  # BOM Scaling (FR-2.35)
+  # ==========================================================================
+  scaling:
+    - id: "AC-14.30"
+      given: "BOM detail page open"
+      when: "user clicks 'Scale Batch'"
+      then: "scaling modal opens with current batch size"
+      test_type: "e2e"
+      priority: "P0"
+      fr_reference: "FR-2.35"
+
+    - id: "AC-14.31"
+      given: "scaling modal open with current batch 100kg"
+      when: "user enters new batch size 150kg"
+      then: "preview shows all ingredients scaled by 1.5x"
+      test_type: "e2e"
+      priority: "P0"
+      fr_reference: "FR-2.35"
+
+    - id: "AC-14.32"
+      given: "scaling preview displayed"
+      when: "ingredient 'Flour' is 60kg at 100kg batch"
+      then: "scaled quantity shows 90kg at 150kg batch"
+      test_type: "unit"
+      priority: "P0"
+      fr_reference: "FR-2.35"
+
+    - id: "AC-14.33"
+      given: "user enters scale factor instead of target size"
+      when: "factor=2.0 entered"
+      then: "all quantities double"
+      test_type: "unit"
+      priority: "P0"
+      fr_reference: "FR-2.35"
+
+    - id: "AC-14.34"
+      given: "scaling preview displayed"
+      when: "user clicks 'Apply Scaling' with preview_only=false"
+      then: "all ingredient quantities update in database"
+      test_type: "integration"
+      priority: "P0"
+      fr_reference: "FR-2.35"
+
+    - id: "AC-14.35"
+      given: "scaling applied"
+      when: "confirmation shows"
+      then: "message says 'Batch scaled from 100kg to 150kg. All ingredients updated.'"
+      test_type: "e2e"
+      priority: "P1"
+      fr_reference: "FR-2.35"
+
+    - id: "AC-14.36"
+      given: "scaling would result in fractional quantities <0.001"
+      when: "displayed"
+      then: "values round to 3 decimal places with warning"
+      test_type: "unit"
+      priority: "P0"
+      fr_reference: "FR-2.35"
+
+    - id: "AC-14.37"
+      given: "scaling to 0 or negative batch size"
+      when: "submitted"
+      then: "validation error shows 'Batch size must be positive'"
+      test_type: "integration"
+      priority: "P0"
+      fr_reference: "FR-2.35"
+
+    - id: "AC-14.38"
+      given: "scaling modal open"
+      when: "user clicks 'Preview Only'"
+      then: "scaled values display without saving changes"
+      test_type: "e2e"
+      priority: "P0"
+      fr_reference: "FR-2.35"
+
+  # ==========================================================================
+  # Validation & Edge Cases
+  # ==========================================================================
+  validation:
+    - id: "AC-14.40"
+      given: "yield configured with losses totaling >100%"
+      when: "submitted"
+      then: "error shows 'Total loss cannot exceed 100%'"
+      test_type: "integration"
+      priority: "P1"
+      fr_reference: "FR-2.34"
+
+    - id: "AC-14.41"
+      given: "user from Org B"
+      when: "attempting to compare BOMs from Org A"
+      then: "response is 404 Not Found"
+      test_type: "integration"
+      priority: "P0"
+      security: true
+
+    - id: "AC-14.42"
+      given: "user without write permission"
+      when: "attempting to apply scaling (preview_only=false)"
+      then: "response is 403 Forbidden"
+      test_type: "integration"
+      priority: "P0"
+      security: true
+
+  # ==========================================================================
+  # UI Integration
+  # ==========================================================================
+  ui:
+    - id: "AC-14.50"
+      given: "BOM detail page"
+      when: "header actions display"
+      then: "'Compare Versions' and 'Scale Batch' buttons appear"
+      test_type: "e2e"
+      priority: "P0"
+
+    - id: "AC-14.51"
+      given: "comparison modal open"
+      when: "user switches versions in dropdown"
+      then: "comparison auto-refreshes"
+      test_type: "e2e"
+      priority: "P1"
+
+    - id: "AC-14.52"
+      given: "scaling applied"
+      when: "BOM items table refreshes"
+      then: "updated quantities display immediately"
+      test_type: "e2e"
+      priority: "P0"
+
+    - id: "AC-14.53"
+      given: "yield configuration saved"
+      when: "BOM detail loads"
+      then: "yield analysis section displays with breakdown"
+      test_type: "e2e"
+      priority: "P0"
+
+# ==========================================================================
+# Unit Test Cases
+# ==========================================================================
+unit_tests:
+  comparison_algorithm:
+    - name: "identifies added items correctly"
+      setup: "BOM1 with items A, B; BOM2 with items A, B, C"
+      expected: "differences.added contains C"
+
+    - name: "identifies removed items correctly"
+      setup: "BOM1 with items A, B, C; BOM2 with items A, B"
+      expected: "differences.removed contains C"
+
+    - name: "identifies modified quantities"
+      setup: "BOM1 with item A at 50kg; BOM2 with item A at 75kg"
+      expected: "differences.modified contains A with +50% change"
+
+    - name: "handles UoM changes"
+      setup: "BOM1 with item A in kg; BOM2 with item A in g"
+      expected: "differences.modified contains A with field='uom'"
+
+    - name: "calculates summary totals"
+      setup: "Multiple changes across versions"
+      expected: "summary.total_added, removed, modified are correct"
+
+    - name: "calculates weight change percentage"
+      setup: "BOM1 total 100kg; BOM2 total 120kg"
+      expected: "summary.weight_change_percent = 20"
+
+  explosion_algorithm:
+    - name: "expands single level correctly"
+      setup: "BOM with 5 direct items"
+      expected: "levels[0] contains 5 items at level 1"
+
+    - name: "expands WIP sub-BOM"
+      setup: "BOM with WIP item that has 3 sub-items"
+      expected: "levels[1] contains 3 items at level 2"
+
+    - name: "calculates cumulative quantities"
+      setup: "Parent BOM output 100kg, needs 50kg WIP; WIP BOM output 10kg, needs 5kg flour"
+      expected: "cumulative_qty for flour = (50/10) * 5 = 25kg"
+
+    - name: "detects circular references"
+      setup: "BOM A contains WIP B; WIP B BOM contains A"
+      expected: "throws CIRCULAR_REFERENCE error"
+
+    - name: "respects max depth limit"
+      setup: "BOM with 15 levels deep"
+      expected: "stops at level 10"
+
+    - name: "aggregates raw materials"
+      setup: "Same raw material appears in multiple sub-BOMs"
+      expected: "raw_materials_summary shows total across all occurrences"
+
+  scaling_algorithm:
+    - name: "scales by target batch size"
+      setup: "BOM output 100kg, items [50kg, 30kg], target 150kg"
+      expected: "scaled items [75kg, 45kg], factor 1.5"
+
+    - name: "scales by factor"
+      setup: "BOM output 100kg, items [50kg, 30kg], factor 2.0"
+      expected: "scaled items [100kg, 60kg], new batch 200kg"
+
+    - name: "rounds to specified decimals"
+      setup: "Quantity 33.3333..., round_decimals=3"
+      expected: "new_quantity = 33.333"
+
+    - name: "generates rounding warnings"
+      setup: "Quantity rounds from 0.0003 to 0.001"
+      expected: "warnings array contains rounding message"
+
+    - name: "rejects zero batch size"
+      setup: "target_batch_size = 0"
+      expected: "throws INVALID_SCALE error"
+
+    - name: "rejects negative scale factor"
+      setup: "scale_factor = -1.5"
+      expected: "throws INVALID_SCALE error"
+
+  yield_calculation:
+    - name: "calculates theoretical yield"
+      setup: "Input 500kg (with scrap), output 475kg"
+      expected: "theoretical_yield_percent = 95"
+
+    - name: "accounts for scrap in input total"
+      setup: "Item 100kg with 5% scrap"
+      expected: "input_total includes 100 * 1.05 = 105kg"
+
+    - name: "detects variance exceeding threshold"
+      setup: "Expected 95%, actual 88%, threshold 5%"
+      expected: "variance_warning = true"
+
+    - name: "handles missing expected yield"
+      setup: "expected_yield_percent = null"
+      expected: "variance calculations skip, no warning"
+
+# ==========================================================================
+# Integration Test Cases
+# ==========================================================================
+integration_tests:
+  api_comparison:
+    - name: "returns comparison for valid BOM pair"
+      setup: "Create 2 BOM versions for same product"
+      action: "GET /api/technical/boms/{id1}/compare/{id2}"
+      expected: "200 OK with comparison data"
+
+    - name: "rejects same BOM comparison"
+      setup: "Valid BOM ID"
+      action: "GET /api/technical/boms/{id}/compare/{id}"
+      expected: "400 Bad Request, code SAME_VERSION"
+
+    - name: "rejects different product comparison"
+      setup: "BOM1 for Product A, BOM2 for Product B"
+      action: "GET /api/technical/boms/{id1}/compare/{id2}"
+      expected: "400 Bad Request, code DIFFERENT_PRODUCTS"
+
+    - name: "returns 404 for cross-tenant access"
+      setup: "BOM belongs to Org A, request from Org B user"
+      action: "GET /api/technical/boms/{id1}/compare/{id2}"
+      expected: "404 Not Found"
+
+  api_explosion:
+    - name: "returns explosion for valid BOM"
+      setup: "BOM with multi-level items"
+      action: "GET /api/technical/boms/{id}/explosion"
+      expected: "200 OK with levels array"
+
+    - name: "respects maxDepth parameter"
+      setup: "BOM with 5 levels"
+      action: "GET /api/technical/boms/{id}/explosion?maxDepth=3"
+      expected: "200 OK with max 3 levels"
+
+    - name: "handles circular reference gracefully"
+      setup: "BOM with circular dependency"
+      action: "GET /api/technical/boms/{id}/explosion"
+      expected: "422 Unprocessable Entity, code CIRCULAR_REFERENCE"
+
+  api_scaling:
+    - name: "returns preview without applying"
+      setup: "Valid BOM"
+      action: "POST /api/technical/boms/{id}/scale {target_batch_size: 200, preview_only: true}"
+      expected: "200 OK, applied=false, database unchanged"
+
+    - name: "applies scaling when preview_only=false"
+      setup: "Valid BOM, user has write permission"
+      action: "POST /api/technical/boms/{id}/scale {target_batch_size: 200, preview_only: false}"
+      expected: "200 OK, applied=true, database updated"
+
+    - name: "rejects invalid batch size"
+      setup: "Valid BOM"
+      action: "POST /api/technical/boms/{id}/scale {target_batch_size: -100}"
+      expected: "400 Bad Request, code INVALID_SCALE"
+
+    - name: "requires either target or factor"
+      setup: "Valid BOM"
+      action: "POST /api/technical/boms/{id}/scale {preview_only: true}"
+      expected: "400 Bad Request, code MISSING_SCALE_PARAM"
+
+  api_yield:
+    - name: "returns yield data for valid BOM"
+      setup: "BOM with items and output_qty"
+      action: "GET /api/technical/boms/{id}/yield"
+      expected: "200 OK with yield calculations"
+
+    - name: "updates yield configuration"
+      setup: "Valid BOM, user has write permission"
+      action: "PUT /api/technical/boms/{id}/yield {expected_yield_percent: 92}"
+      expected: "200 OK, BOM updated"
+
+    - name: "rejects invalid yield percent"
+      setup: "Valid BOM"
+      action: "PUT /api/technical/boms/{id}/yield {expected_yield_percent: 150}"
+      expected: "400 Bad Request, code INVALID_YIELD"
+
+  rls_isolation:
+    - name: "comparison respects org isolation"
+      setup: "BOM in Org A, request from Org B user"
+      action: "GET /api/technical/boms/{id1}/compare/{id2}"
+      expected: "404 Not Found (not 403)"
+
+    - name: "explosion respects org isolation"
+      setup: "BOM in Org A, request from Org B user"
+      action: "GET /api/technical/boms/{id}/explosion"
+      expected: "404 Not Found (not 403)"
+
+    - name: "scaling respects org isolation"
+      setup: "BOM in Org A, request from Org B user"
+      action: "POST /api/technical/boms/{id}/scale"
+      expected: "404 Not Found (not 403)"
+
+# ==========================================================================
+# E2E Test Cases
+# ==========================================================================
+e2e_tests:
+  comparison_flow:
+    - name: "complete comparison workflow"
+      steps:
+        - "Navigate to BOM list page"
+        - "Click compare on BOM with multiple versions"
+        - "Select version 1 and version 2"
+        - "Verify side-by-side view displays"
+        - "Verify added/removed/modified highlighting"
+        - "Verify summary statistics"
+        - "Export comparison (optional)"
+
+  explosion_flow:
+    - name: "view multi-level BOM"
+      steps:
+        - "Navigate to BOM detail page with WIP items"
+        - "Click 'View Explosion' tab"
+        - "Verify tree structure displays"
+        - "Expand WIP node"
+        - "Verify sub-items display"
+        - "Verify cumulative quantities"
+        - "View raw materials summary"
+
+  scaling_flow:
+    - name: "preview and apply scaling"
+      steps:
+        - "Navigate to BOM detail page"
+        - "Click 'Scale Batch' button"
+        - "Enter new batch size"
+        - "Verify preview updates"
+        - "Verify rounding warnings (if applicable)"
+        - "Uncheck 'Preview Only'"
+        - "Click 'Apply Scaling'"
+        - "Verify quantities updated in BOM"
+
+  yield_flow:
+    - name: "configure yield"
+      steps:
+        - "Navigate to BOM detail page"
+        - "View yield analysis panel"
+        - "Verify theoretical yield displays"
+        - "Click 'Configure Yield'"
+        - "Enter expected yield percentage"
+        - "Save configuration"
+        - "Verify yield display updates"
+
+# ==========================================================================
+# Definition of Done
+# ==========================================================================
+definition_of_done:
+  - "All FR-2.25 acceptance criteria pass (version comparison)"
+  - "All FR-2.29 acceptance criteria pass (multi-level explosion)"
+  - "All FR-2.34 acceptance criteria pass (yield calculation)"
+  - "All FR-2.35 acceptance criteria pass (batch scaling)"
+  - "Unit test coverage >= 80% for comparison and scaling algorithms"
+  - "Integration tests cover all API endpoints"
+  - "E2E tests cover complete user workflows"
+  - "Cross-tenant access returns 404 (not 403)"
+  - "Circular reference detection works correctly"
+  - "Rounding warnings display for small quantities"
+  - "Diff highlighting works correctly (added/removed/modified)"
+
+# ==========================================================================
+# Coverage Requirements
+# ==========================================================================
+coverage:
+  unit:
+    target: 80
+    reason: "Algorithm correctness is critical"
+    files:
+      - "bom-service.ts comparison functions: 80%"
+      - "bom-service.ts explosion functions: 80%"
+      - "bom-service.ts scaling functions: 90%"
+      - "bom-service.ts yield functions: 80%"
+
+  integration:
+    target: 80
+    reason: "API endpoints must handle all error cases"
+    endpoints:
+      - "GET /compare/:compareId: 100%"
+      - "GET /explosion: 100%"
+      - "POST /scale: 100%"
+      - "GET /yield: 100%"
+      - "PUT /yield: 100%"
+
+  e2e:
+    target: 60
+    reason: "Cover main user flows"
+    flows:
+      - "Comparison workflow"
+      - "Explosion view"
+      - "Scaling workflow"
+      - "Yield configuration"
+
+# ==========================================================================
+# Risks
+# ==========================================================================
+risks:
+  - id: "RISK-14.1"
+    description: "Recursive CTE could timeout on deeply nested BOMs"
+    mitigation: "Hard limit of 10 levels, query timeout, max 1000 nodes"
+    severity: "medium"
+    test_coverage: "integration_tests.api_explosion"
+
+  - id: "RISK-14.2"
+    description: "Circular references could cause infinite loops"
+    mitigation: "Path tracking in CTE, explicit circular reference check"
+    severity: "high"
+    test_coverage: "unit_tests.explosion_algorithm"
+
+  - id: "RISK-14.3"
+    description: "Scaling could produce invalid tiny quantities"
+    mitigation: "Rounding with warnings, minimum threshold check"
+    severity: "low"
+    test_coverage: "unit_tests.scaling_algorithm"
+
+  - id: "RISK-14.4"
+    description: "Cross-tenant data leak in comparison"
+    mitigation: "RLS on all queries, explicit org_id checks"
+    severity: "high"
+    test_coverage: "integration_tests.rls_isolation"

@@ -1,0 +1,822 @@
+# Epic 06 - Quality Module Implementation Roadmap
+# Last Updated: 2026-01-15
+# Status: PHASE 1-2 COMPLETE | PHASE 3-4 IN PLANNING
+
+epic:
+  id: "06"
+  name: "Quality Management"
+  module: "quality"
+  status: "in_progress"
+  completion_pct: 29  # 12/41 stories complete
+  priority: "P0"
+  owner: "Product & Engineering Team"
+
+# =============================================================================
+# SUMMARY
+# =============================================================================
+
+summary:
+  total_stories: 41
+  completed_stories: 12
+  remaining_stories: 29
+  phases: 4
+  estimated_days_total: 94-128
+  estimated_days_remaining: 78-98
+  target_completion: "2026-06-15"
+
+# =============================================================================
+# PHASES
+# =============================================================================
+
+phases:
+  - phase_id: "1A-1B"
+    name: "Core Quality"
+    status: "complete"
+    timeline: "Weeks 1-4"
+    stories: 10
+    estimated_days: 16-20
+    actual_days: 18
+    completion_date: "2025-12-20"
+    stories_list:
+      - "06.0"
+      - "06.1"
+      - "06.2"
+      - "06.3"
+      - "06.4"
+      - "06.5"
+      - "06.6"
+      - "06.7"
+      - "06.8"
+      - "06.9"
+    deliverables:
+      - "quality_specifications table with RLS"
+      - "quality_inspections table with RLS"
+      - "quality_holds table with RLS"
+      - "Incoming inspection workflow operational"
+      - "Test results recording works"
+      - "Scanner QA pass/fail functional"
+      - "Basic NCR creation works"
+
+  - phase_id: "2A"
+    name: "In-Process & Final Inspection"
+    status: "complete"
+    timeline: "Weeks 5-6"
+    stories: 2
+    estimated_days: 10-14
+    actual_days: 12
+    completion_date: "2026-01-10"
+    stories_list:
+      - "06.10"
+      - "06.11"
+    deliverables:
+      - "In-process inspection tied to WO operations"
+      - "Final inspection gates batch release"
+
+  - phase_id: "2B"
+    name: "NCR Workflow & Advanced QA"
+    status: "stories_defined"
+    timeline: "Weeks 7-10"
+    stories: 7
+    estimated_days: 18-22
+    target_start: "2026-01-20"
+    target_completion: "2026-02-15"
+    stories_list:
+      - "06.12"
+      - "06.13"
+      - "06.14"
+      - "06.15"
+      - "06.16"
+      - "06.17"
+      - "06.18"
+    deliverables:
+      - "Full NCR lifecycle (Draft → Investigation → Root Cause → Action → Verification → Close)"
+      - "Real-time quality alerts"
+      - "Test result trend analysis"
+      - "Batch release approval workflow"
+
+  - phase_id: "2C"
+    name: "Operation Quality Checkpoints"
+    status: "complete"
+    timeline: "Week 11"
+    stories: 2
+    estimated_days: 6-8
+    actual_days: 7
+    completion_date: "2026-01-15"
+    stories_list:
+      - "06.19"
+      - "06.20"
+    deliverables:
+      - "Operation checkpoints in routing"
+      - "Checkpoint results with operator sign-off"
+
+  - phase_id: "3"
+    name: "HACCP & CoA"
+    status: "stories_to_create"
+    timeline: "Weeks 12-16"
+    stories: 10
+    estimated_days: 32-40
+    target_start: "2026-02-16"
+    target_completion: "2026-04-15"
+    stories_list:
+      - "06.21"
+      - "06.22"
+      - "06.23"
+      - "06.24"
+      - "06.25"
+      - "06.26"
+      - "06.27"
+      - "06.28"
+      - "06.29"
+      - "06.30"
+    deliverables:
+      - "HACCP plan management with CCPs"
+      - "Real-time CCP monitoring (desktop + scanner)"
+      - "CCP deviation alerts (<30s)"
+      - "CoA template configuration"
+      - "CoA PDF generation (<5s)"
+
+  - phase_id: "4"
+    name: "CAPA, Supplier Quality & Analytics"
+    status: "stories_to_create"
+    timeline: "Weeks 17-22"
+    stories: 10
+    estimated_days: 28-36
+    target_start: "2026-04-16"
+    target_completion: "2026-06-15"
+    stories_list:
+      - "06.31"
+      - "06.32"
+      - "06.33"
+      - "06.34"
+      - "06.35"
+      - "06.36"
+      - "06.37"
+      - "06.38"
+      - "06.39"
+      - "06.40"
+    deliverables:
+      - "Full CAPA workflow with effectiveness tracking"
+      - "Supplier quality scorecard"
+      - "Supplier audit management"
+      - "Quality dashboard with KPIs"
+      - "Audit trail reports"
+      - "Quality analytics (Pareto, trends)"
+
+# =============================================================================
+# STORIES
+# =============================================================================
+
+stories:
+  # Phase 1A-1B (COMPLETE)
+  - id: "06.0"
+    name: "Quality Settings"
+    phase: "1A"
+    type: "backend"
+    complexity: "M"
+    estimate_days: 2
+    fr_ids: ["FR-QA-*"]
+    status: "ready"
+    completion_pct: 100
+
+  - id: "06.1"
+    name: "Quality Status Types"
+    phase: "1A"
+    type: "backend"
+    complexity: "S"
+    estimate_days: 1
+    fr_ids: ["FR-QA-001"]
+    status: "ready"
+    completion_pct: 100
+
+  - id: "06.2"
+    name: "Quality Holds CRUD"
+    phase: "1A"
+    type: "fullstack"
+    complexity: "M"
+    estimate_days: 2
+    fr_ids: ["FR-QA-002"]
+    status: "ready"
+    completion_pct: 100
+
+  - id: "06.3"
+    name: "Product Specifications"
+    phase: "1A"
+    type: "fullstack"
+    complexity: "M"
+    estimate_days: 2
+    fr_ids: ["FR-QA-003"]
+    status: "ready"
+    completion_pct: 100
+
+  - id: "06.4"
+    name: "Test Parameters"
+    phase: "1A"
+    type: "backend"
+    complexity: "M"
+    estimate_days: 2
+    fr_ids: ["FR-QA-004"]
+    status: "ready"
+    completion_pct: 100
+
+  - id: "06.5"
+    name: "Incoming Inspection"
+    phase: "1B"
+    type: "fullstack"
+    complexity: "L"
+    estimate_days: 5
+    fr_ids: ["FR-QA-005"]
+    status: "ready"
+    completion_pct: 100
+
+  - id: "06.6"
+    name: "Test Results Recording"
+    phase: "1B"
+    type: "fullstack"
+    complexity: "M"
+    estimate_days: 2
+    fr_ids: ["FR-QA-004"]
+    status: "ready"
+    completion_pct: 100
+
+  - id: "06.7"
+    name: "Sampling Plans (AQL)"
+    phase: "1B"
+    type: "backend"
+    complexity: "M"
+    estimate_days: 2
+    fr_ids: ["FR-QA-008"]
+    status: "ready"
+    completion_pct: 100
+
+  - id: "06.8"
+    name: "Scanner QA Pass/Fail"
+    phase: "1B"
+    type: "frontend"
+    complexity: "M"
+    estimate_days: 2
+    fr_ids: ["FR-QA-025"]
+    status: "ready"
+    completion_pct: 100
+
+  - id: "06.9"
+    name: "Basic NCR Creation"
+    phase: "1B"
+    type: "fullstack"
+    complexity: "M"
+    estimate_days: 2
+    fr_ids: ["FR-QA-009"]
+    status: "ready"
+    completion_pct: 100
+
+  # Phase 2A (COMPLETE)
+  - id: "06.10"
+    name: "In-Process Inspection"
+    phase: "2A"
+    type: "fullstack"
+    complexity: "L"
+    estimate_days: 5
+    fr_ids: ["FR-QA-006"]
+    status: "ready"
+    completion_pct: 100
+
+  - id: "06.11"
+    name: "Final Inspection + Batch Release"
+    phase: "2A"
+    type: "fullstack"
+    complexity: "L"
+    estimate_days: 5
+    fr_ids: ["FR-QA-007", "FR-QA-010"]
+    status: "ready"
+    completion_pct: 100
+
+  # Phase 2B (STORIES DEFINED)
+  - id: "06.12"
+    name: "Batch Release Approval"
+    phase: "2B"
+    type: "fullstack"
+    complexity: "M"
+    estimate_days: 2-3
+    fr_ids: ["FR-QA-010"]
+    status: "to_create"
+    completion_pct: 0
+    dependencies: ["06.11"]
+
+  - id: "06.13"
+    name: "NCR Workflow State Machine"
+    phase: "2B"
+    type: "backend"
+    complexity: "L"
+    estimate_days: 4-5
+    fr_ids: ["FR-QA-009"]
+    status: "to_create"
+    completion_pct: 0
+    dependencies: ["06.9"]
+
+  - id: "06.14"
+    name: "NCR Root Cause Analysis"
+    phase: "2B"
+    type: "fullstack"
+    complexity: "M"
+    estimate_days: 2-3
+    fr_ids: ["FR-QA-009"]
+    status: "to_create"
+    completion_pct: 0
+    dependencies: ["06.13"]
+
+  - id: "06.15"
+    name: "NCR Corrective Action"
+    phase: "2B"
+    type: "fullstack"
+    complexity: "M"
+    estimate_days: 2-3
+    fr_ids: ["FR-QA-009"]
+    status: "to_create"
+    completion_pct: 0
+    dependencies: ["06.14"]
+
+  - id: "06.16"
+    name: "NCR Verification & Close"
+    phase: "2B"
+    type: "fullstack"
+    complexity: "M"
+    estimate_days: 2-3
+    fr_ids: ["FR-QA-009"]
+    status: "to_create"
+    completion_pct: 0
+    dependencies: ["06.15"]
+
+  - id: "06.17"
+    name: "Quality Alerts & Notifications"
+    phase: "2B"
+    type: "backend"
+    complexity: "M"
+    estimate_days: 3-4
+    fr_ids: ["FR-QA-*"]
+    status: "to_create"
+    completion_pct: 0
+    dependencies: ["06.1", "06.2", "06.5", "06.13"]
+
+  - id: "06.18"
+    name: "Test Result Trending & Charts"
+    phase: "2B"
+    type: "frontend"
+    complexity: "M"
+    estimate_days: 3-4
+    fr_ids: ["FR-QA-004"]
+    status: "to_create"
+    completion_pct: 0
+    dependencies: ["06.6"]
+
+  # Phase 2C (COMPLETE)
+  - id: "06.19"
+    name: "Operation Quality Checkpoints"
+    phase: "2C"
+    type: "backend"
+    complexity: "L"
+    estimate_days: 4
+    fr_ids: ["FR-QA-026"]
+    status: "ready"
+    completion_pct: 100
+
+  - id: "06.20"
+    name: "Checkpoint Results & Sign-off"
+    phase: "2C"
+    type: "fullstack"
+    complexity: "M"
+    estimate_days: 3
+    fr_ids: ["FR-QA-026"]
+    status: "ready"
+    completion_pct: 100
+
+  # Phase 3 (STORIES TO CREATE)
+  - id: "06.21"
+    name: "HACCP Plan Setup"
+    phase: "3"
+    type: "fullstack"
+    complexity: "L"
+    estimate_days: 4-5
+    fr_ids: ["FR-QA-013"]
+    status: "to_create"
+    completion_pct: 0
+    dependencies: ["Epic 02 Routing"]
+
+  - id: "06.22"
+    name: "CCP Definition"
+    phase: "3"
+    type: "fullstack"
+    complexity: "M"
+    estimate_days: 3-4
+    fr_ids: ["FR-QA-014"]
+    status: "to_create"
+    completion_pct: 0
+    dependencies: ["06.21"]
+
+  - id: "06.23"
+    name: "CCP Monitoring Desktop"
+    phase: "3"
+    type: "fullstack"
+    complexity: "M"
+    estimate_days: 3-4
+    fr_ids: ["FR-QA-014"]
+    status: "to_create"
+    completion_pct: 0
+    dependencies: ["06.22"]
+
+  - id: "06.24"
+    name: "CCP Monitoring Scanner"
+    phase: "3"
+    type: "frontend"
+    complexity: "L"
+    estimate_days: 4-5
+    fr_ids: ["FR-QA-014"]
+    status: "to_create"
+    completion_pct: 0
+    dependencies: ["06.22", "06.23"]
+
+  - id: "06.25"
+    name: "CCP Deviation Handling"
+    phase: "3"
+    type: "backend"
+    complexity: "M"
+    estimate_days: 3-4
+    fr_ids: ["FR-QA-015"]
+    status: "to_create"
+    completion_pct: 0
+    dependencies: ["06.24"]
+
+  - id: "06.26"
+    name: "CCP Deviation Alerts"
+    phase: "3"
+    type: "backend"
+    complexity: "M"
+    estimate_days: 2-3
+    fr_ids: ["FR-QA-015"]
+    status: "to_create"
+    completion_pct: 0
+    dependencies: ["06.25"]
+
+  - id: "06.27"
+    name: "CoA Templates"
+    phase: "3"
+    type: "fullstack"
+    complexity: "M"
+    estimate_days: 3-4
+    fr_ids: ["FR-QA-012"]
+    status: "to_create"
+    completion_pct: 0
+    dependencies: ["06.11"]
+
+  - id: "06.28"
+    name: "CoA Generation Engine"
+    phase: "3"
+    type: "backend"
+    complexity: "L"
+    estimate_days: 4-5
+    fr_ids: ["FR-QA-011"]
+    status: "to_create"
+    completion_pct: 0
+    dependencies: ["06.27"]
+
+  - id: "06.29"
+    name: "CoA PDF Export"
+    phase: "3"
+    type: "backend"
+    complexity: "M"
+    estimate_days: 2-3
+    fr_ids: ["FR-QA-011"]
+    status: "to_create"
+    completion_pct: 0
+    dependencies: ["06.28"]
+
+  - id: "06.30"
+    name: "HACCP Verification Records"
+    phase: "3"
+    type: "fullstack"
+    complexity: "M"
+    estimate_days: 3-4
+    fr_ids: ["FR-QA-013"]
+    status: "to_create"
+    completion_pct: 0
+    dependencies: ["06.21"]
+
+  # Phase 4 (STORIES TO CREATE)
+  - id: "06.31"
+    name: "CAPA Creation"
+    phase: "4"
+    type: "fullstack"
+    complexity: "M"
+    estimate_days: 3-4
+    fr_ids: ["FR-QA-016"]
+    status: "to_create"
+    completion_pct: 0
+    dependencies: ["06.13"]
+
+  - id: "06.32"
+    name: "CAPA Action Items"
+    phase: "4"
+    type: "fullstack"
+    complexity: "M"
+    estimate_days: 3-4
+    fr_ids: ["FR-QA-017"]
+    status: "to_create"
+    completion_pct: 0
+    dependencies: ["06.31"]
+
+  - id: "06.33"
+    name: "CAPA Effectiveness Check"
+    phase: "4"
+    type: "fullstack"
+    complexity: "M"
+    estimate_days: 2-3
+    fr_ids: ["FR-QA-017"]
+    status: "to_create"
+    completion_pct: 0
+    dependencies: ["06.32"]
+
+  - id: "06.34"
+    name: "Supplier Quality Ratings"
+    phase: "4"
+    type: "fullstack"
+    complexity: "M"
+    estimate_days: 3-4
+    fr_ids: ["FR-QA-018"]
+    status: "to_create"
+    completion_pct: 0
+    dependencies: ["Epic 03 Suppliers"]
+
+  - id: "06.35"
+    name: "Supplier Audits CRUD"
+    phase: "4"
+    type: "fullstack"
+    complexity: "M"
+    estimate_days: 3-4
+    fr_ids: ["FR-QA-019"]
+    status: "to_create"
+    completion_pct: 0
+    dependencies: ["06.34"]
+
+  - id: "06.36"
+    name: "Supplier Audit Findings"
+    phase: "4"
+    type: "fullstack"
+    complexity: "M"
+    estimate_days: 2-3
+    fr_ids: ["FR-QA-019"]
+    status: "to_create"
+    completion_pct: 0
+    dependencies: ["06.35"]
+
+  - id: "06.37"
+    name: "Quality Dashboard"
+    phase: "4"
+    type: "frontend"
+    complexity: "L"
+    estimate_days: 5-6
+    fr_ids: ["FR-QA-020"]
+    status: "to_create"
+    completion_pct: 0
+    dependencies: ["All previous stories"]
+
+  - id: "06.38"
+    name: "Audit Trail Reports"
+    phase: "4"
+    type: "fullstack"
+    complexity: "M"
+    estimate_days: 3-4
+    fr_ids: ["FR-QA-021"]
+    status: "to_create"
+    completion_pct: 0
+    dependencies: ["All"]
+
+  - id: "06.39"
+    name: "Quality Analytics"
+    phase: "4"
+    type: "fullstack"
+    complexity: "L"
+    estimate_days: 4-5
+    fr_ids: ["FR-QA-022"]
+    status: "to_create"
+    completion_pct: 0
+    dependencies: ["All"]
+
+  - id: "06.40"
+    name: "Document Control & Versioning"
+    phase: "4"
+    type: "fullstack"
+    complexity: "M"
+    estimate_days: 3-4
+    fr_ids: ["FR-QA-024"]
+    status: "to_create"
+    completion_pct: 0
+    dependencies: ["06.3"]
+
+# =============================================================================
+# DEPENDENCIES
+# =============================================================================
+
+dependencies:
+  cross_epic:
+    - epic: "01"
+      stories: ["01.1"]
+      provides: "organizations, users, roles, RLS"
+      status: "ready"
+
+    - epic: "02"
+      stories: ["02.1"]
+      provides: "products table"
+      status: "ready"
+
+    - epic: "02"
+      stories: ["02.7", "02.8"]
+      provides: "routings, operations"
+      status: "ready"
+
+    - epic: "03"
+      stories: ["03.1"]
+      provides: "suppliers table"
+      status: "ready"
+
+    - epic: "03"
+      stories: ["03.3"]
+      provides: "purchase_orders, po_lines"
+      status: "ready"
+
+    - epic: "03"
+      stories: ["03.10"]
+      provides: "work_orders table"
+      status: "ready"
+
+    - epic: "04"
+      stories: ["04.3"]
+      provides: "WO operations"
+      status: "ready"
+
+    - epic: "05"
+      stories: ["05.1"]
+      provides: "license_plates, LP service"
+      status: "ready"
+
+    - epic: "05"
+      stories: ["05.11"]
+      provides: "GRNs table, GRN completion"
+      status: "ready"
+
+  within_epic:
+    - story: "06.0"
+      blocks: ["06.1", "06.2", "06.3", "06.5"]
+
+    - story: "06.1"
+      blocks: ["06.2", "06.5", "06.10", "06.11"]
+
+    - story: "06.3"
+      blocks: ["06.4", "06.5", "06.10", "06.11", "06.40"]
+
+    - story: "06.4"
+      blocks: ["06.6", "06.18"]
+
+    - story: "06.5"
+      blocks: ["06.6", "06.7", "06.9"]
+
+    - story: "06.9"
+      blocks: ["06.13", "06.31"]
+
+    - story: "06.11"
+      blocks: ["06.12", "06.27"]
+
+    - story: "06.13"
+      blocks: ["06.14", "06.15", "06.16", "06.17"]
+
+    - story: "06.21"
+      blocks: ["06.22", "06.30"]
+
+    - story: "06.22"
+      blocks: ["06.23", "06.24", "06.25"]
+
+    - story: "06.27"
+      blocks: ["06.28", "06.29"]
+
+    - story: "06.31"
+      blocks: ["06.32", "06.33"]
+
+    - story: "06.34"
+      blocks: ["06.35", "06.36"]
+
+# =============================================================================
+# METRICS & SUCCESS CRITERIA
+# =============================================================================
+
+success_metrics:
+  phase_1:
+    - metric: "Incoming inspection cycle time"
+      target: "<5 minutes"
+      status: "achieved"
+
+    - metric: "Quality holds apply"
+      target: "<500ms"
+      status: "achieved"
+
+    - metric: "Scanner test result capture"
+      target: "<1 second"
+      status: "achieved"
+
+    - metric: "Unit test coverage"
+      target: ">80%"
+      status: "achieved"
+
+  phase_2:
+    - metric: "NCR response time"
+      target: "<24h (critical)"
+      status: "pending"
+
+    - metric: "NCR workflow transition"
+      target: "<500ms"
+      status: "pending"
+
+    - metric: "Quality alert delivery"
+      target: "<5 minutes"
+      status: "pending"
+
+    - metric: "Test trend chart load"
+      target: "<2 seconds"
+      status: "pending"
+
+  phase_3:
+    - metric: "CCP monitoring record"
+      target: "<300ms"
+      status: "pending"
+
+    - metric: "CCP deviation alert"
+      target: "<30 seconds"
+      status: "pending"
+
+    - metric: "CoA PDF generation"
+      target: "<5 seconds"
+      status: "pending"
+
+    - metric: "HACCP plan compliance"
+      target: ">99%"
+      status: "pending"
+
+  phase_4:
+    - metric: "CAPA closure rate"
+      target: ">90%"
+      status: "pending"
+
+    - metric: "Supplier quality score"
+      target: ">85"
+      status: "pending"
+
+    - metric: "Quality dashboard load"
+      target: "<2 seconds"
+      status: "pending"
+
+    - metric: "Audit trail query"
+      target: "<1 second"
+      status: "pending"
+
+# =============================================================================
+# RISKS
+# =============================================================================
+
+risks:
+  - risk: "NCR workflow complexity"
+    impact: "HIGH"
+    likelihood: "MEDIUM"
+    mitigation: "Iterative implementation, clear state machine"
+    owner: "BACKEND-DEV"
+
+  - risk: "CCP monitoring latency"
+    impact: "CRITICAL"
+    likelihood: "LOW"
+    mitigation: "Optimized DB inserts, edge caching"
+    owner: "DEVOPS"
+
+  - risk: "CoA PDF performance"
+    impact: "MEDIUM"
+    likelihood: "MEDIUM"
+    mitigation: "Pre-render templates, CDN delivery"
+    owner: "BACKEND-DEV"
+
+  - risk: "HACCP integration complexity"
+    impact: "MEDIUM"
+    likelihood: "MEDIUM"
+    mitigation: "Clear Epic 04 interface, integration tests"
+    owner: "ARCHITECT"
+
+  - risk: "Audit trail compliance"
+    impact: "HIGH"
+    likelihood: "LOW"
+    mitigation: "Immutable table, no UPDATE policy"
+    owner: "QA"
+
+# =============================================================================
+# METADATA
+# =============================================================================
+
+metadata:
+  created: "2026-01-15"
+  last_updated: "2026-01-15"
+  version: "1.0"
+  author: "ORCHESTRATOR"
+  status: "active"
+  next_review: "2026-01-22"

@@ -1,0 +1,166 @@
+# Story 08.2 - Index File (Entry Point)
+# Generated: 2026-01-15
+# Purpose: Story metadata and dependencies - read this first
+# Status: READY (awaiting implementation)
+
+story:
+  id: "08.2"
+  name: "NPD Projects CRUD & Kanban Dashboard"
+  slug: "npd-projects-crud-kanban"
+  epic: "08-npd"
+  phase: "1"
+  complexity: "L"
+  estimate_days: 4-5
+  type: "full-stack"
+  state: "ready"
+  priority: "P1"
+
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # npd_projects, npd_project_number_sequences tables
+  - api.yaml         # NPD projects CRUD + dashboard endpoints
+  - frontend.yaml    # Kanban board, list view, detail page, modals
+  - tests.yaml       # Acceptance criteria, backend + frontend tests
+
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + RLS"
+      provides: ["organizations", "users", "roles tables"]
+      status: "ready"
+    - story: "01.0"
+      name: "Settings Module"
+      provides: ["org_settings.enabled_modules for NPD feature flag"]
+      status: "ready"
+    - story: "08.1"
+      name: "NPD Settings"
+      provides: ["npd_settings table"]
+      status: "blocked - needs creation"
+  blocks:
+    - story: "08.3"
+      name: "Formulations CRUD"
+      reason: "Needs npd_projects table and npd_project_id FK"
+    - story: "08.4"
+      name: "Gate Checklists"
+      reason: "Needs npd_project_id, current_gate fields"
+    - story: "08.5"
+      name: "NPD Costing"
+      reason: "Needs npd_project_id reference"
+    - story: "08.6"
+      name: "Document Management"
+      reason: "Needs npd_project_id reference"
+    - story: "08.7"
+      name: "Handoff Wizard"
+      reason: "Needs project validation, status update"
+
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/npd.md"
+    sections: ["FR-NPD-01", "FR-NPD-02", "FR-NPD-04", "FR-NPD-05", "Section 2"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/npd.md"
+    sections: ["NPD Projects", "Stage-Gate Workflow"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/08-npd/08.2.npd-projects-crud-kanban.md"
+  patterns:
+    - path: "docs/2-MANAGEMENT/epics/current/03-planning/context/03.13/_index.yaml"
+      relevance: "Kanban pattern reference"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for npd_projects"
+
+deliverables:
+  - type: "database"
+    count: 2
+    description: "npd_projects, npd_project_number_sequences tables"
+    status: "pending"
+  - type: "api"
+    count: 7
+    description: "CRUD endpoints + dashboard + advance-gate"
+    status: "pending"
+  - type: "service"
+    count: 1
+    description: "NPDProjectService with CRUD + workflow methods"
+    status: "pending"
+  - type: "validation"
+    count: 4
+    description: "Zod schemas for create/update/query/advance"
+    status: "pending"
+  - type: "types"
+    count: 1
+    description: "npd-project.ts TypeScript interfaces"
+    status: "pending"
+  - type: "hook"
+    count: 4
+    description: "useNPDProjects, useNPDProject, useAdvanceGate, useKanbanData"
+    status: "pending"
+  - type: "component"
+    count: 12
+    description: "Kanban board, cards, list view, modals, badges"
+    status: "pending"
+  - type: "test"
+    count: 3
+    description: "Unit + integration + E2E tests"
+    status: "pending"
+
+mvp_scope:
+  in_scope:
+    - "npd_projects table with Stage-Gate fields"
+    - "Project number auto-generation (NPD-YYYY-NNNNN)"
+    - "Stage-Gate workflow: G0 → G1 → G2 → G3 → G4 → Launched"
+    - "Status mapping: idea, feasibility, business_case, development, testing, launched, cancelled"
+    - "Priority levels: low, medium, high"
+    - "Owner assignment"
+    - "Target launch date"
+    - "Kanban dashboard with 6 gate columns"
+    - "Drag-and-drop gate advancement"
+    - "Filter by category, priority, owner, status"
+    - "Project list view (DataTable)"
+    - "Project detail page"
+    - "Create/Edit project modals"
+    - "Cancel/Archive workflow"
+  out_of_scope:
+    - "Gate checklists (story 08.4)"
+    - "Formulations (story 08.3)"
+    - "Costing (story 08.5)"
+    - "Documents (story 08.6)"
+    - "Handoff wizard (story 08.7)"
+    - "Timeline/Gantt view (Phase 1+)"
+    - "Approval workflow (Phase 2)"
+    - "Notifications (Phase 2)"
+
+functional_requirements:
+  - id: "FR-NPD-01"
+    name: "Create NPD Projects with Auto-Generated Number"
+    description: "System shall create NPD projects with NPD-YYYY-NNNNN format"
+  - id: "FR-NPD-02"
+    name: "Advance Projects Through Stage-Gate"
+    description: "System shall advance projects through G0 → G1 → G2 → G3 → G4 → Launched"
+  - id: "FR-NPD-04"
+    name: "Kanban Pipeline View"
+    description: "System shall display Kanban dashboard with gate columns and drag-drop"
+  - id: "FR-NPD-05"
+    name: "Filter Dashboard"
+    description: "System shall filter by category, priority, owner, status"
+
+acceptance_criteria:
+  - id: "AC-01"
+    given: "organization exists"
+    when: "NPD project created"
+    then: "project_number format is 'NPD-2025-00001' and increments sequentially"
+  - id: "AC-02"
+    given: "project in G0 column"
+    when: "user drags to G1"
+    then: "confirmation modal appears and gate advances on confirm"
+  - id: "AC-03"
+    given: "projects with various categories"
+    when: "user filters by category"
+    then: "only matching projects display"
+  - id: "AC-04"
+    given: "user creates project with minimal fields"
+    when: "only project_name provided"
+    then: "defaults applied: current_gate=G0, status=idea, priority=medium"
+  - id: "AC-05"
+    given: "project with status = 'launched'"
+    when: "user attempts to edit"
+    then: "[Edit] button disabled with tooltip explaining restriction"

@@ -1,0 +1,84 @@
+story:
+  id: "09.9"
+  name: "Tax Code Integration"
+  epic: "09-finance"
+  phase: "1"
+  complexity: "S"
+  estimate_days: 1-2
+  type: "backend"
+
+dependencies:
+  required:
+    - story: "01.1"
+      provides: ["tax_codes"]
+    - story: "02.1"
+      provides: ["products"]
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/finance.md"
+  prd_sections: ["FR-9.9.1", "FR-9.9.2", "FR-9.9.3"]
+  story: "docs/2-MANAGEMENT/epics/current/09-finance/09.9.tax-code-integration.md"
+
+files_to_create:
+  database:
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_add_tax_code_to_products.sql"
+      type: "migration"
+  api:
+    - path: "apps/frontend/app/api/finance/tax-codes/route.ts"
+      methods: ["GET"]
+  services:
+    - path: "apps/frontend/lib/services/tax-service.ts"
+  components:
+    - path: "apps/frontend/components/finance/TaxCodeSelector.tsx"
+
+database:
+  tables:
+    - name: "products"
+      columns:
+        - "tax_code_id (added)"
+      rls: true
+      indexes:
+        - "tax_code_id"
+
+api_endpoints:
+  - method: "GET"
+    path: "/api/finance/tax-codes"
+    auth: true
+    roles: ["viewer", "finance_manager"]
+
+ux:
+  wireframes:
+    - id: "FIN-004"
+      description: "Tax Code Selector in Product Form"
+      components:
+        - "Dropdown with Polish VAT rates"
+        - "Tax rate display"
+  patterns:
+    selector: "ShadCN Select dropdown"
+
+validation_rules:
+  tax_code_id: "Must be active tax code"
+
+patterns:
+  rls: "ADR-013"
+  api: "REST with org_id filter"
+  reuse: "Leverage existing tax_codes from Epic 01"
+
+acceptance_checklist:
+  - "tax_code_id column added to products"
+  - "Polish VAT rates seeded"
+  - "calculate_tax_amount() function works"
+  - "GET tax codes API works"
+  - "Tax code selector in product form"
+  - "Tax code displays on product detail"
+  - "Tax calculation accurate"
+  - "All tests pass"
+
+output_artifacts:
+  - "Migration: Add tax_code_id to products"
+  - "Migration: Seed Polish VAT rates"
+  - "Function: calculate_tax_amount()"
+  - "API: GET /api/finance/tax-codes"
+  - "Service: TaxService"
+  - "Component: TaxCodeSelector"
+  - "Tests: Unit, integration"

@@ -1,0 +1,293 @@
+# Story 06.4 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  - method: "GET"
+    path: "/api/quality/specifications/:specId/parameters"
+    description: "List all parameters for a specification"
+    file: "apps/frontend/app/api/quality/specifications/[specId]/parameters/route.ts"
+    auth: "required"
+    roles: ["qa_inspector", "qa_manager", "quality_director", "admin", "owner"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        specId: "UUID - specification ID"
+
+    response:
+      status: 200
+      type: "ParametersListResponse"
+      schema:
+        parameters:
+          type: "QualitySpecParameter[]"
+          items:
+            id: "UUID"
+            spec_id: "UUID"
+            sequence: "number"
+            parameter_name: "string"
+            parameter_type: "'numeric' | 'text' | 'boolean' | 'range'"
+            target_value: "string | null"
+            min_value: "number | null"
+            max_value: "number | null"
+            unit: "string | null"
+            test_method: "string | null"
+            instrument_required: "boolean"
+            instrument_id: "UUID | null"
+            instrument_name: "string | null"
+            is_critical: "boolean"
+            acceptance_criteria: "string | null"
+            sampling_instructions: "string | null"
+            created_at: "string"
+            created_by: "UUID"
+            updated_at: "string"
+            updated_by: "UUID | null"
+        spec:
+          id: "UUID"
+          spec_number: "string"
+          name: "string"
+          status: "string"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token provided"
+      - status: 404
+        code: "SPEC_NOT_FOUND"
+        message: "Specification not found"
+        when: "spec_id invalid or not in user's org"
+
+  - method: "POST"
+    path: "/api/quality/specifications/:specId/parameters"
+    description: "Add a new parameter to a specification"
+    file: "apps/frontend/app/api/quality/specifications/[specId]/parameters/route.ts"
+    auth: "required"
+    roles: ["qa_manager", "quality_director", "admin", "owner"]
+
+    request:
+      body:
+        parameter_name: "string (required, 2-200 chars)"
+        parameter_type: "'numeric' | 'text' | 'boolean' | 'range' (required)"
+        target_value: "string (optional)"
+        min_value: "number (conditional - required for numeric/range)"
+        max_value: "number (conditional - required for numeric/range)"
+        unit: "string (optional)"
+        test_method: "string (optional)"
+        instrument_required: "boolean (default: false)"
+        instrument_id: "UUID (optional)"
+        is_critical: "boolean (default: false)"
+        acceptance_criteria: "string (optional, max 1000 chars)"
+        sampling_instructions: "string (optional, max 1000 chars)"
+
+    response:
+      status: 201
+      type: "QualitySpecParameter"
+
+    errors:
+      - status: 400
+        code: "VALIDATION_ERROR"
+        message: "Numeric parameters require at least min or max value"
+        when: "Type is numeric but no min/max provided"
+      - status: 400
+        code: "VALIDATION_ERROR"
+        message: "Range parameters require both min and max values"
+        when: "Type is range but missing min or max"
+      - status: 400
+        code: "SPEC_NOT_DRAFT"
+        message: "Cannot add parameters to non-draft specifications"
+        when: "Spec status is not 'draft'"
+      - status: 404
+        code: "SPEC_NOT_FOUND"
+        message: "Specification not found"
+        when: "spec_id invalid or not in user's org"
+
+  - method: "PUT"
+    path: "/api/quality/specifications/:specId/parameters/:id"
+    description: "Update an existing parameter"
+    file: "apps/frontend/app/api/quality/specifications/[specId]/parameters/[id]/route.ts"
+    auth: "required"
+    roles: ["qa_manager", "quality_director", "admin", "owner"]
+
+    request:
+      body: "Partial<CreateParameterRequest>"
+
+    response:
+      status: 200
+      type: "QualitySpecParameter"
+
+    errors:
+      - status: 400
+        code: "SPEC_NOT_DRAFT"
+        message: "Cannot modify parameters on non-draft specifications"
+        when: "Spec status is not 'draft'"
+      - status: 404
+        code: "PARAMETER_NOT_FOUND"
+        message: "Parameter not found"
+        when: "Parameter ID invalid or not in user's org"
+
+  - method: "DELETE"
+    path: "/api/quality/specifications/:specId/parameters/:id"
+    description: "Delete a parameter from a specification"
+    file: "apps/frontend/app/api/quality/specifications/[specId]/parameters/[id]/route.ts"
+    auth: "required"
+    roles: ["qa_manager", "quality_director", "admin", "owner"]
+
+    response:
+      status: 204
+      type: "No Content"
+
+    errors:
+      - status: 403
+        code: "DELETE_BLOCKED"
+        message: "Cannot delete parameters from non-draft specifications"
+        when: "RLS policy blocks deletion on non-draft specs"
+      - status: 404
+        code: "PARAMETER_NOT_FOUND"
+        message: "Parameter not found"
+        when: "Parameter ID invalid or not in user's org"
+
+  - method: "PATCH"
+    path: "/api/quality/specifications/:specId/parameters/reorder"
+    description: "Reorder parameters by providing array of IDs in new order"
+    file: "apps/frontend/app/api/quality/specifications/[specId]/parameters/reorder/route.ts"
+    auth: "required"
+    roles: ["qa_manager", "quality_director", "admin", "owner"]
+
+    request:
+      body:
+        parameter_ids: "UUID[] (required, min 1)"
+
+    response:
+      status: 200
+      type: "ReorderResponse"
+      schema:
+        updated_count: "number"
+        parameters: "QualitySpecParameter[]"
+
+    errors:
+      - status: 400
+        code: "SPEC_NOT_DRAFT"
+        message: "Cannot reorder parameters on non-draft specifications"
+        when: "Spec status is not 'draft'"
+      - status: 400
+        code: "VALIDATION_ERROR"
+        message: "At least one parameter ID required"
+        when: "Empty parameter_ids array"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/spec-parameter-service.ts"
+    description: "CRUD operations for specification parameters"
+    exports:
+      - name: "SpecParameterService"
+        type: "class"
+        methods:
+          - name: "getBySpecId"
+            params: ["specId: string"]
+            returns: "Promise<QualitySpecParameter[]>"
+            description: "Get all parameters for a specification, ordered by sequence"
+
+          - name: "create"
+            params: ["specId: string", "data: CreateParameterRequest", "userId: string"]
+            returns: "Promise<QualitySpecParameter>"
+            description: "Create parameter with auto-generated sequence"
+
+          - name: "update"
+            params: ["parameterId: string", "data: UpdateParameterRequest", "userId: string"]
+            returns: "Promise<QualitySpecParameter>"
+            description: "Update parameter (draft specs only)"
+
+          - name: "delete"
+            params: ["parameterId: string"]
+            returns: "Promise<void>"
+            description: "Delete parameter (draft specs only)"
+
+          - name: "reorder"
+            params: ["specId: string", "parameterIds: string[]"]
+            returns: "Promise<QualitySpecParameter[]>"
+            description: "Reorder parameters by ID array"
+
+          - name: "cloneToNewSpec"
+            params: ["sourceSpecId: string", "targetSpecId: string", "userId: string"]
+            returns: "Promise<void>"
+            description: "Clone all parameters to a new spec version"
+
+          - name: "validateValue"
+            params: ["parameter: QualitySpecParameter", "value: string | number | boolean"]
+            returns: "{ valid: boolean; reason?: string }"
+            description: "Validate measured value against parameter definition"
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/quality-parameter.ts"
+    description: "Parameter TypeScript interfaces"
+    exports:
+      - "QualitySpecParameter"
+      - "CreateParameterRequest"
+      - "UpdateParameterRequest"
+      - "ReorderParametersRequest"
+      - "ParameterType"
+      - "ParameterValidationResult"
+
+# Validation Schemas
+validation:
+  - path: "apps/frontend/lib/validation/parameter-schemas.ts"
+    description: "Zod schemas for parameter validation"
+    exports:
+      - name: "parameterTypeEnum"
+        type: "z.enum(['numeric', 'text', 'boolean', 'range'])"
+
+      - name: "createParameterSchema"
+        type: "z.object"
+        fields:
+          parameter_name: "z.string().min(2).max(200)"
+          parameter_type: "parameterTypeEnum"
+          target_value: "z.string().max(500).optional()"
+          min_value: "z.number().optional()"
+          max_value: "z.number().optional()"
+          unit: "z.string().max(50).optional()"
+          test_method: "z.string().max(200).optional()"
+          instrument_required: "z.boolean().default(false)"
+          instrument_id: "z.string().uuid().optional().nullable()"
+          is_critical: "z.boolean().default(false)"
+          acceptance_criteria: "z.string().max(1000).optional()"
+          sampling_instructions: "z.string().max(1000).optional()"
+        refinements:
+          - "Numeric/range types require at least one of min_value or max_value"
+          - "Range type requires both min_value and max_value"
+          - "min_value must be less than max_value"
+
+      - name: "updateParameterSchema"
+        type: "createParameterSchema.partial()"
+
+      - name: "reorderParametersSchema"
+        type: "z.object({ parameter_ids: z.array(z.string().uuid()).min(1) })"
+
+# Common Test Methods (for autocomplete)
+test_methods:
+  chemical:
+    - "AOAC 942.15 (Ash)"
+    - "AOAC 990.03 (Protein)"
+    - "AOAC 925.10 (Moisture)"
+    - "ISO 5509 (Fatty Acids)"
+    - "ISO 6579 (Salmonella)"
+  physical:
+    - "Visual Inspection"
+    - "Calipers"
+    - "Weighing"
+    - "Thermometer"
+  equipment:
+    - "pH Meter"
+    - "Moisture Analyzer"
+    - "Refractometer"
+    - "Viscometer"
+
+# Common Units (for autocomplete)
+units:
+  temperature: ["C", "F", "K"]
+  weight: ["g", "kg", "lb", "oz"]
+  volume: ["mL", "L", "gal"]
+  dimension: ["mm", "cm", "m", "in", "ft"]
+  other: ["pH", "%", "ppm", "ppb", "mg/L", "s", "min", "h"]

@@ -1,0 +1,319 @@
+# Code Review Summary: Story 02.2
+# Product Versioning + History
+# Date: 2024-12-24
+
+story:
+  id: "02.2"
+  name: "Product Versioning + History"
+  epic: "02-technical"
+  phase: "5 - CODE REVIEW"
+
+decision: REQUEST_CHANGES
+
+scores:
+  security: 6/10
+  code_quality: 7/10
+  test_coverage: 8/10
+  performance: 6/10
+  overall: 6.7/10
+
+threshold:
+  required: 8.0/10
+  achieved: 6.7/10
+  gap: -1.3/10
+
+test_results:
+  total_tests: 71
+  passing: 69
+  failing: 2
+  pass_rate: 97.2%
+
+  by_category:
+    service_tests: "36/36 PASS"
+    validation_tests: "34/36 FAIL (2 failures)"
+    component_badge: "14/14 PASS"
+    component_warning: "PARTIAL (3 failures)"
+    component_diff: "MISSING"
+    component_panel: "NOT VERIFIED"
+
+issues:
+  critical: 3
+  major: 4
+  minor: 5
+  total: 12
+
+critical_issues:
+  - id: CRIT-1
+    title: "SQL Injection Risk in Migration Trigger"
+    file: "supabase/migrations/033_create_product_version_history.sql"
+    line: 100-102
+    severity: CRITICAL
+    type: security
+    description: "Dynamic SQL with EXECUTE format() creates injection vector if field list becomes dynamic"
+    cwe: "CWE-89"
+    fix_required: true
+
+  - id: CRIT-2
+    title: "RLS Policy Recursion Pattern (ADR-013 Violation)"
+    file: "supabase/migrations/033_create_product_version_history.sql"
+    line: 49-56
+    severity: CRITICAL
+    type: security_performance
+    description: "Missing org_id column causes recursive RLS checks on products table"
+    adr_violation: "ADR-013"
+    fix_required: true
+
+  - id: CRIT-3
+    title: "Product Existence Information Leakage"
+    file: "apps/frontend/app/api/v1/technical/products/[id]/versions/route.ts"
+    line: 82-84
+    severity: CRITICAL
+    type: security
+    description: "Error message reveals product existence across organizations"
+    owasp: "A01:2021 - Broken Access Control"
+    fix_required: true
+
+major_issues:
+  - id: MAJ-1
+    title: "Validation Schema Bug - Incomplete Strictness"
+    file: "apps/frontend/lib/validation/product-history.ts"
+    line: 43-49
+    severity: MAJOR
+    type: quality
+    description: "changedFieldsSchema uses z.any() and doesn't enforce required fields"
+    test_failures: 2
+    fix_required: true
+
+  - id: MAJ-2
+    title: "Component Test Failures - Version Display"
+    file: "apps/frontend/components/technical/__tests__/version-warning-banner.test.tsx"
+    line: 33, 59
+    severity: MAJOR
+    type: quality
+    description: "Version numbers split across elements break regex matching"
+    test_failures: 2
+    fix_required: true
+
+  - id: MAJ-3
+    title: "Missing Test Coverage - VersionDiff Component"
+    file: "apps/frontend/components/technical/version-diff.tsx"
+    severity: MAJOR
+    type: security_quality
+    description: "No tests for critical display component, XSS risk in formatValue()"
+    fix_required: true
+
+  - id: MAJ-4
+    title: "Missing Database Index for Date Range Queries"
+    file: "supabase/migrations/033_create_product_version_history.sql"
+    severity: MAJOR
+    type: performance
+    description: "No composite index for (product_id, changed_at) date range filters"
+    fix_required: false
+    recommended: true
+
+minor_issues:
+  - id: MIN-1
+    title: "DRY Violation in API Routes"
+    severity: MINOR
+    type: quality
+    description: "Duplicate auth/validation logic across routes"
+
+  - id: MIN-2
+    title: "Type Safety - any Usage in API Routes"
+    severity: MINOR
+    type: quality
+    description: "Using any instead of Supabase generated types"
+
+  - id: MIN-3
+    title: "Missing ARIA Labels in Components"
+    severity: MINOR
+    type: accessibility
+    description: "Loading/error states need aria-live attributes"
+
+  - id: MIN-4
+    title: "Missing Error Context in Service"
+    severity: MINOR
+    type: quality
+    description: "Fetch errors lose response status/details"
+
+  - id: MIN-5
+    title: "Hardcoded Magic Numbers"
+    severity: MINOR
+    type: quality
+    description: "Page size hardcoded instead of constant"
+
+security_checklist:
+  sql_injection: FAIL
+  xss_prevention: UNKNOWN
+  rls_enforcement: FAIL
+  authentication: PASS
+  authorization: PARTIAL
+  input_validation: PASS
+  error_messages: FAIL
+  csrf_protection: PASS
+  rate_limiting: UNKNOWN
+  audit_logging: PASS
+
+performance_checklist:
+  database_indexes: PARTIAL
+  rls_performance: FAIL
+  api_pagination: PASS
+  query_optimization: PASS
+  n_plus_one_queries: FAIL
+  caching: NONE
+  bundle_size: PASS
+
+adr_compliance:
+  adr_013_rls_pattern:
+    status: VIOLATED
+    issues:
+      - "Missing org_id column in product_version_history"
+      - "Recursive RLS subquery instead of direct lookup"
+      - "Performance overhead from nested checks"
+
+files_reviewed:
+  database:
+    - path: "supabase/migrations/033_create_product_version_history.sql"
+      status: ISSUES_FOUND
+
+  types:
+    - path: "apps/frontend/lib/types/product-history.ts"
+      status: OK
+
+  validation:
+    - path: "apps/frontend/lib/validation/product-history.ts"
+      status: SCHEMA_BUG
+
+  services:
+    - path: "apps/frontend/lib/services/product-history-service.ts"
+      status: OK
+
+  api_routes:
+    - path: "apps/frontend/app/api/v1/technical/products/[id]/versions/route.ts"
+      status: INFO_LEAK
+    - path: "apps/frontend/app/api/v1/technical/products/[id]/history/route.ts"
+      status: INFO_LEAK
+
+  components:
+    - path: "apps/frontend/components/technical/version-badge.tsx"
+      status: OK
+    - path: "apps/frontend/components/technical/version-warning-banner.tsx"
+      status: TEST_FAILURES
+    - path: "apps/frontend/components/technical/version-history-panel.tsx"
+      status: MISSING_TESTS
+    - path: "apps/frontend/components/technical/version-diff.tsx"
+      status: NO_TESTS
+
+  tests:
+    - path: "apps/frontend/lib/services/__tests__/product-history-service.test.ts"
+      status: PASS
+      count: 36
+    - path: "apps/frontend/lib/validation/__tests__/product-history.test.ts"
+      status: FAILURES
+      count: 34/36
+    - path: "apps/frontend/components/technical/__tests__/version-badge.test.tsx"
+      status: PASS
+      count: 14
+    - path: "apps/frontend/components/technical/__tests__/version-warning-banner.test.tsx"
+      status: PARTIAL
+      count: "~13/16"
+    - path: "apps/frontend/components/technical/__tests__/version-diff.test.tsx"
+      status: MISSING
+      count: 0
+
+required_fixes:
+  database:
+    - action: "Add org_id column to product_version_history"
+      file: "supabase/migrations/033_create_product_version_history.sql"
+      priority: P0
+
+    - action: "Remove dynamic SQL from fn_product_version_increment()"
+      file: "supabase/migrations/033_create_product_version_history.sql"
+      priority: P0
+
+    - action: "Update RLS policies to ADR-013 pattern"
+      file: "supabase/migrations/033_create_product_version_history.sql"
+      priority: P0
+
+  validation:
+    - action: "Fix changedFieldsSchema to enforce required old/new"
+      file: "apps/frontend/lib/validation/product-history.ts"
+      priority: P0
+
+  api:
+    - action: "Update error messages to avoid info leakage"
+      file: "apps/frontend/app/api/v1/technical/products/[id]/versions/route.ts"
+      priority: P0
+    - action: "Update error messages to avoid info leakage"
+      file: "apps/frontend/app/api/v1/technical/products/[id]/history/route.ts"
+      priority: P0
+
+  components:
+    - action: "Create VersionDiff component tests (XSS prevention)"
+      file: "apps/frontend/components/technical/__tests__/version-diff.test.tsx"
+      priority: P0
+
+    - action: "Fix VersionWarningBanner component tests"
+      file: "apps/frontend/components/technical/__tests__/version-warning-banner.test.tsx"
+      priority: P1
+
+recommended_improvements:
+  - action: "Add composite index for date range queries"
+    file: "supabase/migrations/033_create_product_version_history.sql"
+    priority: P1
+
+  - action: "Extract shared API middleware (DRY)"
+    file: "apps/frontend/lib/utils/api-auth-middleware.ts"
+    priority: P2
+
+  - action: "Replace any types with Supabase types"
+    file: "apps/frontend/app/api/v1/technical/products/[id]/versions/route.ts"
+    priority: P2
+
+  - action: "Add ARIA labels to components"
+    file: "apps/frontend/components/technical/version-history-panel.tsx"
+    priority: P2
+
+  - action: "Improve fetch error handling"
+    file: "apps/frontend/lib/services/product-history-service.ts"
+    priority: P3
+
+positive_observations:
+  - "Excellent test coverage (97.2%)"
+  - "Clean separation of concerns"
+  - "Comprehensive Zod validation schemas"
+  - "Good TypeScript strict mode compliance"
+  - "Well-documented code with inline comments"
+  - "Proper use of ShadCN UI components"
+  - "No @ts-ignore comments"
+
+estimated_fix_time:
+  critical_fixes: "3-4 hours"
+  major_fixes: "2-3 hours"
+  total: "4-6 hours"
+
+handoff:
+  to: BACKEND-DEV
+  action: FIX_ISSUES
+  re_review_required: true
+  expected_timeline: "4-6 hours"
+
+next_steps:
+  - "Fix critical security issues (SQL injection, RLS, info leak)"
+  - "Fix validation schema bug"
+  - "Create missing component tests"
+  - "Fix failing component tests"
+  - "Re-submit for code review"
+  - "After approval: Deploy to staging"
+  - "QA validation"
+
+review_metadata:
+  reviewer: CODE-REVIEWER
+  date: 2024-12-24
+  duration: "~2 hours"
+  files_reviewed: 16
+  lines_reviewed: "~2500"
+  tools_used:
+    - vitest
+    - grep
+    - manual_inspection

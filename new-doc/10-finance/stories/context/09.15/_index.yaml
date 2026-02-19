@@ -1,0 +1,133 @@
+story:
+  id: "09.15"
+  name: "Yield & Scrap Variance"
+  epic: "09-finance"
+  phase: "2"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "backend"
+
+dependencies:
+  required:
+    - story: "01.1"
+      provides: ["organizations", "users"]
+    - story: "03.10"
+      provides: ["work_orders"]
+    - story: "04.4"
+      provides: ["wo_outputs", "qty_good"]
+    - story: "04.5"
+      provides: ["scrap", "scrap_reasons"]
+    - story: "09.2"
+      provides: ["standard_costs"]
+    - story: "09.6"
+      provides: ["work_order_costs"]
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/finance.md"
+  prd_sections: ["FR-9.4.6", "FR-9.3.8", "FR-9.2.5"]
+  story: "docs/2-MANAGEMENT/epics/current/09-finance/09.15.yield-scrap-variance.md"
+  patterns:
+    - "apps/frontend/lib/services/work-order-cost-service.ts"
+
+files_to_create:
+  database:
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_create_yield_scrap_variance.sql"
+      type: "migration"
+  api:
+    - path: "apps/frontend/app/api/finance/work-order-costs/[id]/yield-variance/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/finance/scrap-costs/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/finance/reports/yield-variance/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/finance/reports/scrap-cost-by-reason/route.ts"
+      methods: ["GET"]
+  services:
+    - path: "apps/frontend/lib/services/yield-variance-service.ts"
+  validation:
+    - path: "apps/frontend/lib/validation/finance.ts"
+      note: "Extend existing"
+
+database:
+  tables:
+    - name: "scrap_costs"
+      columns: ["id", "org_id", "work_order_id", "scrap_id", "product_id", "quantity", "uom", "unit_cost", "total_cost", "scrap_reason", "scrap_category", "currency_id", "transaction_date"]
+      rls: true
+      indexes: ["org_id", "work_order_id", "product_id", "scrap_reason", "transaction_date"]
+    - name: "cost_variances"
+      new_columns: ["planned_yield", "actual_yield", "yield_percent", "scrap_quantity", "scrap_cost"]
+      indexes: ["org_id+variance_type (WHERE variance_type = 'yield')"]
+  functions:
+    - name: "calculate_yield_variance"
+      type: "calculation"
+      formula: "(actual_yield - planned_yield) × standard_unit_cost"
+    - name: "calculate_work_order_scrap_cost"
+      type: "aggregation"
+      returns: "table (per scrap transaction)"
+    - name: "calculate_work_order_yield_variance"
+      type: "aggregation"
+      returns: "table (yield + scrap summary)"
+  triggers:
+    - name: "wo_yield_variance"
+      on: "work_orders UPDATE"
+      event: "status = 'completed'"
+    - name: "scrap_cost_tracking"
+      on: "scrap INSERT"
+      event: "auto-create scrap cost"
+
+api_endpoints:
+  - method: "GET"
+    path: "/api/finance/work-order-costs/:id/yield-variance"
+    auth: true
+    roles: ["viewer", "finance_manager"]
+  - method: "GET"
+    path: "/api/finance/scrap-costs"
+    auth: true
+    roles: ["viewer", "finance_manager"]
+  - method: "GET"
+    path: "/api/finance/reports/yield-variance"
+    auth: true
+    roles: ["viewer", "finance_manager"]
+  - method: "GET"
+    path: "/api/finance/reports/scrap-cost-by-reason"
+    auth: true
+    roles: ["viewer", "finance_manager"]
+
+validation_rules:
+  planned_yield: "numeric >= 0"
+  actual_yield: "numeric >= 0"
+  yield_percent: "numeric 0-100 (calculated)"
+  scrap_quantity: "numeric >= 0"
+  unit_cost: "numeric >= 0"
+  total_cost: "calculated = quantity × unit_cost"
+
+patterns:
+  rls: "ADR-013"
+  api: "REST with org_id filter"
+  service: "class-based with static methods"
+  validation: "zod schemas"
+  triggers: "Auto-create variance on WO completion, scrap cost on scrap insert"
+
+acceptance_checklist:
+  - "scrap_costs table created with RLS"
+  - "Yield variance calculated correctly (formula verified)"
+  - "Scrap costs tracked per transaction"
+  - "Auto-create variance on WO completion"
+  - "Auto-create scrap cost on scrap insert"
+  - "Yield variance report generates < 2s"
+  - "Scrap by reason report generates < 2s"
+  - "Yield percentage calculated correctly"
+  - "RLS enforces org isolation"
+  - "All tests pass (unit, integration, edge cases)"
+
+output_artifacts:
+  - "Migration: scrap_costs table"
+  - "Migration: extend cost_variances table"
+  - "Function: calculate_yield_variance()"
+  - "Function: calculate_work_order_scrap_cost()"
+  - "Function: calculate_work_order_yield_variance()"
+  - "Trigger: wo_yield_variance"
+  - "Trigger: scrap_cost_tracking"
+  - "API: 4 endpoints"
+  - "Service: YieldVarianceService with 5 methods"
+  - "Tests: Unit, integration, edge cases"

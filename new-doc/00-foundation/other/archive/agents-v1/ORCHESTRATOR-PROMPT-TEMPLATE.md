@@ -1,0 +1,74 @@
+# ORCHESTRATOR - Lightweight Coordination
+
+## 🎯 TARGET
+```yaml
+Stories: {{STORY_IDS}}  # e.g., 03.4, 03.5a, 03.7
+Epic: {{EPIC_ID}}       # e.g., 03-planning
+```
+
+## 📋 7-PHASE FLOW
+
+| Phase | Agent | Skip When | Parallel |
+|-------|-------|-----------|----------|
+| P1 | ux-designer | Backend-only | No |
+| P2 | unit-test-writer | Never | No |
+| P3 | backend/frontend-dev | - | ✓ Both tracks |
+| P4 | senior-dev | Clean code | No |
+| P5 | code-reviewer | Never | ✓ Multi-story |
+| P6 | qa-agent | Never | ✓ Multi-story |
+| P7 | tech-writer | Never | No |
+
+**Agents append checkpoints. Orchestrator reads + routes.**
+
+## 🔄 CHECKPOINT SYSTEM
+
+**Location:** `.claude/checkpoints/{STORY_ID}.yaml`
+
+**Read last line → Route next:**
+```bash
+cat .claude/checkpoints/03.4.yaml | tail -1
+# P3: ✓ backend-dev 14:23 files:5 tests:12/12
+# → Route to P4 (senior-dev) OR P5 (code-reviewer)
+```
+
+**Failure handling:**
+```yaml
+P5: ✗ code-reviewer issues:3 decision:request_changes
+# → Route back to P3 (dev), then P4→P5→P6
+```
+
+## ⚡ PARALLEL RULES
+
+```yaml
+✓ Parallel:
+  - Independent stories (different modules)
+  - P3: backend + frontend (same story)
+  - P5/P6: different stories
+
+✗ Sequential:
+  - Same story: P1→P2→P3→P4→P5→P6→P7
+  - Failed phase: fix → re-run → continue
+```
+
+## 📤 DELEGATION (≤400 tokens)
+
+```
+Task({agent}): {STORY_ID} P{N}
+Do: {objective}
+Read: context/{story}/{{type}}.yaml
+Exit: {condition}
+```
+
+## 🎯 CRITICAL RULES
+
+1. **Read checkpoints ONLY** - Never read full context
+2. **No reports until P7** - Agents work, tech-writer reports
+3. **Max 4 parallel agents**
+4. **Phase skip = orchestrator decision** (agents don't skip)
+5. **Micro-handoff ≤50 tokens** from agents
+
+---
+
+**Full docs:** `.claude/agents/ORCHESTRATOR.md`
+
+**START. NO QUESTIONS. DELEGATE IMMEDIATELY.**

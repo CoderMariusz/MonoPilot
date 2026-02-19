@@ -1,0 +1,22 @@
+# Story 06.40 - Document Control Tests
+
+unit_tests:
+  - DocumentControlService.uploadFile - uploads to Supabase Storage
+  - DocumentControlService.calculateFileHash - SHA-256 correct
+  - DocumentControlService.createNewVersion - increments version, creates new record
+
+integration_tests:
+  - POST /api/quality/documents - uploads file and creates record
+  - GET /api/quality/documents/:id/download - returns signed URL
+  - POST /api/quality/documents/:id/approve - workflow state change
+
+e2e_tests:
+  - Upload document workflow (draft → review → approve)
+  - Create new version workflow
+  - Download document
+  - Search and filter documents
+  - Expiry alert displayed for expiring documents
+
+performance_tests:
+  - File upload <10s for 10 MB PDF
+  - Document list <500ms for 1,000 documents

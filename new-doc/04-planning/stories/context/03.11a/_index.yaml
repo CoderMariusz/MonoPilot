@@ -1,0 +1,105 @@
+# Story 03.11a - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "03.11a"
+  name: "WO Materials (BOM Snapshot)"
+  slug: "wo-bom-snapshot"
+  epic: "03-planning"
+  phase: "MVP"
+  complexity: "L"
+  estimate_days: 5-7
+  type: "backend + frontend"
+  state: "ready"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, RLS, migrations
+  - api.yaml         # Endpoints, request/response schemas
+  - frontend.yaml    # Components, types, services
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["org_id context", "RLS patterns"]
+    - story: "02.4"
+      name: "BOMs CRUD"
+      provides: ["boms table", "output_qty"]
+    - story: "02.5a"
+      name: "BOM Items Core"
+      provides: ["bom_items table", "component data"]
+    - story: "03.10"
+      name: "WO CRUD + BOM Auto-Select"
+      provides: ["work_orders table", "bom_id FK", "planned_quantity"]
+  blocked_by: []
+  blocks:
+    - story: "03.11b"
+      name: "WO Material Reservation"
+      reason: "Requires wo_materials table for LP reservation"
+    - story: "03.13"
+      name: "Material Availability Check"
+      reason: "Needs wo_materials to compare against inventory"
+    - epic: "04"
+      name: "Production Execution"
+      reason: "Consumes wo_materials during production"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/planning.md"
+    sections: ["FR-PLAN-019"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/planning.md"
+    sections: ["WO Materials", "BOM Snapshot"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/03-planning/03.11a.wo-bom-snapshot.md"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-015-work-order-detail.md"
+      sections: ["Materials Tab", "Materials Table"]
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-002-bom-snapshot-pattern.md"
+      relevance: "PRIMARY - BOM snapshot copy pattern and scaling formula"
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for org isolation"
+  dependencies:
+    - path: "docs/2-MANAGEMENT/epics/current/03-planning/03.10.wo-crud.md"
+      relevance: "Work Order foundation, status lifecycle"
+    - path: "docs/2-MANAGEMENT/epics/current/02-technical/02.5a.bom-items-core.md"
+      relevance: "BOM items source data structure"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "Create wo_materials table with indexes and RLS"
+  - type: "api"
+    count: 2
+    description: "GET /work-orders/:id/materials, POST /work-orders/:id/snapshot"
+  - type: "service"
+    count: 1
+    description: "wo-snapshot-service.ts with scaling logic"
+  - type: "validation"
+    count: 1
+    description: "wo-materials.ts Zod schemas"
+  - type: "component"
+    count: 3
+    description: "WOMaterialsTable, WOMaterialRow, RefreshSnapshotButton"
+  - type: "test"
+    count: 4
+    description: "Unit tests (scaleQuantity), integration tests (API), immutability tests"
+
+# Technical notes
+technical_notes:
+  - "BOM Snapshot Pattern: Copy bom_items to wo_materials with quantity scaling (ADR-002)"
+  - "Scaling Formula: (wo_qty / bom.output_qty) * item_qty * (1 + scrap_percent/100)"
+  - "Snapshot is IMMUTABLE after WO status = released"
+  - "Denormalize material_name for snapshot preservation"
+  - "RLS: org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+  - "By-products copied with required_qty = 0, yield_percent preserved"
+  - "Precision: 6 decimal places for required_qty (DECIMAL(15,6))"
+  - "Use ADR-013 RLS pattern consistently"

@@ -1,0 +1,453 @@
+# Story 06.5 - Database Schema
+# Purpose: Tables, RLS policies, migrations, triggers, indexes
+# Agent: BACKEND-DEV (database focus)
+
+migrations:
+  - path: "supabase/migrations/070_create_quality_inspections_table.sql"
+    type: "migration"
+    description: "Create quality_inspections table with all columns, constraints, RLS"
+  - path: "supabase/migrations/071_create_inspection_number_sequences.sql"
+    type: "migration"
+    description: "Create inspection_number_sequences table for auto-increment inspection numbers"
+  - path: "supabase/migrations/072_inspection_triggers_and_functions.sql"
+    type: "migration"
+    description: "Create triggers and functions for inspection workflow (auto-create, LP status update)"
+
+tables:
+  - name: "quality_inspections"
+    description: "Quality inspections for incoming materials (and future in-process, final)"
+    columns:
+      # Identity
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id) ON DELETE CASCADE" }
+      - { name: "inspection_number", type: "TEXT", constraints: "NOT NULL" }
+
+      # Type and Classification
+      - { name: "inspection_type", type: "TEXT", constraints: "NOT NULL DEFAULT 'incoming'" }
+      - { name: "reference_type", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "reference_id", type: "UUID", constraints: "NOT NULL" }
+
+      # Product and Specification
+      - { name: "product_id", type: "UUID", constraints: "NOT NULL REFERENCES products(id)" }
+      - { name: "spec_id", type: "UUID", constraints: "REFERENCES quality_specifications(id)" }
+
+      # LP Reference (for incoming, the received LP)
+      - { name: "lp_id", type: "UUID", constraints: "REFERENCES license_plates(id)" }
+      - { name: "grn_id", type: "UUID", constraints: "REFERENCES grns(id)" }
+      - { name: "po_id", type: "UUID", constraints: "REFERENCES purchase_orders(id)" }
+
+      # Batch Tracking
+      - { name: "batch_number", type: "TEXT", constraints: "" }
+      - { name: "lot_size", type: "INTEGER", constraints: "" }
+      - { name: "sample_size", type: "INTEGER", constraints: "" }
+      - { name: "sampling_plan_id", type: "UUID", constraints: "REFERENCES sampling_plans(id)" }
+
+      # Assignment
+      - { name: "inspector_id", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "assigned_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "assigned_at", type: "TIMESTAMPTZ", constraints: "" }
+
+      # Workflow Status
+      - { name: "status", type: "TEXT", constraints: "NOT NULL DEFAULT 'scheduled'" }
+      - { name: "scheduled_date", type: "DATE", constraints: "" }
+      - { name: "priority", type: "TEXT", constraints: "DEFAULT 'normal'" }
+
+      # Execution
+      - { name: "started_at", type: "TIMESTAMPTZ", constraints: "" }
+      - { name: "completed_at", type: "TIMESTAMPTZ", constraints: "" }
+      - { name: "completed_by", type: "UUID", constraints: "REFERENCES users(id)" }
+
+      # Results
+      - { name: "result", type: "TEXT", constraints: "" }
+      - { name: "result_notes", type: "TEXT", constraints: "" }
+
+      # Defect Counts
+      - { name: "defects_found", type: "INTEGER", constraints: "DEFAULT 0" }
+      - { name: "major_defects", type: "INTEGER", constraints: "DEFAULT 0" }
+      - { name: "minor_defects", type: "INTEGER", constraints: "DEFAULT 0" }
+      - { name: "critical_defects", type: "INTEGER", constraints: "DEFAULT 0" }
+
+      # Conditional Approval
+      - { name: "conditional_reason", type: "TEXT", constraints: "" }
+      - { name: "conditional_restrictions", type: "TEXT", constraints: "" }
+      - { name: "conditional_approved_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "conditional_expires_at", type: "TIMESTAMPTZ", constraints: "" }
+
+      # NCR Linkage
+      - { name: "ncr_id", type: "UUID", constraints: "REFERENCES ncr_reports(id)" }
+
+      # Audit
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT now()" }
+      - { name: "created_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "DEFAULT now()" }
+      - { name: "updated_by", type: "UUID", constraints: "REFERENCES users(id)" }
+
+    constraints:
+      - "CONSTRAINT uq_inspection_number UNIQUE(org_id, inspection_number)"
+      - "CONSTRAINT inspection_type_check CHECK (inspection_type IN ('incoming', 'in_process', 'final'))"
+      - "CONSTRAINT reference_type_check CHECK (reference_type IN ('po', 'grn', 'wo', 'lp', 'batch'))"
+      - "CONSTRAINT status_check CHECK (status IN ('scheduled', 'in_progress', 'completed', 'cancelled'))"
+      - "CONSTRAINT priority_check CHECK (priority IN ('low', 'normal', 'high', 'urgent'))"
+      - "CONSTRAINT result_check CHECK (result IN ('pass', 'fail', 'conditional', NULL))"
+
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+    indexes:
+      - "idx_inspections_org_status ON quality_inspections(org_id, status)"
+      - "idx_inspections_org_type ON quality_inspections(org_id, inspection_type)"
+      - "idx_inspections_type_status ON quality_inspections(org_id, inspection_type, status)"
+      - "idx_inspections_product ON quality_inspections(product_id)"
+      - "idx_inspections_lp ON quality_inspections(lp_id) WHERE lp_id IS NOT NULL"
+      - "idx_inspections_grn ON quality_inspections(grn_id) WHERE grn_id IS NOT NULL"
+      - "idx_inspections_po ON quality_inspections(po_id) WHERE po_id IS NOT NULL"
+      - "idx_inspections_inspector ON quality_inspections(inspector_id) WHERE inspector_id IS NOT NULL"
+      - "idx_inspections_scheduled ON quality_inspections(org_id, scheduled_date) WHERE status = 'scheduled'"
+      - "idx_inspections_pending ON quality_inspections(org_id, inspection_type, status) WHERE status IN ('scheduled', 'in_progress')"
+      - "idx_inspections_created ON quality_inspections(org_id, created_at)"
+
+  - name: "inspection_number_sequences"
+    description: "Sequence counter for auto-generating inspection numbers per org/year/type"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id) ON DELETE CASCADE" }
+      - { name: "year", type: "INTEGER", constraints: "NOT NULL" }
+      - { name: "inspection_type", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "current_value", type: "BIGINT", constraints: "NOT NULL DEFAULT 0" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT now()" }
+    constraints:
+      - "CONSTRAINT uq_insp_seq_org_year_type UNIQUE(org_id, year, inspection_type)"
+
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+    indexes:
+      - "idx_insp_seq_org_type ON inspection_number_sequences(org_id, inspection_type)"
+
+# RLS Policies (ADR-013)
+rls_policies:
+  pattern: "Users Table Lookup"
+  pattern_sql: "(SELECT org_id FROM users WHERE id = auth.uid())"
+
+  policies:
+    - table: "quality_inspections"
+      name: "inspections_select"
+      operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      description: "All authenticated users can read org inspections"
+
+    - table: "quality_inspections"
+      name: "inspections_insert"
+      operation: "INSERT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      description: "Users can create inspections in their org"
+
+    - table: "quality_inspections"
+      name: "inspections_update"
+      operation: "UPDATE"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      description: "Users can update inspections in their org"
+
+    - table: "quality_inspections"
+      name: "inspections_delete"
+      operation: "DELETE"
+      using: |
+        org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        AND status = 'scheduled'
+      description: "Only scheduled inspections can be deleted"
+
+    - table: "inspection_number_sequences"
+      name: "insp_seq_select"
+      operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      description: "Read sequence for org"
+
+    - table: "inspection_number_sequences"
+      name: "insp_seq_update"
+      operation: "UPDATE"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      description: "Update sequence counter"
+
+# Triggers and Functions
+triggers:
+  - name: "generate_inspection_number"
+    description: "SQL function to generate inspection number with auto-increment"
+    type: "FUNCTION"
+    sql: |
+      CREATE OR REPLACE FUNCTION generate_inspection_number(p_org_id UUID, p_type TEXT)
+      RETURNS TEXT AS $$
+      DECLARE
+        v_year INTEGER;
+        v_next_val BIGINT;
+        v_prefix TEXT;
+        v_inspection_number TEXT;
+      BEGIN
+        v_year := EXTRACT(YEAR FROM CURRENT_DATE);
+
+        CASE p_type
+          WHEN 'incoming' THEN v_prefix := 'INC';
+          WHEN 'in_process' THEN v_prefix := 'IPR';
+          WHEN 'final' THEN v_prefix := 'FIN';
+          ELSE v_prefix := 'INS';
+        END CASE;
+
+        INSERT INTO inspection_number_sequences (org_id, year, inspection_type, current_value)
+        VALUES (p_org_id, v_year, p_type, 1)
+        ON CONFLICT (org_id, year, inspection_type)
+        DO UPDATE SET
+          current_value = inspection_number_sequences.current_value + 1,
+          updated_at = NOW()
+        RETURNING current_value INTO v_next_val;
+
+        v_inspection_number := 'INS-' || v_prefix || '-' || v_year::TEXT || '-' || LPAD(v_next_val::TEXT, 5, '0');
+        RETURN v_inspection_number;
+      END;
+      $$ LANGUAGE plpgsql;
+
+  - name: "create_incoming_inspection_on_grn"
+    description: "Auto-create inspection on GRN completion (if setting enabled)"
+    table: "grns"
+    timing: "AFTER UPDATE"
+    for_each: "ROW"
+    when: "NEW.status = 'completed' AND (OLD.status IS NULL OR OLD.status != 'completed')"
+    sql: |
+      CREATE OR REPLACE FUNCTION create_incoming_inspection_on_grn()
+      RETURNS TRIGGER AS $$
+      DECLARE
+        v_settings RECORD;
+        v_grn_item RECORD;
+        v_spec_id UUID;
+        v_inspection_number TEXT;
+      BEGIN
+        IF NEW.status = 'completed' AND (OLD.status IS NULL OR OLD.status != 'completed') THEN
+          SELECT * INTO v_settings
+          FROM quality_settings
+          WHERE org_id = NEW.org_id;
+
+          IF v_settings.auto_create_inspection_on_grn = true THEN
+            FOR v_grn_item IN
+              SELECT gi.*, lp.id as lp_uuid
+              FROM grn_items gi
+              LEFT JOIN license_plates lp ON lp.id = gi.lp_id
+              WHERE gi.grn_id = NEW.id
+                AND gi.lp_id IS NOT NULL
+            LOOP
+              SELECT id INTO v_spec_id
+              FROM quality_specifications
+              WHERE org_id = NEW.org_id
+                AND product_id = v_grn_item.product_id
+                AND status = 'active'
+              ORDER BY effective_date DESC
+              LIMIT 1;
+
+              v_inspection_number := generate_inspection_number(NEW.org_id, 'incoming');
+
+              INSERT INTO quality_inspections (
+                org_id, inspection_number, inspection_type, reference_type, reference_id,
+                product_id, spec_id, lp_id, grn_id, po_id, batch_number,
+                status, scheduled_date, priority, created_by
+              ) VALUES (
+                NEW.org_id, v_inspection_number, 'incoming', 'grn', NEW.id,
+                v_grn_item.product_id, v_spec_id, v_grn_item.lp_uuid, NEW.id, NEW.po_id, v_grn_item.batch_number,
+                'scheduled', CURRENT_DATE, 'normal', NEW.received_by
+              );
+            END LOOP;
+          END IF;
+        END IF;
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+
+    trigger_sql: |
+      CREATE TRIGGER trigger_create_incoming_inspection
+      AFTER UPDATE ON grns
+      FOR EACH ROW
+      WHEN (NEW.status = 'completed')
+      EXECUTE FUNCTION create_incoming_inspection_on_grn();
+
+  - name: "update_lp_qa_status_on_inspection"
+    description: "Update LP QA status when inspection completes"
+    table: "quality_inspections"
+    timing: "AFTER UPDATE"
+    for_each: "ROW"
+    when: "NEW.status = 'completed' AND (OLD.status IS NULL OR OLD.status != 'completed')"
+    sql: |
+      CREATE OR REPLACE FUNCTION update_lp_qa_status_on_inspection()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        IF NEW.status = 'completed' AND (OLD.status IS NULL OR OLD.status != 'completed') THEN
+          IF NEW.lp_id IS NOT NULL THEN
+            UPDATE license_plates
+            SET qa_status = CASE NEW.result
+              WHEN 'pass' THEN 'passed'
+              WHEN 'fail' THEN 'failed'
+              WHEN 'conditional' THEN 'conditional'
+              ELSE 'pending'
+            END,
+            updated_at = NOW()
+            WHERE id = NEW.lp_id;
+          END IF;
+        END IF;
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+
+    trigger_sql: |
+      CREATE TRIGGER trigger_update_lp_qa_status
+      AFTER UPDATE ON quality_inspections
+      FOR EACH ROW
+      WHEN (NEW.status = 'completed')
+      EXECUTE FUNCTION update_lp_qa_status_on_inspection();
+
+  - name: "update_quality_inspections_updated_at"
+    description: "Auto-update updated_at timestamp"
+    table: "quality_inspections"
+    timing: "BEFORE UPDATE"
+    for_each: "ROW"
+    sql: |
+      CREATE OR REPLACE FUNCTION update_updated_at_column()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        NEW.updated_at = NOW();
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+
+    trigger_sql: |
+      CREATE TRIGGER update_quality_inspections_updated_at
+      BEFORE UPDATE ON quality_inspections
+      FOR EACH ROW
+      EXECUTE FUNCTION update_updated_at_column();
+
+# Field Notes
+field_notes:
+  inspection_type:
+    description: "Type of inspection"
+    values:
+      - code: "incoming"
+        label: "Incoming"
+        description: "Materials upon receipt from PO"
+      - code: "in_process"
+        label: "In-Process"
+        description: "Semi-finished products during WO execution"
+      - code: "final"
+        label: "Final"
+        description: "Finished goods before shipment"
+
+  reference_type:
+    description: "Polymorphic reference to source document"
+    values:
+      - code: "po"
+        label: "Purchase Order"
+        description: "Linked to PO line item"
+      - code: "grn"
+        label: "Good Receipt Note"
+        description: "Linked to GRN"
+      - code: "wo"
+        label: "Work Order"
+        description: "Linked to WO operation"
+      - code: "lp"
+        label: "License Plate"
+        description: "Direct LP inspection"
+      - code: "batch"
+        label: "Batch"
+        description: "Full batch inspection"
+
+  status:
+    description: "Inspection workflow status"
+    values:
+      - code: "scheduled"
+        label: "Scheduled"
+        description: "Created, awaiting start"
+      - code: "in_progress"
+        label: "In Progress"
+        description: "Inspector actively recording results"
+      - code: "completed"
+        label: "Completed"
+        description: "Results recorded and result determined"
+      - code: "cancelled"
+        label: "Cancelled"
+        description: "Cancelled without completion"
+
+  result:
+    description: "Inspection outcome"
+    values:
+      - code: "pass"
+        label: "Pass"
+        description: "All criteria met, material approved"
+      - code: "fail"
+        label: "Fail"
+        description: "Failed criteria, material rejected or on hold"
+      - code: "conditional"
+        label: "Conditional"
+        description: "Limited approval with restrictions"
+
+  priority:
+    description: "Inspection priority/urgency"
+    values:
+      - code: "low"
+        label: "Low"
+        description: "Standard priority"
+      - code: "normal"
+        label: "Normal"
+        description: "Default priority"
+      - code: "high"
+        label: "High"
+        description: "Should be completed within 24 hours"
+      - code: "urgent"
+        label: "Urgent"
+        description: "Critical material, complete ASAP (within 4 hours)"
+
+  inspection_number:
+    description: "Unique inspection identifier per org per year per type"
+    format: "INS-{TYPE}-{YYYY}-{NNNNN}"
+    examples:
+      - "INS-INC-2025-00001 (first incoming inspection of 2025)"
+      - "INS-IPR-2025-00001 (first in-process inspection of 2025)"
+      - "INS-FIN-2025-00001 (first final inspection of 2025)"
+    note: "Auto-generated by generate_inspection_number() function"
+
+# Related Tables (Future Stories)
+related_tables:
+  - name: "quality_test_results"
+    story: "06.6"
+    relationship: "One inspection has many test results"
+    fk: "quality_test_results.inspection_id → quality_inspections.id"
+
+  - name: "quality_holds"
+    story: "06.2"
+    relationship: "Failed inspection can create quality hold"
+    fk: "quality_holds.reference_id → quality_inspections.id (when reference_type='inspection')"
+
+  - name: "ncr_reports"
+    story: "06.9"
+    relationship: "Inspection can trigger NCR creation"
+    fk: "quality_inspections.ncr_id → ncr_reports.id"
+
+  - name: "sampling_plans"
+    story: "06.7"
+    relationship: "Sampling integration with inspections"
+    fk: "quality_inspections.sampling_plan_id → sampling_plans.id"
+
+# Performance Considerations
+performance:
+  expected_volumes:
+    inspections_per_month: "500-2,000"
+    max_inspections: "20,000"
+    test_results_per_inspection: "10-50"
+    max_test_results: "200"
+
+  query_optimization:
+    - "Paginate inspection list (default 20 per page)"
+    - "Use indexed columns for filtering (org_id, status, inspection_type)"
+    - "Denormalize product/material names in query response"
+    - "Cache summary metrics (1 min TTL)"
+    - "Lazy load test results grid (load on detail page open)"
+
+  cache_keys:
+    - "org:{orgId}:quality:inspections:{type}:list (1 min TTL)"
+    - "org:{orgId}:quality:inspection:{id} (5 min TTL)"
+    - "org:{orgId}:quality:inspections:{type}:summary (1 min TTL)"

@@ -1,0 +1,190 @@
+story:
+  id: "08.10"
+  name: "Risk Management"
+  epic: "08-npd"
+  phase: "1A"
+  complexity: "M"
+  estimate_days: 3-4
+
+dependencies:
+  required:
+    - story: "08.2"
+      provides: ["npd_projects", "ProjectService"]
+    - story: "01.1"
+      provides: ["organizations", "users", "RLS"]
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/npd.md"
+  prd_sections: ["FR-NPD-48", "FR-NPD-49", "FR-NPD-50", "FR-NPD-51", "FR-NPD-52", "Section 6"]
+  story: "docs/2-MANAGEMENT/epics/current/08-npd/08.10.risk-management.md"
+  architecture: "docs/1-BASELINE/architecture/modules/npd.md"
+  patterns:
+    - "docs/2-MANAGEMENT/epics/current/06-quality/06.5.incoming-inspection.md"
+
+files_to_create:
+  database:
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_create_npd_risks.sql"
+      type: "migration"
+      tables: ["npd_risks"]
+      triggers: ["calculate_risk_score", "update_npd_risks_updated_at"]
+
+  api:
+    - path: "apps/frontend/app/api/npd/projects/[projectId]/risks/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/npd/risks/route.ts"
+      methods: ["POST"]
+    - path: "apps/frontend/app/api/npd/risks/[id]/route.ts"
+      methods: ["PUT", "DELETE"]
+    - path: "apps/frontend/app/api/npd/projects/[projectId]/risks/matrix/route.ts"
+      methods: ["GET"]
+
+  services:
+    - path: "apps/frontend/lib/services/risk-service.ts"
+
+  validation:
+    - path: "apps/frontend/lib/validation/npd/risk-schemas.ts"
+
+  pages:
+    - path: "apps/frontend/app/(authenticated)/npd/projects/[id]/page.tsx"
+      note: "Add Risks tab to project detail page"
+
+  components:
+    - path: "apps/frontend/components/npd/risk/RiskRegisterTable.tsx"
+    - path: "apps/frontend/components/npd/risk/RiskFilters.tsx"
+    - path: "apps/frontend/components/npd/risk/RiskScoreBadge.tsx"
+    - path: "apps/frontend/components/npd/risk/RiskStatusBadge.tsx"
+    - path: "apps/frontend/components/npd/risk/RiskSeverityBadge.tsx"
+    - path: "apps/frontend/components/npd/risk/RiskLikelihoodSelect.tsx"
+    - path: "apps/frontend/components/npd/risk/RiskImpactSelect.tsx"
+    - path: "apps/frontend/components/npd/risk/CreateRiskModal.tsx"
+    - path: "apps/frontend/components/npd/risk/EditRiskModal.tsx"
+    - path: "apps/frontend/components/npd/risk/RiskDetailModal.tsx"
+    - path: "apps/frontend/components/npd/risk/DeleteRiskDialog.tsx"
+    - path: "apps/frontend/components/npd/risk/RiskMatrix.tsx"
+    - path: "apps/frontend/components/npd/risk/RiskMatrixCell.tsx"
+    - path: "apps/frontend/components/npd/risk/RiskMatrixLegend.tsx"
+    - path: "apps/frontend/components/npd/risk/RiskSummaryCards.tsx"
+    - path: "apps/frontend/components/npd/risk/RiskOwnerSelector.tsx"
+
+database:
+  tables:
+    - name: "npd_risks"
+      columns:
+        - "id"
+        - "org_id"
+        - "npd_project_id"
+        - "risk_description"
+        - "likelihood (1-5)"
+        - "impact (1-5)"
+        - "risk_score (calculated)"
+        - "mitigation_plan"
+        - "status"
+        - "owner_id"
+        - "created_at"
+        - "updated_at"
+        - "created_by"
+        - "updated_by"
+      rls: true
+      indexes:
+        - "idx_npd_risks_org_project"
+        - "idx_npd_risks_project_score"
+        - "idx_npd_risks_status"
+
+api_endpoints:
+  - method: "GET"
+    path: "/api/npd/projects/:projectId/risks"
+    auth: true
+    roles: ["NPD_LEAD", "R&D", "VIEWER"]
+    returns: "RisksListResponse with summary"
+
+  - method: "POST"
+    path: "/api/npd/risks"
+    auth: true
+    roles: ["NPD_LEAD", "R&D"]
+    returns: "RiskWithOwner"
+
+  - method: "PUT"
+    path: "/api/npd/risks/:id"
+    auth: true
+    roles: ["NPD_LEAD", "R&D (owner only)"]
+    returns: "RiskWithOwner"
+
+  - method: "DELETE"
+    path: "/api/npd/risks/:id"
+    auth: true
+    roles: ["NPD_LEAD"]
+    returns: "204 No Content"
+
+  - method: "GET"
+    path: "/api/npd/projects/:projectId/risks/matrix"
+    auth: true
+    roles: ["NPD_LEAD", "R&D", "VIEWER"]
+    returns: "RiskMatrixResponse (5x5 grid)"
+
+ux:
+  wireframes:
+    - id: "NPD-015"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/NPD-015-risk-register-matrix.md"
+      relevance: "5x5 risk matrix with color-coded cells and risk register table"
+      components: ["RiskMatrix", "RiskMatrixCell", "RiskMatrixLegend", "RiskRegisterTable", "RiskFilters", "RiskSummaryCards"]
+
+  patterns:
+    table: "ShadCN DataTable with sorting and filtering"
+    modal: "ShadCN Dialog for create/edit/delete"
+    matrix: "5x5 grid with color-coded cells"
+    score_colors: "Red (20-25), Orange (12-19), Yellow (6-11), Green (1-5)"
+
+  states:
+    - "loading_risks"
+    - "empty_risks"
+    - "risks_displayed"
+    - "create_modal_open"
+    - "edit_modal_open"
+    - "detail_modal_open"
+    - "delete_dialog_open"
+    - "matrix_modal_open"
+    - "error"
+
+validation_rules:
+  risk_description: "Min 10 chars, max 2000 chars"
+  likelihood: "Integer 1-5"
+  impact: "Integer 1-5"
+  risk_score: "Auto-calculated: likelihood x impact (1-25)"
+  mitigation_plan: "Optional, max 2000 chars"
+  status: "Enum: open, mitigated, closed"
+  owner_id: "Optional UUID, must exist in users table"
+
+patterns:
+  rls: "ADR-013 - RLS enforces org isolation"
+  api: "REST with org_id filter from auth.uid()"
+  service: "class-based with static methods (RiskService)"
+  validation: "zod schemas for request validation"
+  scoring: "Database trigger auto-calculates risk_score"
+  severity: "Calculated in service layer from risk_score"
+
+acceptance_checklist:
+  - "Risk list loads within 300ms for 50 risks"
+  - "Create risk auto-calculates risk_score"
+  - "Risk score badge displays correct color"
+  - "Risks sorted by risk_score DESC by default"
+  - "Risk status filter works"
+  - "Risk owner filter shows all users"
+  - "Risk matrix displays 5x5 grid"
+  - "Matrix cells color-coded by severity"
+  - "Matrix cells clickable with risk details"
+  - "Permission checks hide actions for VIEWER"
+
+output_artifacts:
+  - "npd_risks table migration with triggers"
+  - "GET /api/npd/projects/:projectId/risks endpoint"
+  - "POST /api/npd/risks endpoint"
+  - "PUT /api/npd/risks/:id endpoint"
+  - "DELETE /api/npd/risks/:id endpoint"
+  - "GET /api/npd/projects/:projectId/risks/matrix endpoint"
+  - "Risks tab in project detail page"
+  - "RiskRegisterTable with filtering/sorting"
+  - "CreateRiskModal and EditRiskModal"
+  - "RiskMatrix 5x5 visualization"
+  - "Unit tests: RiskService methods"
+  - "Integration tests: All API endpoints"
+  - "E2E tests: Full risk CRUD workflow and matrix"

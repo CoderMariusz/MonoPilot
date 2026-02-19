@@ -1,0 +1,75 @@
+# Story 10.14 - Email Alerts & Shift Handover Context (Entry Point)
+# Generated: 2025-01-15
+# Phase: 2 (Advanced Analytics)
+
+story:
+  id: "10.14"
+  name: "Email Alerts & Shift Handover"
+  slug: "email-alerts-shift-handover"
+  epic: "10-oee"
+  phase: "2"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "backend"
+  state: "ready"
+  priority: "P1"
+
+context_files:
+  - _index.yaml
+  - database.yaml
+  - api.yaml
+  - frontend.yaml
+  - tests.yaml
+
+dependencies:
+  required:
+    - story: "10.6"
+      name: "OEE Threshold Alerts"
+      provides: ["oee_alerts table", "alert trigger system"]
+    - story: "10.7"
+      name: "Shift Report Generation"
+      provides: ["shift_reports table", "shift context"]
+
+  blocked_by: []
+  blocks: []
+
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/oee.md"
+    sections: ["FR-OEE-020, FR-OEE-021 - Email Alerts & Shift Handover"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/10-oee/10.14.email-alerts-shift-handover.md"
+
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "shift_handover_notes table"
+  - type: "service"
+    count: 2
+    description: "Email notification service, handover notes service"
+  - type: "api"
+    count: 4
+    description: "Handover notes CRUD + acknowledge"
+  - type: "components"
+    count: 4
+    description: "Handover notes UI, email templates"
+
+technical_notes:
+  - "Email delivery via Supabase Edge Functions or SendGrid"
+  - "HTML email templates for all alert types"
+  - "Configurable recipients per alert rule"
+  - "Handover note types: Issue, Action Item, Information"
+  - "Priority levels for notes"
+  - "Acknowledgment workflow with notes"
+
+summary: |
+  Story 10.14 implements email notifications and shift handover notes.
+
+  MVP SCOPE:
+  - Email notification service for alerts
+  - HTML email templates
+  - Configurable recipients
+  - shift_handover_notes table
+  - Handover notes CRUD
+  - Acknowledgment workflow
+  - Handover notes UI

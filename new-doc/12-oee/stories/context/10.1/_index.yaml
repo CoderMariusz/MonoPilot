@@ -1,0 +1,141 @@
+# Story 10.1 - OEE Settings & Targets Context (Entry Point)
+# Generated: 2025-01-15
+# Purpose: Story metadata, dependencies, and overview - read this first
+# Phase: 1A (Core OEE)
+
+story:
+  id: "10.1"
+  name: "OEE Settings & Targets"
+  slug: "oee-settings-targets"
+  epic: "10-oee"
+  phase: "1A"
+  complexity: "M"
+  estimate_days: 2-3
+  type: "backend + frontend"
+  state: "ready"
+  priority: "P0"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies, overview
+  - database.yaml    # Tables, RLS, migrations, indexes
+  - api.yaml         # Endpoints, request/response schemas, services
+  - frontend.yaml    # Components, pages, types, hooks, UX
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["org_id context", "RLS pattern", "users table"]
+    - story: "01.3"
+      name: "Machine Settings"
+      provides: ["machines table", "machine reference"]
+    - story: "01.5"
+      name: "Production Lines"
+      provides: ["production_lines table", "line grouping"]
+
+  blocked_by: []
+
+  blocks:
+    - story: "10.2"
+      name: "Downtime Reason Codes"
+      reason: "Soft dependency - settings enable OEE module"
+    - story: "10.4"
+      name: "OEE Calculation Engine"
+      reason: "Target values used for OEE comparisons"
+    - story: "10.5"
+      name: "Real-Time Dashboard"
+      reason: "Target thresholds for dashboard color coding"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/oee.md"
+    sections: ["FR-OEE-009 - OEE Target Configuration"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/oee.md"
+    sections: ["performance_targets table", "Settings schema"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/10-oee/10.1.oee-settings-targets.md"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "PRIMARY - RLS policy pattern for performance_targets table"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 2
+    description: "performance_targets table + settings columns for OEE"
+  - type: "service"
+    count: 1
+    description: "oee-target-service.ts with CRUD and hierarchy resolution"
+  - type: "validation"
+    count: 2
+    description: "createTargetSchema, updateTargetSchema"
+  - type: "api"
+    count: 6
+    description: "GET/POST/PATCH/DELETE targets, GET resolve target"
+  - type: "components"
+    count: 5
+    description: "Settings form, targets table, modal, badges"
+  - type: "page"
+    count: 2
+    description: "/oee/settings, /oee/settings/targets"
+  - type: "test"
+    count: 3
+    description: "Unit (service), Integration (API), E2E (CRUD)"
+
+# Technical notes
+technical_notes:
+  - "Target scope: organization-wide, line-specific, or machine-specific"
+  - "Target hierarchy: machine > line > organization > default (85%)"
+  - "Targets include: oee_target, availability_target, performance_target, quality_target"
+  - "Thresholds: warning (85%), critical (75%) - configurable per target"
+  - "Effective date and expiry date support for scheduling"
+  - "Default target: settings.oee_default_target (used for new machines)"
+  - "RLS org isolation on performance_targets table"
+  - "Percentage validation: 0-100%, critical <= warning"
+
+# Business Rules
+business_rules:
+  - rule: "Target Hierarchy Resolution"
+    description: "Machine-specific target overrides line-specific, which overrides organization-wide"
+    enforcement: "Service method resolveTarget() implements hierarchy lookup"
+  - rule: "Critical Threshold Below Warning"
+    description: "Critical threshold must be <= warning threshold"
+    enforcement: "Database CHECK constraint + validation schema"
+  - rule: "Organization Targets No Reference"
+    description: "target_type='organization' must have reference_id=NULL"
+    enforcement: "Database CHECK constraint + validation"
+  - rule: "Line/Machine Targets Require Reference"
+    description: "target_type='line'/'machine' must have valid reference_id"
+    enforcement: "Validation schema + foreign key check"
+
+# Context Summary
+summary: |
+  Story 10.1 implements OEE module configuration and performance target management.
+
+  MVP SCOPE (This Story):
+  - performance_targets table with machine/line/organization scope
+  - OEE module enable/disable toggle
+  - Target configuration: OEE%, Availability%, Performance%, Quality%
+  - Alert thresholds: warning/critical
+  - Effective date and expiry date support
+  - Target hierarchy resolution (machine > line > org > default)
+  - Settings page for OEE module
+  - Targets CRUD page
+
+  KEY FEATURES:
+  - Organization-wide default targets
+  - Line-specific targets override organization
+  - Machine-specific targets override line
+  - Scheduled targets (effective_date, expiry_date)
+  - Alert threshold configuration per target
+  - Default target for new machines (settings.oee_default_target)
+
+  INTEGRATION POINTS:
+  - Used by story 10.4 (OEE Calculation) for comparison
+  - Used by story 10.5 (Dashboard) for color coding
+  - Used by Phase 1B alerts for threshold checks

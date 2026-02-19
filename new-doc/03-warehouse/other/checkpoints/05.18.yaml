@@ -1,0 +1,49 @@
+# Story 05.18 - LP Merge Workflow
+# Type: fullstack
+# Epic: 05-warehouse
+# Audit Date: 2026-01-08
+
+audit:
+  code_exists: false
+  files_found:
+    - path: "apps/frontend/lib/services/lp-genealogy-service.ts"
+      type: service
+      status: partial
+      notes: "linkMerge() implemented for genealogy, no merge/validateMerge in LP service"
+    - path: "apps/frontend/app/api/warehouse/genealogy/link-merge/route.ts"
+      type: api
+      status: partial
+      notes: "Mock implementation only"
+    - path: "apps/frontend/lib/validation/lp-genealogy-schemas.ts"
+      type: validation
+      status: exists
+      notes: "LinkMergeSchema for genealogy linking"
+  tests_exist: false
+  test_files: []
+  estimated_completion: 5%
+
+status: NOT_STARTED
+
+blockers:
+  - "No merge() or validateMerge() methods in license-plate-service.ts"
+  - "No POST /api/warehouse/license-plates/merge endpoint"
+  - "No POST /api/warehouse/license-plates/validate-merge endpoint"
+  - "No mergeLPSchema validation schemas"
+  - "No UI components for merge modal"
+  - "No merge-specific tests"
+
+recommendation: |
+  Story definition complete with 25 ACs. All dependencies satisfied.
+  Genealogy linkMerge() exists. Core implementation needed:
+  1. Add validation schemas (mergeLPSchema, validateMergeSchema)
+  2. Implement service methods (validateMerge, merge, getByIds)
+  3. Create API routes for /merge and /validate-merge
+  4. Build 6 UI components for merge workflow
+  5. Write comprehensive tests
+
+next_phase: P2
+P2: test-writer 17:58 files:4 tests:152 status:red
+P3: ✓ backend-dev 20:51 files:11 tests:137/149 status:green
+P5: ✓ code-reviewer 21:00 issues:0-critical tests:137/149 decision:approved
+P6: x qa-agent 21:10 ac:25/25 bugs:0-critical tests:133/145 decision:pass (12-ui-mock-issues)
+P7: ✓ tech-writer 21:14 report:done docs:updated status:COMPLETE

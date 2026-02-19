@@ -1,0 +1,255 @@
+# Story 04.7b: Output Registration Scanner - API Endpoints
+
+endpoints:
+  - method: "POST"
+    path: "/api/production/output/validate-wo"
+    auth: true
+    roles: ["production", "admin", "warehouse"]
+    description: "Validate WO barcode, return WO details within 500ms"
+    performance_target: "500ms"
+    request_schema:
+      body:
+        barcode:
+          type: "string"
+          required: true
+          description: "WO barcode scanned (e.g., WO-2025-0156)"
+    response_schema:
+      valid: "boolean"
+      wo:
+        id: "uuid"
+        wo_number: "string"
+        status: "string"
+        product_id: "uuid"
+        product_name: "string"
+        product_code: "string"
+        planned_qty: "number"
+        registered_qty: "number"
+        remaining_qty: "number"
+        progress_percent: "number"
+        uom: "string"
+        batch_number: "string"
+        line_name: "string"
+        shelf_life_days: "number"
+      by_products:
+        type: "array"
+        items:
+          product_id: "uuid"
+          product_name: "string"
+          yield_percent: "number"
+    error_codes:
+      - code: "400"
+        message: "Invalid barcode format"
+      - code: "404"
+        message: "Work order not found"
+      - code: "409"
+        message: "Work order is not in progress or paused"
+
+  - method: "POST"
+    path: "/api/production/output/register"
+    auth: true
+    roles: ["production", "admin"]
+    description: "Create LP, update WO progress, link genealogy"
+    request_schema:
+      body:
+        wo_id:
+          type: "uuid"
+          required: true
+        quantity:
+          type: "number"
+          required: true
+          validation: "Must be greater than 0"
+        qa_status:
+          type: "string"
+          required: true
+          enum: ["approved", "pending", "rejected"]
+        batch_number:
+          type: "string"
+          required: true
+        expiry_date:
+          type: "date"
+          required: true
+        location_id:
+          type: "uuid"
+          required: true
+        operator_badge:
+          type: "string"
+          required: false
+    response_schema:
+      lp:
+        id: "uuid"
+        lp_number: "string"
+        qty: "number"
+        uom: "string"
+        batch_number: "string"
+        qa_status: "string"
+        expiry_date: "date"
+      wo_progress:
+        output_qty: "number"
+        progress_percent: "number"
+        remaining_qty: "number"
+      genealogy:
+        parent_count: "number"
+        child_lp_id: "uuid"
+    error_codes:
+      - code: "400"
+        message: "Validation failed"
+      - code: "409"
+        message: "Work order status changed"
+
+  - method: "POST"
+    path: "/api/production/output/generate-label"
+    auth: true
+    roles: ["production", "admin"]
+    description: "Generate ZPL label content for LP"
+    request_schema:
+      body:
+        lp_id:
+          type: "uuid"
+          required: true
+        template_id:
+          type: "uuid"
+          required: false
+    response_schema:
+      zpl_content: "string"
+      label_fields:
+        lp_number: "string"
+        barcode_type: "string"
+        product_name: "string"
+        qty_with_uom: "string"
+        batch_number: "string"
+        expiry_date: "string"
+        qa_status: "string"
+        operator_badge: "string"
+    error_codes:
+      - code: "404"
+        message: "LP not found"
+      - code: "500"
+        message: "ZPL generation failed"
+
+  - method: "POST"
+    path: "/api/production/output/print-label"
+    auth: true
+    roles: ["production", "admin"]
+    description: "Send ZPL to configured printer"
+    performance_target: "2000ms"
+    request_schema:
+      body:
+        zpl_content:
+          type: "string"
+          required: true
+        printer_id:
+          type: "uuid"
+          required: false
+          description: "Uses default printer if not specified"
+    response_schema:
+      success: "boolean"
+      printer_name: "string"
+      sent_at: "timestamp"
+    error_codes:
+      - code: "404"
+        message: "No printer configured"
+      - code: "503"
+        message: "Printer not responding"
+      - code: "504"
+        message: "Print timeout"
+
+  - method: "GET"
+    path: "/api/production/output/by-products/:woId"
+    auth: true
+    roles: ["production", "admin"]
+    description: "Get by-products from BOM where is_by_product=true"
+    request_schema:
+      params:
+        woId:
+          type: "uuid"
+          required: true
+    response_schema:
+      by_products:
+        type: "array"
+        items:
+          product_id: "uuid"
+          product_name: "string"
+          product_code: "string"
+          yield_percent: "number"
+          expected_qty: "number"
+          uom: "string"
+          shelf_life_days: "number"
+          default_location_id: "uuid"
+    error_codes:
+      - code: "404"
+        message: "Work order not found"
+
+  - method: "POST"
+    path: "/api/production/output/register-by-product"
+    auth: true
+    roles: ["production", "admin"]
+    description: "Create by-product LP with linked genealogy"
+    request_schema:
+      body:
+        wo_id:
+          type: "uuid"
+          required: true
+        main_output_lp_id:
+          type: "uuid"
+          required: true
+        by_product_id:
+          type: "uuid"
+          required: true
+        quantity:
+          type: "number"
+          required: true
+          description: "Can be 0 with warning confirmation"
+        qa_status:
+          type: "string"
+          required: true
+        batch_number:
+          type: "string"
+          required: true
+        expiry_date:
+          type: "date"
+          required: true
+        location_id:
+          type: "uuid"
+          required: true
+        zero_qty_confirmed:
+          type: "boolean"
+          required: false
+          description: "Required true if quantity is 0"
+    response_schema:
+      lp:
+        id: "uuid"
+        lp_number: "string"
+        product_name: "string"
+        qty: "number"
+        batch_number: "string"
+      genealogy:
+        linked_to_main_output: "uuid"
+        parent_count: "number"
+    error_codes:
+      - code: "400"
+        message: "Quantity is 0 and not confirmed"
+      - code: "404"
+        message: "Main output LP not found"
+
+  - method: "GET"
+    path: "/api/production/output/printer-status"
+    auth: true
+    roles: ["production", "admin"]
+    description: "Check printer availability for current location"
+    request_schema:
+      query:
+        location_id:
+          type: "uuid"
+          required: false
+    response_schema:
+      configured: "boolean"
+      printer:
+        id: "uuid"
+        name: "string"
+        ip: "string"
+        status: "string"
+      error:
+        message: "string"
+    error_codes:
+      - code: "503"
+        message: "Printer offline"

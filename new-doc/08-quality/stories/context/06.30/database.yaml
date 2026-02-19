@@ -1,0 +1,76 @@
+# Story 06.30 - HACCP Verification Records Database Schema
+
+tables:
+  haccp_verification_records:
+    columns:
+      - id: UUID PRIMARY KEY
+      - org_id: UUID NOT NULL
+      - verification_number: TEXT UNIQUE (org_id, verification_number)
+      - haccp_plan_id: UUID (FK haccp_plans)
+      - verification_type: TEXT (calibration/record_review/plan_review/audit)
+      - verification_date: DATE NOT NULL
+      - scheduled_date: DATE
+      - frequency: TEXT (monthly/quarterly/annually/as_needed)
+      - next_verification_date: DATE (auto-calculated)
+      - verified_by: UUID (FK users) NOT NULL
+      - verified_at: TIMESTAMPTZ DEFAULT now()
+      - checklist_items: JSONB DEFAULT '[]' (array of {item, checked, notes})
+      - result: TEXT (pass/fail/partial)
+      - findings: TEXT
+      - recommendations: TEXT
+      - corrective_actions_required: BOOLEAN DEFAULT false
+      - corrective_action_notes: TEXT
+      - qa_manager_approved_by: UUID (FK users)
+      - qa_manager_approved_at: TIMESTAMPTZ
+      - qa_manager_signature: TEXT (encrypted)
+      - director_approved_by: UUID (FK users)
+      - director_approved_at: TIMESTAMPTZ
+      - director_signature: TEXT (encrypted)
+      - status: TEXT (draft/pending_qa_approval/pending_director_approval/approved/rejected)
+      - is_locked: BOOLEAN DEFAULT false
+      - created_at: TIMESTAMPTZ
+      - created_by: UUID
+      - updated_at: TIMESTAMPTZ
+
+    indexes:
+      - idx_verifications_org: (org_id)
+      - idx_verifications_org_status: (org_id, status)
+      - idx_verifications_plan: (haccp_plan_id)
+      - idx_verifications_type: (org_id, verification_type)
+      - idx_verifications_date: (org_id, verification_date)
+      - idx_verifications_next_date: (org_id, next_verification_date) WHERE next_verification_date IS NOT NULL
+      - idx_verifications_overdue: (org_id, next_verification_date) WHERE next_verification_date < CURRENT_DATE AND status = 'approved'
+
+    rls: true
+    policies:
+      - SELECT: org_id match
+      - INSERT: org_id match
+      - UPDATE: org_id match AND is_locked = false
+      - DELETE: org_id match AND status = 'draft'
+
+  haccp_verification_number_sequences:
+    columns:
+      - id: UUID PRIMARY KEY
+      - org_id: UUID UNIQUE (org_id, year)
+      - year: INTEGER
+      - current_value: BIGINT DEFAULT 0
+      - updated_at: TIMESTAMPTZ
+    rls: true
+
+functions:
+  generate_verification_number:
+    params: [p_org_id UUID]
+    returns: TEXT
+    description: "Generates HACCP-VER-YYYY-NNNNN format"
+
+  calculate_next_verification_date:
+    trigger: BEFORE UPDATE
+    table: haccp_verification_records
+    condition: NEW.status = 'approved'
+    logic: |
+      - If frequency = 'monthly': next_date = verification_date + 1 month
+      - If frequency = 'quarterly': next_date = verification_date + 3 months
+      - If frequency = 'annually': next_date = verification_date + 1 year
+      - Sets is_locked = true
+
+migration_file: "YYYYMMDDHHMMSS_create_haccp_verification_records.sql"

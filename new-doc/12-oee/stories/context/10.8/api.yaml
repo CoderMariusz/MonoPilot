@@ -1,0 +1,51 @@
+# Story 10.8 - API Specification
+# Energy Consumption Tracking
+
+endpoints:
+  - method: "GET"
+    path: "/api/oee/energy/readings"
+    description: "List energy readings"
+    query_params:
+      machine_id: "UUID"
+      start_date: "YYYY-MM-DD"
+      end_date: "YYYY-MM-DD"
+
+  - method: "POST"
+    path: "/api/oee/energy/readings"
+    description: "Log energy reading"
+    request:
+      body:
+        machine_id: "UUID"
+        kwh_consumed: "number"
+        meter_reading: "number (optional)"
+        reading_time: "ISO 8601 (default: now)"
+        work_order_id: "UUID (optional)"
+
+  - method: "GET"
+    path: "/api/oee/energy/consumption/:machineId"
+    description: "Get energy consumption for machine"
+
+  - method: "GET"
+    path: "/api/oee/energy/cost"
+    description: "Energy cost analysis"
+
+  - method: "GET"
+    path: "/api/oee/energy/baselines"
+    description: "List energy baselines"
+
+  - method: "POST"
+    path: "/api/oee/energy/baselines"
+    description: "Create energy baseline"
+
+services:
+  - path: "apps/frontend/lib/services/energy-tracking-service.ts"
+    methods:
+      - { name: "logReading", params: ["input"], returns: "Promise<EnergyReading>" }
+      - { name: "getConsumption", params: ["machineId", "period"], returns: "Promise<ConsumptionData>" }
+      - { name: "calculateCost", params: ["readings"], returns: "Promise<CostData>" }
+      - { name: "setBaseline", params: ["input"], returns: "Promise<EnergyBaseline>" }
+
+types:
+  - "EnergyReading"
+  - "EnergyBaseline"
+  - "EnergyCost"

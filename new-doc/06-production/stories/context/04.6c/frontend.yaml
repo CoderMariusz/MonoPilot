@@ -1,0 +1,155 @@
+# Story 04.6c - Frontend Modifications
+# Modifies existing components from 04.6a and 04.6b
+
+components:
+  - name: "AddConsumptionModal"
+    path: "apps/frontend/components/production/consumption/AddConsumptionModal.tsx"
+    modification: "MODIFY"
+    changes:
+      - area: "Step 2 (Qty Entry)"
+        condition: "wo_material.consume_whole_lp = true"
+        behavior:
+          - "Pre-fill qty input with LP.qty"
+          - "Make qty input read-only (disabled)"
+          - "Show lock icon next to input"
+          - "Show warning banner above input"
+        warning_banner:
+          background: "Yellow-900"
+          text: "Yellow-300"
+          icon: "lock"
+          message: "This material requires full LP consumption"
+          height: "40dp"
+      - area: "Use All Available button"
+        condition: "consume_whole_lp = true"
+        behavior: "Button becomes primary action, qty already filled"
+
+  - name: "NumberPad"
+    path: "apps/frontend/components/scanner/NumberPad.tsx"
+    modification: "MODIFY"
+    changes:
+      - prop: "disabled"
+        type: "boolean"
+        description: "When true, all keys grayed out and non-interactive"
+      - visual:
+          disabled_background: "Slate-800"
+          disabled_opacity: "50%"
+          disabled_cursor: "not-allowed"
+      - behavior: "When disabled, key taps do nothing"
+
+  - name: "MaterialsTable"
+    path: "apps/frontend/components/production/consumption/MaterialsTable.tsx"
+    modification: "MODIFY"
+    changes:
+      - area: "Material name column"
+        condition: "wo_material.consume_whole_lp = true"
+        behavior: "Display 'Full LP Required' badge"
+        badge:
+          text: "Full LP Required"
+          icon: "lock"
+          background: "Yellow-900"
+          text_color: "Yellow-300"
+          size: "small"
+
+  - name: "MaterialsList"
+    path: "apps/frontend/components/scanner/MaterialsList.tsx"
+    modification: "MODIFY"
+    changes:
+      - area: "Material item"
+        condition: "wo_material.consume_whole_lp = true"
+        behavior: "Display 'Full LP Required' badge"
+        badge:
+          text: "Full LP Required"
+          icon: "lock"
+          background: "Yellow-600"
+          text_color: "Yellow-900"
+          position: "Below material name"
+
+  - name: "FullLPRequiredBadge"
+    path: "apps/frontend/components/production/consumption/FullLPRequiredBadge.tsx"
+    modification: "NEW COMPONENT"
+    props:
+      size: "small | medium"
+      variant: "desktop | scanner"
+    visual:
+      desktop:
+        background: "Yellow-900"
+        text: "Yellow-300"
+        icon: "lock (16px)"
+        padding: "4px 8px"
+        border_radius: "4px"
+        font_size: "12px"
+      scanner:
+        background: "Yellow-600"
+        text: "Yellow-900"
+        icon: "lock (20px)"
+        padding: "6px 12px"
+        border_radius: "6px"
+        font_size: "14px"
+
+  - name: "ConsumptionQtyInput"
+    path: "apps/frontend/components/production/consumption/ConsumptionQtyInput.tsx"
+    modification: "NEW COMPONENT"
+    description: "Qty input that handles both editable and read-only states"
+    props:
+      value: "number"
+      onChange: "(value: number) => void"
+      uom: "string"
+      maxQty: "number"
+      isReadOnly: "boolean"
+      showLockIcon: "boolean"
+    states:
+      editable:
+        border: "Slate-600"
+        background: "Slate-800"
+        cursor: "text"
+      readOnly:
+        border: "Yellow-600"
+        background: "Slate-900"
+        cursor: "not-allowed"
+        icon: "lock (right side)"
+
+wireframe_refs:
+  - id: "PROD-003"
+    path: "docs/3-ARCHITECTURE/ux/wireframes/PROD-003-material-consumption.md"
+    sections:
+      - "Error: 1:1 Enforcement (Whole LP Required)"
+      - "'Full LP Required' badge in materials table"
+
+  - id: "PROD-005"
+    path: "docs/3-ARCHITECTURE/ux/wireframes/PROD-005-scanner-consume-material.md"
+    sections:
+      - "Step 3: Full LP Consumption (consume_whole_lp = true)"
+      - "Error State: Full LP Required but Partial Qty Entered"
+
+states:
+  consume_whole_lp_true:
+    desktop:
+      qty_input: "Pre-filled with LP.qty, read-only, lock icon"
+      warning_banner: "Yellow banner above qty input"
+      use_all_button: "Primary action, already reflects full qty"
+    scanner:
+      qty_display: "Shows LP.qty with lock icon"
+      number_pad: "Disabled (grayed out, 50% opacity)"
+      full_consumption_button: "Enabled, primary action"
+      warning_banner: "Yellow banner explaining why qty cannot be changed"
+
+  consume_whole_lp_false:
+    desktop:
+      qty_input: "Editable, no lock icon"
+      warning_banner: "Not shown"
+      use_all_button: "Available as option"
+    scanner:
+      qty_display: "Editable via number pad"
+      number_pad: "Enabled, interactive"
+      full_consumption_button: "Available as quick action"
+      warning_banner: "Not shown"
+
+hooks:
+  - name: "useConsumeWholeLPCheck"
+    path: "apps/frontend/lib/hooks/use-consume-whole-lp-check.ts"
+    description: "Check if material requires full LP consumption"
+    params:
+      materialId: "string"
+    returns:
+      consumeWholeLP: "boolean"
+      isLoading: "boolean"

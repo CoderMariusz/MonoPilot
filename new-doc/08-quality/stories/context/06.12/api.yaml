@@ -1,0 +1,501 @@
+# Story 06.12 API Context
+# Batch Release Approval Endpoints
+# Request/response schemas, service layer, validation
+
+api:
+  endpoints:
+    - path: "/api/quality/releases/:id/approve"
+      method: "POST"
+      auth: true
+      roles: ["QA_MANAGER", "QUALITY_DIRECTOR"]
+      description: "Approve batch release with e-signature"
+      request:
+        schema:
+          signature_method:
+            type: "string"
+            enum: ["password", "pin", "email_confirm"]
+            required: true
+            description: "Method for e-signature verification"
+          signature_credential:
+            type: "string"
+            required: true
+            description: "Password, PIN, or confirmation code"
+          signature_meaning:
+            type: "string"
+            optional: true
+            description: "Override default meaning statement"
+          approval_notes:
+            type: "string"
+            optional: true
+            max_length: 2000
+          is_conditional:
+            type: "boolean"
+            default: false
+          conditional_reason:
+            type: "string"
+            optional: true
+            required_if: "is_conditional == true"
+            max_length: 500
+          conditional_restrictions:
+            type: "string"
+            optional: true
+            required_if: "is_conditional == true"
+            max_length: 1000
+          conditional_expires_at:
+            type: "ISO8601"
+            optional: true
+      response:
+        status: 200
+        schema:
+          release: "BatchReleaseRecord"
+          signature_captured: "boolean"
+          lps_updated: "integer"
+          certificate_available: "boolean"
+      errors:
+        - status: 400
+          code: "INVALID_SIGNATURE"
+          message: "Invalid password/PIN"
+        - status: 400
+          code: "CONDITIONS_NOT_MET"
+          message: "Release conditions not met - cannot approve"
+        - status: 403
+          code: "INSUFFICIENT_ROLE"
+          message: "QA Manager or Quality Director role required"
+        - status: 404
+          code: "RELEASE_NOT_FOUND"
+          message: "Release record not found"
+        - status: 409
+          code: "ALREADY_APPROVED"
+          message: "Release already approved"
+        - status: 423
+          code: "ACCOUNT_LOCKED"
+          message: "Account locked after failed signature attempts"
+
+    - path: "/api/quality/releases/:id/reject"
+      method: "POST"
+      auth: true
+      roles: ["QA_MANAGER", "QUALITY_DIRECTOR"]
+      description: "Reject batch release with e-signature"
+      request:
+        schema:
+          signature_method:
+            type: "string"
+            enum: ["password", "pin", "email_confirm"]
+            required: true
+          signature_credential:
+            type: "string"
+            required: true
+          rejection_reason:
+            type: "string"
+            required: true
+            min_length: 20
+            max_length: 1000
+            description: "Reason for rejection (min 20 chars)"
+          create_ncr:
+            type: "boolean"
+            default: false
+            description: "Create NCR for rejected batch"
+      response:
+        status: 200
+        schema:
+          release: "BatchReleaseRecord"
+          signature_captured: "boolean"
+          lps_updated: "integer"
+          ncr_id: "string | null"
+      errors:
+        - status: 400
+          code: "INVALID_SIGNATURE"
+          message: "Invalid password/PIN"
+        - status: 400
+          code: "REJECTION_REASON_TOO_SHORT"
+          message: "Rejection reason must be at least 20 characters"
+        - status: 403
+          code: "INSUFFICIENT_ROLE"
+          message: "QA Manager or Quality Director role required"
+        - status: 404
+          code: "RELEASE_NOT_FOUND"
+          message: "Release record not found"
+
+    - path: "/api/quality/releases/pending"
+      method: "GET"
+      auth: true
+      roles: ["QA_MANAGER", "QUALITY_DIRECTOR", "QA_INSPECTOR"]
+      description: "List releases pending approval (QA Manager queue)"
+      query_params:
+        - name: "product_id"
+          type: "uuid"
+          optional: true
+        - name: "priority"
+          type: "string"
+          enum: ["high", "normal", "urgent"]
+          optional: true
+        - name: "submitted_from"
+          type: "ISO8601"
+          optional: true
+        - name: "submitted_to"
+          type: "ISO8601"
+          optional: true
+        - name: "page"
+          type: "integer"
+          default: 1
+        - name: "limit"
+          type: "integer"
+          default: 20
+          max: 100
+        - name: "sort"
+          type: "string"
+          enum: ["submitted_at", "priority", "batch_number"]
+          default: "submitted_at"
+        - name: "order"
+          type: "string"
+          enum: ["asc", "desc"]
+          default: "asc"
+      response:
+        status: 200
+        schema:
+          releases: "BatchReleaseRecord[]"
+          summary:
+            total_pending: "integer"
+            high_priority: "integer"
+            urgent: "integer"
+            oldest_waiting_hours: "number"
+            avg_waiting_hours: "number"
+          pagination:
+            page: "integer"
+            limit: "integer"
+            total: "integer"
+            total_pages: "integer"
+
+    - path: "/api/quality/releases/:id/conditions"
+      method: "GET"
+      auth: true
+      roles: ["QA_MANAGER", "QUALITY_DIRECTOR", "QA_INSPECTOR"]
+      description: "Get release conditions validation status"
+      response:
+        status: 200
+        schema:
+          release_id: "uuid"
+          batch_number: "string"
+          all_conditions_met: "boolean"
+          can_approve: "boolean"
+          conditions:
+            type: "array"
+            items:
+              type: "string"
+              result: "string"
+              details: "object | null"
+              blocking: "boolean"
+              reference_type: "string | null"
+              reference_id: "uuid | null"
+          blockers: "string[]"
+          warnings: "string[]"
+          validated_at: "ISO8601"
+          validated_by: "string | null"
+
+    - path: "/api/quality/releases/:id/certificate"
+      method: "GET"
+      auth: true
+      roles: ["QA_MANAGER", "QUALITY_DIRECTOR", "QA_INSPECTOR"]
+      description: "Generate/retrieve release certificate PDF"
+      response:
+        status: 200
+        schema:
+          certificate_url: "string"
+          document_id: "string"
+          generated_at: "ISO8601"
+          batch_number: "string"
+          release_number: "string"
+      errors:
+        - status: 400
+          code: "NOT_APPROVED"
+          message: "Certificate only available after approval"
+        - status: 404
+          code: "RELEASE_NOT_FOUND"
+          message: "Release record not found"
+
+    - path: "/api/quality/releases/:id/history"
+      method: "GET"
+      auth: true
+      roles: ["QA_MANAGER", "QUALITY_DIRECTOR", "QA_INSPECTOR"]
+      description: "Get approval history/audit trail"
+      response:
+        status: 200
+        schema:
+          release_id: "uuid"
+          history:
+            type: "array"
+            items:
+              action: "string"
+              user_id: "uuid"
+              user_name: "string"
+              timestamp: "ISO8601"
+              details: "object"
+              signature_captured: "boolean"
+
+  service_layer:
+    - class_name: "ReleaseApprovalService"
+      file: "apps/frontend/lib/services/release-approval-service.ts"
+      methods:
+        - name: "validateSignatureCredential"
+          signature: |
+            static async validateSignatureCredential(
+              userId: string,
+              method: 'password' | 'pin' | 'email_confirm',
+              credential: string
+            ): Promise<{ valid: boolean; error?: string }>
+          description: "Validate user credentials for e-signature"
+          logic: |
+            1. Get user record by userId
+            2. Based on method:
+               - password: Hash credential and compare with stored hash
+               - pin: Compare with stored PIN (if configured)
+               - email_confirm: Validate confirmation code
+            3. Track failed attempts (lock after 3)
+            4. Return { valid: true } or { valid: false, error: 'reason' }
+
+        - name: "approveRelease"
+          signature: |
+            static async approveRelease(
+              releaseId: string,
+              input: ApproveReleaseInput,
+              userId: string,
+              ipAddress: string,
+              userAgent: string
+            ): Promise<ApproveReleaseResult>
+          description: "Approve release with e-signature"
+          logic: |
+            1. Validate user has QA_MANAGER or QUALITY_DIRECTOR role
+            2. Validate release exists and is pending_release
+            3. Validate signature credential
+            4. Validate all release conditions (call validateConditions)
+            5. If conditions have blockers, return error
+            6. Begin transaction:
+               a. Update batch_release_records:
+                  - release_decision = 'approved' (or 'conditional')
+                  - approved_by = userId
+                  - approved_at = NOW()
+                  - signature_* fields
+                  - conditional_* fields (if conditional)
+               b. Update all batch_release_lps: release_status = 'released'
+               c. Trigger LP update via existing trigger
+               d. Create audit log entry
+            7. Commit transaction
+            8. Return result with LP count, certificate availability
+
+        - name: "rejectRelease"
+          signature: |
+            static async rejectRelease(
+              releaseId: string,
+              input: RejectReleaseInput,
+              userId: string,
+              ipAddress: string,
+              userAgent: string
+            ): Promise<RejectReleaseResult>
+          description: "Reject release with e-signature"
+          logic: |
+            1. Validate user role
+            2. Validate release exists and is pending_release
+            3. Validate signature credential
+            4. Validate rejection_reason length >= 20
+            5. Begin transaction:
+               a. Update batch_release_records:
+                  - release_decision = 'rejected'
+                  - rejected_by = userId
+                  - rejected_at = NOW()
+                  - rejection_reason
+                  - signature_* fields
+               b. Update batch_release_lps: release_status = 'rejected'
+               c. Trigger LP update
+               d. If create_ncr, create NCR record
+               e. Create audit log entry
+            6. Commit transaction
+            7. Return result with NCR ID if created
+
+        - name: "validateConditions"
+          signature: |
+            static async validateConditions(
+              releaseId: string
+            ): Promise<ConditionsResult>
+          description: "Validate all 7 release conditions"
+          logic: |
+            1. Call validate_release_conditions SQL function
+            2. Map results to ConditionsResult:
+               - all_conditions_met: no 'fail' results
+               - can_approve: all_conditions_met
+               - conditions: array of 7 checks
+               - blockers: failed conditions
+               - warnings: warning conditions
+            3. Log conditions to release_conditions_log
+            4. Return result
+
+        - name: "getPendingReleases"
+          signature: |
+            static async getPendingReleases(
+              params: PendingReleasesParams
+            ): Promise<PaginatedResult<BatchReleaseRecord>>
+          description: "Get releases pending approval"
+          logic: |
+            1. Query batch_release_records WHERE release_decision = 'pending_release'
+            2. Apply filters (product_id, priority, date range)
+            3. Calculate summary stats
+            4. Return paginated result
+
+        - name: "generateCertificate"
+          signature: |
+            static async generateCertificate(
+              releaseId: string
+            ): Promise<{ url: string; documentId: string }>
+          description: "Generate release certificate PDF"
+          logic: |
+            1. Validate release is approved
+            2. Get release with all related data
+            3. Generate PDF using template:
+               - Header: Company logo, title
+               - Batch info: batch #, product, qty, dates
+               - Inspection summary
+               - Conditions checklist (7 items)
+               - Approval: name, signature meaning, timestamp
+               - Footer: document ID, generation time
+            4. Store PDF in storage
+            5. Log generation in audit
+            6. Return URL and document ID
+
+        - name: "getApprovalHistory"
+          signature: |
+            static async getApprovalHistory(
+              releaseId: string
+            ): Promise<AuditLogEntry[]>
+          description: "Get approval audit trail"
+          logic: |
+            1. Query quality_audit_log WHERE entity_id = releaseId
+            2. Include user names
+            3. Sort by timestamp ascending
+            4. Return array
+
+  validation:
+    - name: "approveReleaseSchema"
+      type: "Zod"
+      file: "apps/frontend/lib/validation/release-approval.ts"
+      schema: |
+        z.object({
+          signature_method: z.enum(['password', 'pin', 'email_confirm']),
+          signature_credential: z.string().min(1, 'Credential required'),
+          signature_meaning: z.string().max(500).optional(),
+          approval_notes: z.string().max(2000).optional(),
+
+          is_conditional: z.boolean().default(false),
+          conditional_reason: z.string().max(500).optional(),
+          conditional_restrictions: z.string().max(1000).optional(),
+          conditional_expires_at: z.string().datetime().optional()
+        }).refine(
+          (data) => {
+            if (data.is_conditional) {
+              return data.conditional_reason && data.conditional_restrictions;
+            }
+            return true;
+          },
+          {
+            message: 'Conditional reason and restrictions required for conditional approval',
+            path: ['conditional_reason']
+          }
+        )
+
+    - name: "rejectReleaseSchema"
+      type: "Zod"
+      file: "apps/frontend/lib/validation/release-approval.ts"
+      schema: |
+        z.object({
+          signature_method: z.enum(['password', 'pin', 'email_confirm']),
+          signature_credential: z.string().min(1, 'Credential required'),
+          rejection_reason: z.string()
+            .min(20, 'Rejection reason must be at least 20 characters')
+            .max(1000),
+          create_ncr: z.boolean().default(false)
+        })
+
+    - name: "pendingReleasesQuerySchema"
+      type: "Zod"
+      file: "apps/frontend/lib/validation/release-approval.ts"
+      schema: |
+        z.object({
+          product_id: z.string().uuid().optional(),
+          priority: z.enum(['high', 'normal', 'urgent']).optional(),
+          submitted_from: z.string().optional(),
+          submitted_to: z.string().optional(),
+          page: z.coerce.number().int().positive().default(1),
+          limit: z.coerce.number().int().min(1).max(100).default(20),
+          sort: z.enum(['submitted_at', 'priority', 'batch_number']).default('submitted_at'),
+          order: z.enum(['asc', 'desc']).default('asc')
+        })
+
+  error_handling:
+    - code: 400
+      message: "INVALID_SIGNATURE"
+      description: "E-signature credential validation failed"
+      example: "Invalid password. Please try again."
+
+    - code: 400
+      message: "CONDITIONS_NOT_MET"
+      description: "Release conditions have blocking failures"
+      example: "Cannot approve: Open NCR NCR-2025-00123 linked to batch"
+
+    - code: 400
+      message: "REJECTION_REASON_TOO_SHORT"
+      description: "Rejection reason less than 20 characters"
+      example: "Rejection reason must be at least 20 characters"
+
+    - code: 400
+      message: "NOT_APPROVED"
+      description: "Certificate requested for non-approved release"
+      example: "Certificate only available after approval"
+
+    - code: 403
+      message: "INSUFFICIENT_ROLE"
+      description: "User lacks QA_MANAGER or QUALITY_DIRECTOR role"
+      example: "QA Manager or Quality Director role required for approval"
+
+    - code: 404
+      message: "RELEASE_NOT_FOUND"
+      description: "Release record not found (includes cross-tenant)"
+      example: "Release REL-2025-00123 not found"
+
+    - code: 409
+      message: "ALREADY_APPROVED"
+      description: "Attempting to approve already approved release"
+      example: "Release already approved on 2025-01-15 by John Doe"
+
+    - code: 409
+      message: "ALREADY_REJECTED"
+      description: "Attempting to reject already rejected release"
+      example: "Release already rejected on 2025-01-15"
+
+    - code: 423
+      message: "ACCOUNT_LOCKED"
+      description: "Account locked after failed signature attempts"
+      example: "Account locked after 3 failed attempts. Contact administrator."
+
+  rates_and_limits:
+    - endpoint: "/api/quality/releases/:id/approve"
+      rate_limit: "5 requests / minute"
+      timeout: "30 seconds"
+      description: "Critical approval action - limited rate"
+
+    - endpoint: "/api/quality/releases/:id/reject"
+      rate_limit: "5 requests / minute"
+      timeout: "30 seconds"
+      description: "Critical rejection action - limited rate"
+
+    - endpoint: "/api/quality/releases/pending"
+      rate_limit: "60 requests / minute"
+      timeout: "30 seconds"
+      description: "Read-only queue list - higher rate"
+
+    - endpoint: "/api/quality/releases/:id/conditions"
+      rate_limit: "30 requests / minute"
+      timeout: "30 seconds"
+      description: "Conditions validation - moderate rate"
+
+    - endpoint: "/api/quality/releases/:id/certificate"
+      rate_limit: "10 requests / minute"
+      timeout: "60 seconds"
+      description: "PDF generation - longer timeout"

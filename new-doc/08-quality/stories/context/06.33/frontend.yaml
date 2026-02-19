@@ -1,0 +1,7 @@
+# Story 06.33 - Frontend Schema
+
+components:
+  - EffectivenessCheckList.tsx
+  - ScheduleCheckModal.tsx
+  - CompleteCheckModal.tsx
+  - ReopenCapaDialog.tsx

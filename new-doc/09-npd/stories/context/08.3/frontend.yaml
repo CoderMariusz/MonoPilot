@@ -1,0 +1,518 @@
+# Frontend Context - Story 08.3: Stage-Gate Workflow
+
+components:
+  NPDGateTimeline:
+    path: "apps/frontend/components/npd/NPDGateTimeline.tsx"
+    type: "presentational"
+    description: "Horizontal stepper showing gate progress (G0 -> G1 -> G2 -> G3 -> G4 -> Launched)"
+
+    props:
+      project:
+        type: "NPDProject"
+        required: true
+        description: "NPD project with current_gate"
+
+      checklistSummary:
+        type: "ChecklistSummary | null"
+        required: false
+        description: "Current gate checklist completion %"
+
+      compact:
+        type: "boolean"
+        required: false
+        default: false
+        description: "Compact mode (smaller spacing)"
+
+    ui_states:
+      - "completed: Green check, date shown"
+      - "current: Highlighted, progress indicator"
+      - "pending: Gray, future gate"
+      - "blocked: Red warning if required items incomplete"
+
+    features:
+      - "Display all 6 gates horizontally"
+      - "Show completion checkmarks for past gates"
+      - "Highlight current gate with ring"
+      - "Show checklist completion % on current gate"
+      - "Tooltip on hover (gate name, date entered, days in gate)"
+      - "Responsive (stack vertically on mobile)"
+
+    styling:
+      colors:
+        G0: "bg-gray-100 text-gray-800 border-gray-300"
+        G1: "bg-blue-100 text-blue-800 border-blue-300"
+        G2: "bg-purple-100 text-purple-800 border-purple-300"
+        G3: "bg-orange-100 text-orange-800 border-orange-300"
+        G4: "bg-yellow-100 text-yellow-800 border-yellow-300"
+        launched: "bg-green-100 text-green-800 border-green-300"
+
+      step_status:
+        completed: "border-green-500 bg-green-50"
+        current: "border-blue-500 bg-blue-50 ring-2 ring-blue-500"
+        pending: "border-gray-300 bg-gray-50"
+        blocked: "border-red-500 bg-red-50 ring-2 ring-red-500"
+
+  NPDAdvanceGateModal:
+    path: "apps/frontend/components/npd/NPDAdvanceGateModal.tsx"
+    type: "modal"
+    description: "Modal to advance project to next gate"
+
+    props:
+      project:
+        type: "NPDProject"
+        required: true
+
+      checklistSummary:
+        type: "ChecklistSummary"
+        required: true
+
+      open:
+        type: "boolean"
+        required: true
+
+      onClose:
+        type: "() => void"
+        required: true
+
+      onSuccess:
+        type: "(project: NPDProject) => void"
+        required: true
+
+    ui_sections:
+      - section: "header"
+        content: "Title: 'Advance to [Next Gate]'"
+
+      - section: "body"
+        content: |
+          - Current gate -> Target gate visual
+          - Checklist completion summary
+          - Validation warnings (if blocking items)
+          - Notes textarea (optional for G0-G1)
+          - Approval section (for G3+)
+            - Approval notes textarea (required, min 50 chars)
+            - Character counter
+            - "Requires Director approval" warning
+
+      - section: "footer"
+        content: |
+          - [Cancel] button
+          - [Advance to {NextGate}] button
+            - Disabled if validation fails
+            - Loading spinner during submission
+
+    validation:
+      - "All required checklist items complete"
+      - "Approval notes >= 50 chars for G3+"
+      - "User has required role"
+
+    error_handling:
+      - "Display inline validation errors"
+      - "Show server errors in alert"
+      - "Disable submit during loading"
+
+  NPDMoveBackModal:
+    path: "apps/frontend/components/npd/NPDMoveBackModal.tsx"
+    type: "modal"
+    description: "Modal to move project back to previous gate"
+
+    props:
+      project:
+        type: "NPDProject"
+        required: true
+
+      open:
+        type: "boolean"
+        required: true
+
+      onClose:
+        type: "() => void"
+        required: true
+
+      onSuccess:
+        type: "(project: NPDProject) => void"
+        required: true
+
+    ui_sections:
+      - section: "header"
+        content: "Title: 'Move Back to Previous Gate'"
+
+      - section: "body"
+        content: |
+          - Current gate -> Target gate selector
+          - Justification textarea (required, min 50 chars)
+          - Character counter
+          - Warning: "This will reset gate progress"
+          - Confirmation checkbox
+
+      - section: "footer"
+        content: |
+          - [Cancel] button
+          - [Move Back] button (destructive variant)
+            - Disabled if justification < 50 chars
+            - Disabled if not confirmed
+            - Loading spinner during submission
+
+    validation:
+      - "Justification >= 50 chars"
+      - "Target gate is valid previous gate"
+      - "User is Director or Admin"
+      - "Confirmation checkbox checked"
+
+  NPDChecklistPanel:
+    path: "apps/frontend/components/npd/NPDChecklistPanel.tsx"
+    type: "panel"
+    description: "Collapsible panel showing checklist for current gate"
+
+    props:
+      projectId:
+        type: "string (UUID)"
+        required: true
+
+      currentGate:
+        type: "string"
+        required: true
+
+      editable:
+        type: "boolean"
+        required: false
+        default: true
+
+    ui_sections:
+      - section: "header"
+        content: |
+          - Gate badge (e.g., "G2 Checklist")
+          - Completion summary: "4/5 items complete (80%)"
+          - Progress bar
+          - Collapse/expand toggle
+
+      - section: "body"
+        content: |
+          - Category grouping (Technical, Business, Compliance)
+          - ChecklistItem components per item
+          - Empty state: "No checklist items for this gate"
+
+    features:
+      - "Fetch checklist from API on mount"
+      - "Group items by category"
+      - "Show completion percentage"
+      - "Collapsible by default (expanded if incomplete)"
+      - "Real-time updates on item completion"
+
+  NPDChecklistItem:
+    path: "apps/frontend/components/npd/NPDChecklistItem.tsx"
+    type: "row"
+    description: "Single checklist item row with completion checkbox"
+
+    props:
+      item:
+        type: "ChecklistItem"
+        required: true
+
+      projectId:
+        type: "string (UUID)"
+        required: true
+
+      editable:
+        type: "boolean"
+        required: false
+        default: true
+
+      onComplete:
+        type: "(item: ChecklistItem) => void"
+        required: true
+
+    ui_sections:
+      - section: "checkbox"
+        content: "Checkbox (checked if is_completed)"
+
+      - section: "content"
+        content: |
+          - Item description
+          - Required indicator (badge)
+          - Category badge
+          - Completion metadata (if complete):
+            - Completed by [name]
+            - Completed at [date]
+            - Notes icon (tooltip with notes)
+            - Attachment icon (link to download)
+
+      - section: "actions"
+        content: |
+          - [Mark Complete] button (if incomplete + editable)
+          - [Uncomplete] button (if complete + editable + NPD_LEAD)
+
+    styling:
+      required_incomplete: "border-red-300 bg-red-50"
+      required_complete: "border-green-300 bg-green-50"
+      optional_incomplete: "border-gray-200 bg-white"
+      optional_complete: "border-green-200 bg-green-50"
+
+    interactions:
+      - "Click checkbox toggles completion"
+      - "Click [Mark Complete] opens completion dialog"
+      - "Click [Uncomplete] confirms and unmarks"
+      - "Click attachment icon downloads file"
+      - "Hover shows completion notes tooltip"
+
+  NPDGateHistory:
+    path: "apps/frontend/components/npd/NPDGateHistory.tsx"
+    type: "list"
+    description: "Table/list of gate transitions"
+
+    props:
+      projectId:
+        type: "string (UUID)"
+        required: true
+
+      compact:
+        type: "boolean"
+        required: false
+        default: false
+
+    ui_sections:
+      - section: "header"
+        content: "Title: 'Gate History' | Columns: Transition, Date, By, Type, Notes"
+
+      - section: "body"
+        content: |
+          - NPDGateHistoryCard components per transition
+          - Ordered by transitioned_at DESC (newest first)
+          - Empty state: "No gate transitions yet"
+
+    features:
+      - "Fetch history from API on mount"
+      - "Display transitions in reverse chronological order"
+      - "Show transition type (advance, move_back, cancel)"
+      - "Link to user profile"
+      - "Expand/collapse notes"
+
+  NPDGateHistoryCard:
+    path: "apps/frontend/components/npd/NPDGateHistoryCard.tsx"
+    type: "card"
+    description: "Card for single gate transition"
+
+    props:
+      transition:
+        type: "GateTransitionEntry"
+        required: true
+
+    ui_sections:
+      - section: "header"
+        content: |
+          - From gate -> To gate badges
+          - Transition type icon (advance: arrow, move_back: undo)
+          - Date/time
+
+      - section: "body"
+        content: |
+          - Transitioned by [name]
+          - Transition notes (if present)
+          - Approval metadata (if requires_approval):
+            - Approved by [name]
+            - Approval notes
+          - Checklist completion %
+          - Days in previous gate
+
+    styling:
+      advance: "border-green-300 bg-green-50"
+      move_back: "border-orange-300 bg-orange-50"
+      cancel: "border-red-300 bg-red-50"
+
+  NPDGateBadge:
+    path: "apps/frontend/components/npd/NPDGateBadge.tsx"
+    type: "badge"
+    description: "Badge for gate (G0-G4, Launched)"
+
+    props:
+      gate:
+        type: "string"
+        required: true
+        enum: ["G0", "G1", "G2", "G3", "G4", "launched", "cancelled"]
+
+      size:
+        type: "sm | md | lg"
+        required: false
+        default: "md"
+
+    styling:
+      G0: "bg-gray-100 text-gray-800"
+      G1: "bg-blue-100 text-blue-800"
+      G2: "bg-purple-100 text-purple-800"
+      G3: "bg-orange-100 text-orange-800"
+      G4: "bg-yellow-100 text-yellow-800"
+      launched: "bg-green-100 text-green-800"
+      cancelled: "bg-red-100 text-red-800"
+
+  NPDValidationWarning:
+    path: "apps/frontend/components/npd/NPDValidationWarning.tsx"
+    type: "alert"
+    description: "Warning alert for blocking items"
+
+    props:
+      blockingItems:
+        type: "string[]"
+        required: true
+
+      canAdvance:
+        type: "boolean"
+        required: true
+
+    ui:
+      - "Red alert if !canAdvance"
+      - "Yellow warning if canAdvance but has suggestions"
+      - "List of blocking items"
+      - "Link to checklist panel"
+
+hooks:
+  useNPDGateWorkflow:
+    path: "apps/frontend/lib/hooks/use-npd-gate-workflow.ts"
+    description: "Hook for gate workflow operations"
+
+    exports:
+      advanceGate:
+        type: "(projectId: string, notes?: string, approvalNotes?: string) => Promise<NPDProject>"
+        description: "Advance project to next gate"
+
+      moveBack:
+        type: "(projectId: string, targetGate: string, justification: string) => Promise<NPDProject>"
+        description: "Move project back to previous gate"
+
+      validateAdvance:
+        type: "(projectId: string) => Promise<ValidateAdvanceResponse>"
+        description: "Validate if project can advance"
+
+      getGateHistory:
+        type: "(projectId: string) => Promise<GateTransitionEntry[]>"
+        description: "Get gate transition history"
+
+      loading:
+        type: "boolean"
+        description: "Loading state"
+
+      error:
+        type: "Error | null"
+        description: "Error state"
+
+    implementation:
+      - "Use SWR for caching"
+      - "Optimistic updates for advance/move-back"
+      - "Revalidate on mutation"
+      - "Handle loading/error states"
+
+  useChecklist:
+    path: "apps/frontend/lib/hooks/use-checklist.ts"
+    description: "Hook for checklist operations"
+
+    exports:
+      checklist:
+        type: "ChecklistResponse | null"
+        description: "Checklist data with summary"
+
+      completeItem:
+        type: "(itemId: string, notes?: string, attachmentUrl?: string) => Promise<ChecklistItem>"
+        description: "Mark checklist item complete"
+
+      uncompleteItem:
+        type: "(itemId: string) => Promise<ChecklistItem>"
+        description: "Mark checklist item incomplete"
+
+      loading:
+        type: "boolean"
+        description: "Loading state"
+
+      error:
+        type: "Error | null"
+        description: "Error state"
+
+      mutate:
+        type: "() => void"
+        description: "Manually revalidate checklist"
+
+    implementation:
+      - "Use SWR for caching"
+      - "Auto-revalidate on complete/uncomplete"
+      - "Calculate summary on client side"
+      - "Handle loading/error states"
+
+pages:
+  project_detail:
+    path: "apps/frontend/app/(authenticated)/npd/projects/[id]/page.tsx"
+    action: "extend"
+    additions:
+      - "Add NPDGateTimeline component"
+      - "Add NPDChecklistPanel component"
+      - "Add advance/move-back action buttons"
+      - "Add NPDValidationWarning if blocking items"
+
+  gate_history:
+    path: "apps/frontend/app/(authenticated)/npd/projects/[id]/gate-history/page.tsx"
+    action: "create"
+    sections:
+      - "Page header with project info"
+      - "NPDGateTimeline (compact mode)"
+      - "NPDGateHistory component"
+      - "Back button to project detail"
+
+shared_types:
+  ChecklistSummary:
+    total_items: "number"
+    required_items: "number"
+    completed_items: "number"
+    required_completed: "number"
+    completion_pct: "number"
+    required_completion_pct: "number"
+    can_advance: "boolean"
+    blocking_items: "string[]"
+
+  ValidateAdvanceResponse:
+    can_advance: "boolean"
+    next_gate: "string"
+    requires_approval: "boolean"
+    required_roles: "string[]"
+    blocking_reasons: "string[]"
+    checklist_summary: "ChecklistSummary"
+
+responsive_design:
+  mobile:
+    - "Timeline: Stack vertically instead of horizontal"
+    - "Checklist: Full width cards"
+    - "Modal: Full screen on mobile"
+    - "History: Card layout instead of table"
+
+  tablet:
+    - "Timeline: Horizontal with smaller spacing"
+    - "Checklist: Two-column layout"
+    - "Modal: Standard dialog width"
+
+  desktop:
+    - "Timeline: Full horizontal layout"
+    - "Checklist: Three-column layout (by category)"
+    - "Modal: Wide dialog (max-w-2xl)"
+
+accessibility:
+  - "All modals have aria-label"
+  - "Checklist items keyboard navigable"
+  - "Focus trap in modals"
+  - "Screen reader announcements for completion"
+  - "Color contrast WCAG AA compliant"
+  - "Gate badges have aria-label"
+
+testing:
+  unit_tests:
+    - "NPDGateTimeline renders correctly"
+    - "NPDChecklistPanel groups by category"
+    - "NPDChecklistItem toggles completion"
+    - "useNPDGateWorkflow hook logic"
+    - "useChecklist hook logic"
+
+  integration_tests:
+    - "Advance gate modal flow"
+    - "Move back modal flow"
+    - "Checklist completion updates timeline"
+    - "Validation warnings display"
+
+  e2e_tests:
+    - "Complete gate workflow UI (G0 -> Launched)"
+    - "Move back workflow UI"
+    - "Checklist blocking prevents advance"
+    - "Director approval for G3+"

@@ -1,0 +1,265 @@
+story:
+  id: "08.8"
+  name: "Compliance Documents Upload"
+  epic: "08-npd"
+  phase: "1"
+  complexity: "M"
+  estimate_days: 3-4
+
+dependencies:
+  required:
+    - story: "01.1"
+      provides: ["organizations", "users", "RLS patterns"]
+    - story: "08.2"
+      provides: ["npd_projects table"]
+  optional: []
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/npd.md"
+  prd_sections: ["Section 7", "FR-NPD-31", "FR-NPD-32", "FR-NPD-33", "FR-NPD-34", "FR-NPD-35"]
+  architecture: "docs/1-BASELINE/architecture/modules/npd.md"
+  story: "docs/2-MANAGEMENT/epics/current/08-npd/08.8.compliance-documents-upload.md"
+  patterns:
+    - "docs/2-MANAGEMENT/epics/current/06-quality/06.40.document-control-versioning.md"
+  reference_tables:
+    - ".claude/TABLES.md"
+  reference_patterns:
+    - ".claude/PATTERNS.md"
+
+files_to_create:
+  database:
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_create_npd_compliance_docs.sql"
+      type: "migration"
+      tables: ["npd_compliance_docs"]
+      functions: ["check_required_documents"]
+
+  api:
+    - path: "apps/frontend/app/api/npd/projects/[id]/documents/route.ts"
+      methods: ["GET", "POST"]
+    - path: "apps/frontend/app/api/npd/documents/[id]/route.ts"
+      methods: ["DELETE"]
+    - path: "apps/frontend/app/api/npd/documents/[id]/download/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/npd/projects/[id]/documents/validate/route.ts"
+      methods: ["GET"]
+
+  services:
+    - path: "apps/frontend/lib/services/npd-document-service.ts"
+
+  validation:
+    - path: "apps/frontend/lib/validation/npd-document-schema.ts"
+
+  pages:
+    - path: "apps/frontend/app/(authenticated)/npd/projects/[id]/documents/page.tsx"
+
+  components:
+    - path: "apps/frontend/components/npd/documents/DocumentUploadModal.tsx"
+    - path: "apps/frontend/components/npd/documents/DocumentList.tsx"
+    - path: "apps/frontend/components/npd/documents/DocumentCard.tsx"
+    - path: "apps/frontend/components/npd/documents/DocumentPreviewModal.tsx"
+    - path: "apps/frontend/components/npd/documents/DocumentTypeBadge.tsx"
+    - path: "apps/frontend/components/npd/documents/RequiredDocsChecklist.tsx"
+    - path: "apps/frontend/components/npd/documents/DocumentActionsMenu.tsx"
+    - path: "apps/frontend/components/npd/documents/UploadProgress.tsx"
+
+database:
+  tables:
+    - name: "npd_compliance_docs"
+      columns:
+        - "id UUID PRIMARY KEY"
+        - "org_id UUID NOT NULL"
+        - "npd_project_id UUID NOT NULL"
+        - "doc_type TEXT NOT NULL (haccp_plan, label_proof, nutritional_info, coa, sds, trial_report, sensory_eval, shelf_life, other)"
+        - "file_name TEXT NOT NULL"
+        - "file_size_bytes BIGINT NOT NULL"
+        - "mime_type TEXT NOT NULL"
+        - "storage_path TEXT NOT NULL"
+        - "version TEXT (optional)"
+        - "description TEXT"
+        - "notes TEXT"
+        - "uploaded_by UUID NOT NULL"
+        - "uploaded_at TIMESTAMPTZ NOT NULL"
+        - "updated_at TIMESTAMPTZ NOT NULL"
+        - "deleted_at TIMESTAMPTZ (soft delete)"
+        - "deleted_by UUID"
+      rls: true
+      indexes:
+        - "idx_npd_docs_org ON (org_id)"
+        - "idx_npd_docs_project ON (npd_project_id) WHERE deleted_at IS NULL"
+        - "idx_npd_docs_type ON (npd_project_id, doc_type) WHERE deleted_at IS NULL"
+        - "idx_npd_docs_uploaded ON (uploaded_at DESC)"
+      constraints:
+        - "FK org_id → organizations(id) ON DELETE CASCADE"
+        - "FK npd_project_id → npd_projects(id) ON DELETE CASCADE"
+        - "FK uploaded_by → users(id)"
+        - "FK deleted_by → users(id)"
+        - "CHECK doc_type IN (haccp_plan, label_proof, nutritional_info, allergen_declaration, coa, sds, trial_report, sensory_eval, shelf_life, other)"
+
+  functions:
+    - name: "check_required_documents"
+      params: ["p_project_id UUID"]
+      returns: "JSONB"
+      description: "Validates required documents for current gate (G4 requires HACCP plan)"
+
+api_endpoints:
+  - method: "GET"
+    path: "/api/npd/projects/:id/documents"
+    auth: true
+    roles: ["NPD_LEAD", "R&D", "REGULATORY", "VIEWER"]
+    description: "List all documents for NPD project"
+    query_params:
+      - "doc_type: string (optional filter)"
+      - "sort_by: uploaded_at | file_name | file_size_bytes"
+      - "sort_order: asc | desc"
+      - "page: number"
+      - "limit: number"
+
+  - method: "POST"
+    path: "/api/npd/projects/:id/documents"
+    auth: true
+    roles: ["NPD_LEAD", "R&D", "REGULATORY"]
+    description: "Upload compliance document (multipart)"
+    body:
+      - "doc_type: string (required)"
+      - "file: File (required, max 50 MB)"
+      - "version: string (optional)"
+      - "description: string (optional)"
+      - "notes: string (optional)"
+
+  - method: "DELETE"
+    path: "/api/npd/documents/:id"
+    auth: true
+    roles: ["NPD_LEAD", "document owner"]
+    description: "Soft delete document (sets deleted_at)"
+
+  - method: "GET"
+    path: "/api/npd/documents/:id/download"
+    auth: true
+    roles: ["NPD_LEAD", "R&D", "REGULATORY", "VIEWER"]
+    description: "Generate signed URL for document download (1-hour expiry)"
+
+  - method: "GET"
+    path: "/api/npd/projects/:id/documents/validate"
+    auth: true
+    roles: ["NPD_LEAD", "R&D"]
+    description: "Validate required documents for current gate"
+
+ux:
+  wireframes:
+    - id: "NPD-DOC-001"
+      description: "Documents tab with upload button and document list"
+      components: ["DocumentUploadModal", "DocumentList"]
+    - id: "NPD-DOC-002"
+      description: "Upload modal with drag-and-drop zone"
+      components: ["DocumentUploadModal", "UploadProgress"]
+    - id: "NPD-DOC-003"
+      description: "Document preview modal (PDF/image viewer)"
+      components: ["DocumentPreviewModal"]
+    - id: "NPD-DOC-004"
+      description: "Required documents checklist"
+      components: ["RequiredDocsChecklist"]
+
+  patterns:
+    upload: "Drag-and-drop zone with file browser fallback (react-dropzone)"
+    list: "Grid layout with thumbnails (3 columns on desktop, 1 on mobile)"
+    preview: "Modal with PDF.js for PDFs, native image viewer for images"
+    actions: "Dropdown menu (Download, Delete) with confirmation dialogs"
+
+  states:
+    - "loading: Fetching documents from API"
+    - "empty: No documents uploaded yet"
+    - "uploading: File upload in progress (show progress bar)"
+    - "error: Upload failed or file validation error"
+    - "success: Document list with thumbnails"
+
+validation_rules:
+  file_type: "Must be PDF, DOCX, XLSX, PNG, JPG, or JPEG"
+  file_size: "Maximum 50 MB per file"
+  doc_type: "Must be one of: haccp_plan, label_proof, nutritional_info, allergen_declaration, coa, sds, trial_report, sensory_eval, shelf_life, other"
+  required_fields: "doc_type, file"
+  soft_delete: "Never hard delete, only set deleted_at timestamp"
+  signed_url_expiry: "Download URLs expire after 1 hour (3600 seconds)"
+
+patterns:
+  rls: "ADR-013 - Row Level Security on all tables"
+  api: "REST with org_id filter via RLS"
+  service: "class-based with static methods"
+  validation: "zod schemas for request validation"
+  storage: "Supabase Storage with bucket npd-compliance-docs"
+  storage_path: "{org_id}/{project_id}/{doc_type}/{uuid}_{filename}"
+  multipart: "Next.js API Route with FormData for file uploads"
+
+supabase_storage:
+  bucket: "npd-compliance-docs"
+  public: false
+  file_size_limit: 52428800 # 50 MB in bytes
+  allowed_mime_types:
+    - "application/pdf"
+    - "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    - "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    - "image/png"
+    - "image/jpeg"
+    - "image/jpg"
+  signed_url_expiry: 3600 # 1 hour in seconds
+
+acceptance_checklist:
+  database:
+    - "npd_compliance_docs table created with all columns"
+    - "RLS policies enforce org isolation"
+    - "Soft delete mechanism works (deleted_at column)"
+    - "check_required_documents() function validates G4 gate"
+    - "Indexes created for performance"
+
+  api:
+    - "GET /api/npd/projects/:id/documents returns paginated list"
+    - "POST /api/npd/projects/:id/documents uploads file to Supabase Storage"
+    - "DELETE /api/npd/documents/:id soft deletes document"
+    - "GET /api/npd/documents/:id/download generates signed URL"
+    - "GET /api/npd/projects/:id/documents/validate checks required docs"
+    - "File type validation works (PDF, DOCX, XLSX, PNG, JPG only)"
+    - "File size validation works (50 MB limit)"
+
+  service:
+    - "NPDDocumentService.list() returns documents with thumbnails"
+    - "NPDDocumentService.upload() uploads to Storage and creates record"
+    - "NPDDocumentService.delete() performs soft delete"
+    - "NPDDocumentService.generateDownloadUrl() creates signed URL"
+    - "NPDDocumentService.validateRequiredDocuments() checks G4 requirements"
+    - "Thumbnail generation works for PDFs and images"
+
+  frontend:
+    - "Documents tab page displays document list"
+    - "Upload modal with drag-and-drop works"
+    - "Progress indicator shows during upload"
+    - "Document list displays thumbnails, metadata, actions"
+    - "Preview modal works for PDFs (PDF.js) and images"
+    - "Download functionality works (opens signed URL)"
+    - "Delete confirmation dialog works"
+    - "Required documents checklist shows missing docs"
+    - "Empty state displays when no documents"
+
+  storage:
+    - "Supabase Storage bucket created with correct policies"
+    - "Files upload successfully to organized paths"
+    - "Signed URLs work and expire after 1 hour"
+    - "CDN delivery functional"
+
+  testing:
+    - "Unit tests >80% coverage for NPDDocumentService"
+    - "Integration tests for all API endpoints"
+    - "E2E tests: upload → preview → download → delete workflow"
+    - "File upload/download verified"
+    - "RLS tests verify org isolation"
+    - "Validation tests verify required documents check"
+
+output_artifacts:
+  - "Migration file: create_npd_compliance_docs.sql"
+  - "5 API route files"
+  - "1 service file: npd-document-service.ts"
+  - "1 validation schema: npd-document-schema.ts"
+  - "1 page: npd/projects/[id]/documents/page.tsx"
+  - "8 component files"
+  - "Unit test files for service"
+  - "Integration test files for API routes"
+  - "E2E test file for document workflow"
+  - "Supabase Storage bucket configuration"

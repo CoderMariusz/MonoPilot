@@ -1,0 +1,364 @@
+# Story 05.4 - API Specification
+# Purpose: Endpoints, services, validation schemas for LP Status Management
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  - method: "PATCH"
+    path: "/api/warehouse/license-plates/:id/status"
+    description: "Update LP status with validation and audit trail"
+    file: "apps/frontend/app/api/warehouse/license-plates/[id]/status/route.ts"
+    auth: "required"
+    roles: ["warehouse_manager", "warehouse_operator", "admin", "owner"]
+    request:
+      params:
+        id: "UUID - License Plate ID"
+      body:
+        status: "LPStatus - required"
+        reason: "string - optional"
+    response:
+      status: 200
+      type: "LicensePlate"
+    errors:
+      - { status: 400, code: "INVALID_TRANSITION", message: "Invalid status transition: {from} -> {to}" }
+      - { status: 400, code: "TERMINAL_STATE", message: "Cannot transition from terminal state: consumed" }
+      - { status: 400, code: "SAME_STATUS", message: "Status is already {status}" }
+      - { status: 404, code: "LP_NOT_FOUND", message: "License plate not found" }
+
+  - method: "PATCH"
+    path: "/api/warehouse/license-plates/:id/qa-status"
+    description: "Update QA status with side effects and audit trail"
+    file: "apps/frontend/app/api/warehouse/license-plates/[id]/qa-status/route.ts"
+    auth: "required"
+    roles: ["warehouse_manager", "quality_manager", "quality_inspector", "admin", "owner"]
+    request:
+      params:
+        id: "UUID - License Plate ID"
+      body:
+        qa_status: "QAStatus - required"
+        reason: "string - required for failed/quarantine"
+        quarantine_location_id: "UUID - required if qa_status='quarantine'"
+    response:
+      status: 200
+      type: "QAStatusUpdateResponse"
+    errors:
+      - { status: 400, code: "REASON_REQUIRED", message: "Reason is required when changing status to failed/quarantine" }
+      - { status: 400, code: "QUARANTINE_LOCATION_REQUIRED", message: "Quarantine location must be selected" }
+      - { status: 400, code: "INVALID_TRANSITION", message: "Invalid QA status transition" }
+      - { status: 403, code: "PERMISSION_DENIED", message: "Insufficient permissions for QA status change" }
+
+  - method: "GET"
+    path: "/api/warehouse/license-plates/:id/status-audit"
+    description: "Get status change audit trail for LP"
+    file: "apps/frontend/app/api/warehouse/license-plates/[id]/status-audit/route.ts"
+    auth: "required"
+    roles: ["*"]
+    request:
+      params:
+        id: "UUID - License Plate ID"
+      query:
+        field_name: "string - optional filter (status|qa_status)"
+        limit: "number - default 50"
+        offset: "number - default 0"
+    response:
+      status: 200
+      type: "StatusAuditEntry[]"
+
+  - method: "POST"
+    path: "/api/warehouse/license-plates/:id/block"
+    description: "Block LP with reason (shortcut endpoint)"
+    file: "apps/frontend/app/api/warehouse/license-plates/[id]/block/route.ts"
+    auth: "required"
+    roles: ["warehouse_manager", "quality_manager", "admin", "owner"]
+    request:
+      params:
+        id: "UUID - License Plate ID"
+      body:
+        reason: "string - required, min 5 chars"
+    response:
+      status: 200
+      type: "LicensePlate"
+    errors:
+      - { status: 400, code: "REASON_REQUIRED", message: "Reason is required to block LP" }
+      - { status: 400, code: "ALREADY_BLOCKED", message: "LP is already blocked" }
+
+  - method: "POST"
+    path: "/api/warehouse/license-plates/:id/unblock"
+    description: "Unblock LP with reason (shortcut endpoint)"
+    file: "apps/frontend/app/api/warehouse/license-plates/[id]/unblock/route.ts"
+    auth: "required"
+    roles: ["warehouse_manager", "quality_manager", "admin", "owner"]
+    request:
+      params:
+        id: "UUID - License Plate ID"
+      body:
+        reason: "string - required, min 5 chars"
+    response:
+      status: 200
+      type: "LicensePlate"
+    errors:
+      - { status: 400, code: "REASON_REQUIRED", message: "Reason is required to unblock LP" }
+      - { status: 400, code: "NOT_BLOCKED", message: "LP is not blocked" }
+
+  - method: "POST"
+    path: "/api/warehouse/license-plates/:id/validate-consumption"
+    description: "Validate LP is available for consumption (Epic 04.6 uses this)"
+    file: "apps/frontend/app/api/warehouse/license-plates/[id]/validate-consumption/route.ts"
+    auth: "required"
+    roles: ["*"]
+    request:
+      params:
+        id: "UUID - License Plate ID"
+    response:
+      status: 200
+      type: "StatusValidationResult"
+    errors:
+      - { status: 400, code: "NOT_AVAILABLE", message: "LP not available for consumption (status: {status})" }
+      - { status: 400, code: "QA_NOT_PASSED", message: "LP not QA approved (qa_status: {qa_status})" }
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/lp-status-service.ts"
+    description: "LP Status management service - CRITICAL for Epic 04.6"
+    exports:
+      - name: "validateLPForConsumption"
+        type: "async function"
+        params:
+          - "lpId: string"
+        returns: "Promise<StatusValidationResult>"
+        description: "Validate LP is available for consumption (Epic 04.6 uses this)"
+        critical: true
+
+      - name: "updateLPStatus"
+        type: "async function"
+        params:
+          - "lpId: string"
+          - "newStatus: LPStatus"
+          - "reason?: string"
+        returns: "Promise<LicensePlate>"
+        description: "Update LP status with validation and audit trail"
+
+      - name: "updateQAStatus"
+        type: "async function"
+        params:
+          - "lpId: string"
+          - "newQAStatus: QAStatus"
+          - "reason?: string"
+        returns: "Promise<LicensePlate>"
+        description: "Update QA status with side effects and audit trail"
+
+      - name: "getStatusAuditTrail"
+        type: "async function"
+        params:
+          - "lpId: string"
+        returns: "Promise<StatusAuditEntry[]>"
+        description: "Get status audit trail for LP"
+
+      - name: "validateStatusTransition"
+        type: "function"
+        params:
+          - "currentStatus: LPStatus"
+          - "newStatus: LPStatus"
+        returns: "StatusValidationResult"
+        description: "Validate status transition is allowed"
+
+      - name: "isConsumptionAllowed"
+        type: "function"
+        params:
+          - "status: LPStatus"
+          - "qaStatus: QAStatus"
+        returns: "boolean"
+        description: "Check if LP status allows consumption"
+
+      - name: "blockLP"
+        type: "async function"
+        params:
+          - "lpId: string"
+          - "reason: string"
+        returns: "Promise<LicensePlate>"
+        description: "Block LP with reason"
+
+      - name: "unblockLP"
+        type: "async function"
+        params:
+          - "lpId: string"
+          - "reason: string"
+        returns: "Promise<LicensePlate>"
+        description: "Unblock LP with reason"
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/lp-status.ts"
+    description: "LP Status TypeScript interfaces"
+    content: |
+      export type LPStatus = 'available' | 'reserved' | 'consumed' | 'blocked';
+      export type QAStatus = 'pending' | 'passed' | 'failed' | 'quarantine';
+
+      export interface StatusValidationResult {
+        valid: boolean;
+        error?: string;
+        currentStatus?: LPStatus;
+        currentQAStatus?: QAStatus;
+      }
+
+      export interface StatusAuditEntry {
+        id: string;
+        lp_id: string;
+        field_name: 'status' | 'qa_status';
+        old_value: string;
+        new_value: string;
+        reason: string | null;
+        changed_by: string;
+        changed_by_name?: string;
+        changed_at: string;
+      }
+
+      export interface QAStatusUpdateResponse {
+        lp: LicensePlate;
+        changes: {
+          lp_status_changed: boolean;
+          qa_status_changed: boolean;
+          location_changed: boolean;
+          consumption_allowed: boolean;
+        };
+        stock_move?: StockMove | null;
+        audit_entry: StatusAuditEntry;
+      }
+
+# Validation Schemas
+validation:
+  path: "apps/frontend/lib/validation/lp-status-schemas.ts"
+  schemas:
+    - name: "lpStatusEnum"
+      schema: "z.enum(['available', 'reserved', 'consumed', 'blocked'])"
+
+    - name: "qaStatusEnum"
+      schema: "z.enum(['pending', 'passed', 'failed', 'quarantine'])"
+
+    - name: "updateStatusSchema"
+      schema: |
+        z.object({
+          status: lpStatusEnum,
+          reason: z.string().optional(),
+        })
+
+    - name: "updateQAStatusSchema"
+      schema: |
+        z.object({
+          qa_status: qaStatusEnum,
+          reason: z.string().min(1, "Reason required for QA status change").optional(),
+          quarantine_location_id: z.string().uuid().optional(),
+        }).refine(
+          (data) => {
+            if (data.qa_status === 'failed' || data.qa_status === 'quarantine') {
+              return data.reason && data.reason.length >= 10;
+            }
+            return true;
+          },
+          { message: "Reason must be at least 10 characters for failed/quarantine", path: ["reason"] }
+        ).refine(
+          (data) => {
+            if (data.qa_status === 'quarantine') {
+              return !!data.quarantine_location_id;
+            }
+            return true;
+          },
+          { message: "Quarantine location required", path: ["quarantine_location_id"] }
+        )
+
+    - name: "blockLPSchema"
+      schema: |
+        z.object({
+          reason: z.string().min(5, "Reason must be at least 5 characters"),
+        })
+
+# Service Implementation Pattern
+patterns:
+  status_validation: |
+    // apps/frontend/lib/services/lp-status-service.ts
+
+    const VALID_TRANSITIONS: Record<LPStatus, LPStatus[]> = {
+      available: ['reserved', 'consumed', 'blocked'],
+      reserved: ['available', 'consumed'],
+      consumed: [],  // Terminal state
+      blocked: ['available']
+    };
+
+    export function validateStatusTransition(
+      currentStatus: LPStatus,
+      newStatus: LPStatus
+    ): StatusValidationResult {
+      if (currentStatus === newStatus) {
+        return { valid: false, error: `Status is already ${currentStatus}` };
+      }
+
+      const allowedTransitions = VALID_TRANSITIONS[currentStatus];
+      if (!allowedTransitions.includes(newStatus)) {
+        return {
+          valid: false,
+          error: `Invalid status transition: ${currentStatus} -> ${newStatus}`,
+          currentStatus
+        };
+      }
+
+      return { valid: true };
+    }
+
+  consumption_validation: |
+    export async function validateLPForConsumption(
+      lpId: string
+    ): Promise<StatusValidationResult> {
+      const lp = await getLicensePlate(lpId);
+
+      // Check status (available or reserved allowed)
+      if (lp.status !== 'available' && lp.status !== 'reserved') {
+        return {
+          valid: false,
+          error: `LP not available for consumption (status: ${lp.status})`,
+          currentStatus: lp.status,
+          currentQAStatus: lp.qa_status
+        };
+      }
+
+      // Check QA status (must be passed)
+      if (lp.qa_status !== 'passed') {
+        return {
+          valid: false,
+          error: `LP not QA approved (qa_status: ${lp.qa_status})`,
+          currentStatus: lp.status,
+          currentQAStatus: lp.qa_status
+        };
+      }
+
+      return { valid: true };
+    }
+
+  qa_side_effects: |
+    const QA_STATUS_SIDE_EFFECTS: Record<QAStatus, { status?: LPStatus; reason: string } | null> = {
+      pending: null,
+      passed: null,  // If from quarantine, triggers available
+      failed: { status: 'blocked', reason: 'Auto-blocked: QA failed' },
+      quarantine: null
+    };
+
+    export async function updateQAStatus(
+      lpId: string,
+      newQAStatus: QAStatus,
+      reason?: string
+    ): Promise<LicensePlate> {
+      const lp = await getLicensePlate(lpId);
+
+      // Create QA status audit entry
+      await createAuditEntry(lpId, 'qa_status', lp.qa_status, newQAStatus, reason);
+
+      // Handle side effects
+      if (newQAStatus === 'failed' && lp.status !== 'blocked') {
+        await updateLPStatus(lpId, 'blocked', 'Auto-blocked: QA failed');
+      }
+
+      if (newQAStatus === 'passed' && lp.qa_status === 'quarantine' && lp.status === 'blocked') {
+        await updateLPStatus(lpId, 'available', 'Auto-unblocked: QA passed after quarantine');
+      }
+
+      // Update QA status
+      return await updateLP(lpId, { qa_status: newQAStatus });
+    }

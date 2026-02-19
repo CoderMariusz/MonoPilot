@@ -1,0 +1,42 @@
+# Story 10.19 - Frontend Specification
+# Purpose: Benchmarking and improvement visualization
+# Agent: FRONTEND-DEV
+
+components:
+  - path: "apps/frontend/components/oee/benchmarks/BenchmarkComparisonTable.tsx"
+    description: "Table comparing org OEE to benchmarks"
+    columns:
+      - "Metric"
+      - "Your OEE"
+      - "Industry Typical"
+      - "World-Class"
+      - "Gap"
+
+  - path: "apps/frontend/components/oee/benchmarks/InternalBestCards.tsx"
+    description: "Cards showing internal best performers"
+    cards:
+      - { title: "Best Line", metric: "oee" }
+      - { title: "Best Shift", metric: "oee" }
+      - { title: "Best Day", metric: "oee" }
+
+  - path: "apps/frontend/components/oee/benchmarks/ImprovementChart.tsx"
+    description: "Trend chart showing improvement vs baseline"
+    features:
+      - "Baseline reference line"
+      - "Monthly OEE progression"
+      - "Milestone annotations"
+
+  - path: "apps/frontend/components/oee/benchmarks/GapAnalysisBar.tsx"
+    description: "Visual bar showing gap to targets"
+
+pages:
+  - path: "apps/frontend/app/(authenticated)/oee/benchmarks/page.tsx"
+    route: "/oee/benchmarks"
+    title: "OEE Benchmarking"
+
+hooks:
+  - path: "apps/frontend/lib/hooks/use-benchmarks.ts"
+    exports:
+      - "useBenchmarks"
+      - "useInternalBest"
+      - "useImprovement"

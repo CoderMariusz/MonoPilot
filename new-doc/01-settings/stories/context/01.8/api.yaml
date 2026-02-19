@@ -1,0 +1,527 @@
+# Story 01.8 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  # ==================== LIST WAREHOUSES ====================
+  - method: "GET"
+    path: "/api/v1/settings/warehouses"
+    description: "List warehouses with pagination, filtering, and search"
+    file: "apps/frontend/app/api/v1/settings/warehouses/route.ts"
+    auth: "required"
+    roles: ["*"]  # All authenticated users can read
+
+    query_parameters:
+      - name: "search"
+        type: "string"
+        required: false
+        description: "Filter by code or name (min 2 chars)"
+        example: "WH-RAW"
+      - name: "type"
+        type: "WarehouseType"
+        required: false
+        description: "Filter by warehouse type"
+        enum: ["GENERAL", "RAW_MATERIALS", "WIP", "FINISHED_GOODS", "QUARANTINE"]
+      - name: "status"
+        type: "string"
+        required: false
+        description: "Filter by status"
+        enum: ["active", "disabled"]
+      - name: "sort"
+        type: "string"
+        required: false
+        default: "code"
+        description: "Sort field"
+        enum: ["code", "name", "type", "location_count", "created_at"]
+      - name: "order"
+        type: "string"
+        required: false
+        default: "asc"
+        description: "Sort order"
+        enum: ["asc", "desc"]
+      - name: "page"
+        type: "integer"
+        required: false
+        default: 1
+        description: "Page number"
+      - name: "limit"
+        type: "integer"
+        required: false
+        default: 20
+        max: 100
+        description: "Items per page"
+
+    response:
+      status: 200
+      type: "PaginatedResult<Warehouse>"
+      schema:
+        data:
+          - id: "UUID"
+            org_id: "UUID"
+            code: "string"
+            name: "string"
+            type: "WarehouseType"
+            address: "string | null"
+            contact_email: "string | null"
+            contact_phone: "string | null"
+            is_default: "boolean"
+            is_active: "boolean"
+            location_count: "number"
+            disabled_at: "string | null"
+            disabled_by: "UUID | null"
+            created_at: "string"
+            updated_at: "string"
+            created_by: "UUID"
+            updated_by: "UUID"
+        pagination:
+          page: "number"
+          limit: "number"
+          total: "number"
+          total_pages: "number"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 400
+        code: "INVALID_QUERY_PARAMS"
+        message: "Invalid query parameters"
+
+  # ==================== GET WAREHOUSE BY ID ====================
+  - method: "GET"
+    path: "/api/v1/settings/warehouses/:id"
+    description: "Get warehouse details by ID"
+    file: "apps/frontend/app/api/v1/settings/warehouses/[id]/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    path_parameters:
+      - name: "id"
+        type: "UUID"
+        required: true
+        description: "Warehouse ID"
+
+    response:
+      status: 200
+      type: "Warehouse"
+      schema:
+        id: "UUID"
+        org_id: "UUID"
+        code: "string"
+        name: "string"
+        type: "WarehouseType"
+        address: "string | null"
+        contact_email: "string | null"
+        contact_phone: "string | null"
+        is_default: "boolean"
+        is_active: "boolean"
+        location_count: "number"
+        disabled_at: "string | null"
+        disabled_by: "UUID | null"
+        created_at: "string"
+        updated_at: "string"
+        created_by: "UUID"
+        updated_by: "UUID"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 404
+        code: "NOT_FOUND"
+        message: "Warehouse not found"
+        when: "Invalid ID or cross-tenant access (returns 404, not 403)"
+
+  # ==================== CREATE WAREHOUSE ====================
+  - method: "POST"
+    path: "/api/v1/settings/warehouses"
+    description: "Create new warehouse"
+    file: "apps/frontend/app/api/v1/settings/warehouses/route.ts"
+    auth: "required"
+    roles: ["SUPER_ADMIN", "ADMIN", "WAREHOUSE_MANAGER"]
+
+    request_body:
+      type: "CreateWarehouseInput"
+      schema:
+        code: "string (required, 2-20 chars, uppercase alphanumeric + hyphens)"
+        name: "string (required, 2-100 chars)"
+        type: "WarehouseType (default: GENERAL)"
+        address: "string | null (max 500 chars)"
+        contact_email: "string | null (email format)"
+        contact_phone: "string | null (max 20 chars)"
+        is_active: "boolean (default: true)"
+      example:
+        code: "WH-001"
+        name: "Main Warehouse"
+        type: "GENERAL"
+        address: "123 Factory Road\nSpringfield, IL 62701\nUSA"
+        contact_email: "warehouse@example.com"
+        contact_phone: "+1-555-123-4567"
+        is_active: true
+
+    response:
+      status: 201
+      type: "Warehouse"
+      schema: "Same as GET response"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Insufficient permissions"
+      - status: 400
+        code: "VALIDATION_ERROR"
+        message: "Validation failed"
+        details: "Zod validation errors"
+      - status: 409
+        code: "DUPLICATE_CODE"
+        message: "Warehouse code already exists"
+
+  # ==================== UPDATE WAREHOUSE ====================
+  - method: "PUT"
+    path: "/api/v1/settings/warehouses/:id"
+    description: "Update warehouse (code immutable with inventory)"
+    file: "apps/frontend/app/api/v1/settings/warehouses/[id]/route.ts"
+    auth: "required"
+    roles: ["SUPER_ADMIN", "ADMIN", "WAREHOUSE_MANAGER"]
+
+    path_parameters:
+      - name: "id"
+        type: "UUID"
+        required: true
+
+    request_body:
+      type: "UpdateWarehouseInput"
+      schema:
+        code: "string (optional, only if no inventory)"
+        name: "string (optional)"
+        type: "WarehouseType (optional)"
+        address: "string | null (optional)"
+        contact_email: "string | null (optional)"
+        contact_phone: "string | null (optional)"
+        is_active: "boolean (optional)"
+
+    response:
+      status: 200
+      type: "Warehouse"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Insufficient permissions"
+      - status: 404
+        code: "NOT_FOUND"
+        message: "Warehouse not found"
+      - status: 400
+        code: "CODE_IMMUTABLE"
+        message: "Cannot change code for warehouse with active inventory"
+      - status: 409
+        code: "DUPLICATE_CODE"
+        message: "Warehouse code already exists"
+
+  # ==================== DELETE WAREHOUSE (Soft Delete) ====================
+  - method: "DELETE"
+    path: "/api/v1/settings/warehouses/:id"
+    description: "Soft delete warehouse (sets is_active = false)"
+    file: "apps/frontend/app/api/v1/settings/warehouses/[id]/route.ts"
+    auth: "required"
+    roles: ["SUPER_ADMIN", "ADMIN"]
+
+    path_parameters:
+      - name: "id"
+        type: "UUID"
+        required: true
+
+    response:
+      status: 204
+      type: "void"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Insufficient permissions"
+      - status: 404
+        code: "NOT_FOUND"
+        message: "Warehouse not found"
+
+  # ==================== SET AS DEFAULT ====================
+  - method: "PATCH"
+    path: "/api/v1/settings/warehouses/:id/set-default"
+    description: "Set warehouse as default (atomic, unsets previous)"
+    file: "apps/frontend/app/api/v1/settings/warehouses/[id]/set-default/route.ts"
+    auth: "required"
+    roles: ["SUPER_ADMIN", "ADMIN", "WAREHOUSE_MANAGER"]
+
+    path_parameters:
+      - name: "id"
+        type: "UUID"
+        required: true
+
+    response:
+      status: 200
+      type: "Warehouse"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Insufficient permissions"
+      - status: 404
+        code: "NOT_FOUND"
+        message: "Warehouse not found"
+
+  # ==================== DISABLE WAREHOUSE ====================
+  - method: "PATCH"
+    path: "/api/v1/settings/warehouses/:id/disable"
+    description: "Disable warehouse (checks for active inventory and default status)"
+    file: "apps/frontend/app/api/v1/settings/warehouses/[id]/disable/route.ts"
+    auth: "required"
+    roles: ["SUPER_ADMIN", "ADMIN", "WAREHOUSE_MANAGER"]
+
+    path_parameters:
+      - name: "id"
+        type: "UUID"
+        required: true
+
+    response:
+      status: 200
+      type: "Warehouse"
+      schema:
+        # ... warehouse with is_active = false, disabled_at = NOW(), disabled_by = user_id
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Insufficient permissions"
+      - status: 404
+        code: "NOT_FOUND"
+        message: "Warehouse not found"
+      - status: 400
+        code: "HAS_ACTIVE_INVENTORY"
+        message: "Cannot disable warehouse with active inventory"
+      - status: 400
+        code: "CANNOT_DISABLE_DEFAULT"
+        message: "Cannot disable default warehouse. Set another warehouse as default first."
+
+  # ==================== ENABLE WAREHOUSE ====================
+  - method: "PATCH"
+    path: "/api/v1/settings/warehouses/:id/enable"
+    description: "Enable previously disabled warehouse"
+    file: "apps/frontend/app/api/v1/settings/warehouses/[id]/enable/route.ts"
+    auth: "required"
+    roles: ["SUPER_ADMIN", "ADMIN", "WAREHOUSE_MANAGER"]
+
+    path_parameters:
+      - name: "id"
+        type: "UUID"
+        required: true
+
+    response:
+      status: 200
+      type: "Warehouse"
+      schema:
+        # ... warehouse with is_active = true, disabled_at = null, disabled_by = null
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Insufficient permissions"
+      - status: 404
+        code: "NOT_FOUND"
+        message: "Warehouse not found"
+
+  # ==================== VALIDATE CODE ====================
+  - method: "GET"
+    path: "/api/v1/settings/warehouses/validate-code"
+    description: "Check if warehouse code is available (for real-time validation)"
+    file: "apps/frontend/app/api/v1/settings/warehouses/validate-code/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    query_parameters:
+      - name: "code"
+        type: "string"
+        required: true
+        description: "Warehouse code to validate"
+      - name: "exclude_id"
+        type: "UUID"
+        required: false
+        description: "Exclude this warehouse ID (for edit mode)"
+
+    response:
+      status: 200
+      type: "ValidationResult"
+      schema:
+        available: "boolean"
+        message: "string (optional)"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 400
+        code: "INVALID_CODE_FORMAT"
+        message: "Invalid code format"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/warehouse-service.ts"
+    description: "Warehouse business logic and data operations"
+    exports:
+      - name: "WarehouseService"
+        type: "class"
+        methods:
+          - name: "list"
+            params: ["params: WarehouseListParams"]
+            returns: "Promise<PaginatedResult<Warehouse>>"
+            description: "List warehouses with filters and pagination"
+
+          - name: "getById"
+            params: ["id: string"]
+            returns: "Promise<Warehouse | null>"
+            description: "Get warehouse by ID"
+
+          - name: "create"
+            params: ["data: CreateWarehouseInput"]
+            returns: "Promise<Warehouse>"
+            description: "Create new warehouse"
+
+          - name: "update"
+            params: ["id: string", "data: UpdateWarehouseInput"]
+            returns: "Promise<Warehouse>"
+            description: "Update warehouse"
+
+          - name: "delete"
+            params: ["id: string"]
+            returns: "Promise<void>"
+            description: "Soft delete warehouse"
+
+          - name: "setDefault"
+            params: ["id: string"]
+            returns: "Promise<Warehouse>"
+            description: "Set warehouse as default"
+
+          - name: "disable"
+            params: ["id: string"]
+            returns: "Promise<Warehouse>"
+            description: "Disable warehouse (with validation)"
+
+          - name: "enable"
+            params: ["id: string"]
+            returns: "Promise<Warehouse>"
+            description: "Enable warehouse"
+
+          - name: "validateCode"
+            params: ["code: string", "excludeId?: string"]
+            returns: "Promise<{ available: boolean }>"
+            description: "Check code availability"
+
+          - name: "hasActiveInventory"
+            params: ["id: string"]
+            returns: "Promise<boolean>"
+            description: "Check if warehouse has active inventory"
+
+          - name: "canDisable"
+            params: ["id: string"]
+            returns: "Promise<{ allowed: boolean; reason?: string }>"
+            description: "Check if warehouse can be disabled"
+
+# Validation Schemas
+validation:
+  - path: "apps/frontend/lib/validation/warehouse.ts"
+    description: "Zod schemas for warehouse validation"
+    exports:
+      - name: "warehouseTypeEnum"
+        type: "z.enum"
+        values: ["GENERAL", "RAW_MATERIALS", "WIP", "FINISHED_GOODS", "QUARANTINE"]
+
+      - name: "createWarehouseSchema"
+        type: "z.object"
+        fields:
+          code: "z.string().min(2).max(20).regex(/^[A-Z0-9-]+$/).transform(toUpperCase)"
+          name: "z.string().min(2).max(100)"
+          type: "warehouseTypeEnum.default('GENERAL')"
+          address: "z.string().max(500).nullable().optional()"
+          contact_email: "z.string().email().max(255).nullable().optional().or(z.literal(''))"
+          contact_phone: "z.string().max(20).nullable().optional()"
+          is_active: "z.boolean().default(true)"
+
+      - name: "updateWarehouseSchema"
+        type: "z.object"
+        description: "Partial of create schema with conditional code validation"
+
+      - name: "setDefaultSchema"
+        type: "z.object"
+        fields:
+          warehouse_id: "z.string().uuid()"
+
+# Implementation Patterns
+patterns:
+  service_pattern: |
+    // apps/frontend/lib/services/warehouse-service.ts
+    import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+
+    export class WarehouseService {
+      static async list(params: WarehouseListParams): Promise<PaginatedResult<Warehouse>> {
+        const response = await fetch(`/api/v1/settings/warehouses?${new URLSearchParams(params)}`);
+        if (!response.ok) throw new Error('Failed to fetch warehouses');
+        return response.json();
+      }
+
+      static async hasActiveInventory(id: string): Promise<boolean> {
+        const supabase = createClientComponentClient();
+        const { count } = await supabase
+          .from('license_plates')
+          .select('*', { count: 'exact', head: true })
+          .eq('warehouse_id', id)
+          .gt('quantity', 0);
+        return (count ?? 0) > 0;
+      }
+
+      static async canDisable(id: string): Promise<{ allowed: boolean; reason?: string }> {
+        const warehouse = await this.getById(id);
+        if (!warehouse) return { allowed: false, reason: 'Warehouse not found' };
+        if (warehouse.is_default) return { allowed: false, reason: 'Cannot disable default warehouse' };
+        const hasInventory = await this.hasActiveInventory(id);
+        if (hasInventory) return { allowed: false, reason: 'Cannot disable warehouse with active inventory' };
+        return { allowed: true };
+      }
+    }
+
+  api_route_pattern: |
+    // apps/frontend/app/api/v1/settings/warehouses/[id]/disable/route.ts
+    import { NextRequest, NextResponse } from 'next/server';
+    import { WarehouseService } from '@/lib/services/warehouse-service';
+
+    export async function PATCH(
+      request: NextRequest,
+      { params }: { params: { id: string } }
+    ) {
+      const canDisableResult = await WarehouseService.canDisable(params.id);
+
+      if (!canDisableResult.allowed) {
+        return NextResponse.json(
+          { error: canDisableResult.reason },
+          { status: 400 }
+        );
+      }
+
+      const warehouse = await WarehouseService.disable(params.id);
+      return NextResponse.json(warehouse);
+    }

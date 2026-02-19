@@ -1,0 +1,133 @@
+# Story 05.9 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "05.9"
+  name: "ASN Receive Workflow"
+  slug: "asn-receive-workflow"
+  epic: "05-warehouse"
+  phase: "1"
+  complexity: "M"
+  estimate_days: 4
+  type: "full-stack"
+  state: "ready"
+  model: "Sonnet"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, columns, indexes, RLS
+  - api.yaml         # Endpoints, request/response, validation
+  - frontend.yaml    # Components, pages, UX patterns
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "05.1"
+      name: "LP Table + CRUD"
+      provides: ["license_plates table", "LicensePlateService", "createOutputLP()"]
+      status: "ready"
+    - story: "05.8"
+      name: "ASN CRUD + Items"
+      provides: ["asns table", "asn_items table", "AsnService"]
+      status: "ready"
+    - story: "03.2"
+      name: "Purchase Orders"
+      provides: ["purchase_orders table", "PO linkage"]
+      status: "done"
+    - story: "01.8"
+      name: "Warehouses CRUD"
+      provides: ["warehouses table"]
+      status: "ready"
+    - story: "01.9"
+      name: "Locations CRUD"
+      provides: ["locations table"]
+      status: "ready"
+  blocked_by:
+    - story: "05.8"
+      reason: "Requires asns and asn_items tables"
+  blocks:
+    - story: "05.17"
+      name: "Scanner Receive"
+      reason: "Scanner workflow leverages ASN receive service methods"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/warehouse.md"
+    sections:
+      - "WH-FR-015"  # ASN Processing (pre-receive notification, pre-fill GRN)
+      - "WH-FR-003"  # GRN from PO (receiving workflow)
+      - "WH-FR-001"  # LP Creation
+      - "WH-FR-029"  # Over-Receipt Control
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/warehouse.md"
+    sections: ["Database Schema", "API Design"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/05-warehouse/05.9.asn-receive-workflow.md"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/WH-010-scanner-receive.md"
+      relevance: "Desktop modal patterns from scanner workflow"
+  patterns:
+    - path: "docs/2-MANAGEMENT/epics/current/05-warehouse/05.8.asn-crud-items.md"
+      relevance: "ASN table schema and service patterns"
+    - path: "docs/2-MANAGEMENT/epics/current/05-warehouse/05.1.lp-table-crud.md"
+      relevance: "LP service methods for createOutputLP()"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "Add variance columns to asn_items table"
+  - type: "api"
+    count: 2
+    description: "GET/POST /api/warehouse/asns/:id/receive endpoints"
+  - type: "service"
+    count: 1
+    description: "asn-receive-service.ts with receive workflow methods"
+  - type: "validation"
+    count: 1
+    description: "asn-receive.ts Zod schemas"
+  - type: "component"
+    count: 4
+    description: "ReceiveModal, ReceiveItemRow, VarianceBadge, ReceiveSummary"
+  - type: "test"
+    count: 3
+    description: "Unit + integration + E2E tests"
+
+# Technical notes
+technical_notes:
+  - "ASN receive creates GRN + LPs in single transaction"
+  - "Variance tracking: received_qty vs expected_qty per item"
+  - "ASN status transitions: pending -> partial -> received"
+  - "Over-receipt control respects warehouse_settings tolerance"
+  - "GRN.asn_id links receipt to ASN for traceability"
+  - "Cumulative receiving: asn_items.received_qty accumulates across sessions"
+  - "Desktop UI: Modal-based receive workflow from ASN detail page"
+
+# PRD Coverage
+prd_coverage:
+  full:
+    - "WH-FR-015: ASN Processing (pre-receive notification, pre-fill GRN)"
+    - "WH-FR-029: Over-Receipt Control"
+  partial:
+    - "WH-FR-003: GRN from PO (ASN-based variant)"
+  integration:
+    - "WH-FR-001: LP Creation (via receiveFromASN)"
+
+# Risk assessment
+risks:
+  - id: "RISK-01"
+    description: "Complex multi-table transaction (ASN, GRN, LP updates)"
+    severity: "medium"
+    mitigation: "Use database transaction with rollback on failure"
+  - id: "RISK-02"
+    description: "Over-receipt tolerance calculation edge cases"
+    severity: "low"
+    mitigation: "Comprehensive unit tests for tolerance scenarios"
+  - id: "RISK-03"
+    description: "Cumulative receiving state management"
+    severity: "low"
+    mitigation: "Track remaining_qty = expected_qty - received_qty per session"

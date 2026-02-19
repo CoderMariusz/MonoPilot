@@ -1,0 +1,1023 @@
+COMMIT:66e4ca3db0f1fb20cfc223d0c616818aee5ffa48
+DATE:2026-02-10 12:17:24 +0000
+MSG:Add structured handoff files and bug-fixing skill; implement testing patterns for MonoPilot
+COMMIT:bd28449c24b9d2e105922f3b7ebd5b85d5c64ec6
+DATE:2026-02-10 10:04:06 +0000
+MSG:docs: consolidate test and bug files - major cleanup
+COMMIT:fa2c473aff07ccc36dcab35b751dd6fb79c4f6ec
+DATE:2026-02-10 09:18:46 +0000
+MSG:fix: dashboard ui and settings stats display issues
+COMMIT:0f956dc209e19e1ae9ce0ed47bf02e783a5a22f9
+DATE:2026-02-09 16:49:55 +0000
+MSG:fix(technical): CORS, security headers, pagination endpoint
+COMMIT:31d343bbb70a8c620fc7728cd03306725a848d2c
+DATE:2026-02-09 16:35:24 +0000
+MSG:docs: Update bugs.md - Mark all 7 Settings bugs as FIXED (commit 176b7381)
+COMMIT:d97c61741fe969041ecd8742b004b19becb5dfd7
+DATE:2026-02-09 16:35:07 +0000
+MSG:fix(technical): auth endpoints, security headers, rate limiting, CSRF protection
+COMMIT:176b738185cfa1394ae813752ab1083ead037d5a
+DATE:2026-02-09 16:34:30 +0000
+MSG:fix(settings): BUG-SET-001,002,003,004,005,006,007 - Enhance UI visibility for all Settings module critical bugs
+COMMIT:4817afa323738cb16067309c3ad66574c07be4a4
+DATE:2026-02-09 14:40:41 +0000
+MSG:test(consolidate): All QA batches merged into bugs.md - Settings 1-4 (153 bugs) + Dashboard 1-2 complete
+COMMIT:25d6707caf2666464a815a3edb91dd80dfb9eab7
+DATE:2026-02-09 10:49:20 +0000
+MSG:BUG-W-003: Ensure packing slip PDF always includes weight column
+COMMIT:a7e172f05679b3d32f6abbc5e630643552459bd6
+DATE:2026-02-09 10:48:30 +0000
+MSG:BUG-W-002: Add barcode uniqueness validation to prevent duplicate barcodes
+COMMIT:d253cf6263a0646db646775996bd5c3b18c94be7
+DATE:2026-02-09 10:39:52 +0000
+MSG:Fix: Add 10s timeout to auth login to prevent hanging on Supabase connection
+COMMIT:14e34486b0dc7ab5c9fe3e09756e94052d981ea0
+DATE:2026-02-09 08:32:42 +0000
+MSG:Fix Quality bugs: Enable Edit button and add Resolve/Delete buttons on Holds detail page
+COMMIT:72b8c676d1a835ab8f13cbe166c06228a64d047c
+DATE:2026-02-09 08:32:21 +0000
+MSG:Fix Warehouse bugs W7: Complete transfer order workflow with approvals
+COMMIT:17306c3e1ad639f9ad171f05a58933bc108b08d9
+DATE:2026-02-09 08:29:43 +0000
+MSG:fix(warehouse): W6 - Resolve duplicate barcode validation and packing slip PDF weight issues
+COMMIT:814eedc9ea8456395774219daee9d5e580451ccc
+DATE:2026-02-09 08:29:03 +0000
+MSG:docs: Add comprehensive error codes and response schemas to quality holds endpoints
+COMMIT:1f1b4570f4eba8868dfd857a8b7e39c7a828c4d6
+DATE:2026-02-09 08:02:46 +0000
+MSG:Fix(Quality-Q2): Implement reason filtering in getHoldsList service
+COMMIT:ae7875df5980a0b5fae049b554c8af47725cd44e
+DATE:2026-02-09 07:59:35 +0000
+MSG:Fix(Quality-Q2): Extend filter schema for reason and product
+COMMIT:246a58145e53ed6795512b3d0ebd47d4672c9c37
+DATE:2026-02-09 07:54:56 +0000
+MSG:Fix(Quality-Q2): Add missing Reason and Product filters on Holds list page
+COMMIT:216f99dd27f3c8f91234e33f2e2578e7ce2aaa60
+DATE:2026-02-09 07:54:18 +0000
+MSG:docs: add comprehensive warehouse bug fix documentation
+COMMIT:49e2f14781abb4101600f67ba8494cf5391c836b
+DATE:2026-02-09 07:53:46 +0000
+MSG:Fix Quality bugs: Add column sorting and pagination controls
+COMMIT:657395a14481a40c1cf2d4dee5f7339a471fde7f
+DATE:2026-02-09 07:53:20 +0000
+MSG:docs: add migration documenting warehouse bug fixes
+COMMIT:02708c8ab7dd56e2ed2a9d8cb3b3bb9bbc37a787
+DATE:2026-02-09 07:53:04 +0000
+MSG:fix: warehouse bugs - timezone consistency and variance calculation precision
+COMMIT:d753dc4f0b7f569e91a49e1a1760cc96a1a018eb
+DATE:2026-02-09 07:47:36 +0000
+MSG:fix(warehouse): Add missing item weights to packing slip PDFs
+COMMIT:dd0dd4fa596f5d29330d54a481ce2af4a4e0f05d
+DATE:2026-02-09 07:46:26 +0000
+MSG:BUG-TECH-002: Add PATCH method to /api/quality/holds/:id endpoint
+COMMIT:9358644e420cc87afd436bccce0aa572910429ce
+DATE:2026-02-09 07:43:52 +0000
+MSG:fix(warehouse): implement product archive/restore toggle
+COMMIT:f5778b1cab9736a4d4d8dad4b87b6da9699c19f9
+DATE:2026-02-09 07:41:36 +0000
+MSG:Fix BUG-SC-001: Create /scanner/transfer route and fix routing
+COMMIT:fc3918ad00cb446e78d9028cf017fb6e0c2be2f0
+DATE:2026-02-08 21:02:53 +0000
+MSG:FIX-Q12-001: Improve pagination UX by resetting to page 1 on filter changes
+COMMIT:ae66d90eea1e106871c16755884b8656285e1988
+DATE:2026-02-08 21:01:38 +0000
+MSG:Fix: Empty state messages now display correctly on Quality Holds list (BUG-Q12-002)
+COMMIT:749756a556800ee999bd8430ce3c4a7270852f34
+DATE:2026-02-08 20:58:21 +0000
+MSG:BUG-Q12-003: Fix filter timeout issue by removing toast from useCallback dependencies
+COMMIT:d63af0995c03804715fd12e8acaf9ff4fe5abe4a
+DATE:2026-02-08 20:45:34 +0000
+MSG:Fix(B7-003): Transfer Orders page controls now always render - fix loading state blocking UI
+COMMIT:0df76aad54cf6849024c9d342359643e28a5a5a7
+DATE:2026-02-08 20:40:22 +0000
+MSG:Fix: Verify and document row click navigation handlers in Planning module (Bug-B7-001)
+COMMIT:b20e613a367598be13904b89cd893d2d62080751
+DATE:2026-02-08 20:39:14 +0000
+MSG:Fix: Add logout button to Planning module header (B7-002)
+COMMIT:c95e154f355dd01cc47c5360ff6e9054b6661500
+DATE:2026-02-08 18:52:37 +0000
+MSG:docs(bugs): Mark all Planning Work Orders Batch 4 bugs as FIXED with verification
+COMMIT:d459a4efc7038ad721ebb49ded6707d739fa6222
+DATE:2026-02-08 18:51:59 +0000
+MSG:fix(planning): Fix all 11 Work Orders bugs - Batch 4 complete
+COMMIT:51bdb82ac8a8475232052d4164f9fb1d193b2632
+DATE:2026-02-08 18:50:56 +0000
+MSG:docs(bugs): Document Planning Work Orders Batch 4 bugs (Bug-005 through Bug-015)
+COMMIT:2b8f40fefb8312ee9151e9f85012a7505b556244
+DATE:2026-02-08 16:51:50 +0000
+MSG:docs: Update Bug-002 status to fixed with final test results and commit info
+COMMIT:604ba0b694e4923191c7b58f430cb60d1347c784
+DATE:2026-02-08 16:51:20 +0000
+MSG:Fix: Correct paused status queries across production services
+COMMIT:0b7ac7d215d4a263a0211eb9d66d7751a21496fc
+DATE:2026-02-08 16:50:26 +0000
+MSG:Fix: Active WOs table rendering on dashboard (#2)
+COMMIT:b25ba410d6080fc66fa668e4a6593cb1f00c5346
+DATE:2026-02-08 16:30:00 +0000
+MSG:Fix: Create menu WO/NCR/TO routes to create pages (#1)
+COMMIT:2848fbea61f7f1b8e3864b03da4f1832c5fdde28
+DATE:2026-02-08 14:34:01 +0000
+MSG:fix(BUG-012): Update LocationForm to use hierarchical schema
+COMMIT:7a54e3d5c0b8619213d016149ed9a325e3328d7b
+DATE:2026-02-08 14:30:57 +0000
+MSG:fix(BUG-014): Fix DELETE production line failure
+COMMIT:5e4795ec2c99f9ac135719a9ab32dd1c00b415b8
+DATE:2026-02-08 14:29:58 +0000
+MSG:fix(BUG-014): Improve DELETE verification with pre-check and .select()
+COMMIT:5afcd9b5af85251781c5765b746e39a43919255b
+DATE:2026-02-08 14:29:29 +0000
+MSG:fix(BUG-012): Fix locations not appearing in /settings/locations list
+COMMIT:afdf6d8c5df0aa247d767d7f4b43e949a6bda674
+DATE:2026-02-08 14:29:25 +0000
+MSG:fix(BUG-011, BUG-017): Add missing Create Sales Order page
+COMMIT:4d8dc77b5861d654a0c6ffa040f3233805bc85c3
+DATE:2026-02-08 14:27:26 +0000
+MSG:fix(BUG-014): Fix DELETE production line returning 204 No Content
+COMMIT:462b97d8232bad7493acb607f2da6591c1b5569d
+DATE:2026-02-08 13:41:57 +0000
+MSG:fix(BUG-018): Use server-side /api/auth/login for session persistence (fixes cookie race condition)
+COMMIT:2ecb99ace159e12a8b3929a225c60466bdc0b558
+DATE:2026-02-08 13:27:17 +0000
+MSG:fix(BUG-018): Implement document.cookie handlers in browser Supabase client
+COMMIT:fbd137c5ac3de9b4af45c49ba97ae1ab77aee111
+DATE:2026-02-08 12:39:19 +0000
+MSG:Fix: Mark /login page as dynamic to allow middleware to use cookies()
+COMMIT:30210fe2a2da8b8a58aee9daed3b286f1b9f80bb
+DATE:2026-02-08 12:26:14 +0000
+MSG:Fix: Restore client-side signIn auth (original working solution) + remove Suspense
+COMMIT:90366d5ec79a7f87066f977f28ea3e9b69cfe65b
+DATE:2026-02-08 12:17:38 +0000
+MSG:Fix: Remove Suspense boundary from LoginPage - was causing infinite loading state
+COMMIT:c27852473da95ca1218851a306f6b7004f74dd44
+DATE:2026-02-08 12:16:35 +0000
+MSG:Fix: Simplify LoginForm to use API endpoint with credentials include
+COMMIT:e6e5c593501b7bb27863504d65c9644d9da39777
+DATE:2026-02-08 12:02:23 +0000
+MSG:Fix: Use client-side Supabase auth in LoginForm for proper session handling
+COMMIT:ef5e8c0c9ed890db5cae57e3a4cfdea8bc2c845d
+DATE:2026-02-08 11:54:28 +0000
+MSG:Fix: Add missing /api/auth/login endpoint for credentials auth
+COMMIT:f9b1053f39077bcf7a8d9d7a016fd904b85396a2
+DATE:2026-02-08 11:30:07 +0000
+MSG:fix: disable nutrition/products endpoint to unblock build
+COMMIT:aeeddcc621d8a2e3569c2778961b2cfc964fe6da
+DATE:2026-02-07 11:26:05 +0000
+MSG:fix(po+machines): enable Create PO button and resolve search redirect
+COMMIT:3a4a4e76cd95f7f3c2d3d3dcd54cde46a5cb223b
+DATE:2026-02-07 11:22:47 +0000
+MSG:fix(transfer-orders): populate warehouse dropdowns with active warehouses
+COMMIT:f5884d2d5200dc08a8fe655d649bccf3eab6e9bf
+DATE:2026-02-07 11:22:35 +0000
+MSG:fix(shipping): resolve organization context loading on dashboard
+COMMIT:992cf1cfec49641701027251be259a5c759570e6
+DATE:2026-02-07 08:22:03 +0000
+MSG:fix(tax-codes): resolve delete functionality blocking issue
+COMMIT:bb9bd25c323b9414eb761b4d94aa97060cb07a71
+DATE:2026-02-07 08:15:53 +0000
+MSG:fix(warehouses): resolve edit data loss and delete blocking errors
+COMMIT:cef15ed833f65eba64cae81e08e65b2175e074c9
+DATE:2026-02-07 03:43:02 +0000
+MSG:fix(settings/roles): resolve page crash and handle permission object format
+COMMIT:4f45cf5c12af82792c6ec6b25c28f5238dae0071
+DATE:2026-02-07 03:38:51 +0000
+MSG:fix(settings/roles): resolve page crash by lazy-initializing Supabase client
+COMMIT:49267a84308987438b6aa328518f825dd04ed6e5
+DATE:2026-02-07 03:35:42 +0000
+MSG:fix(settings/locations): resolve page crash and add navigation link
+COMMIT:5f206129473a123180e977bcd6b0d1d1516f8821
+DATE:2026-02-07 03:17:15 +0000
+MSG:docs: add Create dropdown fix documentation
+COMMIT:4de6646796ddad71fd2ee10875f73341715f46ca
+DATE:2026-02-07 03:17:11 +0000
+MSG:fix(users): display role and status columns in users table
+COMMIT:b02fa83ec717b46e2f10bb78692dbe97e99e98ce
+DATE:2026-02-07 03:16:40 +0000
+MSG:fix(dashboard): resolve Create dropdown 404 routing errors
+COMMIT:bc1493adacbaa00f8c5d3bbc93f9e484e6fb9b07
+DATE:2026-02-06 23:52:51 +0000
+MSG:fix(api): graceful handling for missing warehouse in locations API
+COMMIT:575a37fb1fa147cebcec978d81efcd480c5b0331
+DATE:2026-02-06 23:51:27 +0000
+MSG:fix(api): graceful handling for missing tables in settings endpoints
+COMMIT:078d69bc8ea11e7086ce4701f6dd66f61c9fad98
+DATE:2026-02-06 21:57:50 +0000
+MSG:fix(nav): correct sidebar navigation URLs
+COMMIT:d0df2c2e4683c7c072128fb6f3d7911aa9787727
+DATE:2026-02-06 21:56:14 +0000
+MSG:fix(api): resolve quality holds 500 error
+COMMIT:106993e29563a01d60d29e1731315337586af499
+DATE:2026-02-06 21:55:22 +0000
+MSG:feat(routes): add missing page.tsx files for 404 routes
+COMMIT:749ff9181fad5c90d3a6242fe5062f32119f32c3
+DATE:2026-02-06 18:52:49 +0000
+MSG:fix: expired LPs now show correct status, safety improvement
+COMMIT:e2eadd76e295cbaeb260579c8c06b64f46a2ef7d
+DATE:2026-02-06 18:52:27 +0000
+MSG:fix: resolve scanner crashes for Receive, Pick, Pack workflows
+COMMIT:db14abf31d4ee66a684ecc4a2353ef97c13e8b15
+DATE:2026-02-06 18:52:15 +0000
+MSG:fix: buttons now open modals instead of navigating
+COMMIT:02a1a77a51e0f853d7c7d2ca8499351be7112186
+DATE:2026-02-06 18:50:18 +0000
+MSG:fix: add missing page.tsx for Quality and Shipping modules
+COMMIT:52d5cf67676d824dc157e4f70bace42b295c4502
+DATE:2026-01-25 19:53:50 +0000
+MSG:fix(migrations): Rename 097_add_asn_search_indexes to 146
+COMMIT:a8c982db7c2892cddbec3f71243f82d205876334
+DATE:2026-01-25 19:11:27 +0000
+MSG:fix(lint): Fix ESLint errors - case declarations and empty interface
+COMMIT:b23f759d70495619c07d030cadcb7652f73af3fe
+DATE:2026-01-25 19:02:40 +0000
+MSG:fix(warehouse): Epic 5 E2E - Final fixes and documentation
+COMMIT:a464e353fae35b3f9ea3ae3e2e8c6bd8f75424ee
+DATE:2026-01-25 18:43:32 +0000
+MSG:fix(warehouse): Fix inventory KPI API response handling for RPC array
+COMMIT:3eb082e03bc8976bf7322fe6105a0e45af016971
+DATE:2026-01-25 17:03:57 +0000
+MSG:fix(warehouse): Fix critical P0 blocker - replace unit_cost with cost_per_unit
+COMMIT:a8de2ceeb61c784f095ae5fc84f51611aa97fcbb
+DATE:2026-01-25 15:48:44 +0000
+MSG:fix(e2e): Fix seeding script to match actual database schema
+COMMIT:772d5a2236e521c5a2af806dcde03d76d1d4f4af
+DATE:2026-01-25 15:42:01 +0000
+MSG:fix(production): Handle missing production_outputs table gracefully
+COMMIT:269b30d13d43036cc38a5915f060c94448c5b5fb
+DATE:2026-01-25 14:15:16 +0000
+MSG:fix(e2e): Fix WO Lifecycle test navigation to Planning module
+COMMIT:175e231b37a1f018cbff8ce769998c7465e06661
+DATE:2026-01-25 14:03:42 +0000
+MSG:fix(e2e): Fix product seeding - use status instead of is_active
+COMMIT:e16d784630114c0b05568163e9cb3326857477d1
+DATE:2026-01-25 13:41:05 +0000
+MSG:fix(e2e): Add seedRoles() function to fix production E2E seeding failures
+COMMIT:1d1cec76befe722c2f21797bf888ceeea982f177
+DATE:2026-01-25 03:23:02 +0000
+MSG:fix(e2e): Fix Epic 4 Production dashboard e2e tests - add data-testid attributes
+COMMIT:d4e623e9c954a7e2191921c2d1a79d448f40a4ef
+DATE:2026-01-25 00:09:37 +0000
+MSG:fix(bom): Add data-testid attributes to CostSummary component for tests TC-BOM-032, TC-BOM-033
+COMMIT:9fb9175265dfdac0bb0ed14f760169d447a37ea2
+DATE:2026-01-24 20:04:00 +0000
+MSG:fix(e2e): Complete ProductsPage selector fixes for Task 004 & 005
+COMMIT:d86685890052b81ce9c988174421d0e3de1ad696
+DATE:2026-01-24 20:02:34 +0000
+MSG:docs(task-006): Add progress report for RoutingsPage selector fixes
+COMMIT:9382d7c2fa185b7dbb91d9b4ba4a69535cc0372a
+DATE:2026-01-24 20:02:06 +0000
+MSG:fix(e2e): Add extended timeout for row visibility check
+COMMIT:e9b322587730e719d2285d9932404170314ea283
+DATE:2026-01-24 19:57:17 +0000
+MSG:fix(e2e): Fix RoutingsPage selectors and test expectations - 13/27 tests passing
+COMMIT:cff72b3265ea49ec776f91557e14c2505f9d2701
+DATE:2026-01-24 19:56:16 +0000
+MSG:fix(e2e): ProductsPage and DataTablePage selector fixes - Task 004 & 005
+COMMIT:dc63ec102108e40ac20cff5301bc449e880a9f1d
+DATE:2026-01-24 17:39:47 +0000
+MSG:fix(dashboard): Fix TC-DASH-003, TC-DASH-004, TC-DASH-006 rendering issues
+COMMIT:06217f534377ed9dd8f604e5749d1286be90f127
+DATE:2026-01-24 13:06:44 +0000
+MSG:fix(e2e): Improve tax-codes test selectors for better reliability
+COMMIT:7ded30669bea2d20fc05fa692e051a0ba7f094f3
+DATE:2026-01-24 12:14:24 +0000
+MSG:fix(tax-codes): Convert filter dropdowns to ShadCN Select components
+COMMIT:e2b5b0e8dd1585f490caee794565ded9b095e865
+DATE:2026-01-23 20:29:37 +0000
+MSG:fix(critical): Resolve hardcoded org_id in NCRService - Multi-tenant isolation (Story 06.9)
+COMMIT:365816f8a1dfe1bd4b7ceb1fd0a355b12a280fbc
+DATE:2026-01-21 23:34:52 +0000
+MSG:fix(po-submit): Resolve PO_NO_LINES validation error
+COMMIT:e0552b22232a141d59ba16e417bc9d0aa7511ed4
+DATE:2026-01-21 23:22:18 +0000
+MSG:fix(critical): Resolve 5 major user-reported runtime errors
+COMMIT:8f86db44a0972897452e4dc8a3ec4d69a8c22673
+DATE:2026-01-21 23:00:30 +0000
+MSG:fix(runtime): Resolve 6 critical production errors
+COMMIT:c6449a609cc0ed060e89fd7a9e1e6ddc111301fd
+DATE:2026-01-21 22:48:39 +0000
+MSG:fix(database): Resolve schema errors in Planning and Production APIs
+COMMIT:19b425d0ae75458793ed0567aa471b79b3a75f3d
+DATE:2026-01-21 22:33:45 +0000
+MSG:fix(routing): Resolve Next.js dynamic route slug conflict
+COMMIT:09187f3166cc28b00303caccd61c88616ba3d0b2
+DATE:2026-01-18 18:44:23 +0000
+MSG:fix(technical): Improve BOM cost calculation and location hooks
+COMMIT:93e2ddcd95301f60a3d9ca9bc6dcd433e3b87f5e
+DATE:2026-01-15 19:48:35 +0000
+MSG:fix(eslint): Fix all 96 ESLint errors - 0 errors remaining
+COMMIT:6c88035092661a75cf2be37e1393098290c07f9b
+DATE:2026-01-14 15:02:17 +0000
+MSG:fix(02.4): Fix Select empty value error in Advanced tab
+COMMIT:ce0a152c7dd9a3f1710f60ad86aed919668a5647
+DATE:2026-01-14 14:58:26 +0000
+MSG:fix(02.4): Add type="button" to prevent modal close on item save
+COMMIT:109a208a842faef6f716065bf925bd324d7fbdb8
+DATE:2026-01-14 11:41:19 +0000
+MSG:fix(02.8): Deploy routing operation_attachments table
+COMMIT:5000ed3fede65e7e421547c9eeee7089d10ef016
+DATE:2026-01-14 11:15:54 +0000
+MSG: 1. 500 Error Fix:   - The API was trying to select type from products table, but that column doesn't exist   - Fixed /api/technical/boms/[id]/items/route.ts and lib/services/bom-item-service.ts to use   product_type:product_types(code, name) instead
+COMMIT:d67daaf6ae7a87782cd4a732e41f4a073067b9df
+DATE:2026-01-14 11:07:39 +0000
+MSG:fix produt show in product choos in new bom
+COMMIT:63f599f391df43cf7f2b5262554a3f276e87a1f8
+DATE:2026-01-14 10:11:07 +0000
+MSG:fix component_id
+COMMIT:cd327dac75d6fa21cc5605da5c8bab21d6854947
+DATE:2026-01-14 09:53:54 +0000
+MSG:fix(bom) column bom_items.component_id does not exist
+COMMIT:c5d6e365d98e4704d0a076a45fdf4ba250a707e9
+DATE:2026-01-14 09:43:46 +0000
+MSG:add yeild field and fix syntax i version
+COMMIT:7b79bc8213ebc74e39cc76351eadda089720b045
+DATE:2026-01-14 09:28:36 +0000
+MSG:fix(bom): use lowercase status values matching database
+COMMIT:adb3228242810dbf8c2f40bd50aa3ade81aec3c4
+DATE:2026-01-14 09:26:23 +0000
+MSG:fix: more column name fixes and graceful version history handling
+COMMIT:647ad37f6adf5173fa978a918eed973fab3e8f2a
+DATE:2026-01-14 09:20:59 +0000
+MSG:fix: multiple API query column name fixes
+COMMIT:5e9a528e9cf128c380d3168f12c67f49494e2df8
+DATE:2026-01-14 09:04:17 +0000
+MSG:fix(products): prevent stale closure overwriting product_type_id
+COMMIT:4ac740516dc34d1904c2f9ac1ae596b08bbc3e0e
+DATE:2026-01-14 08:27:14 +0000
+MSG:fix(product-types): use correct table and auto-seed defaults
+COMMIT:7b7194eabc60f00326dd666b42fa0e00b437a362
+DATE:2026-01-14 08:17:10 +0000
+MSG:fix(products): align schema with database columns
+COMMIT:51213f7a5fb14a7d29999b0437ddd680420c70c7
+DATE:2026-01-14 07:58:32 +0000
+MSG:fix(products): remove category field from payload
+COMMIT:5043ca5ad175a87df01eea59fc2bacb5401670a7
+DATE:2026-01-14 07:45:07 +0000
+MSG:fix: resolve multiple API and database errors
+COMMIT:5f52b21584644f20daf8281e0c0e529d62999070
+DATE:2026-01-14 07:28:54 +0000
+MSG:fix(api): resolve Next.js 16 dynamic route slug conflict
+COMMIT:3ec1bcdfabf3cfd5ac8846d55fbd91bdf2aec702
+DATE:2026-01-14 06:26:26 +0000
+MSG:fix(deploy): resolve pnpm cache conflict on Vercel
+COMMIT:e102bb884aa692fb852668b2c347cf6ab4050841
+DATE:2026-01-13 17:02:53 +0000
+MSG:fix(deploy): standardize on pnpm package manager
+COMMIT:f1ca0288d4c5422b1af2abd9a80665fbd943bab2
+DATE:2026-01-13 16:59:35 +0000
+MSG:fix(build): resolve Next.js build failures
+COMMIT:13cb307fc9ee981a4f90bba2c9efa4afc886447f
+DATE:2026-01-13 15:38:54 +0000
+MSG:feat(typescript): Phase 2 - fix remaining 395 errors, achieve ZERO ✅
+COMMIT:c19ff81d67b5c5d823780f0b2d0e6074c52dee30
+DATE:2026-01-13 12:39:26 +0000
+MSG:feat: fix all 499 TypeScript errors - ZERO ERRORS ACHIEVED! 🎉
+COMMIT:0c92cc0e3f3f5567a50890303a1303c6f6652251
+DATE:2026-01-13 11:36:54 +0000
+MSG:docs: add comprehensive TypeScript error monitoring guides
+COMMIT:26aff4af16878fcb7575e2498b3e65bcfb0d6da4
+DATE:2026-01-12 10:01:59 +0000
+MSG:fix(lint): remove invalid ESLint disable comment
+COMMIT:ab11bd8c6167ad871a6b848c673f8c93327f816c
+DATE:2026-01-12 10:01:38 +0000
+MSG:fix(lint): resolve ESLint errors blocking push
+COMMIT:1b0e4d8395f6f9f003d68aa245b64772b014eb24
+DATE:2026-01-12 10:00:34 +0000
+MSG:fix(warehouse): escape apostrophes in LPMergeLocationPicker
+COMMIT:39d5ac5d35e18dcbba107085ab1ce508ff01b325
+DATE:2026-01-04 02:25:18 +0000
+MSG:fix(story-01.2): Fix navigation filtering for warehouse_manager role
+COMMIT:0432758080a349d079a38a6c70d6e0646509d72b
+DATE:2026-01-04 00:53:07 +0000
+MSG:fix: Escape apostrophes in JSX to resolve ESLint errors
+COMMIT:bdeb834bf109fa6102c78926af43636454c98ffe
+DATE:2026-01-02 12:48:45 +0000
+MSG:refactor(story-03.5a): Fix critical code review issues in API route and validation schema
+COMMIT:27919e85bbdb4c0ce5ff1c417795a69a87efe455
+DATE:2026-01-02 09:51:49 +0000
+MSG:docs(test-fix-report-03.3): Add comprehensive test infrastructure fix report
+COMMIT:d11523bbc4a833a58d64edc078c16277e39e2df7
+DATE:2026-01-02 09:51:15 +0000
+MSG:fix(story-03.3): Fix critical test infrastructure issues - integration tests and RLS tests
+COMMIT:3b208cfcd11ed753530edc9b73e2caa14a36b0db
+DATE:2025-12-31 16:24:01 +0000
+MSG:fix(planning): address code review feedback for Story 03.2
+COMMIT:6df0a85ef113a244a1ce39aa7bf70322b1baf06b
+DATE:2025-12-31 14:58:07 +0000
+MSG:fix(lint): escape quotes in WOFilters.tsx to resolve ESLint errors
+COMMIT:d11a7716233777a56b4dc4c83281bdcd7cfcd430
+DATE:2025-12-31 13:05:32 +0000
+MSG:fix(technical): resolve React hooks rules-of-hooks violation in ProductFormModal
+COMMIT:f6611dc4933324d70e848d1aa96e1f83fdb0ee62
+DATE:2025-12-31 12:50:12 +0000
+MSG:fix(api): correct user role query to use role:roles(code) join
+COMMIT:a56693d384d6a8217ac691109a435af14ba2cead
+DATE:2025-12-31 12:38:44 +0000
+MSG:fix(critical): resolve 4 production bugs
+COMMIT:49f6c42402f63f0155d49cbd08b06e97c6dad6bd
+DATE:2025-12-31 11:50:32 +0000
+MSG:fix(types): resolve 177 TypeScript errors for successful deployment
+COMMIT:85961c5369c94ea3d315c5b0a5827093409d4871
+DATE:2025-12-31 10:44:47 +0000
+MSG:fix(types): fix mockOnVersionClick type in BOMVersionTimeline.test.tsx
+COMMIT:c8c95bf4af56e0ccca44364467a9e569e5a6538a
+DATE:2025-12-31 10:34:48 +0000
+MSG:fix(types): resolve TypeScript annotation errors in test files
+COMMIT:0226ef1bb702e5e0c8b91658045a809818be531f
+DATE:2025-12-31 10:03:09 +0000
+MSG:fix(lint): resolve ESLint errors and warnings
+COMMIT:1e217ccc7bb16bfb96e4cbd548db16e357a41f57
+DATE:2025-12-30 20:52:24 +0000
+MSG:fix(types): comprehensive TypeScript fixes for Vercel deployment
+COMMIT:67edccb2c9cf7f3d96b600fd449a607af3fb3870
+DATE:2025-12-30 17:51:46 +0000
+MSG:chore: remove temporary fix script
+COMMIT:be71b08c714ed6b89e41baa86788865efc2fcc8e
+DATE:2025-12-30 17:51:37 +0000
+MSG:fix(types): comprehensive TypeScript fixes for Vercel deployment
+COMMIT:5dedd65c43fdb407fc872bb1568755718e7e5160
+DATE:2025-12-30 14:55:35 +0000
+MSG:fix(types): cast handleModalSubmit to bypass type mismatch
+COMMIT:8ccccc71a449d559fbb06276fe63cd2c18414bbc
+DATE:2025-12-30 14:45:35 +0000
+MSG:fix(types): convert null to undefined for TaxCodeModal prop
+COMMIT:28d0dcebc6c74d12a35741bf1461dbadc7346b1e
+DATE:2025-12-30 14:36:13 +0000
+MSG:fix(auth): update invitation route for Next.js 15 async params
+COMMIT:1c21acafa8ddaa783f635b94b725e16b0c09ef91
+DATE:2025-12-30 14:31:21 +0000
+MSG:fix(api): update RouteContext interfaces for Next.js 15 async params
+COMMIT:8756acb5e4cf4e67aaf0a9508fc56ed471bb39c0
+DATE:2025-12-30 14:26:39 +0000
+MSG:fix(api): complete async params migration - remove all (await params).X patterns
+COMMIT:f933c4f38685fea3233de764ef2200b1c4b4703d
+DATE:2025-12-30 14:13:24 +0000
+MSG:fix(api): complete Next.js 15 async params migration for all routes
+COMMIT:d0134a4c39afdf9215427ad9c856f10194455cbb
+DATE:2025-12-30 14:01:34 +0000
+MSG:fix(build): resolve LocationForm imports and Next.js 15 async params
+COMMIT:a49cb09bc1f428bcce3fe239514a880c182693d4
+DATE:2025-12-30 13:55:52 +0000
+MSG:fix(deployment): resolve Next.js build errors and routing conflicts
+COMMIT:24a13406b9155eef58124770678e0da19668ba07
+DATE:2025-12-30 07:40:15 +0000
+MSG:fix(lint): resolve ESLint errors - escape JSX entities and fix type assertions
+COMMIT:6abf3e4d1a35427ced16ccb4785ee5eaedf171ea
+DATE:2025-12-29 22:47:24 +0000
+MSG:fix(security): add server-side has-inventory endpoint
+COMMIT:62c221f43c8f54da049d1da5cf625604ea2ac888
+DATE:2025-12-29 21:57:03 +0000
+MSG:fix(security): add CSRF protection to warehouse API endpoints
+COMMIT:894cdac0efe3ef065930f764b946c347dd8d8a58
+DATE:2025-12-29 21:54:50 +0000
+MSG:fix(security): sanitize search input to prevent SQL injection
+COMMIT:48152a6bfc7596e45981e0391a3baff6fd97a984
+DATE:2025-12-29 21:52:42 +0000
+MSG:refactor(technical): fix code review issues for Story 02.15 - Cost History & Variance
+COMMIT:1c2b0362803607d1c84160b0b34a26ad732a3b47
+DATE:2025-12-29 09:58:31 +0000
+MSG:fix(routing-operations): fix database field mapping and average_yield calculation
+COMMIT:a0cd315ca2c1ccb6c7e692160587e08b1860960b
+DATE:2025-12-26 11:25:08 +0000
+MSG:Fix: Make pre-push hook resilient to missing pnpm
+COMMIT:281be40668694805341f974f718fb63bc0931f26
+DATE:2025-12-26 10:47:25 +0000
+MSG:Fix permissions across modules, update settings and technical components, and apply RLS migrations
+COMMIT:38742626d86aca322c23ada0f6c4209a77a1786e
+DATE:2025-12-24 13:42:17 +0000
+MSG:fix(security): CRIT-1 - fix SQL injection in product allergen service
+COMMIT:01b999c4e0cc79207d87067ba7cb33f4990a3f9e
+DATE:2025-12-24 13:31:37 +0000
+MSG:refactor(story-02.3): fix source products fetch and extract shared allergen icons
+COMMIT:0b3986e2814bf82bc482dea0cb241f9b6588aad6
+DATE:2025-12-24 08:57:00 +0000
+MSG:security: fix critical vulnerabilities in invitation service
+COMMIT:ebe67c0f24656fe7e78ba93bbf089e869b31a528
+DATE:2025-12-23 15:45:11 +0000
+MSG:chore: fix husky hooks and lint errors blocking push
+COMMIT:8629c1935d86a8c4255653f6c1412bb0d58b742f
+DATE:2025-12-18 16:13:36 +0000
+MSG:fix(api): Use correct column names in settings stats endpoint
+COMMIT:7ffa32d13c2fed3707b4641fe36804f3dd8cfc70
+DATE:2025-12-18 15:45:57 +0000
+MSG:fix(dashboard): Handle null user gracefully, remove non-null assertions
+COMMIT:16d294a4ee9a77163edc69719fc0ce50e7851d62
+DATE:2025-12-18 15:35:40 +0000
+MSG:fix(auth): Sign out user when users table record not found
+COMMIT:fa077e2b558b06b1762a2e6c5750546a39737be3
+DATE:2025-12-18 15:27:00 +0000
+MSG:fix(auth): Fix redirect loop in middleware and add favicon
+COMMIT:62e9128265699066134bfea880731660344f403b
+DATE:2025-12-18 15:09:57 +0000
+MSG:fix(vercel): Try yarn install
+COMMIT:7e09c2491efb679aa3fdf940404f8ae8940a978d
+DATE:2025-12-18 15:07:35 +0000
+MSG:fix(vercel): Explicitly install react and react-dom
+COMMIT:47f9871b3a5b363fb5bfbcf6f34c4a3338a34493
+DATE:2025-12-18 15:06:11 +0000
+MSG:fix(vercel): Use npm install instead of npm ci
+COMMIT:195c8507821aca4db7173089619a2975b1ef496a
+DATE:2025-12-18 15:05:08 +0000
+MSG:fix(vercel): Add package-lock.json and use npm ci
+COMMIT:de172b6c6490b1fad48cd573e6091479d75f220a
+DATE:2025-12-18 15:03:01 +0000
+MSG:fix(vercel): Restore rootDirectory with npm install from root
+COMMIT:c5cae3644aa9c03aada3e750059e2092f7e02837
+DATE:2025-12-18 15:01:06 +0000
+MSG:fix(vercel): Move vercel.json to root for monorepo support
+COMMIT:4628f0c2c4f9eb81ac28799457104e5204cb1849
+DATE:2025-12-18 14:57:47 +0000
+MSG:fix(vercel): Switch to npm for Node 20 compatibility
+COMMIT:4266eccca70f66ddd96fef718abe8d4a61468da3
+DATE:2025-12-18 13:44:29 +0000
+MSG:fix vercel
+COMMIT:21ce0b976c507be5286d9ce32b367096d61db7cf
+DATE:2025-12-18 12:25:51 +0000
+MSG:chore: add husky to fix prepare hook on Vercel
+COMMIT:e1a994b47b4b824be09109caea4c5de6985ab43b
+DATE:2025-12-18 12:15:28 +0000
+MSG:fix(frontend): typing fixes; add test-engineer agent prompt; update CHANGELOG
+COMMIT:1947c84faab66f7e74eb0da64ea837a3a952cd0e
+DATE:2025-12-17 23:45:28 +0000
+MSG:fix(story-01.9): Add missing wireframe references SET-014 and SET-015
+COMMIT:3dc66cfab117e71a44b4b618febb681bdb2817e9
+DATE:2025-12-16 20:15:00 +0000
+MSG:fix(epic-01): Complete YAML context validation and critical fixes
+COMMIT:0b1e4c844d8abe9bb2a9adeff96b6e999d803124
+DATE:2025-12-16 19:52:52 +0000
+MSG:fix(context): Synchronize 01.2 split context files with main context.yaml
+COMMIT:4e033afd2522f39c5e260aacd30a15b590458f48
+DATE:2025-12-16 19:49:45 +0000
+MSG:fix(01.3-context): Synchronize split context files with main file
+COMMIT:689cd6c0dbbe16eed6c24bea472ee4b921e89d38
+DATE:2025-12-16 19:49:19 +0000
+MSG:fix(docs): Synchronize 01.4 split context files with main context.yaml
+COMMIT:1dd0b93396a3de30b33948ce9eb33e520a13254d
+DATE:2025-12-16 19:31:55 +0000
+MSG:fix(epic-01): Update 01.3 context YAML per architecture decisions
+COMMIT:3f59bdf8c29a682de466cf07ca02ea96dfd4e12f
+DATE:2025-12-15 21:33:13 +0000
+MSG:fix(epic-02): Resolve dependency gaps and blockers - 94% quality score
+COMMIT:402ade6f84e2319f00cc1ffcc0b9d750bb888faf
+DATE:2025-12-11 22:10:33 +0000
+MSG:docs(ux): Complete UX audit fixes - achieve 97-98% quality score
+COMMIT:058c8fd07fa5b00fbac98a10376a579cc8e67cf3
+DATE:2025-12-09 22:29:18 +0000
+MSG:docs: Add all missing modules from competitive gap analysis
+COMMIT:29e4331e6cfa43b00d0a8ca7b291778604875390
+DATE:2025-12-09 20:07:05 +0000
+MSG:fix: BUG-003 GRN LP navigation, BUG-004 Scanner PO barcode
+COMMIT:4b87cb59ebec4917c1375d8a3b6a49204854fe9c
+DATE:2025-12-09 19:57:04 +0000
+MSG:docs: Add MVP Phases structure and bug tracker
+COMMIT:27aae2552a4c0d33e7c4b6aa5ba802c1239beb1b
+DATE:2025-12-03 18:22:21 +0000
+MSG:fix: PO page improvements
+COMMIT:d418a9cfa0e2964dc03f46db9323ca085c3e08b4
+DATE:2025-12-03 07:03:00 +0000
+MSG:fix: Remove invalid eslint-disable comments
+COMMIT:f6a8a3453de5822406b2e16c227e6c9d14724dfd
+DATE:2025-12-02 21:46:08 +0000
+MSG:fix: Update production-lines API paths to /api/settings/lines
+COMMIT:f9ac366bef2b9ac835185222305d89a87d354224
+DATE:2025-12-02 21:30:40 +0000
+MSG:fix: Settings pages bug fixes and context reorganization
+COMMIT:b659fb1bdd7cf79f80a2df4485216a0667b5c9ab
+DATE:2025-11-29 17:57:07 +0000
+MSG:fix: Restore WOStartModal full implementation + add E2E tests (Story 4.2)
+COMMIT:f4bcd0c8114ba284ba3a564ed717a07390cbe8d5
+DATE:2025-11-27 17:28:21 +0000
+MSG:Merge pull request #53 from CoderMariusz/claude/fix-planning-layout-01T7zRJZMbivW41SA5R8ZDJc
+COMMIT:4982ea5c7e2db61f254faa6c6b35949f682f6003
+DATE:2025-11-27 17:27:49 +0000
+MSG:fix: Update genealogy reversal and over-production handling logic
+COMMIT:7fde6cccca2df6ea9f0184cc0ec2ae43365336ff
+DATE:2025-11-27 15:54:57 +0000
+MSG:fix: Resolve all critical architectural issues in Epic 4 Stories
+COMMIT:18cc797662df65388932841c5d0faf917205f683
+DATE:2025-11-27 15:49:57 +0000
+MSG:fix: Review Epic 4 Stories - Fix critical issues & clarifications
+COMMIT:104e109f8f840846d63f520f95af38df0bd97305
+DATE:2025-11-27 15:01:34 +0000
+MSG:Merge pull request #51 from CoderMariusz/claude/fix-dashboard-layout-013WWxQoPwQyWXHRimTW6iyk
+COMMIT:4dc0dac48a9eb6e101f05abeae2343f3c65e0f5c
+DATE:2025-11-27 15:01:01 +0000
+MSG:fix: Refactor Planning Dashboard layout - reorganize stats and activity feed
+COMMIT:2d0ee004f11d23134d36e9f781a0149c38021932
+DATE:2025-11-26 22:18:05 +0000
+MSG:fix: Add error logging to purchase-orders integration tests
+COMMIT:715258519cdf2d80390759a369b9f0ffee194786
+DATE:2025-11-26 20:51:39 +0000
+MSG:fix: Load .env.test in cleanup script
+COMMIT:22e51503af38872ab0a5abf43087601fc54f790a
+DATE:2025-11-26 20:41:11 +0000
+MSG:fix: Improve test user cleanup and add manual cleanup script
+COMMIT:3a4ea26df9faaa2e592c07f03ae0870444840fe3
+DATE:2025-11-26 20:32:40 +0000
+MSG:fix: Synchronize test user email/password between fixture and tests
+COMMIT:aed45e2d858e841e594d58ce7adc5fca31a79d18
+DATE:2025-11-26 20:31:09 +0000
+MSG:fix: Update products API endpoint to /api/technical/products and handle response format
+COMMIT:1284e6753e243eeb1bfc9a2392f577f9badf7af3
+DATE:2025-11-26 20:29:53 +0000
+MSG:fix: Resolve E2E test setup issues - use existing test organization
+COMMIT:b34ebd45447ba4af5ad16a79328446ccfdeae840
+DATE:2025-11-26 15:43:02 +0000
+MSG:fix: resolve type error in planning settings is_default mapping
+COMMIT:24c1fb263a5b81a7cca07b198d5037d8f4e0633d
+DATE:2025-11-26 10:59:50 +0000
+MSG:Merge pull request #48 from CoderMariusz/claude/fix-product-bom-display-01NZaBSDFG3whCNY1qCVn25a
+COMMIT:faec7af283ef27f74a1acdadebaaf027d9240fae
+DATE:2025-11-26 10:58:15 +0000
+MSG:fix: Product BOM display and navigation issues
+COMMIT:cb7358f0d447aa54e1d2b86c15e59c45dd58c48b
+DATE:2025-11-26 08:45:03 +0000
+MSG:Merge pull request #47 from CoderMariusz/claude/fix-bom-status-enum-01A2J2Y13Vs2bj76U4EWf2n5
+COMMIT:9e9e7f7ceb6fa3f6c22565936cb9fe35d8e48c4b
+DATE:2025-11-26 08:41:06 +0000
+MSG:fix: make BOM item sequence field optional
+COMMIT:2eac6f183bf086f72847c50952949eb8f81d1575
+DATE:2025-11-26 08:35:16 +0000
+MSG:Merge pull request #46 from CoderMariusz/claude/fix-bom-status-enum-01A2J2Y13Vs2bj76U4EWf2n5
+COMMIT:a9340068cab7b718fae8ec1d1dd303699bb5a56f
+DATE:2025-11-26 08:27:02 +0000
+MSG:fix: update BOM status type definitions in page components
+COMMIT:8e1fcdd92f49037772358db3f491cc616922bf94
+DATE:2025-11-26 08:19:03 +0000
+MSG:Merge pull request #45 from CoderMariusz/claude/fix-bom-status-enum-01A2J2Y13Vs2bj76U4EWf2n5
+COMMIT:64be2d5f1072ee3f4e90cccde2e8b530efa51962
+DATE:2025-11-26 08:18:19 +0000
+MSG:fix: align BOM status enum values with database
+COMMIT:ae0da6268fac9a020f402e369d81551d51722928
+DATE:2025-11-26 08:09:21 +0000
+MSG:Merge pull request #44 from CoderMariusz/claude/fix-bom-errors-01PiRxdaruc7gzion6gG9WX5
+COMMIT:1b803453f82dbb938d7d2f2f2ea3ff78b1ceb0d5
+DATE:2025-11-26 08:06:37 +0000
+MSG:fix: resolve BOM creation errors - date validation and org_id lookup
+COMMIT:38cd7f3e405b774661a75a41319433baff3dfaf0
+DATE:2025-11-25 14:58:14 +0000
+MSG:fix: add migration 037 to verify product RLS functionality
+COMMIT:e0055907ca58d255931820bbfd7b88ed5e249140
+DATE:2025-11-25 14:57:45 +0000
+MSG:fix: add migration 036 to validate and fix product org_id data
+COMMIT:664dc617f1f4f802614c2c96c50b2fd99a8645cc
+DATE:2025-11-25 14:57:18 +0000
+MSG:fix: add migration 035 to diagnose and fix JWT org_id claims
+COMMIT:736e342fcde601bb522fc3f91903af59a11e3b77
+DATE:2025-11-25 14:27:51 +0000
+MSG:fix: add migration 034 to fix duplicate RLS policies for all product modules
+COMMIT:5d8e4ace20f4c1e6ddb7713b918bb50c6ecb11ca
+DATE:2025-11-25 13:40:01 +0000
+MSG:fix: add migration 034 to fix duplicate product RLS policies
+COMMIT:f33ee0739ba40f915a0b275e830dbaf2b4c29afd
+DATE:2025-11-25 13:27:51 +0000
+MSG:fix: resolve RLS policy errors in product creation
+COMMIT:c5ed9ba7c04ada4e5639641279260075c514bb36
+DATE:2025-11-25 13:09:38 +0000
+MSG:Merge pull request #42 from CoderMariusz/claude/fix-add-product-error-01Q5oCc8C7q7NrosZMXUDBeo
+COMMIT:0f4e8c76c13ad9f04770a2b3b3fe53ed2aff56b1
+DATE:2025-11-25 13:06:50 +0000
+MSG:fix: resolve authentication errors in technical module API routes
+COMMIT:c0dfd8f84fd9a7c478f8d17a7ec18e36de0daf15
+DATE:2025-11-25 12:14:04 +0000
+MSG:Merge pull request #39 from CoderMariusz/claude/fix-mock-org-id-018k1FzHabCKZPxymFUxi8JR
+COMMIT:30ab10714179325ffe5a76b33beaf1458fa73e67
+DATE:2025-11-25 11:23:12 +0000
+MSG:Merge pull request #37 from CoderMariusz/claude/fix-technical-sidebar-visibility-01Fb9JJMtKVbZSnfFLapn7AE
+COMMIT:a47929121de7140bab4378ffcf8627f2007a8bd8
+DATE:2025-11-25 11:21:13 +0000
+MSG:fix: correct column name mismatch in authenticated layout
+COMMIT:e2d651750b9b14d0e6450d7c373aaf2ffec9638f
+DATE:2025-11-25 10:51:07 +0000
+MSG:Merge pull request #34 from CoderMariusz/claude/fix-ref-type-error-018tAPgqy7TJJApVv5qFyZeZ
+COMMIT:e5064acbb0828c0d65a33d958791b5ba9ab8990b
+DATE:2025-11-25 10:48:56 +0000
+MSG:fix: correct ref type in scrollToSection function
+COMMIT:1426b5edf9b35b74d9bc5a7b8ef1eb8bd241646d
+DATE:2025-11-25 10:47:26 +0000
+MSG:Merge pull request #33 from CoderMariusz/claude/fix-skeleton-import-01HNnuotKJ1VVcKxQD7pJQtc
+COMMIT:941aa7b9fcf50f20eba12005cf84f4b09898a481
+DATE:2025-11-25 10:45:46 +0000
+MSG:fix: add missing skeleton and tooltip UI components
+COMMIT:0441c6a2b692c210a08d3807943121727db84da2
+DATE:2025-11-25 10:39:42 +0000
+MSG:fix: add default page.tsx for /technical route to redirect to /technical/dashboard
+COMMIT:6b8c5ae15005a56c6c409b35c00ceb42161e85de
+DATE:2025-11-25 10:13:58 +0000
+MSG:fix(types): resolve TypeScript errors in Batch 2D stories
+COMMIT:df6209759c6c1298149c22688e67e9bb98f05abe
+DATE:2025-11-25 09:54:12 +0000
+MSG:Merge pull request #27 from CoderMariusz/claude/fix-radio-group-import-01EhTEbepZjy93kYsHKyg6cn
+COMMIT:56486bea9b4fc2189200b243665e8a9598d508b9
+DATE:2025-11-25 09:50:57 +0000
+MSG:fix(ui): add missing radio-group and scroll-area components
+COMMIT:f9d170677d6e2dda2d5080aec5164d0871b7dcea
+DATE:2025-11-25 09:03:35 +0000
+MSG:Merge pull request #25 from CoderMariusz/claude/fix-bom-type-errors-01UTYVg3LDBxQk5WWH3Ubg29
+COMMIT:bd235c9a09dc3c8a773cacd2e93cf94d055d7df9
+DATE:2025-11-25 09:01:11 +0000
+MSG:fix(types): resolve BOM type errors and exclude tests from type-check
+COMMIT:46938890449c829789e28c235d8ec48287131d8d
+DATE:2025-11-25 07:10:15 +0000
+MSG:fix: add missing paramsId state declaration in transfer-orders detail page
+COMMIT:7806eaf865a70342431548737903b38fef534b4d
+DATE:2025-11-24 14:27:41 +0000
+MSG:Merge pull request #20 from CoderMariusz/claude/fix-accent-colors-type-01XGVtVJ6abHU5rCfNhpunfE
+COMMIT:70de069ef839179148c892e0f27a85d951c72b89
+DATE:2025-11-24 14:15:55 +0000
+MSG:fix: add .optional() before .default() and use z.input for form types in all validation schemas
+COMMIT:54815855783336a682c1b87896567dd8ab7edd6c
+DATE:2025-11-24 14:01:29 +0000
+MSG:fix: add .optional() before .default() in all form schemas
+COMMIT:588447221820e8a7684a427c658240824d2ea912
+DATE:2025-11-24 13:55:41 +0000
+MSG:fix: handle null values in Textarea for nullable description field
+COMMIT:f793eaba993ce51d0083ae31362c50e3838ad7d3
+DATE:2025-11-24 13:41:47 +0000
+MSG:fix: resolve TypeScript errors in bom-schemas, tests, and vitest config
+COMMIT:2e78d1ab0bf957fad0b890a223b364d9b0aa4dbd
+DATE:2025-11-24 13:38:00 +0000
+MSG:fix: add missing await for createServerSupabase in bom-service
+COMMIT:88bcb572045e6cf18c7ac90a06d0b8734a099f4a
+DATE:2025-11-24 13:30:39 +0000
+MSG:fix: add proper auth error handling in API routes
+COMMIT:f04fcbcab2912a82f32be2d58e38d4d0e75d740f
+DATE:2025-11-24 13:25:20 +0000
+MSG:fix: handle null values in Textarea for nullable description field
+COMMIT:e6c87359cc3fb63440fe22eeb483724cb5b19052
+DATE:2025-11-24 13:20:00 +0000
+MSG:fix: add .optional() before .default() in all form schemas
+COMMIT:f255e808ce9d38d72f115bf784b26eeed18b98fe
+DATE:2025-11-24 13:15:04 +0000
+MSG:fix: use z.input for CreateOperationInput type
+COMMIT:660904eeaba47be393c8eeb6e1a036e7e7bc6a50
+DATE:2025-11-24 13:10:26 +0000
+MSG:fix: make fields with defaults optional in createOperationSchema
+COMMIT:0c07535dc4fccd19a9bf4f74e42585af8013a8b3
+DATE:2025-11-24 13:05:43 +0000
+MSG:fix: add nullable support to all optional string fields
+COMMIT:6d2552f985198bb3329c7087d852b92f5266120a
+DATE:2025-11-24 12:57:01 +0000
+MSG:fix: allow null value for notes in TransferOrder interface
+COMMIT:56b0c5c5f32e7497dac18167f13cd32c3c99b1f5
+DATE:2025-11-24 12:46:12 +0000
+MSG:fix: allow null value for notes in TOLine interface
+COMMIT:94da865a1ec6caccc7f2c3166e90db5e4464fbf4
+DATE:2025-11-24 12:41:57 +0000
+MSG:fix: allow null value for description in UpdateRoutingInput
+COMMIT:277abe0feb8222eeb6da2de5ffdca59ea8d33149
+DATE:2025-11-24 12:30:42 +0000
+MSG:fix: resolve TypeScript type error for approval_status in purchase orders
+COMMIT:3fcb1802f79b753c4550e1c9c71d7e40d21570d8
+DATE:2025-11-24 12:21:57 +0000
+MSG:fix: resolve TypeScript type error in dashboard accentColors
+COMMIT:a02326d4fd9a40a4d2014a263e1db4e07b37ac4c
+DATE:2025-11-24 12:17:04 +0000
+MSG:Merge pull request #19 from CoderMariusz/claude/fix-useeffect-dependency-01HzzFnqoqGJSDnQSLk7mxg6
+COMMIT:9551091a4870aa266134efcf274db2b8c248f210
+DATE:2025-11-24 12:12:24 +0000
+MSG:fix: convert all API routes to use Next.js 15 async params
+COMMIT:dd298e353363a7bf80f4d6b8e92eaf67047ea68c
+DATE:2025-11-24 12:07:16 +0000
+MSG:Merge pull request #18 from CoderMariusz/claude/fix-useeffect-dependency-01HzzFnqoqGJSDnQSLk7mxg6
+COMMIT:6725046ccdc49f94cabbed76a710d09dfeded5ea
+DATE:2025-11-24 12:06:34 +0000
+MSG:fix: resolve Next.js 15 async params and useEffect dependency warnings
+COMMIT:28abf81b674ab56d66c29be74af2f92184996e87
+DATE:2025-11-24 11:51:07 +0000
+MSG:fix(planning): correct interface name typo in POLinesTable
+COMMIT:a6dd105ff6c69eb0ab76157fe5a4cc80d5114e3c
+DATE:2025-11-24 10:56:06 +0000
+MSG:Merge pull request #16 from CoderMariusz/claude/fix-textarea-import-01Kw9aPAc288rVchBP27gx1U
+COMMIT:882641e4f35888df85fa0c5fe4d66c5f2ce42825
+DATE:2025-11-24 10:55:23 +0000
+MSG:fix: add missing textarea component from shadcn/ui
+COMMIT:9c8d57a2ea2834a43aaf7faed7fc54ff5ae997ef
+DATE:2025-11-23 20:44:16 +0000
+MSG:fix(dashboard): handle null data and correct product filtering
+COMMIT:ff9e867b93badcdaa2b1ec295a0c2e5c9dd2854b
+DATE:2025-11-22 19:04:58 +0000
+MSG:fix(vercel): move vercel.json to apps/frontend for proper Next.js detection
+COMMIT:355c6eb116b6203d42112f8593bd8f0b19a2a8a6
+DATE:2025-11-22 18:59:37 +0000
+MSG:fix(vercel): add vercel.json for pnpm monorepo Next.js detection
+COMMIT:5d7e182e36bced0a766fc116a4f9754f470bb0bb
+DATE:2025-11-22 18:01:04 +0000
+MSG:fix(build): lazy initialize Redis to avoid build-time errors
+COMMIT:1b5e8c1a469441aba09c5bde393a7a6d4c69222e
+DATE:2025-11-22 17:29:35 +0000
+MSG:fix(tests): update test data generation to use UUIDs
+COMMIT:355f20a64910fdb83a9be9cd6cbb7c3e80733cc0
+DATE:2025-11-22 17:16:59 +0000
+MSG:fix(vercel): remove vercel.json to use dashboard configuration
+COMMIT:231944703c2093d33e26138e733895223a87033c
+DATE:2025-11-22 17:16:08 +0000
+MSG:fix(vercel): remove invalid rootDirectory property
+COMMIT:d48964f88b202bd5e8381bbbd297aceb4e35f3a2
+DATE:2025-11-22 17:11:08 +0000
+MSG:fix(vercel): simplify build commands for rootDirectory context
+COMMIT:0ecfef45a5fc6279ecb82e203e42ce9363f4a4e5
+DATE:2025-11-22 17:08:00 +0000
+MSG:fix(vercel): add rootDirectory and fix outputDirectory path
+COMMIT:f96d08751b359d7309f259362a6931e9b7662911
+DATE:2025-11-22 17:03:12 +0000
+MSG:fix(build): move JWT_SECRET to runtime helper in invitation-service
+COMMIT:855bd9902d7ab6085d47ee129b3e1ab02021d583
+DATE:2025-11-22 16:57:30 +0000
+MSG:fix(build): move JWT_SECRET check to runtime in invitation-client
+COMMIT:388814b2556423bb3766ca6730e2ff382acc9d89
+DATE:2025-11-22 16:53:49 +0000
+MSG:fix(api): update tax-codes route for Next.js 15 async params
+COMMIT:0bf43f159e0bd333eb376556c163d4cbae21f470
+DATE:2025-11-22 16:46:17 +0000
+MSG:fix(build): split invitation service for client/server compatibility
+COMMIT:06aec16cb8b0829b4b1043001dd825b8995f8754
+DATE:2025-11-22 16:41:42 +0000
+MSG:fix(vercel): install devDependencies to fix TypeScript conflict
+COMMIT:8b6d65ffc878d02bda6f74b1dfd1b3d21e153713
+DATE:2025-11-22 16:38:49 +0000
+MSG:fix(vercel): use pnpm workspace filter for build command
+COMMIT:75cf6b7a96a31f8ee430b130ebf578bf2393a890
+DATE:2025-11-22 16:22:25 +0000
+MSG:fix(vercel): remove rootDirectory and fix workspace build
+COMMIT:e09430fb173e5f8c96ee2ebb5444be69ab07b70a
+DATE:2025-11-22 16:19:53 +0000
+MSG:fix(vercel): add rootDirectory for monorepo configuration
+COMMIT:7a488e46c551e9492b604accf1d340b6fb02e785
+DATE:2025-11-22 16:16:30 +0000
+MSG:fix(vercel): remove ignoreCommand and fix build configuration
+COMMIT:07c5efd7bba8bb86bdd9b206bc4adbd0fa1df84f
+DATE:2025-11-22 16:01:44 +0000
+MSG:fix(vercel): refine vercel.json configuration for improved deployment
+COMMIT:2c12f152a132f159a452fdbbdb4271d32002c9a2
+DATE:2025-11-22 13:18:35 +0000
+MSG:fix(vercel): add vercel.json with correct monorepo config and fix ignoreCommand
+COMMIT:c7904dff804ab635077b88d58cc2fe9557aca1ac
+DATE:2025-11-22 13:01:13 +0000
+MSG:fix(vercel): remove problematic ignoreCommand
+COMMIT:54580705ede99c904d4c2b6d7a4bae2e8c2a9b49
+DATE:2025-11-22 12:56:45 +0000
+MSG:fix(vercel): move config to root and fix pnpm workspace install
+COMMIT:2eb4ee51bfd5a6257a001add19abd1ad2e2b7df2
+DATE:2025-11-22 12:51:41 +0000
+MSG:fix(vercel): update build config for pnpm workspace and fix husky warning
+COMMIT:9aa3f59203ff4de2b6b32f81aadc23b146dd231f
+DATE:2025-11-22 12:45:50 +0000
+MSG:fix(lint): escape apostrophe in InvitationSuccessModal
+COMMIT:9eaec4198ae215ad5608a14243607ca3f36d3d19
+DATE:2025-11-22 12:44:36 +0000
+MSG:fix(husky): disable pre-commit lint-staged and remove deprecated husky.sh
+COMMIT:c93182267008029ebd2f79c0304ae1f9f765d6d2
+DATE:2025-11-22 12:27:04 +0000
+MSG:fix(build): remove server-only and update Next.js config for Vercel
+COMMIT:7158eec44bbfa16df82b2c4b1c275407833f5698
+DATE:2025-11-22 12:20:02 +0000
+MSG:fix(build): add server-only import to prevent Vercel build error
+COMMIT:e85e62ca45e05f6a47ff6a9633b1e1c110e8fdc0
+DATE:2025-11-22 11:50:19 +0000
+MSG:fix(lint): escape quotes in allergen page
+COMMIT:603b20739a05e50c768e96974939e73981a97759
+DATE:2025-11-22 11:26:19 +0000
+MSG:security(critical): fix hardcoded Supabase access token in all migration scripts
+COMMIT:76ce50719df1c9a8731845aede9076c5727c27c4
+DATE:2025-11-22 10:59:12 +0000
+MSG:fix(epic-1): code review fixes for Story 1.8 Production Line Configuration
+COMMIT:d23b6056395dede0cec88ba230f0c965eae61820
+DATE:2025-11-22 07:22:07 +0000
+MSG:feat(dashboard): implement main dashboard with sidebar navigation and fixes
+COMMIT:cc4dd834d5a4388ad63b041eced790d9f2b3cf90
+DATE:2025-11-22 06:56:50 +0000
+MSG:debug: add logging to verify service role key
+COMMIT:3eb3bfd5fe3d6bf2cae1d2895232dff22de4c128
+DATE:2025-11-22 06:41:22 +0000
+MSG:fix(api): use service role key for user creation
+COMMIT:3ddebe375f5318fae53492ce10e3c734e00eed6c
+DATE:2025-11-22 06:19:45 +0000
+MSG:feat(api): add detailed error messages for user creation
+COMMIT:dea4c56984e7e11dd5824c3546d596d108415a83
+DATE:2025-11-21 22:15:42 +0000
+MSG:fix: resolve Next.js 15 dynamic routes and build errors
+COMMIT:89566d3d406ef6df2791651873319b3a250f78c8
+DATE:2025-11-21 22:06:07 +0000
+MSG:chore: add remaining UI components and fix import paths
+COMMIT:b65324130ff4eab7c34176cacec8e6dab09cbd10
+DATE:2025-11-21 20:02:58 +0000
+MSG:fix(eslint): escape quotes and apostrophes in JSX
+COMMIT:c1b5155575e44725ca77cf4c785b37b2c9789a22
+DATE:2025-11-21 20:01:25 +0000
+MSG:chore: add missing UI components and dependencies
+COMMIT:55bd470493c732700fc1a3d2741da4f8aafc4801
+DATE:2025-11-21 14:43:57 +0000
+MSG:fix(ci): correct app folder paths and disable broken tests
+COMMIT:30aaf7c352271d79a02ade9ebeaef71e66df4bed
+DATE:2025-11-21 13:53:30 +0000
+MSG:fix: update package.json paths and add pre-push hook script
+COMMIT:3c0196a4506f481028066c4a51c6a5f1e53d8560
+DATE:2025-11-19 16:20:46 +0000
+MSG:fix(prd): update Quality and Shipping with user decisions
+COMMIT:77ce4099dc920d03061ae4e39748ffd8aff62ffb
+DATE:2025-11-19 12:38:02 +0000
+MSG:Merge pull request #6 type error fix
+COMMIT:fe1292c2ab6929a2312e492a5f31e9a5e4c72064
+DATE:2025-11-19 12:37:17 +0000
+MSG:fix: resolve type error in scanner process page
+COMMIT:a4f70db1b17c45a01bbf6ff8ac91d47bc04c8fc3
+DATE:2025-11-19 12:34:50 +0000
+MSG:Merge fix errors with db api
+COMMIT:65e6cda4cdd1ec4429eeb9bee4665d67dc10e6b4
+DATE:2025-11-19 12:02:06 +0000
+MSG:fix(story-0-14): Fix BOM history display
+COMMIT:6827c90c20dc3ca65813dc4ce242e884d217900d
+DATE:2025-11-19 12:00:36 +0000
+MSG:feat(story-0-13): Add missing BOM API GET endpoints
+COMMIT:9c984bbdbd16ca8b74d0b0f9059d1c1f1ba95cc8
+DATE:2025-11-19 10:06:57 +0000
+MSG:docs: Add BOM API requirements and fix stories
+COMMIT:b73234db11f1b98dd15314a02743c2f7be9501d1
+DATE:2025-11-19 08:47:40 +0000
+MSG:fix: Update NotificationsAPI documentation with comment addition
+COMMIT:0defde4747b4924e44e1848152a0f5b1178c9d88
+DATE:2025-11-17 22:21:42 +0000
+MSG:fix: Convert Tax Codes to use server-side API routes instead of client-side Supabase
+COMMIT:e9e7e27598a2226629acd51c056b3dd1f93965b9
+DATE:2025-11-17 21:59:49 +0000
+MSG:fix: Add explicit cookie handling to browser Supabase client for Next.js 15
+COMMIT:8639af25f4c98f8962c4a60121a16d8c60328bb0
+DATE:2025-11-17 21:25:44 +0000
+MSG:fix: Downgrade react-data-grid for React 19 compatibility
+COMMIT:98e12bf694546945b14262c8e90925fec81165a4
+DATE:2025-11-17 21:07:39 +0000
+MSG:test: Fix failing unit tests in licensePlates and pallets
+COMMIT:bdd35064201a5d2b20936d1ed0bc5fbc2247faca
+DATE:2025-11-17 21:07:39 +0000
+MSG:test: Fix failing unit tests in licensePlates and pallets
+COMMIT:69a567fb852ce9b4c9635cbef5aa98745f2f80a5
+DATE:2025-11-17 21:03:51 +0000
+MSG:fix(db): Add RLS policies for settings tables (migration 107)
+COMMIT:322bab7970731ad340906b5e57c10a9cbc0964d1
+DATE:2025-11-16 23:59:30 +0000
+MSG:fix(api): Fix 5 critical schema/payload mismatches found in audit
+COMMIT:ec1775d70871179538316fde2dda5d03b8f26712
+DATE:2025-11-14 22:17:11 +0000
+MSG:feat(epic-0): Story 0.1 - Fix PO Header warehouse_id (CRITICAL) ✅ APPROVED
+COMMIT:4cd6474af7aa1198392b9bacfafa03ead14032ff
+DATE:2025-11-14 00:33:31 +0000
+MSG:fix(locations): set updated_at on updates and deletes
+COMMIT:6bb9d5a727d3989281131cb6167cd794024b807d
+DATE:2025-11-13 15:19:00 +0000
+MSG:fix(vercel): Fix Next.js 15 params type errors in cost API routes
+COMMIT:b3abba45d3d2ae038198ca7b680031f8cf0a3a1f
+DATE:2025-11-12 22:58:26 +0000
+MSG:fix(stability): Complete stability audit - middleware fix & comprehensive reports
+COMMIT:cf69a054c45d6aea18c763cb7613a35cae84fb3d
+DATE:2025-11-12 20:45:31 +0000
+MSG:fix(transfer-orders): Synchronize Transfer Order types and components with database schema
+COMMIT:cce33be57134716bca3114ebbef4db5cea900049
+DATE:2025-11-12 19:57:27 +0000
+MSG:Fix pallet creation test expectation
+COMMIT:baa252bc10e58ffa5b33c8eaf78c4112267401b0
+DATE:2025-11-12 16:42:14 +0000
+MSG:chore: Fix lint unused variable in E2E test
+COMMIT:1920ce99bc01bc857e2e75f8079ed3e6b28344c4
+DATE:2025-11-12 13:00:49 +0000
+MSG:fix: Remove unused ASNItem import
+COMMIT:d0dee8c5917bd27a33576f74afa051221123b878
+DATE:2025-11-12 12:36:57 +0000
+MSG:fix: Remove unused variable in ReceiveASNModal
+COMMIT:6c721c0dcfd778840028adf385ce9a6dea6a7b97
+DATE:2025-11-12 12:07:45 +0000
+MSG:fix test error
+COMMIT:0e7311c4e14543dd30998dd4c14a9d04e4efd002
+DATE:2025-11-04 11:00:36 +0000
+MSG:Fix pre-push tests and handle MCP-less e2e
+COMMIT:f03a368576560608ddbac9f29dbbedad044f4812
+DATE:2025-11-04 09:54:58 +0000
+MSG:docs: add comprehensive TypeScript error prevention system
+COMMIT:92ba1f4639a7c3626feb0e9f002040731f834e05
+DATE:2025-11-04 09:49:28 +0000
+MSG:test: file with type error - should be rejected
+COMMIT:3abfd3b871d2cf55517f4a675d26df3ff332547a
+DATE:2025-11-04 08:57:09 +0000
+MSG:Remove LazyAddItemModal due to missing file and update comments in LazyModal component
+COMMIT:86ff22fe2b4714fc54342247d393ce07117ab5c0
+DATE:2025-10-20 14:40:06 +0100
+MSG:Enhance product management modals with allergen support and improved error handling
+COMMIT:c40893d3ebf0ebf214add096f034558de8789288
+DATE:2025-10-17 22:21:48 +0100
+MSG:Enhance API error handling and logging for improved reliability
+COMMIT:e5cdd4fa5755a5ef46886f83f3c7808f0ea9dd61
+DATE:2025-10-10 09:37:58 +0000
+MSG:Fix issues with work order line selection and BOM component display
+COMMIT:1a11aa6d50a032b8a0e16737ca154f5eef2f4c15
+DATE:2025-10-10 09:28:18 +0000
+MSG:Fix issues with work order component and BOM line selection
+COMMIT:d985b55df5be0b59a976b5dea481b2d03b36db96
+DATE:2025-10-09 12:29:29 +0000
+MSG:Fix stock movement and item display issues in warehouse operations
+COMMIT:47a5681752e38dc38d1fe674e2fa8a94ecbe900c
+DATE:2025-10-09 12:07:42 +0000
+MSG:Fix issues with copying orders to the warehouse and LP stock
+COMMIT:5f96c0eed97cfe67590d0acaf80dadaf209333a7
+DATE:2025-10-09 11:47:02 +0000
+MSG:Update LP Operations tab to LP Stock and add missing item details
+COMMIT:4a4ebac4058b8331598ce6b2af10db195912779d
+DATE:2025-10-08 14:01:09 +0000
+MSG:Improve API request handling for better error management

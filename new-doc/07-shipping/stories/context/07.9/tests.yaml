@@ -1,0 +1,560 @@
+# Story 07.9 - Pick Confirmation Desktop Test Context
+# Status: Ready for Implementation
+# Last Updated: 2025-12-18
+
+# Acceptance Criteria Test Mapping
+acceptance_criteria:
+  ac_1_start_pick_list:
+    id: "AC-1"
+    name: "Start Pick List"
+    gherkin: |
+      Given a pick list with status = 'assigned'
+      And the current user is the assigned picker (or has Warehouse+ role)
+      When the user clicks "Start Picking" on the pick list detail page
+      Then the system updates pick_list.status to 'in_progress'
+      And updates pick_list.started_at to current timestamp
+      And navigates to /shipping/pick-lists/:id/pick (pick confirmation page)
+      And displays the first pending pick line (sorted by pick_sequence)
+    test_cases:
+      - name: "Start as assigned picker"
+        given: |
+          - Pick list PL-001 assigned to User A
+          - User A is logged in
+        when: "User A clicks [Start Picking]"
+        then: |
+          - pick_list.status = 'in_progress'
+          - pick_list.started_at is set
+          - Page navigates to /pick-lists/PL-001/pick
+          - First line (pick_sequence=1) is displayed
+      - name: "Start as Warehouse Manager (override)"
+        given: |
+          - Pick list PL-001 assigned to User A
+          - User B (Warehouse Manager) is logged in
+        when: "User B clicks [Start Picking]"
+        then: |
+          - pick_list.status = 'in_progress' (override allowed)
+          - Navigation succeeds
+      - name: "Reject: User not assigned"
+        given: |
+          - Pick list PL-001 assigned to User A
+          - User C (Picker) is logged in (not assigned)
+        when: "User C tries to access /pick-lists/PL-001/pick"
+        then: |
+          - Return 404 (RLS policy blocks access)
+          - Redirect to /pick-lists with error toast
+
+  ac_2_display_pick_confirmation_page:
+    id: "AC-2"
+    name: "Display Pick Confirmation Page"
+    gherkin: |
+      Given a pick list with status = 'in_progress'
+      When the user navigates to /shipping/pick-lists/:id/pick
+      Then the system displays pick list header and current line
+    test_cases:
+      - name: "Display complete page layout"
+        given: "Pick list PL-001 with 12 lines in progress"
+        when: "Page loads"
+        then: |
+          - Header: PL-001, status In Progress, priority High
+          - Progress: "Picked 3 of 12 lines (25%)"
+          - Current line: Greek Yogurt 500g, Location CHI-01-A-05, Qty 50 Units
+          - LP barcode: LP-2025-0891 (CODE128 + human-readable)
+          - Quantity input: default 50 (editable)
+          - Allergen warning (if applicable)
+          - Buttons: [Confirm Pick], [Short Pick], [Skip]
+          - [Complete Pick List] button (enabled if all picked/short)
+
+  ac_3_confirm_full_pick:
+    id: "AC-3"
+    name: "Confirm Full Pick"
+    gherkin: |
+      Given a pick line with quantity_to_pick = 50 units
+      And the picker has physically picked 50 units from the license plate
+      When the picker enters 50 in the quantity input and clicks "Confirm Pick"
+      Then the system: validates, updates 4 tables, shows success
+    test_cases:
+      - name: "Full pick success"
+        given: |
+          - Line: Qty to pick = 50, LP has 60 units
+          - Picker enters 50
+        when: "Picker clicks [Confirm Pick]"
+        then: |
+          - pick_list_lines.quantity_picked = 50
+          - pick_list_lines.status = 'picked'
+          - inventory_allocations.quantity_picked = 50
+          - sales_order_lines.quantity_picked += 50
+          - license_plates.quantity_on_hand -= 50
+          - Toast: "Line picked successfully"
+          - Advance to next line
+          - Progress updates: "Picked 4 of 12 lines (33%)"
+      - name: "Reject: quantity exceeds allocated"
+        given: |
+          - Line: Qty to pick = 50
+          - Picker enters 60
+        when: "Picker clicks [Confirm Pick]"
+        then: |
+          - Error: "Cannot pick more than allocated (50 units)"
+          - Input highlighted in red
+          - No database update
+          - Stay on current line
+
+  ac_4_confirm_partial_pick_short:
+    id: "AC-4"
+    name: "Confirm Partial Pick (Short Pick)"
+    gherkin: |
+      Given a pick line with quantity_to_pick = 50 units
+      And the license plate only has 30 units available
+      When the picker enters 30 and clicks "Short Pick"
+      Then the system displays ShortPickModal with reason dropdown
+    test_cases:
+      - name: "Short pick with reason"
+        given: |
+          - Line: Qty to pick = 50, LP has 30
+          - Picker selects 30, clicks [Short Pick]
+        when: "Picker selects reason 'Insufficient Inventory', clicks [Confirm Short Pick]"
+        then: |
+          - pick_list_lines.quantity_picked = 30
+          - pick_list_lines.status = 'short'
+          - pick_list_lines.notes = "insufficient_inventory"
+          - inventory_allocations.quantity_picked = 30
+          - sales_order_lines.quantity_picked += 30
+          - license_plates.quantity_on_hand -= 30
+          - Backorder created for 20 units
+          - Toast: "Short pick recorded. Backorder created for 20 units."
+          - Advance to next line
+      - name: "Reject: reason not selected"
+        given: "Short pick modal open"
+        when: "Picker tries to confirm without selecting reason"
+        then: |
+          - [Confirm Short Pick] button disabled
+          - Error message: "Reason is required"
+          - Modal stays open
+
+  ac_5_validation_cannot_pick_more:
+    id: "AC-5"
+    name: "Validation - Cannot Pick More Than Allocated"
+    gherkin: |
+      Given a pick line with quantity_to_pick = 50 units
+      When the picker enters 60 units and clicks "Confirm Pick"
+      Then the system displays error message
+    test_cases:
+      - name: "Quantity validation"
+        given: "Qty to pick = 50, Picker enters 60"
+        when: "Click [Confirm Pick]"
+        then: |
+          - Error: "Cannot pick more than allocated quantity (50 units)"
+          - Input field highlighted in red
+          - No database update
+
+  ac_6_allergen_warning_display:
+    id: "AC-6"
+    name: "Allergen Warning Display"
+    gherkin: |
+      Given a customer with allergen_restrictions = ["gluten", "dairy"]
+      And a pick line for a product with allergens = ["gluten"]
+      When the pick confirmation page displays this line
+      Then the system shows a prominent warning banner
+    test_cases:
+      - name: "Allergen conflict detected and displayed"
+        given: |
+          - Customer: Premium Foods (restrictions: dairy, nuts)
+          - Product: Greek Yogurt (allergens: dairy)
+        when: "Line loads in pick confirmation page"
+        then: |
+          - Red/orange alert banner displayed
+          - Text: "ALLERGEN ALERT: This product contains DAIRY. Customer is allergic to DAIRY."
+          - [✓] Acknowledge checkbox shown
+          - [Confirm Pick] button disabled until checkbox checked
+      - name: "No warning if no conflict"
+        given: |
+          - Customer: Premium Foods (restrictions: dairy, nuts)
+          - Product: Frozen Berries (allergens: none)
+        when: "Line loads"
+        then: |
+          - No allergen warning displayed
+          - [Confirm Pick] button enabled immediately
+
+  ac_7_complete_pick_list:
+    id: "AC-7"
+    name: "Complete Pick List"
+    gherkin: |
+      Given a pick list with 12 lines (10 picked, 2 short)
+      When the picker clicks "Complete Pick List"
+      Then the system validates all lines picked/short and updates SO status
+    test_cases:
+      - name: "Complete with all lines picked"
+        given: |
+          - Pick list with 12 lines
+          - All 12 lines have status='picked'
+        when: "Picker clicks [Complete Pick List]"
+        then: |
+          - pick_list.status = 'completed'
+          - pick_list.completed_at = NOW()
+          - sales_orders updated (if fully picked: status='packing')
+          - Toast: "Pick list PL-001 completed. 12 lines picked, 0 short picks."
+          - Redirect to completion summary page
+      - name: "Complete with short picks"
+        given: |
+          - Pick list with 12 lines
+          - 10 picked, 2 short (status='picked' or 'short')
+        when: "Picker clicks [Complete Pick List]"
+        then: |
+          - pick_list.status = 'completed'
+          - sales_orders updated (status='partial' if any short)
+          - Toast: "Pick list completed. 10 picked, 2 short."
+      - name: "Reject: pending lines exist"
+        given: |
+          - Pick list with 12 lines
+          - 8 picked, 2 pending, 2 short
+        when: "Picker clicks [Complete Pick List]"
+        then: |
+          - Error: "Cannot complete. 2 lines still pending."
+          - Highlight pending lines in table
+          - Stay on current page
+
+  ac_8_real_time_progress:
+    id: "AC-8"
+    name: "Real-Time Progress Indicator"
+    gherkin: |
+      Given a pick list with 12 lines
+      When the picker confirms each pick
+      Then the progress indicator updates without page reload
+    test_cases:
+      - name: "Progress updates on each pick"
+        given: "Pick list loaded, 0 of 12 picked"
+        when: |
+          - Picker confirms line 1
+          - Picker confirms line 2
+          - Picker confirms line 3
+        then: |
+          - After line 1: "Picked 1 of 12 lines (8%)"
+          - After line 2: "Picked 2 of 12 lines (17%)"
+          - After line 3: "Picked 3 of 12 lines (25%)"
+          - Progress bar fills proportionally
+          - No page reload
+
+  ac_9_permission_validation_assigned_picker:
+    id: "AC-9"
+    name: "Permission Validation - Assigned Picker Only"
+    test_cases:
+      - name: "Assigned picker has access"
+        given: |
+          - Pick list assigned to User A
+          - User A is logged in
+        when: "User A navigates to /pick-lists/:id/pick"
+        then: "Page loads successfully"
+      - name: "Other picker blocked (404)"
+        given: |
+          - Pick list assigned to User A
+          - User B (Picker role) is logged in
+        when: "User B navigates to /pick-lists/:id/pick"
+        then: |
+          - Return 404 (RLS policy blocks)
+          - Redirect to /pick-lists
+      - name: "Warehouse Manager can override"
+        given: |
+          - Pick list assigned to User A
+          - User C (Warehouse Manager) is logged in
+        when: "User C navigates to /pick-lists/:id/pick"
+        then: "Page loads successfully (role override)"
+
+  ac_10_lp_barcode_display:
+    id: "AC-10"
+    name: "LP Barcode Display for Scanner Users"
+    test_cases:
+      - name: "Display barcode and human-readable LP"
+        given: "Pick line with license_plate.lp_number = 'LP-2025-00042'"
+        when: "Pick confirmation page loads"
+        then: |
+          - Human-readable: "LP-2025-00042" (large font)
+          - CODE128 barcode: Generated and displayed
+          - Text: "Scan LP with handheld scanner"
+          - User can visually verify LP number
+
+  ac_11_multi_tenant_isolation:
+    id: "AC-11"
+    name: "Multi-Tenant Isolation"
+    test_cases:
+      - name: "Cross-tenant access blocked"
+        given: |
+          - Pick list PL-001 belongs to Org A
+          - User from Org B attempts access
+        when: "User queries /api/shipping/pick-lists/PL-001 or page"
+        then: |
+          - RLS policy blocks (returns 404)
+          - User cannot see Org A's data
+          - All pick operations enforce org_id filter
+
+# Unit Test Specifications
+unit_tests:
+  pick_confirmation_service:
+    path: "lib/services/__tests__/pick-confirmation-service.test.ts"
+    test_suites:
+      - describe: "PickConfirmationService.confirmPick()"
+        tests:
+          - "Should validate quantity <= quantity_to_pick"
+          - "Should throw error if quantity exceeds limit"
+          - "Should validate LP has sufficient on_hand"
+          - "Should throw error if LP quantity insufficient"
+          - "Should update 4 tables in transaction"
+          - "Should return success with updated line and progress"
+          - "Should rollback if any update fails"
+
+      - describe: "PickConfirmationService.confirmShortPick()"
+        tests:
+          - "Should validate quantity < quantity_to_pick"
+          - "Should require reason in enum"
+          - "Should update 4 tables with status='short'"
+          - "Should create backorder if partial fulfillment"
+          - "Should return backorder_created flag"
+
+      - describe: "PickConfirmationService.completePickList()"
+        tests:
+          - "Should validate all lines are picked or short"
+          - "Should throw error if any lines pending"
+          - "Should update pick_list.status to 'completed'"
+          - "Should update SO status to 'packing' if fully picked"
+          - "Should update SO status to 'partial' if short picks"
+          - "Should return completion summary"
+
+      - describe: "AllergenWarningBanner allergen conflict detection"
+        tests:
+          - "Should return true if product allergen matches customer restriction"
+          - "Should return false if no conflict"
+          - "Should handle null restrictions"
+          - "Should handle null allergens"
+
+      - describe: "Progress calculation"
+        tests:
+          - "Should calculate percentage correctly (picked + short) / total"
+          - "Should return 0% when no lines picked"
+          - "Should return 100% when all lines picked or short"
+
+  validation_schemas:
+    path: "lib/validation/__tests__/pick-confirmation-schema.test.ts"
+    test_suites:
+      - describe: "confirmPickSchema"
+        tests:
+          - "Should pass with valid quantity"
+          - "Should fail if quantity is zero"
+          - "Should fail if quantity is negative"
+          - "Should fail if LP ID is invalid UUID"
+          - "Should fail if required fields missing"
+
+      - describe: "shortPickSchema"
+        tests:
+          - "Should pass with valid reason"
+          - "Should fail if reason not in enum"
+          - "Should fail if quantity >= quantity_to_pick"
+          - "Should allow notes up to 500 chars"
+          - "Should fail if notes exceed limit"
+
+# Integration Test Specifications
+integration_tests:
+  path: "tests/integration/shipping/pick-confirmation.spec.ts"
+  test_suites:
+    - describe: "Pick Confirmation API Integration"
+      tests:
+        - name: "POST /api/shipping/pick-lists/:id/start"
+          flow: |
+            1. Create pick list in 'assigned' status
+            2. Call POST /start
+            3. Verify status changed to 'in_progress'
+            4. Verify started_at timestamp set
+            5. Verify RLS prevents cross-tenant access
+
+        - name: "PUT /api/shipping/pick-lists/:id/lines/:lineId/pick"
+          flow: |
+            1. Create pick list with 1 line (qty_to_pick=50, LP qty=100)
+            2. Call PUT with quantity_picked=50
+            3. Verify 4 table updates:
+               - pick_list_lines.quantity_picked=50, status='picked'
+               - inventory_allocations.quantity_picked=50
+               - sales_order_lines.quantity_picked+=50
+               - license_plates.quantity_on_hand-=50
+            4. Verify progress returned
+            5. Verify response structure
+
+        - name: "POST /api/shipping/pick-lists/:id/lines/:lineId/short-pick"
+          flow: |
+            1. Create pick list with 1 line (qty_to_pick=50)
+            2. Call POST with quantity_picked=30, reason='insufficient_inventory'
+            3. Verify status='short', notes set
+            4. Verify backorder_created=true (if partial SO)
+            5. Verify 4 table updates
+
+        - name: "POST /api/shipping/pick-lists/:id/complete"
+          flow: |
+            1. Create pick list with 12 lines
+            2. Confirm 10 lines as 'picked', 2 as 'short'
+            3. Call POST /complete
+            4. Verify pick_list.status='completed'
+            5. Verify sales_orders updated (status=packing if fully picked, partial if short)
+            6. Verify summary returned with line counts
+
+# E2E Test Specifications
+e2e_tests:
+  path: "tests/e2e/shipping/pick-confirmation-desktop.spec.ts"
+  framework: "Playwright"
+  setup: |
+    1. Create test organization
+    2. Create test users (Picker, Manager)
+    3. Create pick list with 12 lines (various products)
+    4. Seed test data (customers, products, LPs, allocations)
+  test_suites:
+    - describe: "Pick Confirmation Happy Path"
+      tests:
+        - name: "Complete full pick list without short picks"
+          steps: |
+            1. Login as assigned picker
+            2. Navigate to /pick-lists/:id
+            3. Click [Start Picking]
+            4. Verify page navigates to /pick-lists/:id/pick
+            5. Verify first line displayed
+            6. Enter quantity=50, click [Confirm Pick]
+            7. Verify progress updates to 1 of 12
+            8. Repeat for all 12 lines
+            9. Click [Complete Pick List]
+            10. Verify completion summary shown
+            11. Verify SO status changed to 'packing'
+          assertions: |
+            - All lines have status='picked'
+            - pick_list.status='completed'
+            - sales_orders.status='packing' (or 'partial' if any short)
+            - Progress shows 100%
+
+        - name: "Pick list with short picks and backorder"
+          steps: |
+            1. Start pick list
+            2. Pick lines 1-5 normally
+            3. On line 6: Enter qty=30 (less than required 50)
+            4. Click [Short Pick]
+            5. Select reason 'Insufficient Inventory', click [Confirm]
+            6. Verify progress updated
+            7. Pick remaining lines (7-12)
+            8. Click [Complete Pick List]
+            9. Verify SO status='partial'
+          assertions: |
+            - Line 6 has status='short'
+            - Line 6.notes contains 'insufficient_inventory'
+            - Backorder created for 20 units
+            - SO status='partial'
+
+        - name: "Allergen conflict workflow"
+          setup: |
+            - Pick list for customer with allergen restriction: dairy
+            - Line with product: Greek Yogurt (dairy)
+          steps: |
+            1. Start pick list
+            2. Navigate to Greek Yogurt line
+            3. Verify red allergen warning banner displayed
+            4. Verify [Confirm Pick] button disabled
+            5. Check acknowledgment checkbox
+            6. Verify [Confirm Pick] button enabled
+            7. Enter quantity, click [Confirm Pick]
+            8. Verify pick confirmed
+          assertions: |
+            - Allergen warning shown
+            - Checkbox required to unlock button
+            - Pick confirmed after acknowledgment
+
+        - name: "Permission check: non-assigned picker blocked"
+          setup: |
+            - Pick list assigned to User A
+            - Logged in as User B (Picker role, different user)
+          steps: |
+            1. Navigate to /pick-lists/:pick_list_id/pick
+            2. Verify access denied (404 or redirect)
+          assertions: |
+            - Page returns 404 or redirects
+            - Error toast shown
+
+        - name: "Error handling: quantity validation"
+          steps: |
+            1. Start pick list
+            2. Enter quantity=100 (exceeds required 50)
+            3. Click [Confirm Pick]
+            4. Verify error message: "Cannot pick more than allocated (50 units)"
+            5. Verify input highlighted in red
+            6. Correct quantity to 50
+            7. Click [Confirm Pick]
+            8. Verify pick succeeds
+          assertions: |
+            - Error message clear and helpful
+            - No partial update to database
+            - User can recover by correcting input
+
+        - name: "Real-time progress without page reload"
+          steps: |
+            1. Start pick list
+            2. Confirm line 1
+            3. Verify progress updates to 1 of 12 (no reload)
+            4. Confirm line 2
+            5. Verify progress updates to 2 of 12 (no reload)
+          assertions: |
+            - Progress bar updates smoothly
+            - No page reload or flicker
+            - Toast messages appear/dismiss
+
+# Performance Tests
+performance_tests:
+  description: "Optional but recommended"
+  test_cases:
+    - name: "Pick confirmation response time"
+      target: "< 500ms"
+      test: |
+        - Confirm 100 picks sequentially
+        - Measure average response time
+        - Verify all succeed
+    - name: "Page load time"
+      target: "< 2s"
+      test: |
+        - Load /pick-lists/:id/pick with 20 lines
+        - Measure time to interactive
+    - name: "Concurrent picks"
+      target: "Support 5 simultaneous pickers"
+      test: |
+        - 5 users confirm picks simultaneously
+        - Verify no conflicts or data corruption
+        - Verify all updates successful
+
+# Testing Checklist
+testing_checklist:
+  unit_tests:
+    - "[ ] PickConfirmationService.confirmPick() - 6 tests"
+    - "[ ] PickConfirmationService.confirmShortPick() - 4 tests"
+    - "[ ] PickConfirmationService.completePickList() - 4 tests"
+    - "[ ] Allergen conflict detection - 4 tests"
+    - "[ ] Progress calculation - 5 tests"
+    - "[ ] Validation schemas - 8 tests"
+    - "Total: 31+ unit tests, target >80% coverage"
+
+  integration_tests:
+    - "[ ] POST /start endpoint"
+    - "[ ] PUT /pick endpoint (full pick)"
+    - "[ ] POST /short-pick endpoint"
+    - "[ ] POST /complete endpoint"
+    - "[ ] GET /pick-lists/:id endpoint"
+    - "[ ] RLS policy enforcement"
+    - "[ ] Transaction rollback on error"
+    - "Total: 7+ integration tests"
+
+  e2e_tests:
+    - "[ ] Happy path: full pick list"
+    - "[ ] Short pick with backorder"
+    - "[ ] Allergen conflict handling"
+    - "[ ] Permission validation"
+    - "[ ] Error recovery"
+    - "[ ] Real-time progress"
+    - "Total: 6+ E2E tests"
+
+  manual_testing:
+    - "[ ] Desktop layout (>1024px)"
+    - "[ ] Tablet layout (768-1024px)"
+    - "[ ] Mobile layout (<768px)"
+    - "[ ] Touch interactions (buttons, modals)"
+    - "[ ] Keyboard navigation (Tab, Enter, Escape)"
+    - "[ ] Screen reader (NVDA, JAWS)"
+    - "[ ] Browser compatibility (Chrome, Firefox, Safari)"
+    - "[ ] Performance (DevTools)"
+    - "[ ] Accessibility (axe DevTools)"

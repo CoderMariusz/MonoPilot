@@ -1,0 +1,263 @@
+# Story 06.11 - Final Inspection & Batch Release (Entry Point)
+# Generated: 2025-12-18
+# Purpose: Story metadata, dependencies, overview - read this first
+# Phase: 2 (In-Process & Final)
+
+story:
+  id: "06.11"
+  name: "Final Inspection & Batch Release"
+  slug: "final-inspection-batch-release"
+  epic: "06-quality"
+  phase: "2"
+  complexity: "L"
+  estimate_days: 5-7
+  type: "full-stack"
+  state: "ready"
+  priority: "P0"
+  regulatory_critical: true
+
+# Files in this context folder
+context_files:
+  - _index.yaml           # This file - metadata, dependencies, overview
+  - database.yaml         # Tables, RLS, migrations, triggers, indexes
+  - api.yaml              # Endpoints, request/response schemas, services
+  - frontend.yaml         # Components, pages, types, hooks, UX
+  - tests.yaml            # Acceptance criteria, test specifications, E2E scenarios
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["org_id context", "RLS pattern", "users table", "roles table"]
+    - story: "02.1"
+      name: "Products CRUD"
+      provides: ["products table", "product reference"]
+    - story: "03.10"
+      name: "Work Orders"
+      provides: ["work_orders table", "WO completion event", "batch_number field"]
+    - story: "04.2c"
+      name: "WO Complete"
+      provides: ["WO completion trigger", "signal to create final inspection"]
+    - story: "05.1"
+      name: "License Plates CRUD"
+      provides: ["license_plates table", "LP service", "LP context", "qa_status field"]
+    - story: "05.7"
+      name: "LP QA Status Management"
+      provides: ["LP qa_status workflow", "release_status field"]
+    - story: "06.0"
+      name: "Quality Settings"
+      provides: ["quality_settings table", "require_final_inspection setting"]
+    - story: "06.1"
+      name: "Quality Status Types"
+      provides: ["QA status enum", "quality_status_transitions"]
+    - story: "06.3"
+      name: "Product Specifications"
+      provides: ["quality_specifications table", "test parameters for specifications"]
+    - story: "06.4"
+      name: "Test Parameters"
+      provides: ["quality_spec_parameters table", "parameter definitions"]
+    - story: "06.5"
+      name: "Incoming Inspection"
+      provides: ["quality_inspections table schema", "inspection patterns"]
+    - story: "06.6"
+      name: "Test Results Recording"
+      provides: ["quality_test_results table", "test recording UI patterns"]
+    - story: "06.10"
+      name: "In-Process Inspection"
+      provides: ["in-process inspection data", "reference for evidence aggregation"]
+
+  blocked_by: []
+
+  blocks:
+    - story: "06.27"
+      name: "CoA Templates"
+      reason: "Released batches trigger CoA generation"
+    - story: "06.28"
+      name: "CoA Generation"
+      reason: "Release status triggers auto-generation"
+    - epic: "07"
+      name: "Shipping Module"
+      reason: "LP.release_status='released' gates shipping eligibility"
+    - epic: "09"
+      name: "Finance Module"
+      reason: "Released batches eligible for invoicing"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/quality.md"
+    sections: ["FR-QA-007", "FR-QA-010", "Section 9.3 - Final Inspection"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/quality.md"
+    sections: ["quality_inspections table", "Batch Release API", "RLS policies"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/06-quality/06.11.final-inspection-batch-release.md"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "PRIMARY - RLS policy pattern for batch_release_records"
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-001-multi-tenancy-isolation.md"
+      relevance: "Multi-tenancy isolation across all quality tables"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/QA-007-final-inspection-part1.md"
+      relevance: "Final inspection queue, detail page, spec verification"
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/QA-007-final-inspection-part2.md"
+      relevance: "Batch traceability, CCP review, documentation & sign-off"
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/QA-010-batch-release.md"
+      relevance: "Batch release queue, detail page, pre-release checklist, approval"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 2
+    description: "batch_release_records, batch_release_lps, release_number_sequences tables + RLS policies"
+  - type: "trigger/function"
+    count: 3
+    description: "create_final_inspection_on_wo_complete(), generate_release_number(), update_lp_release_status_on_batch_release()"
+  - type: "service"
+    count: 1
+    description: "batch-release-service.ts with release check, approval, LP updates"
+  - type: "validation"
+    count: 2
+    description: "releaseChecklistSchema, batchReleaseRequestSchema, batchReleaseListQuerySchema"
+  - type: "api"
+    count: 7
+    description: "GET/POST inspections/final, GET evidence, POST release-check, POST release, GET batch-releases, etc."
+  - type: "components"
+    count: 14
+    description: "FinalInspectionDataTable, EvidenceSummaryPanel, ReleaseChecklist, ReleaseApprovalModal, etc."
+  - type: "page"
+    count: 3
+    description: "/quality/inspections/final, /quality/batch-release/[id], batch release queue"
+  - type: "test"
+    count: 3
+    description: "Unit tests (service), Integration tests (API), E2E tests (full workflow)"
+
+# Technical notes
+technical_notes:
+  - "Inspection types: 'final' (this story), extends 'incoming' and 'in_process' from previous stories"
+  - "Inspection status workflow: scheduled → in_progress → completed"
+  - "Inspection result: pass, fail, conditional - determined on completion"
+  - "Auto-create final inspection on WO completion (configurable via quality_settings.require_final_inspection)"
+  - "Inspection number format: INS-FIN-{YYYY}-{NNNNN} (e.g., INS-FIN-2025-00001)"
+  - "LP QA status updated on inspection completion: passed/failed/conditional"
+  - "LP release_status field gates shipment: pending → released/rejected/hold"
+  - "Two-step release: inspection completion (inspector) + batch release approval (QA Manager)"
+  - "QA Manager role required for batch release approval - cannot override once failed"
+  - "Batch release records immutable once approved (no edit, only new release for changes)"
+  - "Release number format: REL-{YYYY}-{NNNNN} (e.g., REL-2025-00001)"
+  - "Audit trail required for all release decisions (quality_audit_log)"
+  - "E-signature ready fields for FDA 21 CFR Part 11 compliance (Phase 3)"
+  - "Retention sample management deferred to Phase 4"
+  - "Return 404 (not 403) for cross-tenant access per ADR-013"
+
+# Business Rules
+business_rules:
+  - rule: "Final Inspection Required"
+    description: "All batches require final inspection before release (100% coverage)"
+    enforcement: "Auto-create on WO completion if setting enabled"
+
+  - rule: "Two-Step Release Process"
+    description: "Inspection completion and batch release are separate steps"
+    enforcement: "API endpoints separate for completion and release"
+
+  - rule: "QA Manager Approval Mandatory"
+    description: "Only QA_MANAGER or QUALITY_DIRECTOR role can approve/reject batch release"
+    enforcement: "RLS policy on batch_release_records.approved_by requires role check"
+
+  - rule: "Inspector Submit"
+    description: "QA_INSPECTOR can complete inspection but not approve release"
+    enforcement: "Different button/state based on role"
+
+  - rule: "Checklist Minimum"
+    description: "At least 4 of 6 checklist items must be confirmed for approval"
+    enforcement: "Zod schema refine() validation"
+
+  - rule: "Release Gates Shipping"
+    description: "LP.release_status must be 'released' for shipping module to include in inventory"
+    enforcement: "Shipping module queries WHERE release_status='released'"
+
+  - rule: "Conditional Restrictions"
+    description: "Conditional releases carry restrictions (e.g., ship-by date, customer restriction)"
+    enforcement: "Restrictions stored and displayed in shipping module"
+
+  - rule: "Rejected Batches Blocked"
+    description: "Rejected LPs cannot be shipped, require disposition decision"
+    enforcement: "Warehouse module blocks consumption of release_status='rejected' LPs"
+
+  - rule: "Evidence Aggregation"
+    description: "Final inspection displays all quality evidence from production"
+    enforcement: "Evidence summary page shows in-process, CCPs, checkpoints, NCRs"
+
+  - rule: "Auto-Block on Evidence Issues"
+    description: "Failed pre-inspection checks block inspection start"
+    enforcement: "Pre-validation modal with blockers vs warnings"
+
+  - rule: "NCR Blocks Release"
+    description: "Open NCRs linked to batch block release approval"
+    enforcement: "Release check API returns blockers array"
+
+  - rule: "Immutable After Approval"
+    description: "Release records cannot be edited once approved"
+    enforcement: "Database check: release_decision='approved' prevents UPDATE"
+
+# Context Summary
+summary: |
+  Story 06.11 implements Final Inspection (FR-QA-007) and Batch Release Approval (FR-QA-010).
+
+  FINAL INSPECTION (FR-QA-007):
+  - Mandatory quality gate before batch release
+  - Auto-triggered on WO completion (configurable)
+  - 6-section workflow: Specifications, Labeling, Package, Traceability, CCP Review, Documentation
+  - Evidence aggregation from production (in-process, CCPs, checkpoints)
+  - Result determination: pass/fail/conditional
+  - Immutable once signed (e-signature ready for Phase 3)
+
+  BATCH RELEASE (FR-QA-010):
+  - Formal approval step required by FDA FSMA regulations
+  - 7-point pre-release validation checklist
+  - QA Manager exclusive approval authority
+  - LP release_status update (pending → released/rejected/hold)
+  - Gates shipment in Epic 07
+  - Conditional releases with restrictions
+  - Immutable audit trail
+
+  MVP INCLUDES:
+  - quality_inspections table with type='final' (extends 06.5 schema)
+  - batch_release_records + batch_release_lps junction table
+  - Auto-create final inspection on WO completion (trigger)
+  - Manual final inspection creation from pending queue
+  - Pre-inspection evidence verification (6 prerequisites)
+  - Test results recording per specification (via 06.6)
+  - Result determination: pass/fail/conditional
+  - Release check API (7-point validation)
+  - Batch release approval workflow (QA Manager)
+  - LP release_status update on release (trigger)
+  - Audit trail for all decisions
+  - Release number generation (REL-YYYY-NNNNN format)
+
+  DEFERRED (Phase 3+):
+  - CoA auto-generation on release (Story 06.27-06.28)
+  - E-signature integration (FDA 21 CFR Part 11)
+  - Retention sample management (Phase 4)
+  - Advanced conditional release options
+
+  KEY INTEGRATION POINTS:
+  - Triggered by WO completion (Epic 04)
+  - Creates quality holds on failure (Quality 06.2)
+  - Links to NCR system on failure (Quality 06.9)
+  - Uses test parameters from specifications (Quality 06.3/06.4)
+  - Updates LP QA/release status for consumption/shipment (Warehouse Epic 05, Shipping Epic 07)
+  - Provides data for CoA generation (Quality 06.27-06.28)
+  - Blocks shipment until batch released (Shipping Epic 07)
+
+  REGULATORY ALIGNMENT:
+  - FDA FSMA: Batch release before shipping
+  - FDA 21 CFR Part 11: E-signature ready (Phase 3)
+  - HACCP: Verification of all CCPs complete and within limits
+  - GFSI: Full traceability and audit trail
+  - ISO 9001: Quality gate documentation
+
+# Reference for other stories
+blocks_story: "06.27"
+provides_to: ["Epic 07 Shipping", "Epic 09 Finance"]

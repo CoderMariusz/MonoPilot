@@ -1,0 +1,60 @@
+# Story 06.23 - CCP Monitoring Desktop - API Context
+# See: 06.23.ccp-monitoring-desktop.md for full details
+
+base_path: "/api/quality/haccp/ccp-monitoring"
+
+endpoints:
+  - method: "GET"
+    path: "/api/quality/haccp/ccp-monitoring"
+    auth: true
+    query_params: ["ccp_id", "wo_id", "result", "deviation_detected", "date_from", "date_to", "page", "limit"]
+    response: "CCPMonitoringListResponse"
+
+  - method: "POST"
+    path: "/api/quality/haccp/ccp-monitoring"
+    auth: true
+    roles: ["PRODUCTION_OPERATOR", "QA_INSPECTOR"]
+    request_body: "CreateCCPMonitoringRequest"
+    validation: "createCCPMonitoringSchema"
+    response: 201
+
+  - method: "PUT"
+    path: "/api/quality/haccp/ccp-monitoring/:id"
+    auth: true
+    business_rules: ["Can only update if is_locked=false (within 5min)"]
+    response: 200
+
+  - method: "POST"
+    path: "/api/quality/haccp/ccp-monitoring/:id/verify"
+    auth: true
+    roles: ["QA_INSPECTOR", "QA_MANAGER"]
+    response: 200
+
+  - method: "GET"
+    path: "/api/quality/haccp/ccp-monitoring/due"
+    summary: "Get CCPs due for monitoring"
+    response: "DueCCPsResponse"
+
+  - method: "GET"
+    path: "/api/quality/haccp/ccp-monitoring/history/:ccp_id"
+    summary: "Get monitoring history for specific CCP"
+    response: "CCPMonitoringHistoryResponse"
+
+service:
+  name: "CCPMonitoringService"
+  file: "lib/services/ccp-monitoring-service.ts"
+  methods:
+    - "list(params)"
+    - "getById(id)"
+    - "create(input)"
+    - "update(id, input)"
+    - "verify(id, userId)"
+    - "getDueCCPs()"
+    - "getHistory(ccpId, dateRange)"
+    - "validateValue(value, min, max)"
+    - "determineResult(value, min, max)"
+
+validation:
+  - name: "createCCPMonitoringSchema"
+    fields: ["ccp_id", "monitored_value", "wo_id?", "batch_number?", "lp_id?", "equipment_used?", "corrective_action_taken?"]
+    refinements: ["corrective_action required if result='fail'"]

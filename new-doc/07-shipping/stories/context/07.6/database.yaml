@@ -1,0 +1,218 @@
+# Story 07.6 - Database Schema
+# Tables, migrations, RLS policies for allergen validation
+
+database:
+  tables:
+    - name: "sales_orders (ALTER)"
+      type: "extension"
+      description: "Add allergen validation columns to existing sales_orders table"
+      columns:
+        - name: "allergen_validated"
+          type: "BOOLEAN"
+          default: "false"
+          description: "Flag indicating allergen validation passed (no conflicts or override applied)"
+          nullable: false
+        - name: "allow_allergen_override"
+          type: "BOOLEAN"
+          default: "false"
+          description: "Flag indicating manager override has been applied to allergen conflicts"
+          nullable: false
+        - name: "allergen_validation_date"
+          type: "TIMESTAMPTZ"
+          description: "Timestamp when validation was last performed"
+          nullable: true
+        - name: "allergen_validation_user"
+          type: "UUID"
+          description: "User ID who performed the validation"
+          references: "users(id)"
+          nullable: true
+        - name: "allergen_override_date"
+          type: "TIMESTAMPTZ"
+          description: "Timestamp when override was approved (if applicable)"
+          nullable: true
+        - name: "allergen_override_user"
+          type: "UUID"
+          description: "User ID who approved the override (Manager or Admin)"
+          references: "users(id)"
+          nullable: true
+        - name: "allergen_override_reason"
+          type: "TEXT"
+          description: "Reason provided for override (min 20 chars, max 500)"
+          nullable: true
+      rls: true
+      rls_policy: "org_isolation"
+      indexes:
+        - name: "idx_sales_orders_allergen_validated"
+          columns: ["org_id", "allergen_validated", "status"]
+          description: "Find orders needing allergen validation before confirmation"
+        - name: "idx_sales_orders_allergen_override"
+          columns: ["org_id", "allow_allergen_override", "created_at"]
+          description: "Track override frequency for compliance monitoring"
+
+    - name: "audit_logs (CREATE NEW)"
+      type: "table"
+      description: "Audit trail for all allergen validation and override events"
+      columns:
+        - name: "id"
+          type: "UUID"
+          primary_key: true
+          default: "uuid_generate_v4()"
+          nullable: false
+        - name: "org_id"
+          type: "UUID"
+          references: "organizations(id)"
+          nullable: false
+          description: "Organization ID for multi-tenant isolation"
+        - name: "entity_type"
+          type: "TEXT"
+          nullable: false
+          description: "Type of entity being audited (e.g., 'sales_order')"
+          constraints: "CHECK (entity_type IN ('sales_order', 'customer', 'product'))"
+        - name: "entity_id"
+          type: "UUID"
+          nullable: false
+          description: "ID of the entity being audited"
+        - name: "action"
+          type: "TEXT"
+          nullable: false
+          description: "Action performed (e.g., 'allergen_validation_failed', 'allergen_override')"
+          constraints: "CHECK (action IN ('allergen_validation_failed', 'allergen_validation_passed', 'allergen_override', 'override_denied'))"
+        - name: "old_value"
+          type: "JSONB"
+          nullable: true
+          description: "Previous state of entity (for change tracking)"
+        - name: "new_value"
+          type: "JSONB"
+          nullable: true
+          description: "New state of entity (for change tracking)"
+        - name: "user_id"
+          type: "UUID"
+          references: "users(id)"
+          nullable: true
+          description: "User who performed the action"
+        - name: "reason"
+          type: "TEXT"
+          nullable: true
+          description: "Reason for override or other context"
+        - name: "ip_address"
+          type: "VARCHAR(45)"
+          nullable: true
+          description: "IP address where action originated (for security)"
+        - name: "created_at"
+          type: "TIMESTAMPTZ"
+          default: "now()"
+          nullable: false
+          description: "Timestamp when action was performed"
+      rls: true
+      rls_policy: "org_isolation"
+      indexes:
+        - name: "idx_audit_logs_entity"
+          columns: ["entity_type", "entity_id"]
+          description: "Find all audit entries for a specific entity"
+        - name: "idx_audit_logs_org"
+          columns: ["org_id", "created_at DESC"]
+          description: "Find recent audit entries within organization"
+        - name: "idx_audit_logs_action"
+          columns: ["org_id", "action", "created_at DESC"]
+          description: "Find allergen overrides for compliance reporting"
+        - name: "idx_audit_logs_user"
+          columns: ["user_id", "created_at DESC"]
+          description: "Find actions performed by specific user"
+
+  migrations:
+    - id: "migration_07_6_001"
+      name: "Add allergen validation columns to sales_orders"
+      description: "Extends sales_orders table with allergen validation tracking"
+      sql: |
+        ALTER TABLE sales_orders
+          ADD COLUMN allergen_validated BOOLEAN DEFAULT false,
+          ADD COLUMN allow_allergen_override BOOLEAN DEFAULT false,
+          ADD COLUMN allergen_validation_date TIMESTAMPTZ,
+          ADD COLUMN allergen_validation_user UUID REFERENCES users(id),
+          ADD COLUMN allergen_override_date TIMESTAMPTZ,
+          ADD COLUMN allergen_override_user UUID REFERENCES users(id),
+          ADD COLUMN allergen_override_reason TEXT;
+
+        CREATE INDEX idx_sales_orders_allergen_validated
+          ON sales_orders(org_id, allergen_validated, status);
+
+        CREATE INDEX idx_sales_orders_allergen_override
+          ON sales_orders(org_id, allow_allergen_override, created_at DESC);
+      dependencies: ["sales_orders table exists"]
+      rollback: |
+        ALTER TABLE sales_orders
+          DROP COLUMN allergen_override_reason,
+          DROP COLUMN allergen_override_user,
+          DROP COLUMN allergen_override_date,
+          DROP COLUMN allergen_validation_user,
+          DROP COLUMN allergen_validation_date,
+          DROP COLUMN allow_allergen_override,
+          DROP COLUMN allergen_validated;
+
+    - id: "migration_07_6_002"
+      name: "Create audit_logs table"
+      description: "New table for audit trail of all system actions"
+      sql: |
+        CREATE TABLE audit_logs (
+          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+          entity_type TEXT NOT NULL CHECK (entity_type IN ('sales_order', 'customer', 'product')),
+          entity_id UUID NOT NULL,
+          action TEXT NOT NULL CHECK (action IN ('allergen_validation_failed', 'allergen_validation_passed', 'allergen_override', 'override_denied')),
+          old_value JSONB,
+          new_value JSONB,
+          user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+          reason TEXT,
+          ip_address VARCHAR(45),
+          created_at TIMESTAMPTZ DEFAULT now()
+        );
+
+        CREATE INDEX idx_audit_logs_entity ON audit_logs(entity_type, entity_id);
+        CREATE INDEX idx_audit_logs_org ON audit_logs(org_id, created_at DESC);
+        CREATE INDEX idx_audit_logs_action ON audit_logs(org_id, action, created_at DESC);
+        CREATE INDEX idx_audit_logs_user ON audit_logs(user_id, created_at DESC);
+
+        ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
+      dependencies: ["organizations table exists", "users table exists"]
+      rollback: "DROP TABLE audit_logs;"
+
+  rls_policies:
+    - table: "sales_orders"
+      name: "allergen_validation_org_isolation"
+      definition: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      description: "Users can only view/modify sales orders within their organization"
+      operations: ["SELECT", "INSERT", "UPDATE", "DELETE"]
+
+    - table: "audit_logs"
+      name: "audit_logs_org_isolation"
+      definition: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      description: "Users can only view audit logs for their organization"
+      operations: ["SELECT", "INSERT"]
+
+  data_consistency:
+    - rule: "allergen_validated and allow_allergen_override"
+      description: "At least one must be true before SO confirmation"
+      check: "(allergen_validated = true) OR (allow_allergen_override = true)"
+      trigger_point: "Before SO status change to 'confirmed'"
+
+    - rule: "allergen_override_reason required with override"
+      description: "If allow_allergen_override = true, allergen_override_reason must be non-null"
+      check: "allow_allergen_override = false OR (allergen_override_reason IS NOT NULL AND LENGTH(allergen_override_reason) >= 20)"
+      trigger_point: "On insert/update"
+
+    - rule: "audit_logs immutable"
+      description: "Audit log entries cannot be modified or deleted"
+      check: "RLS only allows INSERT and SELECT, never UPDATE/DELETE"
+
+  performance_targets:
+    - operation: "Validate allergens for SO with 50 lines"
+      target: "< 1000ms"
+      strategy: "Index on org_id, allergen_validated; eager load product allergens"
+
+    - operation: "Record override in audit_logs"
+      target: "< 200ms"
+      strategy: "Indexes on org_id and action"
+
+    - operation: "Query order history (20 items per page)"
+      target: "< 300ms"
+      strategy: "Index on customer_id, created_at DESC"

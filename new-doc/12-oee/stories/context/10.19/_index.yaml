@@ -1,0 +1,67 @@
+# Story 10.19 - TPM & Benchmarking Context (Entry Point)
+# Generated: 2025-01-15
+# Phase: 3 (Advanced Analytics)
+
+story:
+  id: "10.19"
+  name: "TPM & Benchmarking"
+  slug: "tpm-benchmarking"
+  epic: "10-oee"
+  phase: "3"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "fullstack"
+  state: "ready"
+  priority: "P1"
+
+context_files:
+  - _index.yaml
+  - database.yaml
+  - api.yaml
+  - frontend.yaml
+  - tests.yaml
+
+dependencies:
+  required:
+    - story: "10.4"
+      name: "OEE Calculation Engine"
+      provides: ["OEE metrics for benchmarking"]
+    - story: "10.16"
+      name: "MTBF/MTTR Calculation"
+      provides: ["reliability metrics for TPM"]
+
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/oee.md"
+    sections: ["FR-OEE-026, FR-OEE-027 - TPM & Benchmarking"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/10-oee/10.19.tpm-benchmarking.md"
+
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "oee_benchmarks table (industry data)"
+  - type: "api"
+    count: 2
+    description: "Benchmark comparison endpoints"
+  - type: "components"
+    count: 4
+    description: "Benchmark comparison table, improvement chart"
+
+technical_notes:
+  - "Industry benchmarks: Food & Bev typical (60-75%), world-class (85%)"
+  - "Internal benchmarking: best line, best shift, best day"
+  - "Improvement tracking vs baseline date"
+  - "TPM: Link maintenance schedule to availability"
+  - "Preventive maintenance effectiveness score"
+
+summary: |
+  Story 10.19 implements OEE benchmarking and TPM integration.
+
+  MVP SCOPE:
+  - Industry benchmark library (static data)
+  - Benchmark comparison API
+  - Internal best-in-class calculation
+  - Gap analysis visualization
+  - Improvement tracking vs baseline
+  - TPM schedule integration basics

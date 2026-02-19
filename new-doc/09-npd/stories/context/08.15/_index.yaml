@@ -1,0 +1,149 @@
+# Story 08.15 - Event Sourcing & Notifications Context (Entry Point)
+# Generated: 2026-01-15
+# Purpose: Story metadata, dependencies, and overview - read this first
+# Phase: 2 (Event & Notification System)
+
+story:
+  id: "08.15"
+  name: "Event Sourcing & Notifications"
+  slug: "event-sourcing-notifications"
+  epic: "08-npd"
+  phase: "2"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "backend"
+  state: "ready"
+  priority: "P1"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies, overview
+  - database.yaml    # npd_events, notifications, user_notification_preferences tables
+  - api.yaml         # Event log, notification endpoints
+  - frontend.yaml    # Notification center, bell icon, preferences UI
+  - tests.yaml       # Acceptance criteria, event/notification tests
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + RLS"
+      provides: ["organizations, users, roles tables"]
+    - story: "08.2"
+      name: "NPD Projects CRUD"
+      provides: ["npd_projects table for event linkage"]
+    - story: "08.3"
+      name: "Stage-Gate Workflow"
+      provides: ["Gate advancement events to log"]
+
+  soft:
+    - story: "08.7"
+      name: "Formulation Costing"
+      provides: ["Costing events (submitted, approved)"]
+      impact: "Costing events not logged (minor)"
+    - story: "08.11"
+      name: "Handoff Wizard"
+      provides: ["Handoff completed events"]
+      impact: "Handoff events not logged (minor)"
+
+  blocked_by: []
+
+  blocks: []
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/npd.md"
+    sections: ["FR-NPD-53-56 (Event Sourcing)", "FR-NPD-70-74 (Notifications)", "Section 9 - Event Sourcing"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/08-npd/08.15.event-sourcing-notifications.md"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 3
+    description: "npd_events, notifications, user_notification_preferences tables"
+  - type: "service"
+    count: 2
+    description: "NPDEventService, NPDNotificationService"
+  - type: "api"
+    count: 4
+    description: "Event log, retry, notifications, preferences endpoints"
+  - type: "edge_function"
+    count: 1
+    description: "send-email Edge Function (Supabase)"
+  - type: "frontend"
+    count: 3
+    description: "Notification bell, notification center, preferences page"
+  - type: "test"
+    count: 3
+    description: "Unit, Integration, E2E tests"
+
+# Technical notes
+technical_notes:
+  - "Event types: NPD.GateAdvanced, NPD.FormulationLocked, NPD.CostingSubmitted, NPD.HandoffCompleted"
+  - "Event status workflow: pending → processing → completed (or failed)"
+  - "Retry mechanism: Exponential backoff (1min, 2min, 4min), max 3 retries"
+  - "Event payload: JSONB with entity-specific data"
+  - "Notification delivery: Email (Supabase Edge Function) + In-app (database)"
+  - "Notification triggers: Gate approval, costing approval, cost variance, compliance docs, handoff"
+  - "User preferences: Per-notification-type toggle (email/in-app)"
+  - "In-app badge count: Real-time unread notification count"
+  - "Admin event log: View all events, retry failed events"
+  - "Event retention: 90 days (configurable in npd_settings)"
+
+# Business Rules
+business_rules:
+  - rule: "Critical Events Must Be Logged"
+    description: "All gate advances, locks, approvals, handoffs logged"
+    enforcement: "Service layer creates event on every critical action"
+  - rule: "Failed Events Retry 3 Times"
+    description: "Failed events retry with exponential backoff, max 3 attempts"
+    enforcement: "Retry worker checks retry_count < 3, increments on retry"
+  - rule: "Admin Can Force Replay"
+    description: "Admin can retry failed events beyond max retries"
+    enforcement: "API endpoint with force=true parameter resets retry_count"
+  - rule: "Notification Preferences Honored"
+    description: "Users receive notifications based on their preferences"
+    enforcement: "Service checks user_notification_preferences before sending"
+  - rule: "Org Isolation on Events"
+    description: "Events and notifications scoped to organization"
+    enforcement: "RLS policies enforce org_id filter"
+  - rule: "Event Immutability"
+    description: "Events cannot be deleted, only status updated"
+    enforcement: "No DELETE operation on npd_events table"
+
+# Context Summary
+summary: |
+  Story 08.15 implements comprehensive event sourcing and notification system
+  for NPD critical milestones, ensuring auditability and timely stakeholder communication.
+
+  MVP SCOPE (This Story):
+  - Event logging for critical NPD events (gate, lock, costing, handoff)
+  - Event retry mechanism with exponential backoff (1-2-4 min, max 3)
+  - Admin event log view (all events, filter by status/type)
+  - Admin event replay (retry failed events)
+  - Notification system:
+    * Gate approval required → NPD Lead
+    * Costing approval required → Finance
+    * Cost variance alert → NPD Lead + Finance
+    * Missing compliance docs → Regulatory
+    * Handoff completed → Production
+  - Email notifications via Supabase Edge Function
+  - In-app notification center with badge count
+  - User notification preferences (email/in-app toggle per type)
+
+  DEFERRED (Phase 2/3):
+  - Real-time event streaming (WebSockets)
+  - Event replay with state reconstruction (event sourcing pattern)
+  - Custom notification templates (Handlebars)
+  - SMS/Slack notification channels
+  - Notification batching (daily digest)
+  - Event analytics dashboard
+
+  KEY INTEGRATION POINTS:
+  - Logs events from all critical NPD workflows (08.2, 08.3, 08.7, 08.11)
+  - Sends notifications to stakeholders (Finance, Regulatory, Production)
+  - Provides audit trail for compliance (FDA 21 CFR Part 11)
+  - Enables async processing with retry for transient failures
+  - Foundation for future event-driven architecture

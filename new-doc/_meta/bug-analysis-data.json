@@ -1,0 +1,3528 @@
+{
+  "total": 341,
+  "by_module": {
+    "00-foundation": 94,
+    "00-testing": 12,
+    "01-settings": 76,
+    "02-technical": 86,
+    "06-quality": 17,
+    "03-planning": 28,
+    "05-scanner": 5,
+    "07-shipping": 2,
+    "05-warehouse": 13,
+    "00-dashboard": 7,
+    "04-production": 1
+  },
+  "by_type": {
+    "Routing": 30,
+    "E2E/Testing": 76,
+    "API": 118,
+    "UI": 109,
+    "Data/DB": 95,
+    "Security": 104,
+    "Performance": 13,
+    "Other": 59,
+    "Type/TypeScript": 69,
+    "State Management": 20,
+    "Validation": 46,
+    "Integration": 8,
+    "UX": 20
+  },
+  "commits": [
+    {
+      "hash": "66e4ca3d",
+      "msg": "Add structured handoff files and bug-fixing skill; implement testing patterns for MonoPilot",
+      "module": "00-foundation",
+      "types": [
+        "Routing",
+        "E2E/Testing"
+      ],
+      "file_count": 20
+    },
+    {
+      "hash": "bd28449c",
+      "msg": "docs: consolidate test and bug files - major cleanup",
+      "module": "00-testing",
+      "types": [
+        "Routing",
+        "E2E/Testing"
+      ],
+      "file_count": 20
+    },
+    {
+      "hash": "fa2c473a",
+      "msg": "fix: dashboard ui and settings stats display issues",
+      "module": "01-settings",
+      "types": [
+        "API",
+        "UI",
+        "Data/DB",
+        "Security"
+      ],
+      "file_count": 5
+    },
+    {
+      "hash": "0f956dc2",
+      "msg": "fix(technical): CORS, security headers, pagination endpoint",
+      "module": "02-technical",
+      "types": [
+        "API",
+        "Performance"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "31d343bb",
+      "msg": "docs: Update bugs.md - Mark all 7 Settings bugs as FIXED (commit 176b7381)",
+      "module": "01-settings",
+      "types": [
+        "Other"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "d97c6174",
+      "msg": "fix(technical): auth endpoints, security headers, rate limiting, CSRF protection",
+      "module": "02-technical",
+      "types": [
+        "API",
+        "Security",
+        "Type/TypeScript"
+      ],
+      "file_count": 3
+    },
+    {
+      "hash": "176b7381",
+      "msg": "fix(settings): BUG-SET-001,002,003,004,005,006,007 - Enhance UI visibility for all Settings module critical bugs",
+      "module": "01-settings",
+      "types": [
+        "API",
+        "UI",
+        "State Management",
+        "Security"
+      ],
+      "file_count": 15
+    },
+    {
+      "hash": "4817afa3",
+      "msg": "test(consolidate): All QA batches merged into bugs.md - Settings 1-4 (153 bugs) + Dashboard 1-2 complete",
+      "module": "01-settings",
+      "types": [
+        "E2E/Testing"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "25d6707c",
+      "msg": "BUG-W-003: Ensure packing slip PDF always includes weight column",
+      "module": "06-quality",
+      "types": [
+        "Data/DB"
+      ],
+      "file_count": 2
+    },
+    {
+      "hash": "a7e172f0",
+      "msg": "BUG-W-002: Add barcode uniqueness validation to prevent duplicate barcodes",
+      "module": "02-technical",
+      "types": [
+        "API",
+        "Validation",
+        "Security"
+      ],
+      "file_count": 5
+    },
+    {
+      "hash": "d253cf62",
+      "msg": "Fix: Add 10s timeout to auth login to prevent hanging on Supabase connection",
+      "module": "00-foundation",
+      "types": [
+        "Data/DB",
+        "State Management",
+        "Security",
+        "Integration"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "14e34486",
+      "msg": "Fix Quality bugs: Enable Edit button and add Resolve/Delete buttons on Holds detail page",
+      "module": "06-quality",
+      "types": [
+        "API",
+        "UI",
+        "Security"
+      ],
+      "file_count": 3
+    },
+    {
+      "hash": "72b8c676",
+      "msg": "Fix Warehouse bugs W7: Complete transfer order workflow with approvals",
+      "module": "03-planning",
+      "types": [
+        "State Management",
+        "Performance",
+        "UX"
+      ],
+      "file_count": 3
+    },
+    {
+      "hash": "17306c3e",
+      "msg": "fix(warehouse): W6 - Resolve duplicate barcode validation and packing slip PDF weight issues",
+      "module": "02-technical",
+      "types": [
+        "API",
+        "Validation"
+      ],
+      "file_count": 4
+    },
+    {
+      "hash": "814eedc9",
+      "msg": "docs: Add comprehensive error codes and response schemas to quality holds endpoints",
+      "module": "06-quality",
+      "types": [
+        "API",
+        "Data/DB"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "1f1b4570",
+      "msg": "Fix(Quality-Q2): Implement reason filtering in getHoldsList service",
+      "module": "06-quality",
+      "types": [
+        "Other"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "ae7875df",
+      "msg": "Fix(Quality-Q2): Extend filter schema for reason and product",
+      "module": "02-technical",
+      "types": [
+        "Data/DB",
+        "Validation"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "246a5814",
+      "msg": "Fix(Quality-Q2): Add missing Reason and Product filters on Holds list page",
+      "module": "06-quality",
+      "types": [
+        "API"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "216f99dd",
+      "msg": "docs: add comprehensive warehouse bug fix documentation",
+      "module": "01-settings",
+      "types": [
+        "Other"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "49e2f147",
+      "msg": "Fix Quality bugs: Add column sorting and pagination controls",
+      "module": "06-quality",
+      "types": [
+        "Data/DB",
+        "Security",
+        "Performance"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "657395a1",
+      "msg": "docs: add migration documenting warehouse bug fixes",
+      "module": "01-settings",
+      "types": [
+        "Data/DB"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "02708c8a",
+      "msg": "fix: warehouse bugs - timezone consistency and variance calculation precision",
+      "module": "06-quality",
+      "types": [
+        "API",
+        "UI",
+        "Data/DB",
+        "Security",
+        "E2E/Testing"
+      ],
+      "file_count": 10
+    },
+    {
+      "hash": "d753dc4f",
+      "msg": "fix(warehouse): Add missing item weights to packing slip PDFs",
+      "module": "01-settings",
+      "types": [
+        "API",
+        "E2E/Testing"
+      ],
+      "file_count": 2
+    },
+    {
+      "hash": "dd0dd4fa",
+      "msg": "BUG-TECH-002: Add PATCH method to /api/quality/holds/:id endpoint",
+      "module": "06-quality",
+      "types": [
+        "API",
+        "E2E/Testing"
+      ],
+      "file_count": 6
+    },
+    {
+      "hash": "9358644e",
+      "msg": "fix(warehouse): implement product archive/restore toggle",
+      "module": "02-technical",
+      "types": [
+        "API",
+        "Security",
+        "E2E/Testing"
+      ],
+      "file_count": 9
+    },
+    {
+      "hash": "f5778b1c",
+      "msg": "Fix BUG-SC-001: Create /scanner/transfer route and fix routing",
+      "module": "05-scanner",
+      "types": [
+        "Security",
+        "Routing"
+      ],
+      "file_count": 2
+    },
+    {
+      "hash": "fc3918ad",
+      "msg": "FIX-Q12-001: Improve pagination UX by resetting to page 1 on filter changes",
+      "module": "00-testing",
+      "types": [
+        "State Management",
+        "Performance",
+        "E2E/Testing"
+      ],
+      "file_count": 2
+    },
+    {
+      "hash": "ae66d90e",
+      "msg": "Fix: Empty state messages now display correctly on Quality Holds list (BUG-Q12-002)",
+      "module": "06-quality",
+      "types": [
+        "API",
+        "UI",
+        "Data/DB",
+        "State Management",
+        "Security",
+        "Performance",
+        "E2E/Testing"
+      ],
+      "file_count": 18
+    },
+    {
+      "hash": "749756a5",
+      "msg": "BUG-Q12-003: Fix filter timeout issue by removing toast from useCallback dependencies",
+      "module": "06-quality",
+      "types": [
+        "State Management",
+        "Security",
+        "UX"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "d63af099",
+      "msg": "Fix(B7-003): Transfer Orders page controls now always render - fix loading state blocking UI",
+      "module": "03-planning",
+      "types": [
+        "UI",
+        "State Management",
+        "Type/TypeScript"
+      ],
+      "file_count": 3
+    },
+    {
+      "hash": "0df76aad",
+      "msg": "Fix: Verify and document row click navigation handlers in Planning module (Bug-B7-001)",
+      "module": "03-planning",
+      "types": [
+        "UI",
+        "UX",
+        "Routing",
+        "E2E/Testing"
+      ],
+      "file_count": 5
+    },
+    {
+      "hash": "b20e613a",
+      "msg": "Fix: Add logout button to Planning module header (B7-002)",
+      "module": "03-planning",
+      "types": [
+        "UI",
+        "Type/TypeScript",
+        "E2E/Testing"
+      ],
+      "file_count": 14
+    },
+    {
+      "hash": "c95e154f",
+      "msg": "docs(bugs): Mark all Planning Work Orders Batch 4 bugs as FIXED with verification",
+      "module": "03-planning",
+      "types": [
+        "Other"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "d459a4ef",
+      "msg": "fix(planning): Fix all 11 Work Orders bugs - Batch 4 complete",
+      "module": "03-planning",
+      "types": [
+        "E2E/Testing"
+      ],
+      "file_count": 2
+    },
+    {
+      "hash": "51bdb82a",
+      "msg": "docs(bugs): Document Planning Work Orders Batch 4 bugs (Bug-005 through Bug-015)",
+      "module": "03-planning",
+      "types": [
+        "Other"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "2b8f40fe",
+      "msg": "docs: Update Bug-002 status to fixed with final test results and commit info",
+      "module": "00-foundation",
+      "types": [
+        "E2E/Testing"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "604ba0b6",
+      "msg": "Fix: Correct paused status queries across production services",
+      "module": "02-technical",
+      "types": [
+        "Other"
+      ],
+      "file_count": 3
+    },
+    {
+      "hash": "0b7ac7d2",
+      "msg": "Fix: Active WOs table rendering on dashboard (#2)",
+      "module": "02-technical",
+      "types": [
+        "UI",
+        "Type/TypeScript",
+        "E2E/Testing"
+      ],
+      "file_count": 20
+    },
+    {
+      "hash": "b25ba410",
+      "msg": "Fix: Create menu WO/NCR/TO routes to create pages (#1)",
+      "module": "06-quality",
+      "types": [
+        "Security",
+        "E2E/Testing"
+      ],
+      "file_count": 16
+    },
+    {
+      "hash": "2848fbea",
+      "msg": "fix(BUG-012): Update LocationForm to use hierarchical schema",
+      "module": "01-settings",
+      "types": [
+        "UI",
+        "Data/DB"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "7a54e3d5",
+      "msg": "fix(BUG-014): Fix DELETE production line failure",
+      "module": "01-settings",
+      "types": [
+        "Data/DB"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "5e4795ec",
+      "msg": "fix(BUG-014): Improve DELETE verification with pre-check and .select()",
+      "module": "01-settings",
+      "types": [
+        "Other"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "5afcd9b5",
+      "msg": "fix(BUG-012): Fix locations not appearing in /settings/locations list",
+      "module": "01-settings",
+      "types": [
+        "API",
+        "Data/DB",
+        "Security",
+        "Type/TypeScript"
+      ],
+      "file_count": 9
+    },
+    {
+      "hash": "afdf6d8c",
+      "msg": "fix(BUG-011, BUG-017): Add missing Create Sales Order page",
+      "module": "07-shipping",
+      "types": [
+        "Other"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "4d8dc77b",
+      "msg": "fix(BUG-014): Fix DELETE production line returning 204 No Content",
+      "module": "01-settings",
+      "types": [
+        "API",
+        "Security"
+      ],
+      "file_count": 2
+    },
+    {
+      "hash": "462b97d8",
+      "msg": "fix(BUG-018): Use server-side /api/auth/login for session persistence (fixes cookie race condition)",
+      "module": "00-foundation",
+      "types": [
+        "API",
+        "UI",
+        "State Management",
+        "Security"
+      ],
+      "file_count": 2
+    },
+    {
+      "hash": "2ecb99ac",
+      "msg": "fix(BUG-018): Implement document.cookie handlers in browser Supabase client",
+      "module": "00-foundation",
+      "types": [
+        "Data/DB",
+        "Security",
+        "Integration"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "fbd137c5",
+      "msg": "Fix: Mark /login page as dynamic to allow middleware to use cookies()",
+      "module": "00-foundation",
+      "types": [
+        "Security",
+        "Type/TypeScript"
+      ],
+      "file_count": 2
+    },
+    {
+      "hash": "30210fe2",
+      "msg": "Fix: Restore client-side signIn auth (original working solution) + remove Suspense",
+      "module": "00-foundation",
+      "types": [
+        "UI",
+        "Security"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "90366d5e",
+      "msg": "Fix: Remove Suspense boundary from LoginPage - was causing infinite loading state",
+      "module": "00-foundation",
+      "types": [
+        "UI",
+        "State Management",
+        "Security"
+      ],
+      "file_count": 2
+    },
+    {
+      "hash": "c2785247",
+      "msg": "Fix: Simplify LoginForm to use API endpoint with credentials include",
+      "module": "00-foundation",
+      "types": [
+        "API",
+        "UI",
+        "Security"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "e6e5c593",
+      "msg": "Fix: Use client-side Supabase auth in LoginForm for proper session handling",
+      "module": "00-foundation",
+      "types": [
+        "UI",
+        "Data/DB",
+        "Security"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "ef5e8c0c",
+      "msg": "Fix: Add missing /api/auth/login endpoint for credentials auth",
+      "module": "00-foundation",
+      "types": [
+        "API",
+        "Security",
+        "Type/TypeScript"
+      ],
+      "file_count": 2
+    },
+    {
+      "hash": "f9b1053f",
+      "msg": "fix: disable nutrition/products endpoint to unblock build",
+      "module": "02-technical",
+      "types": [
+        "API",
+        "Type/TypeScript"
+      ],
+      "file_count": 3
+    },
+    {
+      "hash": "aeeddcc6",
+      "msg": "fix(po+machines): enable Create PO button and resolve search redirect",
+      "module": "03-planning",
+      "types": [
+        "UI",
+        "UX"
+      ],
+      "file_count": 5
+    },
+    {
+      "hash": "3a4a4e76",
+      "msg": "fix(transfer-orders): populate warehouse dropdowns with active warehouses",
+      "module": "01-settings",
+      "types": [
+        "API",
+        "UI",
+        "Data/DB",
+        "Validation",
+        "Security"
+      ],
+      "file_count": 16
+    },
+    {
+      "hash": "f5884d2d",
+      "msg": "fix(shipping): resolve organization context loading on dashboard",
+      "module": "07-shipping",
+      "types": [
+        "API",
+        "UI"
+      ],
+      "file_count": 3
+    },
+    {
+      "hash": "992cf1cf",
+      "msg": "fix(tax-codes): resolve delete functionality blocking issue",
+      "module": "01-settings",
+      "types": [
+        "API",
+        "Data/DB",
+        "Security"
+      ],
+      "file_count": 3
+    },
+    {
+      "hash": "bb9bd25c",
+      "msg": "fix(warehouses): resolve edit data loss and delete blocking errors",
+      "module": "01-settings",
+      "types": [
+        "API",
+        "UI"
+      ],
+      "file_count": 2
+    },
+    {
+      "hash": "cef15ed8",
+      "msg": "fix(settings/roles): resolve page crash and handle permission object format",
+      "module": "01-settings",
+      "types": [
+        "UI",
+        "Security",
+        "Type/TypeScript"
+      ],
+      "file_count": 4
+    },
+    {
+      "hash": "4f45cf5c",
+      "msg": "fix(settings/roles): resolve page crash by lazy-initializing Supabase client",
+      "module": "01-settings",
+      "types": [
+        "Data/DB",
+        "Security",
+        "Integration"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "49267a84",
+      "msg": "fix(settings/locations): resolve page crash and add navigation link",
+      "module": "01-settings",
+      "types": [
+        "Security",
+        "UX"
+      ],
+      "file_count": 2
+    },
+    {
+      "hash": "5f206129",
+      "msg": "docs: add Create dropdown fix documentation",
+      "module": "00-foundation",
+      "types": [
+        "UI"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "4de66467",
+      "msg": "fix(users): display role and status columns in users table",
+      "module": "01-settings",
+      "types": [
+        "UI",
+        "Data/DB",
+        "Security"
+      ],
+      "file_count": 2
+    },
+    {
+      "hash": "b02fa83e",
+      "msg": "fix(dashboard): resolve Create dropdown 404 routing errors",
+      "module": "06-quality",
+      "types": [
+        "API",
+        "UI",
+        "Security",
+        "Routing"
+      ],
+      "file_count": 5
+    },
+    {
+      "hash": "bc1493ad",
+      "msg": "fix(api): graceful handling for missing warehouse in locations API",
+      "module": "01-settings",
+      "types": [
+        "API"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "575a37fb",
+      "msg": "fix(api): graceful handling for missing tables in settings endpoints",
+      "module": "01-settings",
+      "types": [
+        "API",
+        "UI"
+      ],
+      "file_count": 2
+    },
+    {
+      "hash": "078d69bc",
+      "msg": "fix(nav): correct sidebar navigation URLs",
+      "module": "03-planning",
+      "types": [
+        "Data/DB",
+        "Security",
+        "UX"
+      ],
+      "file_count": 2
+    },
+    {
+      "hash": "d0df2c2e",
+      "msg": "fix(api): resolve quality holds 500 error",
+      "module": "06-quality",
+      "types": [
+        "API"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "106993e2",
+      "msg": "feat(routes): add missing page.tsx files for 404 routes",
+      "module": "05-warehouse",
+      "types": [
+        "API",
+        "Security",
+        "Routing"
+      ],
+      "file_count": 5
+    },
+    {
+      "hash": "749ff918",
+      "msg": "fix: expired LPs now show correct status, safety improvement",
+      "module": "05-warehouse",
+      "types": [
+        "UI"
+      ],
+      "file_count": 7
+    },
+    {
+      "hash": "e2eadd76",
+      "msg": "fix: resolve scanner crashes for Receive, Pick, Pack workflows",
+      "module": "05-warehouse",
+      "types": [
+        "API",
+        "UX"
+      ],
+      "file_count": 7
+    },
+    {
+      "hash": "db14abf3",
+      "msg": "fix: buttons now open modals instead of navigating",
+      "module": "03-planning",
+      "types": [
+        "UI",
+        "Security"
+      ],
+      "file_count": 3
+    },
+    {
+      "hash": "02a1a77a",
+      "msg": "fix: add missing page.tsx for Quality and Shipping modules",
+      "module": "06-quality",
+      "types": [
+        "Security"
+      ],
+      "file_count": 2
+    },
+    {
+      "hash": "52d5cf67",
+      "msg": "fix(migrations): Rename 097_add_asn_search_indexes to 146",
+      "module": "05-warehouse",
+      "types": [
+        "Data/DB",
+        "Performance"
+      ],
+      "file_count": 2
+    },
+    {
+      "hash": "a8c982db",
+      "msg": "fix(lint): Fix ESLint errors - case declarations and empty interface",
+      "module": "02-technical",
+      "types": [
+        "API",
+        "Type/TypeScript"
+      ],
+      "file_count": 5
+    },
+    {
+      "hash": "b23f759d",
+      "msg": "fix(warehouse): Epic 5 E2E - Final fixes and documentation",
+      "module": "05-warehouse",
+      "types": [
+        "UI",
+        "E2E/Testing"
+      ],
+      "file_count": 8
+    },
+    {
+      "hash": "a464e353",
+      "msg": "fix(warehouse): Fix inventory KPI API response handling for RPC array",
+      "module": "01-settings",
+      "types": [
+        "API",
+        "UI",
+        "Security",
+        "UX",
+        "E2E/Testing"
+      ],
+      "file_count": 20
+    },
+    {
+      "hash": "3eb082e0",
+      "msg": "fix(warehouse): Fix critical P0 blocker - replace unit_cost with cost_per_unit",
+      "module": "05-warehouse",
+      "types": [
+        "Data/DB"
+      ],
+      "file_count": 4
+    },
+    {
+      "hash": "a8de2cee",
+      "msg": "fix(e2e): Fix seeding script to match actual database schema",
+      "module": "00-testing",
+      "types": [
+        "Data/DB",
+        "E2E/Testing"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "772d5a22",
+      "msg": "fix(production): Handle missing production_outputs table gracefully",
+      "module": "02-technical",
+      "types": [
+        "UI"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "269b30d1",
+      "msg": "fix(e2e): Fix WO Lifecycle test navigation to Planning module",
+      "module": "03-planning",
+      "types": [
+        "UX",
+        "E2E/Testing"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "175e231b",
+      "msg": "fix(e2e): Fix product seeding - use status instead of is_active",
+      "module": "02-technical",
+      "types": [
+        "UI",
+        "Data/DB",
+        "State Management",
+        "Security",
+        "Type/TypeScript",
+        "E2E/Testing"
+      ],
+      "file_count": 20
+    },
+    {
+      "hash": "e16d7846",
+      "msg": "fix(e2e): Add seedRoles() function to fix production E2E seeding failures",
+      "module": "01-settings",
+      "types": [
+        "Security",
+        "E2E/Testing"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "1d1cec76",
+      "msg": "fix(e2e): Fix Epic 4 Production dashboard e2e tests - add data-testid attributes",
+      "module": "02-technical",
+      "types": [
+        "Security",
+        "E2E/Testing"
+      ],
+      "file_count": 3
+    },
+    {
+      "hash": "d4e623e9",
+      "msg": "fix(bom): Add data-testid attributes to CostSummary component for tests TC-BOM-032, TC-BOM-033",
+      "module": "02-technical",
+      "types": [
+        "E2E/Testing"
+      ],
+      "file_count": 2
+    },
+    {
+      "hash": "9fb91752",
+      "msg": "fix(e2e): Complete ProductsPage selector fixes for Task 004 & 005",
+      "module": "02-technical",
+      "types": [
+        "Performance",
+        "E2E/Testing"
+      ],
+      "file_count": 4
+    },
+    {
+      "hash": "d8668589",
+      "msg": "docs(task-006): Add progress report for RoutingsPage selector fixes",
+      "module": "02-technical",
+      "types": [
+        "Routing",
+        "E2E/Testing"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "9382d7c2",
+      "msg": "fix(e2e): Add extended timeout for row visibility check",
+      "module": "00-foundation",
+      "types": [
+        "UI",
+        "State Management",
+        "Performance",
+        "Type/TypeScript",
+        "Routing",
+        "E2E/Testing"
+      ],
+      "file_count": 11
+    },
+    {
+      "hash": "e9b32258",
+      "msg": "fix(e2e): Fix RoutingsPage selectors and test expectations - 13/27 tests passing",
+      "module": "02-technical",
+      "types": [
+        "Performance",
+        "Routing",
+        "E2E/Testing"
+      ],
+      "file_count": 4
+    },
+    {
+      "hash": "cff72b32",
+      "msg": "fix(e2e): ProductsPage and DataTablePage selector fixes - Task 004 & 005",
+      "module": "02-technical",
+      "types": [
+        "UI",
+        "Performance",
+        "Routing",
+        "E2E/Testing"
+      ],
+      "file_count": 11
+    },
+    {
+      "hash": "dc63ec10",
+      "msg": "fix(dashboard): Fix TC-DASH-003, TC-DASH-004, TC-DASH-006 rendering issues",
+      "module": "00-dashboard",
+      "types": [
+        "API",
+        "UI",
+        "Security"
+      ],
+      "file_count": 2
+    },
+    {
+      "hash": "06217f53",
+      "msg": "fix(e2e): Improve tax-codes test selectors for better reliability",
+      "module": "01-settings",
+      "types": [
+        "E2E/Testing"
+      ],
+      "file_count": 3
+    },
+    {
+      "hash": "7ded3066",
+      "msg": "fix(tax-codes): Convert filter dropdowns to ShadCN Select components",
+      "module": "01-settings",
+      "types": [
+        "UI"
+      ],
+      "file_count": 2
+    },
+    {
+      "hash": "e2b5b0e8",
+      "msg": "fix(critical): Resolve hardcoded org_id in NCRService - Multi-tenant isolation (Story 06.9)",
+      "module": "06-quality",
+      "types": [
+        "API",
+        "UI",
+        "Data/DB",
+        "Security",
+        "E2E/Testing"
+      ],
+      "file_count": 20
+    },
+    {
+      "hash": "365816f8",
+      "msg": "fix(po-submit): Resolve PO_NO_LINES validation error",
+      "module": "03-planning",
+      "types": [
+        "API",
+        "Validation",
+        "Type/TypeScript",
+        "E2E/Testing"
+      ],
+      "file_count": 11
+    },
+    {
+      "hash": "e0552b22",
+      "msg": "fix(critical): Resolve 5 major user-reported runtime errors",
+      "module": "01-settings",
+      "types": [
+        "API",
+        "UI",
+        "Validation",
+        "Security",
+        "Routing",
+        "E2E/Testing"
+      ],
+      "file_count": 20
+    },
+    {
+      "hash": "8f86db44",
+      "msg": "fix(runtime): Resolve 6 critical production errors",
+      "module": "02-technical",
+      "types": [
+        "API",
+        "UI",
+        "Data/DB",
+        "Security",
+        "Type/TypeScript",
+        "Routing"
+      ],
+      "file_count": 18
+    },
+    {
+      "hash": "c6449a60",
+      "msg": "fix(database): Resolve schema errors in Planning and Production APIs",
+      "module": "02-technical",
+      "types": [
+        "API",
+        "Data/DB",
+        "Validation",
+        "Type/TypeScript"
+      ],
+      "file_count": 11
+    },
+    {
+      "hash": "19b425d0",
+      "msg": "fix(routing): Resolve Next.js dynamic route slug conflict",
+      "module": "02-technical",
+      "types": [
+        "API",
+        "Routing",
+        "E2E/Testing"
+      ],
+      "file_count": 20
+    },
+    {
+      "hash": "09187f31",
+      "msg": "fix(technical): Improve BOM cost calculation and location hooks",
+      "module": "02-technical",
+      "types": [
+        "API",
+        "UI",
+        "Type/TypeScript",
+        "Routing"
+      ],
+      "file_count": 10
+    },
+    {
+      "hash": "93e2ddcd",
+      "msg": "fix(eslint): Fix all 96 ESLint errors - 0 errors remaining",
+      "module": "01-settings",
+      "types": [
+        "UI",
+        "Security",
+        "Type/TypeScript"
+      ],
+      "file_count": 10
+    },
+    {
+      "hash": "6c880350",
+      "msg": "fix(02.4): Fix Select empty value error in Advanced tab",
+      "module": "02-technical",
+      "types": [
+        "UI"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "ce0a152c",
+      "msg": "fix(02.4): Add type=\"button\" to prevent modal close on item save",
+      "module": "02-technical",
+      "types": [
+        "UI",
+        "Type/TypeScript"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "109a208a",
+      "msg": "fix(02.8): Deploy routing operation_attachments table",
+      "module": "02-technical",
+      "types": [
+        "UI",
+        "Data/DB",
+        "Routing"
+      ],
+      "file_count": 6
+    },
+    {
+      "hash": "5000ed3f",
+      "msg": "1. 500 Error Fix:   - The API was trying to select type from products table, but that column doesn't exist   - Fixed /api/technical/boms/[id]/items/route.ts and lib/services/bom-item-service.ts to use   product_type:product_types(code, name) instead",
+      "module": "02-technical",
+      "types": [
+        "API",
+        "UI",
+        "Data/DB",
+        "Security",
+        "Type/TypeScript"
+      ],
+      "file_count": 6
+    },
+    {
+      "hash": "d67daaf6",
+      "msg": "fix produt show in product choos in new bom",
+      "module": "02-technical",
+      "types": [
+        "Security",
+        "Type/TypeScript"
+      ],
+      "file_count": 3
+    },
+    {
+      "hash": "63f599f3",
+      "msg": "fix component_id",
+      "module": "01-settings",
+      "types": [
+        "API"
+      ],
+      "file_count": 5
+    },
+    {
+      "hash": "cd327dac",
+      "msg": "fix(bom) column bom_items.component_id does not exist",
+      "module": "02-technical",
+      "types": [
+        "API",
+        "Data/DB",
+        "Type/TypeScript"
+      ],
+      "file_count": 12
+    },
+    {
+      "hash": "c5d6e365",
+      "msg": "add yeild field and fix syntax i version",
+      "module": "02-technical",
+      "types": [
+        "UI",
+        "Security",
+        "Type/TypeScript"
+      ],
+      "file_count": 5
+    },
+    {
+      "hash": "7b79bc82",
+      "msg": "fix(bom): use lowercase status values matching database",
+      "module": "02-technical",
+      "types": [
+        "Data/DB",
+        "Validation"
+      ],
+      "file_count": 2
+    },
+    {
+      "hash": "adb32282",
+      "msg": "fix: more column name fixes and graceful version history handling",
+      "module": "02-technical",
+      "types": [
+        "API",
+        "Data/DB"
+      ],
+      "file_count": 2
+    },
+    {
+      "hash": "647ad37f",
+      "msg": "fix: multiple API query column name fixes",
+      "module": "02-technical",
+      "types": [
+        "API",
+        "UI",
+        "Data/DB"
+      ],
+      "file_count": 8
+    },
+    {
+      "hash": "5e9a528e",
+      "msg": "fix(products): prevent stale closure overwriting product_type_id",
+      "module": "02-technical",
+      "types": [
+        "UI",
+        "State Management"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "4ac74051",
+      "msg": "fix(product-types): use correct table and auto-seed defaults",
+      "module": "02-technical",
+      "types": [
+        "API",
+        "UI",
+        "Type/TypeScript"
+      ],
+      "file_count": 2
+    },
+    {
+      "hash": "7b7194ea",
+      "msg": "fix(products): align schema with database columns",
+      "module": "02-technical",
+      "types": [
+        "API",
+        "UI",
+        "Data/DB",
+        "Validation",
+        "Security"
+      ],
+      "file_count": 6
+    },
+    {
+      "hash": "51213f7a",
+      "msg": "fix(products): remove category field from payload",
+      "module": "02-technical",
+      "types": [
+        "UI"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "5043ca5a",
+      "msg": "fix: resolve multiple API and database errors",
+      "module": "01-settings",
+      "types": [
+        "API",
+        "UI",
+        "Data/DB",
+        "Security"
+      ],
+      "file_count": 5
+    },
+    {
+      "hash": "5f52b215",
+      "msg": "fix(api): resolve Next.js 16 dynamic route slug conflict",
+      "module": "00-foundation",
+      "types": [
+        "API",
+        "Type/TypeScript",
+        "Routing"
+      ],
+      "file_count": 9
+    },
+    {
+      "hash": "3ec1bcdf",
+      "msg": "fix(deploy): resolve pnpm cache conflict on Vercel",
+      "module": "00-foundation",
+      "types": [
+        "State Management"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "e102bb88",
+      "msg": "fix(deploy): standardize on pnpm package manager",
+      "module": "05-scanner",
+      "types": [
+        "Other"
+      ],
+      "file_count": 4
+    },
+    {
+      "hash": "f1ca0288",
+      "msg": "fix(build): resolve Next.js build failures",
+      "module": "00-foundation",
+      "types": [
+        "Data/DB",
+        "Validation"
+      ],
+      "file_count": 4
+    },
+    {
+      "hash": "13cb307f",
+      "msg": "feat(typescript): Phase 2 - fix remaining 395 errors, achieve ZERO \u2705",
+      "module": "02-technical",
+      "types": [
+        "API",
+        "Data/DB",
+        "Validation",
+        "Security",
+        "Type/TypeScript"
+      ],
+      "file_count": 20
+    },
+    {
+      "hash": "c19ff81d",
+      "msg": "feat: fix all 499 TypeScript errors - ZERO ERRORS ACHIEVED! \ud83c\udf89",
+      "module": "03-planning",
+      "types": [
+        "API",
+        "Validation",
+        "Type/TypeScript",
+        "E2E/Testing"
+      ],
+      "file_count": 20
+    },
+    {
+      "hash": "0c92cc0e",
+      "msg": "docs: add comprehensive TypeScript error monitoring guides",
+      "module": "00-foundation",
+      "types": [
+        "Validation",
+        "Type/TypeScript"
+      ],
+      "file_count": 3
+    },
+    {
+      "hash": "26aff4af",
+      "msg": "fix(lint): remove invalid ESLint disable comment",
+      "module": "00-foundation",
+      "types": [
+        "Validation",
+        "Type/TypeScript"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "ab11bd8c",
+      "msg": "fix(lint): resolve ESLint errors blocking push",
+      "module": "05-warehouse",
+      "types": [
+        "Type/TypeScript",
+        "E2E/Testing"
+      ],
+      "file_count": 3
+    },
+    {
+      "hash": "1b0e4d83",
+      "msg": "fix(warehouse): escape apostrophes in LPMergeLocationPicker",
+      "module": "05-warehouse",
+      "types": [
+        "Other"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "39d5ac5d",
+      "msg": "fix(story-01.2): Fix navigation filtering for warehouse_manager role",
+      "module": "01-settings",
+      "types": [
+        "Security",
+        "UX"
+      ],
+      "file_count": 4
+    },
+    {
+      "hash": "04327580",
+      "msg": "fix: Escape apostrophes in JSX to resolve ESLint errors",
+      "module": "05-warehouse",
+      "types": [
+        "UI",
+        "State Management",
+        "Security",
+        "Type/TypeScript"
+      ],
+      "file_count": 4
+    },
+    {
+      "hash": "bdeb834b",
+      "msg": "refactor(story-03.5a): Fix critical code review issues in API route and validation schema",
+      "module": "01-settings",
+      "types": [
+        "API",
+        "Data/DB",
+        "Validation"
+      ],
+      "file_count": 2
+    },
+    {
+      "hash": "27919e85",
+      "msg": "docs(test-fix-report-03.3): Add comprehensive test infrastructure fix report",
+      "module": "00-foundation",
+      "types": [
+        "E2E/Testing"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "d11523bb",
+      "msg": "fix(story-03.3): Fix critical test infrastructure issues - integration tests and RLS tests",
+      "module": "00-testing",
+      "types": [
+        "API",
+        "Data/DB",
+        "Security",
+        "Integration",
+        "E2E/Testing"
+      ],
+      "file_count": 2
+    },
+    {
+      "hash": "3b208cfc",
+      "msg": "fix(planning): address code review feedback for Story 03.2",
+      "module": "02-technical",
+      "types": [
+        "API",
+        "UI",
+        "UX",
+        "E2E/Testing"
+      ],
+      "file_count": 4
+    },
+    {
+      "hash": "6df0a85e",
+      "msg": "fix(lint): escape quotes in WOFilters.tsx to resolve ESLint errors",
+      "module": "03-planning",
+      "types": [
+        "Type/TypeScript"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "d11a7716",
+      "msg": "fix(technical): resolve React hooks rules-of-hooks violation in ProductFormModal",
+      "module": "02-technical",
+      "types": [
+        "UI"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "f6611dc4",
+      "msg": "fix(api): correct user role query to use role:roles(code) join",
+      "module": "01-settings",
+      "types": [
+        "API",
+        "Data/DB",
+        "Security"
+      ],
+      "file_count": 20
+    },
+    {
+      "hash": "a56693d3",
+      "msg": "fix(critical): resolve 4 production bugs",
+      "module": "02-technical",
+      "types": [
+        "API",
+        "UI",
+        "Data/DB",
+        "Security",
+        "Type/TypeScript",
+        "Routing"
+      ],
+      "file_count": 13
+    },
+    {
+      "hash": "49f6c424",
+      "msg": "fix(types): resolve 177 TypeScript errors for successful deployment",
+      "module": "01-settings",
+      "types": [
+        "API",
+        "UI",
+        "Data/DB",
+        "Validation",
+        "Security",
+        "Type/TypeScript",
+        "E2E/Testing"
+      ],
+      "file_count": 12
+    },
+    {
+      "hash": "85961c53",
+      "msg": "fix(types): fix mockOnVersionClick type in BOMVersionTimeline.test.tsx",
+      "module": "02-technical",
+      "types": [
+        "Type/TypeScript",
+        "E2E/Testing"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "c8c95bf4",
+      "msg": "fix(types): resolve TypeScript annotation errors in test files",
+      "module": "02-technical",
+      "types": [
+        "API",
+        "Validation",
+        "Type/TypeScript",
+        "Integration",
+        "E2E/Testing"
+      ],
+      "file_count": 3
+    },
+    {
+      "hash": "0226ef1b",
+      "msg": "fix(lint): resolve ESLint errors and warnings",
+      "module": "01-settings",
+      "types": [
+        "Security",
+        "Type/TypeScript"
+      ],
+      "file_count": 4
+    },
+    {
+      "hash": "1e217ccc",
+      "msg": "fix(types): comprehensive TypeScript fixes for Vercel deployment",
+      "module": "01-settings",
+      "types": [
+        "API",
+        "UI",
+        "Type/TypeScript",
+        "UX"
+      ],
+      "file_count": 20
+    },
+    {
+      "hash": "67edccb2",
+      "msg": "chore: remove temporary fix script",
+      "module": "00-foundation",
+      "types": [
+        "Other"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "be71b08c",
+      "msg": "fix(types): comprehensive TypeScript fixes for Vercel deployment",
+      "module": "01-settings",
+      "types": [
+        "API",
+        "Security",
+        "Type/TypeScript"
+      ],
+      "file_count": 20
+    },
+    {
+      "hash": "5dedd65c",
+      "msg": "fix(types): cast handleModalSubmit to bypass type mismatch",
+      "module": "01-settings",
+      "types": [
+        "UI",
+        "Security",
+        "Type/TypeScript"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "8ccccc71",
+      "msg": "fix(types): convert null to undefined for TaxCodeModal prop",
+      "module": "01-settings",
+      "types": [
+        "UI",
+        "Security"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "28d0dceb",
+      "msg": "fix(auth): update invitation route for Next.js 15 async params",
+      "module": "00-foundation",
+      "types": [
+        "API",
+        "Security"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "1c21acaf",
+      "msg": "fix(api): update RouteContext interfaces for Next.js 15 async params",
+      "module": "01-settings",
+      "types": [
+        "API",
+        "Type/TypeScript"
+      ],
+      "file_count": 3
+    },
+    {
+      "hash": "8756acb5",
+      "msg": "fix(api): complete async params migration - remove all (await params).X patterns",
+      "module": "01-settings",
+      "types": [
+        "API",
+        "Data/DB",
+        "Security"
+      ],
+      "file_count": 15
+    },
+    {
+      "hash": "f933c4f3",
+      "msg": "fix(api): complete Next.js 15 async params migration for all routes",
+      "module": "01-settings",
+      "types": [
+        "API",
+        "Data/DB",
+        "Security"
+      ],
+      "file_count": 20
+    },
+    {
+      "hash": "d0134a4c",
+      "msg": "fix(build): resolve LocationForm imports and Next.js 15 async params",
+      "module": "01-settings",
+      "types": [
+        "API",
+        "UI"
+      ],
+      "file_count": 2
+    },
+    {
+      "hash": "a49cb09b",
+      "msg": "fix(deployment): resolve Next.js build errors and routing conflicts",
+      "module": "02-technical",
+      "types": [
+        "API",
+        "Security",
+        "Routing"
+      ],
+      "file_count": 6
+    },
+    {
+      "hash": "24a13406",
+      "msg": "fix(lint): resolve ESLint errors - escape JSX entities and fix type assertions",
+      "module": "02-technical",
+      "types": [
+        "API",
+        "UI",
+        "Security",
+        "Type/TypeScript",
+        "Routing"
+      ],
+      "file_count": 10
+    },
+    {
+      "hash": "6abf3e4d",
+      "msg": "fix(security): add server-side has-inventory endpoint",
+      "module": "01-settings",
+      "types": [
+        "API"
+      ],
+      "file_count": 2
+    },
+    {
+      "hash": "62c221f4",
+      "msg": "fix(security): add CSRF protection to warehouse API endpoints",
+      "module": "01-settings",
+      "types": [
+        "API",
+        "Security"
+      ],
+      "file_count": 6
+    },
+    {
+      "hash": "894cdac0",
+      "msg": "fix(security): sanitize search input to prevent SQL injection",
+      "module": "01-settings",
+      "types": [
+        "API",
+        "Data/DB"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "48152a6b",
+      "msg": "refactor(technical): fix code review issues for Story 02.15 - Cost History & Variance",
+      "module": "02-technical",
+      "types": [
+        "API"
+      ],
+      "file_count": 7
+    },
+    {
+      "hash": "1c2b0362",
+      "msg": "fix(routing-operations): fix database field mapping and average_yield calculation",
+      "module": "02-technical",
+      "types": [
+        "Data/DB",
+        "Routing"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "a0cd315c",
+      "msg": "Fix: Make pre-push hook resilient to missing pnpm",
+      "module": "00-foundation",
+      "types": [
+        "Other"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "281be406",
+      "msg": "Fix permissions across modules, update settings and technical components, and apply RLS migrations",
+      "module": "01-settings",
+      "types": [
+        "UI",
+        "Data/DB",
+        "Validation",
+        "State Management",
+        "Security"
+      ],
+      "file_count": 20
+    },
+    {
+      "hash": "38742626",
+      "msg": "fix(security): CRIT-1 - fix SQL injection in product allergen service",
+      "module": "01-settings",
+      "types": [
+        "Data/DB"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "01b999c4",
+      "msg": "refactor(story-02.3): fix source products fetch and extract shared allergen icons",
+      "module": "01-settings",
+      "types": [
+        "UI"
+      ],
+      "file_count": 4
+    },
+    {
+      "hash": "0b3986e2",
+      "msg": "security: fix critical vulnerabilities in invitation service",
+      "module": "01-settings",
+      "types": [
+        "API",
+        "Data/DB",
+        "Security"
+      ],
+      "file_count": 3
+    },
+    {
+      "hash": "ebe67c0f",
+      "msg": "chore: fix husky hooks and lint errors blocking push",
+      "module": "01-settings",
+      "types": [
+        "Type/TypeScript",
+        "E2E/Testing"
+      ],
+      "file_count": 4
+    },
+    {
+      "hash": "8629c193",
+      "msg": "fix(api): Use correct column names in settings stats endpoint",
+      "module": "01-settings",
+      "types": [
+        "API",
+        "Data/DB"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "7ffa32d1",
+      "msg": "fix(dashboard): Handle null user gracefully, remove non-null assertions",
+      "module": "00-dashboard",
+      "types": [
+        "Security"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "16d294a4",
+      "msg": "fix(auth): Sign out user when users table record not found",
+      "module": "01-settings",
+      "types": [
+        "UI",
+        "Security"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "fa077e2b",
+      "msg": "fix(auth): Fix redirect loop in middleware and add favicon",
+      "module": "00-foundation",
+      "types": [
+        "Security",
+        "UX"
+      ],
+      "file_count": 2
+    },
+    {
+      "hash": "62e91282",
+      "msg": "fix(vercel): Try yarn install",
+      "module": "00-foundation",
+      "types": [
+        "Other"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "7e09c249",
+      "msg": "fix(vercel): Explicitly install react and react-dom",
+      "module": "00-foundation",
+      "types": [
+        "Other"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "47f9871b",
+      "msg": "fix(vercel): Use npm install instead of npm ci",
+      "module": "00-foundation",
+      "types": [
+        "Other"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "195c8507",
+      "msg": "fix(vercel): Add package-lock.json and use npm ci",
+      "module": "05-scanner",
+      "types": [
+        "Other"
+      ],
+      "file_count": 2
+    },
+    {
+      "hash": "de172b6c",
+      "msg": "fix(vercel): Restore rootDirectory with npm install from root",
+      "module": "00-foundation",
+      "types": [
+        "Other"
+      ],
+      "file_count": 2
+    },
+    {
+      "hash": "c5cae364",
+      "msg": "fix(vercel): Move vercel.json to root for monorepo support",
+      "module": "03-planning",
+      "types": [
+        "Other"
+      ],
+      "file_count": 4
+    },
+    {
+      "hash": "4628f0c2",
+      "msg": "fix(vercel): Switch to npm for Node 20 compatibility",
+      "module": "00-foundation",
+      "types": [
+        "Other"
+      ],
+      "file_count": 4
+    },
+    {
+      "hash": "4266eccc",
+      "msg": "fix vercel",
+      "module": "02-technical",
+      "types": [
+        "API",
+        "UI"
+      ],
+      "file_count": 12
+    },
+    {
+      "hash": "21ce0b97",
+      "msg": "chore: add husky to fix prepare hook on Vercel",
+      "module": "00-foundation",
+      "types": [
+        "Other"
+      ],
+      "file_count": 2
+    },
+    {
+      "hash": "e1a994b4",
+      "msg": "fix(frontend): typing fixes; add test-engineer agent prompt; update CHANGELOG",
+      "module": "02-technical",
+      "types": [
+        "UI",
+        "Data/DB",
+        "State Management",
+        "Security",
+        "E2E/Testing"
+      ],
+      "file_count": 5
+    },
+    {
+      "hash": "1947c84f",
+      "msg": "fix(story-01.9): Add missing wireframe references SET-014 and SET-015",
+      "module": "00-foundation",
+      "types": [
+        "Other"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "3dc66cfa",
+      "msg": "fix(epic-01): Complete YAML context validation and critical fixes",
+      "module": "00-foundation",
+      "types": [
+        "API",
+        "Data/DB",
+        "Validation",
+        "State Management",
+        "Security",
+        "Performance",
+        "E2E/Testing"
+      ],
+      "file_count": 20
+    },
+    {
+      "hash": "0b1e4c84",
+      "msg": "fix(context): Synchronize 01.2 split context files with main context.yaml",
+      "module": "00-testing",
+      "types": [
+        "API",
+        "E2E/Testing"
+      ],
+      "file_count": 3
+    },
+    {
+      "hash": "4e033afd",
+      "msg": "fix(01.3-context): Synchronize split context files with main file",
+      "module": "00-testing",
+      "types": [
+        "API",
+        "E2E/Testing"
+      ],
+      "file_count": 4
+    },
+    {
+      "hash": "689cd6c0",
+      "msg": "fix(docs): Synchronize 01.4 split context files with main context.yaml",
+      "module": "00-foundation",
+      "types": [
+        "API",
+        "Data/DB"
+      ],
+      "file_count": 3
+    },
+    {
+      "hash": "1dd0b933",
+      "msg": "fix(epic-01): Update 01.3 context YAML per architecture decisions",
+      "module": "00-foundation",
+      "types": [
+        "Other"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "3f59bdf8",
+      "msg": "fix(epic-02): Resolve dependency gaps and blockers - 94% quality score",
+      "module": "06-quality",
+      "types": [
+        "UI",
+        "Data/DB"
+      ],
+      "file_count": 7
+    },
+    {
+      "hash": "402ade6f",
+      "msg": "docs(ux): Complete UX audit fixes - achieve 97-98% quality score",
+      "module": "06-quality",
+      "types": [
+        "UI",
+        "State Management",
+        "Security"
+      ],
+      "file_count": 15
+    },
+    {
+      "hash": "058c8fd0",
+      "msg": "docs: Add all missing modules from competitive gap analysis",
+      "module": "00-foundation",
+      "types": [
+        "UI",
+        "Performance"
+      ],
+      "file_count": 11
+    },
+    {
+      "hash": "29e4331e",
+      "msg": "fix: BUG-003 GRN LP navigation, BUG-004 Scanner PO barcode",
+      "module": "05-warehouse",
+      "types": [
+        "API",
+        "UI",
+        "State Management",
+        "UX"
+      ],
+      "file_count": 4
+    },
+    {
+      "hash": "4b87cb59",
+      "msg": "docs: Add MVP Phases structure and bug tracker",
+      "module": "00-foundation",
+      "types": [
+        "Performance"
+      ],
+      "file_count": 14
+    },
+    {
+      "hash": "27aae255",
+      "msg": "fix: PO page improvements",
+      "module": "03-planning",
+      "types": [
+        "UI",
+        "Security"
+      ],
+      "file_count": 2
+    },
+    {
+      "hash": "d418a9cf",
+      "msg": "fix: Remove invalid eslint-disable comments",
+      "module": "02-technical",
+      "types": [
+        "Validation",
+        "Type/TypeScript",
+        "Routing"
+      ],
+      "file_count": 2
+    },
+    {
+      "hash": "f6a8a345",
+      "msg": "fix: Update production-lines API paths to /api/settings/lines",
+      "module": "01-settings",
+      "types": [
+        "API",
+        "UI"
+      ],
+      "file_count": 2
+    },
+    {
+      "hash": "f9ac366b",
+      "msg": "fix: Settings pages bug fixes and context reorganization",
+      "module": "01-settings",
+      "types": [
+        "API",
+        "Security",
+        "Routing",
+        "E2E/Testing"
+      ],
+      "file_count": 20
+    },
+    {
+      "hash": "b659fb1b",
+      "msg": "fix: Restore WOStartModal full implementation + add E2E tests (Story 4.2)",
+      "module": "02-technical",
+      "types": [
+        "UI",
+        "E2E/Testing"
+      ],
+      "file_count": 3
+    },
+    {
+      "hash": "f4bcd0c8",
+      "msg": "Merge pull request #53 from CoderMariusz/claude/fix-planning-layout-01T7zRJZMbivW41SA5R8ZDJc",
+      "module": "03-planning",
+      "types": [
+        "Other"
+      ],
+      "file_count": 0
+    },
+    {
+      "hash": "4982ea5c",
+      "msg": "fix: Update genealogy reversal and over-production handling logic",
+      "module": "02-technical",
+      "types": [
+        "Other"
+      ],
+      "file_count": 2
+    },
+    {
+      "hash": "7fde6ccc",
+      "msg": "fix: Resolve all critical architectural issues in Epic 4 Stories",
+      "module": "00-foundation",
+      "types": [
+        "Other"
+      ],
+      "file_count": 13
+    },
+    {
+      "hash": "18cc7976",
+      "msg": "fix: Review Epic 4 Stories - Fix critical issues & clarifications",
+      "module": "00-foundation",
+      "types": [
+        "Other"
+      ],
+      "file_count": 8
+    },
+    {
+      "hash": "104e109f",
+      "msg": "Merge pull request #51 from CoderMariusz/claude/fix-dashboard-layout-013WWxQoPwQyWXHRimTW6iyk",
+      "module": "00-dashboard",
+      "types": [
+        "Other"
+      ],
+      "file_count": 0
+    },
+    {
+      "hash": "4dc0dac4",
+      "msg": "fix: Refactor Planning Dashboard layout - reorganize stats and activity feed",
+      "module": "03-planning",
+      "types": [
+        "API",
+        "Security"
+      ],
+      "file_count": 3
+    },
+    {
+      "hash": "2d0ee004",
+      "msg": "fix: Add error logging to purchase-orders integration tests",
+      "module": "00-foundation",
+      "types": [
+        "API",
+        "Integration",
+        "E2E/Testing"
+      ],
+      "file_count": 20
+    },
+    {
+      "hash": "71525851",
+      "msg": "fix: Load .env.test in cleanup script",
+      "module": "00-testing",
+      "types": [
+        "E2E/Testing"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "22e51503",
+      "msg": "fix: Improve test user cleanup and add manual cleanup script",
+      "module": "01-settings",
+      "types": [
+        "E2E/Testing"
+      ],
+      "file_count": 2
+    },
+    {
+      "hash": "3a4ea26d",
+      "msg": "fix: Synchronize test user email/password between fixture and tests",
+      "module": "01-settings",
+      "types": [
+        "E2E/Testing"
+      ],
+      "file_count": 2
+    },
+    {
+      "hash": "aed45e2d",
+      "msg": "fix: Update products API endpoint to /api/technical/products and handle response format",
+      "module": "02-technical",
+      "types": [
+        "API",
+        "UI",
+        "E2E/Testing"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "1284e675",
+      "msg": "fix: Resolve E2E test setup issues - use existing test organization",
+      "module": "00-testing",
+      "types": [
+        "E2E/Testing"
+      ],
+      "file_count": 2
+    },
+    {
+      "hash": "b34ebd45",
+      "msg": "fix: resolve type error in planning settings is_default mapping",
+      "module": "01-settings",
+      "types": [
+        "Validation",
+        "Security",
+        "Type/TypeScript"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "24c1fb26",
+      "msg": "Merge pull request #48 from CoderMariusz/claude/fix-product-bom-display-01NZaBSDFG3whCNY1qCVn25a",
+      "module": "02-technical",
+      "types": [
+        "UI"
+      ],
+      "file_count": 0
+    },
+    {
+      "hash": "faec7af2",
+      "msg": "fix: Product BOM display and navigation issues",
+      "module": "02-technical",
+      "types": [
+        "API",
+        "UI",
+        "Security",
+        "UX"
+      ],
+      "file_count": 5
+    },
+    {
+      "hash": "cb7358f0",
+      "msg": "Merge pull request #47 from CoderMariusz/claude/fix-bom-status-enum-01A2J2Y13Vs2bj76U4EWf2n5",
+      "module": "02-technical",
+      "types": [
+        "Other"
+      ],
+      "file_count": 0
+    },
+    {
+      "hash": "9e9e7f7c",
+      "msg": "fix: make BOM item sequence field optional",
+      "module": "02-technical",
+      "types": [
+        "Data/DB",
+        "Validation"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "2eac6f18",
+      "msg": "Merge pull request #46 from CoderMariusz/claude/fix-bom-status-enum-01A2J2Y13Vs2bj76U4EWf2n5",
+      "module": "02-technical",
+      "types": [
+        "Other"
+      ],
+      "file_count": 0
+    },
+    {
+      "hash": "a9340068",
+      "msg": "fix: update BOM status type definitions in page components",
+      "module": "02-technical",
+      "types": [
+        "Security",
+        "Type/TypeScript"
+      ],
+      "file_count": 3
+    },
+    {
+      "hash": "8e1fcdd9",
+      "msg": "Merge pull request #45 from CoderMariusz/claude/fix-bom-status-enum-01A2J2Y13Vs2bj76U4EWf2n5",
+      "module": "02-technical",
+      "types": [
+        "Other"
+      ],
+      "file_count": 0
+    },
+    {
+      "hash": "64be2d5f",
+      "msg": "fix: align BOM status enum values with database",
+      "module": "02-technical",
+      "types": [
+        "API",
+        "UI",
+        "Data/DB",
+        "Validation"
+      ],
+      "file_count": 5
+    },
+    {
+      "hash": "ae0da626",
+      "msg": "Merge pull request #44 from CoderMariusz/claude/fix-bom-errors-01PiRxdaruc7gzion6gG9WX5",
+      "module": "02-technical",
+      "types": [
+        "Other"
+      ],
+      "file_count": 0
+    },
+    {
+      "hash": "1b803453",
+      "msg": "fix: resolve BOM creation errors - date validation and org_id lookup",
+      "module": "02-technical",
+      "types": [
+        "Data/DB",
+        "Validation"
+      ],
+      "file_count": 2
+    },
+    {
+      "hash": "38cd7f3e",
+      "msg": "fix: add migration 037 to verify product RLS functionality",
+      "module": "02-technical",
+      "types": [
+        "Data/DB",
+        "Security"
+      ],
+      "file_count": 2
+    },
+    {
+      "hash": "e0055907",
+      "msg": "fix: add migration 036 to validate and fix product org_id data",
+      "module": "02-technical",
+      "types": [
+        "Data/DB",
+        "Validation"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "664dc617",
+      "msg": "fix: add migration 035 to diagnose and fix JWT org_id claims",
+      "module": "00-foundation",
+      "types": [
+        "Data/DB"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "736e342f",
+      "msg": "fix: add migration 034 to fix duplicate RLS policies for all product modules",
+      "module": "02-technical",
+      "types": [
+        "Data/DB",
+        "Security"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "5d8e4ace",
+      "msg": "fix: add migration 034 to fix duplicate product RLS policies",
+      "module": "02-technical",
+      "types": [
+        "Data/DB",
+        "Security"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "f33ee073",
+      "msg": "fix: resolve RLS policy errors in product creation",
+      "module": "02-technical",
+      "types": [
+        "Data/DB",
+        "Security"
+      ],
+      "file_count": 3
+    },
+    {
+      "hash": "c5ed9ba7",
+      "msg": "Merge pull request #42 from CoderMariusz/claude/fix-add-product-error-01Q5oCc8C7q7NrosZMXUDBeo",
+      "module": "02-technical",
+      "types": [
+        "Other"
+      ],
+      "file_count": 0
+    },
+    {
+      "hash": "0f4e8c76",
+      "msg": "fix: resolve authentication errors in technical module API routes",
+      "module": "02-technical",
+      "types": [
+        "API",
+        "Security"
+      ],
+      "file_count": 9
+    },
+    {
+      "hash": "c0dfd8f8",
+      "msg": "Merge pull request #39 from CoderMariusz/claude/fix-mock-org-id-018k1FzHabCKZPxymFUxi8JR",
+      "module": "00-foundation",
+      "types": [
+        "Other"
+      ],
+      "file_count": 0
+    },
+    {
+      "hash": "30ab1071",
+      "msg": "Merge pull request #37 from CoderMariusz/claude/fix-technical-sidebar-visibility-01Fb9JJMtKVbZSnfFLapn7AE",
+      "module": "02-technical",
+      "types": [
+        "UI"
+      ],
+      "file_count": 0
+    },
+    {
+      "hash": "a4792912",
+      "msg": "fix: correct column name mismatch in authenticated layout",
+      "module": "00-foundation",
+      "types": [
+        "Data/DB",
+        "Security"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "e2d65175",
+      "msg": "Merge pull request #34 from CoderMariusz/claude/fix-ref-type-error-018tAPgqy7TJJApVv5qFyZeZ",
+      "module": "00-foundation",
+      "types": [
+        "Validation",
+        "Type/TypeScript"
+      ],
+      "file_count": 0
+    },
+    {
+      "hash": "e5064acb",
+      "msg": "fix: correct ref type in scrollToSection function",
+      "module": "02-technical",
+      "types": [
+        "Security",
+        "Type/TypeScript"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "1426b5ed",
+      "msg": "Merge pull request #33 from CoderMariusz/claude/fix-skeleton-import-01HNnuotKJ1VVcKxQD7pJQtc",
+      "module": "00-foundation",
+      "types": [
+        "Other"
+      ],
+      "file_count": 0
+    },
+    {
+      "hash": "941aa7b9",
+      "msg": "fix: add missing skeleton and tooltip UI components",
+      "module": "00-foundation",
+      "types": [
+        "UI"
+      ],
+      "file_count": 4
+    },
+    {
+      "hash": "0441c6a2",
+      "msg": "fix: add default page.tsx for /technical route to redirect to /technical/dashboard",
+      "module": "02-technical",
+      "types": [
+        "Security",
+        "UX"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "6b8c5ae1",
+      "msg": "fix(types): resolve TypeScript errors in Batch 2D stories",
+      "module": "02-technical",
+      "types": [
+        "Validation",
+        "Security",
+        "Type/TypeScript"
+      ],
+      "file_count": 5
+    },
+    {
+      "hash": "df620975",
+      "msg": "Merge pull request #27 from CoderMariusz/claude/fix-radio-group-import-01EhTEbepZjy93kYsHKyg6cn",
+      "module": "00-foundation",
+      "types": [
+        "Other"
+      ],
+      "file_count": 0
+    },
+    {
+      "hash": "56486bea",
+      "msg": "fix(ui): add missing radio-group and scroll-area components",
+      "module": "00-foundation",
+      "types": [
+        "UI"
+      ],
+      "file_count": 4
+    },
+    {
+      "hash": "f9d17067",
+      "msg": "Merge pull request #25 from CoderMariusz/claude/fix-bom-type-errors-01UTYVg3LDBxQk5WWH3Ubg29",
+      "module": "02-technical",
+      "types": [
+        "Validation",
+        "Type/TypeScript"
+      ],
+      "file_count": 0
+    },
+    {
+      "hash": "bd235c9a",
+      "msg": "fix(types): resolve BOM type errors and exclude tests from type-check",
+      "module": "02-technical",
+      "types": [
+        "UI",
+        "Validation",
+        "Security",
+        "Type/TypeScript",
+        "E2E/Testing"
+      ],
+      "file_count": 3
+    },
+    {
+      "hash": "46938890",
+      "msg": "fix: add missing paramsId state declaration in transfer-orders detail page",
+      "module": "03-planning",
+      "types": [
+        "State Management",
+        "Security"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "7806eaf8",
+      "msg": "Merge pull request #20 from CoderMariusz/claude/fix-accent-colors-type-01XGVtVJ6abHU5rCfNhpunfE",
+      "module": "00-foundation",
+      "types": [
+        "Type/TypeScript"
+      ],
+      "file_count": 0
+    },
+    {
+      "hash": "70de069e",
+      "msg": "fix: add .optional() before .default() and use z.input for form types in all validation schemas",
+      "module": "00-foundation",
+      "types": [
+        "UI",
+        "Data/DB",
+        "Validation",
+        "Security",
+        "Routing"
+      ],
+      "file_count": 15
+    },
+    {
+      "hash": "54815855",
+      "msg": "fix: add .optional() before .default() in all form schemas",
+      "module": "00-foundation",
+      "types": [
+        "API",
+        "UI",
+        "Data/DB",
+        "Security"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "58844722",
+      "msg": "fix: handle null values in Textarea for nullable description field",
+      "module": "00-foundation",
+      "types": [
+        "API"
+      ],
+      "file_count": 2
+    },
+    {
+      "hash": "f793eaba",
+      "msg": "fix: resolve TypeScript errors in bom-schemas, tests, and vitest config",
+      "module": "02-technical",
+      "types": [
+        "UI",
+        "Data/DB",
+        "Validation",
+        "Type/TypeScript",
+        "E2E/Testing"
+      ],
+      "file_count": 3
+    },
+    {
+      "hash": "2e78d1ab",
+      "msg": "fix: add missing await for createServerSupabase in bom-service",
+      "module": "02-technical",
+      "types": [
+        "Data/DB"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "88bcb572",
+      "msg": "fix: add proper auth error handling in API routes",
+      "module": "01-settings",
+      "types": [
+        "API",
+        "Security"
+      ],
+      "file_count": 4
+    },
+    {
+      "hash": "f04fcbca",
+      "msg": "fix: handle null values in Textarea for nullable description field",
+      "module": "02-technical",
+      "types": [
+        "Routing"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "e6c87359",
+      "msg": "fix: add .optional() before .default() in all form schemas",
+      "module": "00-foundation",
+      "types": [
+        "UI",
+        "Data/DB",
+        "Validation",
+        "Routing"
+      ],
+      "file_count": 3
+    },
+    {
+      "hash": "f255e808",
+      "msg": "fix: use z.input for CreateOperationInput type",
+      "module": "00-foundation",
+      "types": [
+        "Data/DB",
+        "Validation",
+        "Type/TypeScript",
+        "Routing"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "660904ee",
+      "msg": "fix: make fields with defaults optional in createOperationSchema",
+      "module": "00-foundation",
+      "types": [
+        "Data/DB",
+        "Validation",
+        "Routing"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "0c07535d",
+      "msg": "fix: add nullable support to all optional string fields",
+      "module": "03-planning",
+      "types": [
+        "UI",
+        "Data/DB",
+        "Validation"
+      ],
+      "file_count": 4
+    },
+    {
+      "hash": "6d2552f9",
+      "msg": "fix: allow null value for notes in TransferOrder interface",
+      "module": "03-planning",
+      "types": [
+        "UI",
+        "Type/TypeScript"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "56b0c5c5",
+      "msg": "fix: allow null value for notes in TOLine interface",
+      "module": "03-planning",
+      "types": [
+        "UI",
+        "Type/TypeScript"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "94da865a",
+      "msg": "fix: allow null value for description in UpdateRoutingInput",
+      "module": "02-technical",
+      "types": [
+        "Routing"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "277abe0f",
+      "msg": "fix: resolve TypeScript type error for approval_status in purchase orders",
+      "module": "03-planning",
+      "types": [
+        "API",
+        "Validation",
+        "Type/TypeScript"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "3fcb1802",
+      "msg": "fix: resolve TypeScript type error in dashboard accentColors",
+      "module": "02-technical",
+      "types": [
+        "Validation",
+        "Security",
+        "Type/TypeScript"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "a02326d4",
+      "msg": "Merge pull request #19 from CoderMariusz/claude/fix-useeffect-dependency-01HzzFnqoqGJSDnQSLk7mxg6",
+      "module": "00-foundation",
+      "types": [
+        "Other"
+      ],
+      "file_count": 0
+    },
+    {
+      "hash": "9551091a",
+      "msg": "fix: convert all API routes to use Next.js 15 async params",
+      "module": "02-technical",
+      "types": [
+        "API"
+      ],
+      "file_count": 14
+    },
+    {
+      "hash": "dd298e35",
+      "msg": "Merge pull request #18 from CoderMariusz/claude/fix-useeffect-dependency-01HzzFnqoqGJSDnQSLk7mxg6",
+      "module": "00-foundation",
+      "types": [
+        "Other"
+      ],
+      "file_count": 0
+    },
+    {
+      "hash": "6725046c",
+      "msg": "fix: resolve Next.js 15 async params and useEffect dependency warnings",
+      "module": "00-foundation",
+      "types": [
+        "Security"
+      ],
+      "file_count": 6
+    },
+    {
+      "hash": "28abf81b",
+      "msg": "fix(planning): correct interface name typo in POLinesTable",
+      "module": "03-planning",
+      "types": [
+        "UI",
+        "Type/TypeScript"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "a6dd105f",
+      "msg": "Merge pull request #16 from CoderMariusz/claude/fix-textarea-import-01Kw9aPAc288rVchBP27gx1U",
+      "module": "00-foundation",
+      "types": [
+        "Other"
+      ],
+      "file_count": 0
+    },
+    {
+      "hash": "882641e4",
+      "msg": "fix: add missing textarea component from shadcn/ui",
+      "module": "00-foundation",
+      "types": [
+        "UI"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "9c8d57a2",
+      "msg": "fix(dashboard): handle null data and correct product filtering",
+      "module": "00-dashboard",
+      "types": [
+        "E2E/Testing"
+      ],
+      "file_count": 2
+    },
+    {
+      "hash": "ff9e867b",
+      "msg": "fix(vercel): move vercel.json to apps/frontend for proper Next.js detection",
+      "module": "00-foundation",
+      "types": [
+        "Data/DB",
+        "Security",
+        "E2E/Testing"
+      ],
+      "file_count": 9
+    },
+    {
+      "hash": "355c6eb1",
+      "msg": "fix(vercel): add vercel.json for pnpm monorepo Next.js detection",
+      "module": "03-planning",
+      "types": [
+        "Other"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "5d7e182e",
+      "msg": "fix(build): lazy initialize Redis to avoid build-time errors",
+      "module": "00-foundation",
+      "types": [
+        "Other"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "1b5e8c1a",
+      "msg": "fix(tests): update test data generation to use UUIDs",
+      "module": "00-foundation",
+      "types": [
+        "API",
+        "Data/DB",
+        "Security",
+        "E2E/Testing"
+      ],
+      "file_count": 6
+    },
+    {
+      "hash": "355f20a6",
+      "msg": "fix(vercel): remove vercel.json to use dashboard configuration",
+      "module": "00-dashboard",
+      "types": [
+        "Other"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "23194470",
+      "msg": "fix(vercel): remove invalid rootDirectory property",
+      "module": "00-foundation",
+      "types": [
+        "Validation"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "d48964f8",
+      "msg": "fix(vercel): simplify build commands for rootDirectory context",
+      "module": "00-foundation",
+      "types": [
+        "Other"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "0ecfef45",
+      "msg": "fix(vercel): add rootDirectory and fix outputDirectory path",
+      "module": "04-production",
+      "types": [
+        "Other"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "f96d0875",
+      "msg": "fix(build): move JWT_SECRET to runtime helper in invitation-service",
+      "module": "00-foundation",
+      "types": [
+        "Other"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "855bd990",
+      "msg": "fix(build): move JWT_SECRET check to runtime in invitation-client",
+      "module": "00-foundation",
+      "types": [
+        "Other"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "388814b2",
+      "msg": "fix(api): update tax-codes route for Next.js 15 async params",
+      "module": "01-settings",
+      "types": [
+        "API"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "0bf43f15",
+      "msg": "fix(build): split invitation service for client/server compatibility",
+      "module": "00-foundation",
+      "types": [
+        "Other"
+      ],
+      "file_count": 2
+    },
+    {
+      "hash": "06aec16c",
+      "msg": "fix(vercel): install devDependencies to fix TypeScript conflict",
+      "module": "00-foundation",
+      "types": [
+        "Type/TypeScript"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "8b6d65ff",
+      "msg": "fix(vercel): use pnpm workspace filter for build command",
+      "module": "00-foundation",
+      "types": [
+        "Other"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "75cf6b7a",
+      "msg": "fix(vercel): remove rootDirectory and fix workspace build",
+      "module": "00-foundation",
+      "types": [
+        "Other"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "e09430fb",
+      "msg": "fix(vercel): add rootDirectory for monorepo configuration",
+      "module": "03-planning",
+      "types": [
+        "Other"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "7a488e46",
+      "msg": "fix(vercel): remove ignoreCommand and fix build configuration",
+      "module": "00-foundation",
+      "types": [
+        "Other"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "07c5efd7",
+      "msg": "fix(vercel): refine vercel.json configuration for improved deployment",
+      "module": "00-foundation",
+      "types": [
+        "API",
+        "E2E/Testing"
+      ],
+      "file_count": 4
+    },
+    {
+      "hash": "2c12f152",
+      "msg": "fix(vercel): add vercel.json with correct monorepo config and fix ignoreCommand",
+      "module": "03-planning",
+      "types": [
+        "Other"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "c7904dff",
+      "msg": "fix(vercel): remove problematic ignoreCommand",
+      "module": "00-foundation",
+      "types": [
+        "Other"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "54580705",
+      "msg": "fix(vercel): move config to root and fix pnpm workspace install",
+      "module": "00-foundation",
+      "types": [
+        "Other"
+      ],
+      "file_count": 2
+    },
+    {
+      "hash": "2eb4ee51",
+      "msg": "fix(vercel): update build config for pnpm workspace and fix husky warning",
+      "module": "00-foundation",
+      "types": [
+        "Other"
+      ],
+      "file_count": 2
+    },
+    {
+      "hash": "9aa3f592",
+      "msg": "fix(lint): escape apostrophe in InvitationSuccessModal",
+      "module": "01-settings",
+      "types": [
+        "UI",
+        "Type/TypeScript"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "9eaec419",
+      "msg": "fix(husky): disable pre-commit lint-staged and remove deprecated husky.sh",
+      "module": "01-settings",
+      "types": [
+        "UI",
+        "Data/DB",
+        "Security",
+        "Type/TypeScript",
+        "E2E/Testing"
+      ],
+      "file_count": 20
+    },
+    {
+      "hash": "c9318226",
+      "msg": "fix(build): remove server-only and update Next.js config for Vercel",
+      "module": "00-foundation",
+      "types": [
+        "Data/DB"
+      ],
+      "file_count": 3
+    },
+    {
+      "hash": "7158eec4",
+      "msg": "fix(build): add server-only import to prevent Vercel build error",
+      "module": "00-foundation",
+      "types": [
+        "UI",
+        "Data/DB"
+      ],
+      "file_count": 4
+    },
+    {
+      "hash": "e85e62ca",
+      "msg": "fix(lint): escape quotes in allergen page",
+      "module": "01-settings",
+      "types": [
+        "Type/TypeScript"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "603b2073",
+      "msg": "security(critical): fix hardcoded Supabase access token in all migration scripts",
+      "module": "00-foundation",
+      "types": [
+        "API",
+        "Data/DB"
+      ],
+      "file_count": 17
+    },
+    {
+      "hash": "76ce5071",
+      "msg": "fix(epic-1): code review fixes for Story 1.8 Production Line Configuration",
+      "module": "01-settings",
+      "types": [
+        "API",
+        "UI",
+        "Data/DB"
+      ],
+      "file_count": 7
+    },
+    {
+      "hash": "d23b6056",
+      "msg": "feat(dashboard): implement main dashboard with sidebar navigation and fixes",
+      "module": "00-dashboard",
+      "types": [
+        "Data/DB",
+        "UX"
+      ],
+      "file_count": 7
+    },
+    {
+      "hash": "cc4dd834",
+      "msg": "debug: add logging to verify service role key",
+      "module": "01-settings",
+      "types": [
+        "Data/DB",
+        "Security"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "3eb3bfd5",
+      "msg": "fix(api): use service role key for user creation",
+      "module": "01-settings",
+      "types": [
+        "API",
+        "Data/DB",
+        "Security"
+      ],
+      "file_count": 2
+    },
+    {
+      "hash": "3ddebe37",
+      "msg": "feat(api): add detailed error messages for user creation",
+      "module": "01-settings",
+      "types": [
+        "API"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "dea4c569",
+      "msg": "fix: resolve Next.js 15 dynamic routes and build errors",
+      "module": "01-settings",
+      "types": [
+        "API",
+        "UI",
+        "Data/DB",
+        "Validation",
+        "Routing"
+      ],
+      "file_count": 12
+    },
+    {
+      "hash": "89566d3d",
+      "msg": "chore: add remaining UI components and fix import paths",
+      "module": "01-settings",
+      "types": [
+        "API",
+        "UI",
+        "Data/DB",
+        "Validation"
+      ],
+      "file_count": 20
+    },
+    {
+      "hash": "b6532413",
+      "msg": "fix(eslint): escape quotes and apostrophes in JSX",
+      "module": "00-dashboard",
+      "types": [
+        "Type/TypeScript"
+      ],
+      "file_count": 2
+    },
+    {
+      "hash": "c1b51555",
+      "msg": "chore: add missing UI components and dependencies",
+      "module": "00-foundation",
+      "types": [
+        "UI"
+      ],
+      "file_count": 2
+    },
+    {
+      "hash": "55bd4704",
+      "msg": "fix(ci): correct app folder paths and disable broken tests",
+      "module": "00-foundation",
+      "types": [
+        "UX",
+        "E2E/Testing"
+      ],
+      "file_count": 4
+    },
+    {
+      "hash": "30aaf7c3",
+      "msg": "fix: update package.json paths and add pre-push hook script",
+      "module": "05-scanner",
+      "types": [
+        "Data/DB",
+        "Validation"
+      ],
+      "file_count": 4
+    },
+    {
+      "hash": "3c0196a4",
+      "msg": "fix(prd): update Quality and Shipping with user decisions",
+      "module": "01-settings",
+      "types": [
+        "Other"
+      ],
+      "file_count": 2
+    },
+    {
+      "hash": "77ce4099",
+      "msg": "Merge pull request #6 type error fix",
+      "module": "00-foundation",
+      "types": [
+        "Validation",
+        "Type/TypeScript"
+      ],
+      "file_count": 0
+    },
+    {
+      "hash": "fe1292c2",
+      "msg": "fix: resolve type error in scanner process page",
+      "module": "05-scanner",
+      "types": [
+        "Validation",
+        "Type/TypeScript"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "a4f70db1",
+      "msg": "Merge fix errors with db api",
+      "module": "00-foundation",
+      "types": [
+        "API",
+        "Data/DB"
+      ],
+      "file_count": 0
+    },
+    {
+      "hash": "65e6cda4",
+      "msg": "fix(story-0-14): Fix BOM history display",
+      "module": "02-technical",
+      "types": [
+        "UI"
+      ],
+      "file_count": 2
+    },
+    {
+      "hash": "6827c90c",
+      "msg": "feat(story-0-13): Add missing BOM API GET endpoints",
+      "module": "02-technical",
+      "types": [
+        "API"
+      ],
+      "file_count": 3
+    },
+    {
+      "hash": "9c984bbd",
+      "msg": "docs: Add BOM API requirements and fix stories",
+      "module": "02-technical",
+      "types": [
+        "API",
+        "UI"
+      ],
+      "file_count": 4
+    },
+    {
+      "hash": "b73234db",
+      "msg": "fix: Update NotificationsAPI documentation with comment addition",
+      "module": "00-foundation",
+      "types": [
+        "Other"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "0defde47",
+      "msg": "fix: Convert Tax Codes to use server-side API routes instead of client-side Supabase",
+      "module": "01-settings",
+      "types": [
+        "API",
+        "Data/DB",
+        "Security",
+        "Integration",
+        "E2E/Testing"
+      ],
+      "file_count": 10
+    },
+    {
+      "hash": "e9e7e275",
+      "msg": "fix: Add explicit cookie handling to browser Supabase client for Next.js 15",
+      "module": "00-foundation",
+      "types": [
+        "API",
+        "UI",
+        "Data/DB",
+        "Security",
+        "Integration",
+        "E2E/Testing"
+      ],
+      "file_count": 8
+    },
+    {
+      "hash": "8639af25",
+      "msg": "fix: Downgrade react-data-grid for React 19 compatibility",
+      "module": "00-foundation",
+      "types": [
+        "Data/DB"
+      ],
+      "file_count": 5
+    },
+    {
+      "hash": "98e12bf6",
+      "msg": "test: Fix failing unit tests in licensePlates and pallets",
+      "module": "00-foundation",
+      "types": [
+        "UI",
+        "E2E/Testing"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "bdd35064",
+      "msg": "test: Fix failing unit tests in licensePlates and pallets",
+      "module": "00-testing",
+      "types": [
+        "API",
+        "E2E/Testing"
+      ],
+      "file_count": 2
+    },
+    {
+      "hash": "69a567fb",
+      "msg": "fix(db): Add RLS policies for settings tables (migration 107)",
+      "module": "01-settings",
+      "types": [
+        "API",
+        "UI",
+        "Data/DB",
+        "Security",
+        "UX",
+        "E2E/Testing"
+      ],
+      "file_count": 20
+    },
+    {
+      "hash": "322bab79",
+      "msg": "fix(api): Fix 5 critical schema/payload mismatches found in audit",
+      "module": "00-foundation",
+      "types": [
+        "API",
+        "UI",
+        "Data/DB",
+        "Security",
+        "Routing"
+      ],
+      "file_count": 12
+    },
+    {
+      "hash": "ec1775d7",
+      "msg": "feat(epic-0): Story 0.1 - Fix PO Header warehouse_id (CRITICAL) \u2705 APPROVED",
+      "module": "01-settings",
+      "types": [
+        "API",
+        "UI",
+        "Data/DB",
+        "E2E/Testing"
+      ],
+      "file_count": 13
+    },
+    {
+      "hash": "4cd6474a",
+      "msg": "fix(locations): set updated_at on updates and deletes",
+      "module": "01-settings",
+      "types": [
+        "API"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "6bb9d5a7",
+      "msg": "fix(vercel): Fix Next.js 15 params type errors in cost API routes",
+      "module": "00-foundation",
+      "types": [
+        "API",
+        "Validation",
+        "Type/TypeScript"
+      ],
+      "file_count": 15
+    },
+    {
+      "hash": "b3abba45",
+      "msg": "fix(stability): Complete stability audit - middleware fix & comprehensive reports",
+      "module": "00-foundation",
+      "types": [
+        "E2E/Testing"
+      ],
+      "file_count": 3
+    },
+    {
+      "hash": "cf69a054",
+      "msg": "fix(transfer-orders): Synchronize Transfer Order types and components with database schema",
+      "module": "03-planning",
+      "types": [
+        "API",
+        "UI",
+        "Data/DB"
+      ],
+      "file_count": 9
+    },
+    {
+      "hash": "cce33be5",
+      "msg": "Fix pallet creation test expectation",
+      "module": "00-testing",
+      "types": [
+        "API",
+        "E2E/Testing"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "baa252bc",
+      "msg": "chore: Fix lint unused variable in E2E test",
+      "module": "00-foundation",
+      "types": [
+        "Data/DB",
+        "Type/TypeScript",
+        "UX",
+        "E2E/Testing"
+      ],
+      "file_count": 9
+    },
+    {
+      "hash": "1920ce99",
+      "msg": "fix: Remove unused ASNItem import",
+      "module": "05-warehouse",
+      "types": [
+        "Data/DB"
+      ],
+      "file_count": 4
+    },
+    {
+      "hash": "d0dee8c5",
+      "msg": "fix: Remove unused variable in ReceiveASNModal",
+      "module": "05-warehouse",
+      "types": [
+        "UI",
+        "Data/DB"
+      ],
+      "file_count": 5
+    },
+    {
+      "hash": "6c721c0d",
+      "msg": "fix test error",
+      "module": "00-testing",
+      "types": [
+        "API",
+        "E2E/Testing"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "0e7311c4",
+      "msg": "Fix pre-push tests and handle MCP-less e2e",
+      "module": "00-foundation",
+      "types": [
+        "API",
+        "E2E/Testing"
+      ],
+      "file_count": 6
+    },
+    {
+      "hash": "f03a3685",
+      "msg": "docs: add comprehensive TypeScript error prevention system",
+      "module": "00-foundation",
+      "types": [
+        "Validation",
+        "Type/TypeScript",
+        "E2E/Testing"
+      ],
+      "file_count": 6
+    },
+    {
+      "hash": "92ba1f46",
+      "msg": "test: file with type error - should be rejected",
+      "module": "00-testing",
+      "types": [
+        "Validation",
+        "Type/TypeScript",
+        "E2E/Testing"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "3abfd3b8",
+      "msg": "Remove LazyAddItemModal due to missing file and update comments in LazyModal component",
+      "module": "00-foundation",
+      "types": [
+        "UI"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "86ff22fe",
+      "msg": "Enhance product management modals with allergen support and improved error handling",
+      "module": "01-settings",
+      "types": [
+        "UI",
+        "E2E/Testing"
+      ],
+      "file_count": 6
+    },
+    {
+      "hash": "c40893d3",
+      "msg": "Enhance API error handling and logging for improved reliability",
+      "module": "00-foundation",
+      "types": [
+        "API"
+      ],
+      "file_count": 2
+    },
+    {
+      "hash": "e5cdd4fa",
+      "msg": "Fix issues with work order line selection and BOM component display",
+      "module": "02-technical",
+      "types": [
+        "UI"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "1a11aa6d",
+      "msg": "Fix issues with work order component and BOM line selection",
+      "module": "02-technical",
+      "types": [
+        "Other"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "d985b55d",
+      "msg": "Fix stock movement and item display issues in warehouse operations",
+      "module": "01-settings",
+      "types": [
+        "UI"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "47a56817",
+      "msg": "Fix issues with copying orders to the warehouse and LP stock",
+      "module": "01-settings",
+      "types": [
+        "Other"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "5f96c0ee",
+      "msg": "Update LP Operations tab to LP Stock and add missing item details",
+      "module": "05-warehouse",
+      "types": [
+        "Other"
+      ],
+      "file_count": 1
+    },
+    {
+      "hash": "4a4ebac4",
+      "msg": "Improve API request handling for better error management",
+      "module": "00-foundation",
+      "types": [
+        "API"
+      ],
+      "file_count": 4
+    }
+  ]
+}

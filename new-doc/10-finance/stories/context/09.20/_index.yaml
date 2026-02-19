@@ -1,0 +1,123 @@
+story:
+  id: "09.20"
+  name: "WO Cost by Operation"
+  epic: "09-finance"
+  phase: "2"
+  complexity: "M"
+  estimate_days: 4
+
+dependencies:
+  required:
+    - story: "02.6"
+      provides: ["routing_operations", "routings"]
+    - story: "04.3"
+      provides: ["operation tracking", "labor time per operation"]
+    - story: "09.4"
+      provides: ["labor_costs table"]
+    - story: "09.6"
+      provides: ["work_order_costs"]
+    - story: "09.12"
+      provides: ["overhead_allocations"]
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/finance.md"
+  prd_sections: ["FR-9.3.7", "FR-9.1.6", "WO Cost by Operation"]
+  story: "docs/2-MANAGEMENT/epics/current/09-finance/09.20.wo-cost-by-operation.md"
+  patterns:
+    - "apps/frontend/components/production/WODetailCard.tsx"
+    - "apps/frontend/lib/services/labor-cost-service.ts"
+
+files_to_create:
+  database:
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_create_operation_costs.sql"
+      type: "migration"
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_create_calculate_operation_costs_function.sql"
+      type: "migration"
+  api:
+    - path: "apps/frontend/app/api/finance/work-order-costs/[id]/operations/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/finance/operations/[id]/cost-history/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/finance/reports/compare-operation-costs/route.ts"
+      methods: ["POST"]
+    - path: "apps/frontend/app/api/finance/operation-costs/[id]/route.ts"
+      methods: ["PATCH"]
+  services:
+    - path: "apps/frontend/lib/services/operation-cost-service.ts"
+  validation:
+    - path: "apps/frontend/lib/validation/operation-cost-schema.ts"
+  components:
+    - path: "apps/frontend/components/finance/work-order/WOOperationCostBreakdown.tsx"
+    - path: "apps/frontend/components/finance/operation/OperationVarianceDetailModal.tsx"
+    - path: "apps/frontend/components/finance/operation/OperationCostHistoryChart.tsx"
+    - path: "apps/frontend/components/finance/operation/CompareOperationCostsTable.tsx"
+  hooks:
+    - path: "apps/frontend/lib/hooks/use-operation-costs.ts"
+    - path: "apps/frontend/lib/hooks/use-operation-cost-history.ts"
+    - path: "apps/frontend/lib/hooks/use-compare-operation-costs.ts"
+
+database:
+  tables:
+    - name: "operation_costs"
+      columns: ["id", "org_id", "work_order_id", "operation_id", "operation_sequence", "labor_hours_actual", "labor_hours_standard", "labor_cost_actual", "labor_cost_standard", "labor_rate_variance", "labor_efficiency_variance", "overhead_cost_actual", "overhead_cost_standard", "overhead_variance", "total_cost_actual", "total_cost_standard", "total_variance", "variance_percent", "percent_of_wo_cost", "variance_root_cause", "variance_notes", "cost_center_id", "costing_date"]
+      rls: true
+      indexes: ["work_order_id", "operation_id", "org_id", "costing_date"]
+
+api_endpoints:
+  - method: "GET"
+    path: "/api/finance/work-order-costs/:id/operations"
+    auth: true
+    roles: ["admin", "finance_manager", "production_manager", "cost_accountant"]
+  - method: "GET"
+    path: "/api/finance/operations/:id/cost-history"
+    auth: true
+    roles: ["admin", "finance_manager", "production_manager", "cost_accountant"]
+  - method: "POST"
+    path: "/api/finance/reports/compare-operation-costs"
+    auth: true
+    roles: ["admin", "finance_manager", "production_manager", "cost_accountant"]
+  - method: "PATCH"
+    path: "/api/finance/operation-costs/:id"
+    auth: true
+    roles: ["admin", "finance_manager", "production_manager"]
+
+validation_rules:
+  labor_hours_actual: "number >= 0"
+  labor_hours_standard: "number >= 0"
+  operation_sequence: "integer >= 1"
+  variance_root_cause: "enum: equipment_downtime, material_shortage, operator_training, process_inefficiency, quality_issue, other"
+  variance_notes: "string max 1000 chars"
+  work_order_ids: "array of 2-5 valid work_order UUIDs"
+
+patterns:
+  rls: "ADR-013"
+  api: "REST with org_id filter"
+  service: "class-based with static methods"
+  validation: "zod schemas"
+  calculation: "Database function for operation cost aggregation"
+
+acceptance_checklist:
+  - "operation_costs table created with constraints"
+  - "calculate_operation_costs() database function works"
+  - "Operation cost breakdown displays per work order"
+  - "Operation costs sum to total WO cost"
+  - "Labor rate and efficiency variance calculated correctly"
+  - "Overhead allocated to operations proportionally"
+  - "% of WO cost calculated correctly"
+  - "Operation cost history chart displays trend"
+  - "Trend indicator (increasing/stable/decreasing) calculated"
+  - "Compare operation costs across multiple work orders"
+  - "Variance root cause and notes editable"
+  - "Performance: calculation <500ms, queries <1s"
+  - "RLS policies enforce org isolation"
+
+output_artifacts:
+  - "operation_costs table migration"
+  - "calculate_operation_costs() database function"
+  - "Operation costs API endpoints"
+  - "OperationCostService with calculation logic"
+  - "WO operation cost breakdown component"
+  - "Operation variance detail modal"
+  - "Operation cost history chart component"
+  - "Compare operation costs table"
+  - "Validation schemas for operation costs"

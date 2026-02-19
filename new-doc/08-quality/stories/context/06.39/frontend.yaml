@@ -1,0 +1,17 @@
+# Story 06.39 - Quality Analytics Frontend
+
+pages:
+  - /quality/analytics (dashboard with all 7 charts)
+
+components:
+  - DefectParetoChart (Recharts ComposedChart)
+  - NCRTrendChart (Recharts LineChart with moving avg)
+  - TestResultTrendChart (LineChart with control limits)
+  - SPCXBarChart (LineChart with UCL/LCL)
+  - SPCRChart (LineChart for range)
+  - RootCauseFrequencyChart (BarChart)
+  - SupplierQualityTrendChart (Multi-line chart)
+  - CAPAEffectivenessPieChart (PieChart)
+  - CAPATimeToCloseHistogram (BarChart)
+
+export: Excel multi-sheet, PDF report

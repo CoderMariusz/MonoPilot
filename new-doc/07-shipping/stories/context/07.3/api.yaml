@@ -1,0 +1,293 @@
+# Story 07.3 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling, services
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  # POST Hold Sales Order
+  - method: "POST"
+    path: "/api/shipping/sales-orders/:id/hold"
+    description: "Put sales order on hold with optional reason"
+    file: "apps/frontend/app/api/shipping/sales-orders/[id]/hold/route.ts"
+    auth: "required"
+    roles: ["Sales", "Manager", "Admin"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        id: "string (required) - Sales order ID (UUID)"
+      body:
+        reason: "string (optional, max 500 chars) - Reason for hold"
+
+    response:
+      status: 200
+      type: "HoldOrderResponse"
+      schema:
+        success: "boolean"
+        status: "string (on_hold)"
+        updated_at: "string (ISO 8601)"
+        message: "string"
+
+    errors:
+      - status: 400
+        code: "INVALID_STATUS"
+        message: "Cannot hold order after allocation has started"
+        when: "Current status is allocated, picking, packing, shipped, or delivered"
+      - status: 400
+        code: "INVALID_STATUS"
+        message: "Cannot hold a cancelled order"
+        when: "Current status is already cancelled"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Insufficient permissions to hold orders"
+        when: "User role not in [Sales, Manager, Admin]"
+      - status: 404
+        code: "NOT_FOUND"
+        message: "Sales order not found"
+        when: "Order ID not found or not in user's org"
+
+    performance:
+      target_ms: 300
+      caching: "none (mutating operation)"
+
+  # POST Cancel Sales Order
+  - method: "POST"
+    path: "/api/shipping/sales-orders/:id/cancel"
+    description: "Cancel sales order with required reason"
+    file: "apps/frontend/app/api/shipping/sales-orders/[id]/cancel/route.ts"
+    auth: "required"
+    roles: ["Manager", "Admin"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        id: "string (required) - Sales order ID (UUID)"
+      body:
+        reason: "string (required, min 10 chars, max 500) - Reason for cancellation"
+
+    response:
+      status: 200
+      type: "CancelOrderResponse"
+      schema:
+        success: "boolean"
+        status: "string (cancelled)"
+        updated_at: "string (ISO 8601)"
+        message: "string"
+
+    errors:
+      - status: 400
+        code: "REASON_REQUIRED"
+        message: "Cancel reason is required"
+        when: "reason field is missing or empty"
+      - status: 400
+        code: "INVALID_REASON"
+        message: "Reason must be at least 10 characters"
+        when: "Reason length < 10"
+      - status: 400
+        code: "INVALID_STATUS"
+        message: "Cannot cancel order after picking has started. Please contact warehouse manager."
+        when: "Current status is picking, packing, shipped, or delivered"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Insufficient permissions to cancel orders"
+        when: "User role not in [Manager, Admin]"
+      - status: 404
+        code: "NOT_FOUND"
+        message: "Sales order not found"
+        when: "Order ID not found or not in user's org"
+
+    performance:
+      target_ms: 500
+      caching: "none (mutating operation)"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/sales-order-service.ts"
+    description: "Sales order management - extend existing service with hold/cancel methods"
+    exports:
+      - name: "SalesOrderService"
+        type: "class"
+        methods:
+          - name: "holdOrder"
+            type: "static async"
+            params: ["orderId: string", "reason?: string"]
+            returns: "Promise<SalesOrder>"
+            description: "Put sales order on hold. Valid from: draft, confirmed"
+            throws:
+              - "Error('Cannot hold order after allocation has started')"
+              - "Error('Cannot hold a cancelled order')"
+
+          - name: "cancelOrder"
+            type: "static async"
+            params: ["orderId: string", "reason: string"]
+            returns: "Promise<SalesOrder>"
+            description: "Cancel sales order. Valid from: draft, confirmed, on_hold, allocated"
+            throws:
+              - "Error('Cancel reason is required')"
+              - "Error('Cannot cancel order after picking has started. Please contact warehouse manager.')"
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/sales-order.ts"
+    description: "Sales order TypeScript interfaces - extend existing"
+    exports:
+      - name: "SalesOrder"
+        extends: "from Story 07.2"
+        additions:
+          - "status: 'draft' | 'confirmed' | 'on_hold' | 'cancelled' | 'allocated' | 'picking' | 'packing' | 'shipped' | 'delivered'"
+      - name: "HoldOrderResponse"
+        fields:
+          - "success: boolean"
+          - "status: string"
+          - "updated_at: string"
+          - "message: string"
+      - name: "CancelOrderResponse"
+        fields:
+          - "success: boolean"
+          - "status: string"
+          - "updated_at: string"
+          - "message: string"
+
+# Constants
+constants:
+  - path: "apps/frontend/lib/constants/sales-order-status.ts"
+    description: "Sales order status configuration constants"
+    exports:
+      - name: "SALES_ORDER_STATUS_CONFIG"
+        description: "Maps status code to display props (color, icon, name, description)"
+
+# Validation Schemas
+validation:
+  - path: "apps/frontend/lib/validation/sales-order-schema.ts"
+    description: "Zod schemas for hold/cancel operations"
+    exports:
+      - name: "holdOrderSchema"
+        fields:
+          - "reason: z.string().max(500).optional()"
+      - name: "cancelOrderSchema"
+        fields:
+          - "reason: z.string().min(10, 'Cancel reason is required').max(500)"
+
+# Business Rules Summary
+business_rules:
+  hold_order:
+    - "Valid from: draft, confirmed"
+    - "Invalid from: allocated, picking, packing, shipped, delivered, cancelled"
+    - "Authorization: Sales, Manager, Admin roles"
+    - "Reason: optional"
+    - "Effect: notes appended with '[HOLD - <timestamp>] <reason>'"
+    - "Effect: updated_at timestamp set to current time"
+
+  cancel_order:
+    - "Valid from: draft, confirmed, on_hold, allocated"
+    - "Invalid from: picking, packing, shipped, delivered, cancelled"
+    - "Authorization: Manager, Admin roles only"
+    - "Reason: required, minimum 10 characters"
+    - "Effect: notes appended with '[CANCELLED - <timestamp>] <reason>'"
+    - "Effect: updated_at timestamp set to current time"
+    - "Effect: Release allocations handled in Story 07.7"
+
+  state_machine:
+    description: "Complete SO status state machine"
+    transitions:
+      draft:
+        to: ["confirmed", "on_hold", "cancelled"]
+      confirmed:
+        to: ["on_hold", "cancelled", "allocated"]
+      on_hold:
+        to: ["confirmed", "cancelled"]
+      allocated:
+        to: ["cancelled", "picking"]
+      picking:
+        to: ["packing"]
+      packing:
+        to: ["shipped"]
+      shipped:
+        to: ["delivered"]
+      delivered:
+        to: []
+      cancelled:
+        to: []
+
+# Cascading Effects
+cascading_effects:
+  - trigger: "SO status = cancelled"
+    action: "Release inventory allocations (Story 07.7)"
+    dependency: "Story 07.7 - Inventory Allocation"
+    timing: "Immediate, before response"
+
+  - trigger: "SO status = on_hold"
+    action: "Block allocation creation (Story 07.7)"
+    dependency: "Story 07.7 - Inventory Allocation"
+    timing: "Enforce in allocation service"
+
+# Example Request/Response
+
+example_hold:
+  request: |
+    POST /api/shipping/sales-orders/550e8400-e29b-41d4-a716-446655440000/hold HTTP/1.1
+    Authorization: Bearer eyJhbGc...
+    Content-Type: application/json
+
+    {
+      "reason": "Customer requested delay for receiving capacity"
+    }
+
+  response_success: |
+    HTTP/1.1 200 OK
+    Content-Type: application/json
+
+    {
+      "success": true,
+      "status": "on_hold",
+      "updated_at": "2025-01-15T14:30:00Z",
+      "message": "Sales order placed on hold"
+    }
+
+  response_error: |
+    HTTP/1.1 400 Bad Request
+    Content-Type: application/json
+
+    {
+      "error": "INVALID_STATUS",
+      "message": "Cannot hold order after allocation has started"
+    }
+
+example_cancel:
+  request: |
+    POST /api/shipping/sales-orders/550e8400-e29b-41d4-a716-446655440000/cancel HTTP/1.1
+    Authorization: Bearer eyJhbGc...
+    Content-Type: application/json
+
+    {
+      "reason": "Customer cancelled the order due to budget constraints"
+    }
+
+  response_success: |
+    HTTP/1.1 200 OK
+    Content-Type: application/json
+
+    {
+      "success": true,
+      "status": "cancelled",
+      "updated_at": "2025-01-15T14:32:00Z",
+      "message": "Sales order cancelled"
+    }
+
+  response_error: |
+    HTTP/1.1 403 Forbidden
+    Content-Type: application/json
+
+    {
+      "error": "FORBIDDEN",
+      "message": "Insufficient permissions to cancel orders"
+    }

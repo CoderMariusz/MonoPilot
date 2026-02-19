@@ -1,0 +1,46 @@
+# Story 10.9 - API Specification
+# Historical Trend Analysis
+
+endpoints:
+  - method: "GET"
+    path: "/api/oee/analytics/trends"
+    description: "Get OEE trends over time"
+    query_params:
+      machine_id: "UUID"
+      line_id: "UUID"
+      start_date: "YYYY-MM-DD"
+      end_date: "YYYY-MM-DD"
+      granularity: "daily | weekly | monthly"
+    response:
+      status: 200
+      schema:
+        trends:
+          - period: "YYYY-MM-DD"
+            oee_avg: "number"
+            availability_avg: "number"
+            performance_avg: "number"
+            quality_avg: "number"
+
+  - method: "GET"
+    path: "/api/oee/analytics/comparisons"
+    description: "Period-over-period comparisons"
+    query_params:
+      machine_id: "UUID"
+      period1_start: "YYYY-MM-DD"
+      period1_end: "YYYY-MM-DD"
+      period2_start: "YYYY-MM-DD"
+      period2_end: "YYYY-MM-DD"
+    response:
+      status: 200
+
+services:
+  - path: "apps/frontend/lib/services/oee-analytics-service.ts"
+    methods:
+      - { name: "getTrends", params: ["params"], returns: "Promise<TrendData[]>" }
+      - { name: "comparePeriods", params: ["params"], returns: "Promise<ComparisonData>" }
+      - { name: "getHistoricalData", params: ["params"], returns: "Promise<HistoricalData>" }
+
+types:
+  - "TrendData"
+  - "ComparisonData"
+  - "TrendGranularity"

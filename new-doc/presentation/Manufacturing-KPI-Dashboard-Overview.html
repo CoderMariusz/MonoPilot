@@ -1,0 +1,1619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manufacturing KPI Dashboard — System Overview</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+  :root {
+    --primary: #6C5CE7;
+    --primary-light: #A29BFE;
+    --primary-dark: #5A4BD1;
+    --success: #00D2D3;
+    --success-dark: #00B4B5;
+    --warning: #FECA57;
+    --danger: #FF6B6B;
+    --surface: #FFFFFF;
+    --bg: #F0F2F5;
+    --text: #2D3436;
+    --text-secondary: #636E72;
+    --text-muted: #B2BEC3;
+    --border: #E9ECEF;
+    --shadow: 0 2px 8px rgba(0,0,0,0.08);
+    --shadow-lg: 0 8px 32px rgba(0,0,0,0.12);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .slide {
+    min-height: 100vh;
+    padding: 60px 80px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    position: relative;
+    page-break-after: always;
+  }
+
+  .slide-number {
+    position: absolute;
+    bottom: 30px;
+    right: 40px;
+    font-size: 14px;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+
+  .slide-logo {
+    position: absolute;
+    top: 30px;
+    right: 40px;
+    font-size: 13px;
+    color: var(--text-muted);
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  /* TITLE SLIDE */
+  .slide-title {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    color: #fff;
+    text-align: center;
+    padding: 80px;
+  }
+
+  .slide-title h1 {
+    font-size: 52px;
+    font-weight: 800;
+    margin-bottom: 16px;
+    letter-spacing: -1px;
+    background: linear-gradient(135deg, #A29BFE 0%, #00D2D3 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .slide-title h2 {
+    font-size: 24px;
+    font-weight: 400;
+    color: rgba(255,255,255,0.7);
+    margin-bottom: 40px;
+  }
+
+  .slide-title .meta {
+    font-size: 16px;
+    color: rgba(255,255,255,0.5);
+  }
+
+  .slide-title .badge-row {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    margin-top: 40px;
+    flex-wrap: wrap;
+  }
+
+  .slide-title .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 20px;
+    border-radius: 24px;
+    font-size: 14px;
+    font-weight: 500;
+    background: rgba(255,255,255,0.1);
+    color: rgba(255,255,255,0.8);
+    border: 1px solid rgba(255,255,255,0.15);
+  }
+
+  .slide-title .badge-done { border-color: #00D2D3; color: #00D2D3; }
+  .slide-title .badge-wip { border-color: #FECA57; color: #FECA57; }
+
+  .slide h2 {
+    font-size: 36px;
+    font-weight: 700;
+    margin-bottom: 32px;
+    color: var(--text);
+  }
+
+  .slide h2 .accent { color: var(--primary); }
+
+  .slide h3 {
+    font-size: 22px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    color: var(--text);
+  }
+
+  .card-grid { display: grid; gap: 24px; }
+  .card-grid-2 { grid-template-columns: 1fr 1fr; }
+  .card-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .card-grid-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+
+  .card {
+    background: var(--surface);
+    border-radius: 16px;
+    padding: 28px;
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border);
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+
+  .card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .card-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    margin-bottom: 16px;
+  }
+
+  .card-icon-purple { background: rgba(108,92,231,0.12); }
+  .card-icon-cyan { background: rgba(0,210,211,0.12); }
+  .card-icon-yellow { background: rgba(254,202,87,0.12); }
+  .card-icon-red { background: rgba(255,107,107,0.12); }
+  .card-icon-green { background: rgba(0,210,100,0.12); }
+  .card-icon-blue { background: rgba(0,123,255,0.12); }
+
+  .card h4 { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
+  .card p { font-size: 14px; color: var(--text-secondary); line-height: 1.6; }
+
+  .card .tag {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-top: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .tag-done { background: rgba(0,210,211,0.12); color: var(--success-dark); }
+  .tag-planned { background: rgba(108,92,231,0.12); color: var(--primary); }
+
+  /* COMPARISON */
+  .comparison-row {
+    display: grid;
+    grid-template-columns: 1fr 60px 1fr;
+    gap: 0;
+    align-items: start;
+  }
+
+  .comparison-col { padding: 32px; border-radius: 16px; }
+
+  .comparison-before {
+    background: rgba(255,107,107,0.06);
+    border: 2px solid rgba(255,107,107,0.2);
+  }
+
+  .comparison-after {
+    background: rgba(0,210,211,0.06);
+    border: 2px solid rgba(0,210,211,0.2);
+  }
+
+  .comparison-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    color: var(--primary);
+    align-self: center;
+  }
+
+  .comparison-col h3 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 20px;
+    margin-bottom: 20px;
+  }
+
+  .comparison-col ul { list-style: none; padding: 0; }
+
+  .comparison-col li {
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+    font-size: 15px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .comparison-col li:last-child { border-bottom: none; }
+  .comparison-col li .icon { flex-shrink: 0; font-size: 18px; }
+
+  /* UPLOAD FLOW */
+  .upload-flow {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    text-align: center;
+  }
+
+  .upload-step {
+    padding: 24px 16px;
+    background: var(--surface);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+  }
+
+  .upload-step .step-num {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 12px;
+  }
+
+  .upload-step h4 { font-size: 15px; margin-bottom: 6px; }
+  .upload-step p { font-size: 12px; color: var(--text-secondary); }
+
+  /* ARCHITECTURE */
+  .arch-diagram {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  .arch-row { display: grid; gap: 12px; align-items: stretch; }
+  .arch-row-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .arch-row-1 { grid-template-columns: 1fr; }
+  .arch-row-2 { grid-template-columns: 1fr 1fr; }
+
+  .arch-box {
+    padding: 16px 20px;
+    border-radius: 12px;
+    text-align: center;
+    font-weight: 600;
+    font-size: 14px;
+    border: 2px solid;
+  }
+
+  .arch-box small {
+    display: block;
+    font-weight: 400;
+    font-size: 12px;
+    margin-top: 4px;
+    opacity: 0.7;
+  }
+
+  .arch-excel { background: rgba(0,128,0,0.08); border-color: rgba(0,128,0,0.3); color: #006600; }
+  .arch-parser { background: rgba(108,92,231,0.08); border-color: rgba(108,92,231,0.3); color: var(--primary-dark); }
+  .arch-store { background: rgba(0,210,211,0.08); border-color: rgba(0,210,211,0.3); color: var(--success-dark); }
+  .arch-ui { background: rgba(255,107,107,0.08); border-color: rgba(255,107,107,0.3); color: #CC4444; }
+  .arch-arrow { text-align: center; font-size: 24px; color: var(--text-muted); padding: 4px 0; }
+
+  /* DASHBOARD MOCKUP */
+  .dashboard-mockup {
+    background: var(--bg);
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: var(--shadow-lg);
+    border: 1px solid var(--border);
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    gap: 0;
+    min-height: 480px;
+    overflow: hidden;
+  }
+
+  .mock-sidebar {
+    background: #1a1a2e;
+    border-radius: 12px 0 0 12px;
+    padding: 20px 0;
+    color: rgba(255,255,255,0.7);
+  }
+
+  .mock-sidebar .logo {
+    padding: 0 16px 16px;
+    font-size: 14px;
+    font-weight: 700;
+    color: #fff;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    margin-bottom: 12px;
+  }
+
+  .mock-sidebar .nav-label {
+    padding: 8px 16px 4px;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: rgba(255,255,255,0.35);
+    font-weight: 600;
+  }
+
+  .mock-sidebar .nav-item {
+    padding: 8px 16px;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .mock-sidebar .nav-item.active {
+    background: rgba(108,92,231,0.3);
+    color: #fff;
+    border-left: 3px solid var(--primary-light);
+  }
+
+  .mock-main {
+    padding: 24px;
+    background: var(--bg);
+    border-radius: 0 12px 12px 0;
+  }
+
+  .mock-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+
+  .mock-header h3 { font-size: 20px; font-weight: 700; margin: 0; }
+
+  .mock-header .selector { display: flex; gap: 6px; }
+
+  .mock-header .selector span {
+    padding: 5px 14px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    background: var(--surface);
+    border: 1px solid var(--border);
+  }
+
+  .mock-header .selector span.active {
+    background: var(--primary);
+    color: #fff;
+    border-color: var(--primary);
+  }
+
+  .mock-kpi-row {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .mock-kpi {
+    background: var(--surface);
+    border-radius: 10px;
+    padding: 14px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+
+  .mock-kpi .label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; }
+  .mock-kpi .val { font-size: 22px; font-weight: 800; margin: 4px 0; }
+  .mock-kpi .chg { font-size: 11px; font-weight: 600; }
+
+  .change-up { color: var(--success-dark); }
+  .change-down { color: var(--danger); }
+
+  .mock-charts {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 12px;
+  }
+
+  .mock-chart-box {
+    background: var(--surface);
+    border-radius: 10px;
+    padding: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    min-height: 180px;
+  }
+
+  .mock-chart-box .chart-title {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: var(--text-secondary);
+  }
+
+  .mock-line-chart {
+    height: 120px;
+    display: flex;
+    align-items: flex-end;
+    gap: 4px;
+    padding: 10px 0;
+  }
+
+  .mock-line-chart .bar {
+    flex: 1;
+    border-radius: 4px 4px 0 0;
+    min-width: 8px;
+  }
+
+  .mock-bar-chart {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px 0;
+  }
+
+  .mock-bar-row {
+    display: grid;
+    grid-template-columns: 40px 1fr 40px;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+  }
+
+  .mock-bar-row .bar-track {
+    height: 14px;
+    background: var(--border);
+    border-radius: 7px;
+    overflow: hidden;
+  }
+
+  .mock-bar-row .bar-fill { height: 100%; border-radius: 7px; }
+
+  /* TIMELINE */
+  .timeline { position: relative; padding-left: 40px; }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 12px;
+    top: 8px;
+    bottom: 8px;
+    width: 3px;
+    background: var(--border);
+    border-radius: 2px;
+  }
+
+  .timeline-item { position: relative; padding-bottom: 32px; }
+  .timeline-item:last-child { padding-bottom: 0; }
+
+  .timeline-dot {
+    position: absolute;
+    left: -34px;
+    top: 4px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 3px solid var(--border);
+    background: var(--surface);
+  }
+
+  .timeline-dot-done { border-color: var(--success); background: var(--success); }
+  .timeline-dot-wip { border-color: var(--warning); background: var(--warning); }
+  .timeline-dot-pending { border-color: var(--text-muted); }
+
+  .timeline-item h4 { font-size: 17px; font-weight: 600; margin-bottom: 4px; }
+  .timeline-item p { font-size: 14px; color: var(--text-secondary); }
+
+  .timeline-item .stories {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 4px;
+  }
+
+  /* FEATURE TABLE */
+  .feature-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+
+  .feature-table th {
+    background: var(--primary);
+    color: #fff;
+    padding: 14px 20px;
+    text-align: left;
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .feature-table td {
+    padding: 14px 20px;
+    font-size: 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+
+  .feature-table tr:last-child td { border-bottom: none; }
+
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .status-done { background: rgba(0,210,211,0.12); color: var(--success-dark); }
+  .status-planned { background: rgba(108,92,231,0.1); color: var(--primary); }
+
+  /* SAVINGS */
+  .savings-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+  }
+
+  .savings-card {
+    text-align: center;
+    padding: 32px 24px;
+    background: var(--surface);
+    border-radius: 16px;
+    box-shadow: var(--shadow);
+  }
+
+  .savings-card .big-number {
+    font-size: 56px;
+    font-weight: 900;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--success) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .savings-card .unit {
+    font-size: 18px;
+    color: var(--text-secondary);
+    font-weight: 500;
+    margin-top: 4px;
+  }
+
+  .savings-card p {
+    font-size: 14px;
+    color: var(--text-muted);
+    margin-top: 12px;
+  }
+
+  /* UTILITIES */
+  .divider {
+    width: 60px;
+    height: 4px;
+    background: linear-gradient(90deg, var(--primary), var(--success));
+    border-radius: 2px;
+    margin: 20px 0;
+  }
+
+  .text-center { text-align: center; }
+  .mt-20 { margin-top: 20px; }
+  .mt-32 { margin-top: 32px; }
+  .mb-16 { margin-bottom: 16px; }
+  .mb-24 { margin-bottom: 24px; }
+
+  .highlight-box {
+    background: linear-gradient(135deg, rgba(108,92,231,0.06), rgba(0,210,211,0.06));
+    border: 1px solid rgba(108,92,231,0.15);
+    border-radius: 12px;
+    padding: 24px 32px;
+    margin: 20px 0;
+  }
+
+  .highlight-box p {
+    font-size: 18px;
+    color: var(--text);
+    text-align: center;
+    font-weight: 500;
+  }
+
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 40px;
+    align-items: start;
+  }
+
+  .bullet-list { list-style: none; padding: 0; }
+
+  .bullet-list li {
+    padding: 10px 0;
+    font-size: 16px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .bullet-list li:last-child { border-bottom: none; }
+
+  .bullet-list .num {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .role-features { list-style: none; padding: 0; text-align: left; }
+
+  .role-features li {
+    padding: 6px 0;
+    font-size: 14px;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .progress-section { text-align: center; margin: 40px 0; }
+
+  .progress-bar-container {
+    width: 100%;
+    height: 32px;
+    background: var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+    margin: 16px 0;
+  }
+
+  .progress-bar-fill {
+    height: 100%;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(90deg, var(--success) 0%, var(--success-dark) 100%);
+  }
+
+  .progress-label { font-size: 48px; font-weight: 800; color: var(--primary); }
+  .progress-sub { font-size: 18px; color: var(--text-secondary); margin-top: 4px; }
+
+  /* NAV DOTS */
+  .slide-nav {
+    position: fixed;
+    right: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 100;
+  }
+
+  .slide-nav a {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    opacity: 0.4;
+    transition: opacity 0.2s, transform 0.2s;
+    display: block;
+  }
+
+  .slide-nav a:hover { opacity: 1; transform: scale(1.3); }
+
+  @media print {
+    .slide { page-break-after: always; min-height: auto; padding: 40px; }
+    body { background: #fff; }
+    .slide-nav { display: none; }
+    .card:hover { transform: none; box-shadow: var(--shadow); }
+  }
+</style>
+</head>
+<body>
+
+<!-- SLIDE 1: TITLE -->
+<div class="slide slide-title" id="s1">
+  <h1>Manufacturing KPI Dashboard</h1>
+  <h2>Replacing Manual Excel Workflows with Interactive Analytics</h2>
+  <div class="meta">IPL Manufacturing &bull; February 2026</div>
+  <div class="badge-row">
+    <span class="badge badge-done">&#10003; 13 Features Delivered</span>
+    <span class="badge badge-wip">&#9881; 16 Features Planned</span>
+    <span class="badge">&#128274; Local Web App &mdash; No Server Required</span>
+  </div>
+  <div class="slide-number">1 / 12</div>
+</div>
+
+<!-- SLIDE 2: THE PROBLEM -->
+<div class="slide" id="s2">
+  <h2><span class="accent">The Problem</span> We're Solving</h2>
+  <div class="divider"></div>
+
+  <div class="comparison-row">
+    <div class="comparison-col comparison-before">
+      <h3><span class="icon">&#128308;</span> Current Process (Manual Excel)</h3>
+      <ul>
+        <li><span class="icon">&#9201;</span> 30-60 min daily spent opening, copying, and formatting KPI data across multiple Excel files</li>
+        <li><span class="icon">&#128196;</span> 3+ Excel files (80MB each) opened simultaneously &mdash; slow, crash-prone</li>
+        <li><span class="icon">&#128203;</span> Copy/paste between spreadsheets to build daily reports</li>
+        <li><span class="icon">&#128269;</span> No quick drill-down &mdash; finding root cause of a yield issue requires manually filtering rows</li>
+        <li><span class="icon">&#128101;</span> No standard view for different roles &mdash; everyone sees raw data</li>
+        <li><span class="icon">&#128197;</span> Historical comparison requires manually opening old files</li>
+        <li><span class="icon">&#9888;</span> Risk of formula errors and inconsistent calculations</li>
+      </ul>
+    </div>
+
+    <div class="comparison-arrow">&#10132;</div>
+
+    <div class="comparison-col comparison-after">
+      <h3><span class="icon">&#128994;</span> KPI Dashboard (Automated)</h3>
+      <ul>
+        <li><span class="icon">&#9889;</span> Upload files once each morning &mdash; all dashboards update instantly (under 60 seconds)</li>
+        <li><span class="icon">&#128187;</span> Lightweight web app runs in your browser &mdash; no Excel needed to view KPIs</li>
+        <li><span class="icon">&#128200;</span> Pre-built charts, tables, and trend views &mdash; zero manual formatting</li>
+        <li><span class="icon">&#128270;</span> Click any line &rarr; see SKU breakdown &rarr; see trends. Instant drill-down</li>
+        <li><span class="icon">&#128101;</span> Role-based views: Line Leaders, Supervisors, Management each get relevant data</li>
+        <li><span class="icon">&#128197;</span> 52 weeks of history cached locally &mdash; compare weeks, periods, years instantly</li>
+        <li><span class="icon">&#10003;</span> Consistent calculations using 4-4-5 fiscal calendar &mdash; no formula mistakes</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="slide-number">2 / 12</div>
+  <div class="slide-logo">IPL MANUFACTURING</div>
+</div>
+
+<!-- SLIDE 3: HOW IT WORKS -->
+<div class="slide" id="s3">
+  <h2>How It <span class="accent">Works</span></h2>
+  <div class="divider"></div>
+
+  <div class="upload-flow mb-24">
+    <div class="upload-step">
+      <div class="step-num">1</div>
+      <h4>Upload Excel Files</h4>
+      <p>Drag &amp; drop your daily Excel files into the sidebar &mdash; Line Yields, Prod Pallets, Shift Report, On-Hand Stock</p>
+    </div>
+    <div class="upload-step">
+      <div class="step-num">2</div>
+      <h4>Automatic Parsing</h4>
+      <p>System reads all sheets, maps columns, validates data. Progress shown in real-time</p>
+    </div>
+    <div class="upload-step">
+      <div class="step-num">3</div>
+      <h4>Local Storage</h4>
+      <p>Processed data cached in browser (IndexedDB). Line Yields: incremental append. Others: daily replace</p>
+    </div>
+    <div class="upload-step">
+      <div class="step-num">4</div>
+      <h4>Instant Dashboards</h4>
+      <p>Navigate between 15+ interactive views &mdash; all KPIs, charts, and tables update automatically</p>
+    </div>
+  </div>
+
+  <h3 class="text-center mb-16">Data Flow Architecture</h3>
+
+  <div class="arch-diagram">
+    <div class="arch-row arch-row-3">
+      <div class="arch-box arch-excel">&#128218; Line Yields<small>80MB &bull; 88k+ rows &bull; 52 weeks</small></div>
+      <div class="arch-box arch-excel">&#128218; Prod Pallets<small>11 sheets &bull; daily snapshot</small></div>
+      <div class="arch-box arch-excel">&#128218; On-Hand Stock<small>3,400 rows &bull; inventory</small></div>
+    </div>
+    <div class="arch-arrow">&#8595;</div>
+    <div class="arch-row arch-row-1">
+      <div class="arch-box arch-parser">&#9881; SheetJS Excel Parser &bull; Column Mapping &bull; Data Validation &bull; Progress Tracking</div>
+    </div>
+    <div class="arch-arrow">&#8595;</div>
+    <div class="arch-row arch-row-1">
+      <div class="arch-box arch-store">&#128451; IndexedDB Local Cache &bull; 4-4-5 Calendar Engine &bull; KPI Aggregation</div>
+    </div>
+    <div class="arch-arrow">&#8595;</div>
+    <div class="arch-row arch-row-2">
+      <div class="arch-box arch-ui">&#128200; D3.js Interactive Charts<small>Line, Bar, Heatmap, Donut</small></div>
+      <div class="arch-box arch-ui">&#128203; Data Tables &amp; Drill-Downs<small>Sort, Filter, Export</small></div>
+    </div>
+  </div>
+
+  <div class="highlight-box mt-20">
+    <p>&#128274; <strong>All data stays local</strong> &mdash; nothing is sent to any server. The app runs entirely in your browser from a network drive.</p>
+  </div>
+
+  <div class="slide-number">3 / 12</div>
+  <div class="slide-logo">IPL MANUFACTURING</div>
+</div>
+
+<!-- SLIDE 4: DASHBOARD MOCKUP -->
+<div class="slide" id="s4">
+  <h2>Dashboard <span class="accent">Preview</span> &mdash; Factory Overview</h2>
+  <div class="divider"></div>
+
+  <div class="dashboard-mockup">
+    <div class="mock-sidebar">
+      <div class="logo">&#128200; KPI Dashboard</div>
+      <div class="nav-label">Dashboards</div>
+      <div class="nav-item active">&#128202; Overview</div>
+      <div class="nav-item">&#128200; Yield by Line</div>
+      <div class="nav-item">&#128269; Yield by SKU</div>
+      <div class="nav-item">&#128201; Giveaway</div>
+      <div class="nav-item">&#128100; Line Leaders</div>
+      <div class="nav-item">&#128101; Team Comparison</div>
+      <div class="nav-item">&#128197; Period Reports</div>
+      <div class="nav-label" style="margin-top: 12px">Production</div>
+      <div class="nav-item">&#128221; Production Log</div>
+      <div class="nav-item">&#9889; Efficiency</div>
+      <div class="nav-item">&#128203; Plan Summary</div>
+      <div class="nav-item">&#128230; Total Production</div>
+      <div class="nav-label" style="margin-top: 12px">Stock</div>
+      <div class="nav-item">&#128230; Stock Management</div>
+    </div>
+    <div class="mock-main">
+      <div class="mock-header">
+        <h3>Factory Overview</h3>
+        <div class="selector">
+          <span class="active">Day</span>
+          <span>Week</span>
+          <span>Period</span>
+        </div>
+      </div>
+
+      <div class="mock-kpi-row">
+        <div class="mock-kpi">
+          <div class="label">Yield %</div>
+          <div class="val" style="color: var(--primary)">91.4%</div>
+          <div class="chg change-up">&#9650; +0.8%</div>
+        </div>
+        <div class="mock-kpi">
+          <div class="label">Giveaway %</div>
+          <div class="val" style="color: var(--danger)">3.2%</div>
+          <div class="chg change-down">&#9660; +0.3%</div>
+        </div>
+        <div class="mock-kpi">
+          <div class="label">Efficiency %</div>
+          <div class="val" style="color: var(--success-dark)">87.1%</div>
+          <div class="chg change-up">&#9650; +1.2%</div>
+        </div>
+        <div class="mock-kpi">
+          <div class="label">Cases</div>
+          <div class="val" style="color: #0984E3">12,450</div>
+          <div class="chg change-up">&#9650; +340</div>
+        </div>
+        <div class="mock-kpi">
+          <div class="label">Yield Var &pound;</div>
+          <div class="val" style="color: var(--success-dark)">&pound;2,180</div>
+          <div class="chg change-up">&#9650; +&pound;410</div>
+        </div>
+      </div>
+
+      <div class="mock-charts">
+        <div class="mock-chart-box">
+          <div class="chart-title">Weekly Yield Trend (13 Weeks)</div>
+          <div class="mock-line-chart">
+            <div class="bar" style="height: 65%; background: var(--primary-light)"></div>
+            <div class="bar" style="height: 58%; background: var(--primary-light)"></div>
+            <div class="bar" style="height: 72%; background: var(--primary-light)"></div>
+            <div class="bar" style="height: 68%; background: var(--primary-light)"></div>
+            <div class="bar" style="height: 75%; background: var(--primary-light)"></div>
+            <div class="bar" style="height: 70%; background: var(--primary-light)"></div>
+            <div class="bar" style="height: 80%; background: var(--primary-light)"></div>
+            <div class="bar" style="height: 78%; background: var(--primary-light)"></div>
+            <div class="bar" style="height: 82%; background: var(--primary-light)"></div>
+            <div class="bar" style="height: 76%; background: var(--primary-light)"></div>
+            <div class="bar" style="height: 85%; background: var(--primary-light)"></div>
+            <div class="bar" style="height: 88%; background: var(--primary-light)"></div>
+            <div class="bar" style="height: 91%; background: var(--primary)"></div>
+          </div>
+          <div style="border-top: 2px dashed var(--danger); opacity: 0.4; margin-top: -40px; position: relative;">
+            <span style="position: absolute; right: 0; top: -16px; font-size: 10px; color: var(--danger); font-weight: 600;">Target 92%</span>
+          </div>
+        </div>
+        <div class="mock-chart-box">
+          <div class="chart-title">Variance by Line</div>
+          <div class="mock-bar-chart">
+            <div class="mock-bar-row">
+              <span style="font-weight: 600">L22</span>
+              <div class="bar-track"><div class="bar-fill" style="width: 90%; background: var(--success)"></div></div>
+              <span style="color: var(--success-dark); font-weight: 600">+&pound;580</span>
+            </div>
+            <div class="mock-bar-row">
+              <span style="font-weight: 600">L14</span>
+              <div class="bar-track"><div class="bar-fill" style="width: 75%; background: var(--success)"></div></div>
+              <span style="color: var(--success-dark); font-weight: 600">+&pound;420</span>
+            </div>
+            <div class="mock-bar-row">
+              <span style="font-weight: 600">L8</span>
+              <div class="bar-track"><div class="bar-fill" style="width: 55%; background: var(--success)"></div></div>
+              <span style="color: var(--success-dark); font-weight: 600">+&pound;310</span>
+            </div>
+            <div class="mock-bar-row">
+              <span style="font-weight: 600">L3</span>
+              <div class="bar-track"><div class="bar-fill" style="width: 40%; background: var(--danger)"></div></div>
+              <span style="color: var(--danger); font-weight: 600">-&pound;250</span>
+            </div>
+            <div class="mock-bar-row">
+              <span style="font-weight: 600">L17</span>
+              <div class="bar-track"><div class="bar-fill" style="width: 60%; background: var(--danger)"></div></div>
+              <span style="color: var(--danger); font-weight: 600">-&pound;480</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="slide-number">4 / 12</div>
+  <div class="slide-logo">IPL MANUFACTURING</div>
+</div>
+
+<!-- SLIDE 5: FEATURES DELIVERED -->
+<div class="slide" id="s5">
+  <h2>Features <span class="accent">Delivered</span> (13 Complete)</h2>
+  <div class="divider"></div>
+
+  <div class="card-grid card-grid-3">
+    <div class="card">
+      <div class="card-icon card-icon-purple">&#128202;</div>
+      <h4>Factory Overview</h4>
+      <p>5 KPI summary cards, 13-week yield trend, variance by line, top gains/losses panels, week-over-week comparison</p>
+      <span class="tag tag-done">&#10003; Live</span>
+    </div>
+    <div class="card">
+      <div class="card-icon card-icon-cyan">&#128200;</div>
+      <h4>Yield by Line</h4>
+      <p>Sortable table with inline sparkline trends, multi-filter bar (Team, Shift, Line Manager), copy-to-clipboard</p>
+      <span class="tag tag-done">&#10003; Live</span>
+    </div>
+    <div class="card">
+      <div class="card-icon card-icon-purple">&#128269;</div>
+      <h4>Yield by SKU</h4>
+      <p>Product-level drill-down with contribution analysis, breadcrumb navigation, 13-week SKU trend charts</p>
+      <span class="tag tag-done">&#10003; Live</span>
+    </div>
+    <div class="card">
+      <div class="card-icon card-icon-red">&#128201;</div>
+      <h4>Giveaway Analysis</h4>
+      <p>GA by Line/SKU/Manager/Supervisor views, factory-wide GA trend with target line, contribution bars</p>
+      <span class="tag tag-done">&#10003; Live</span>
+    </div>
+    <div class="card">
+      <div class="card-icon card-icon-yellow">&#128100;</div>
+      <h4>Line Leader Performance</h4>
+      <p>Scorecard table with grading, D3 ranking heatmap, individual detail drawer with trends, real efficiency data</p>
+      <span class="tag tag-done">&#10003; Live</span>
+    </div>
+    <div class="card">
+      <div class="card-icon card-icon-blue">&#128101;</div>
+      <h4>Team Comparison</h4>
+      <p>Team summary, multi-line trend charts, team-by-line matrix heatmap, potential savings calculator</p>
+      <span class="tag tag-done">&#10003; Live</span>
+    </div>
+    <div class="card">
+      <div class="card-icon card-icon-green">&#128197;</div>
+      <h4>Period Reports (4-4-5)</h4>
+      <p>13 fiscal periods, period-over-period &amp; year-over-year comparison, combo charts, print-optimized view</p>
+      <span class="tag tag-done">&#10003; Live</span>
+    </div>
+    <div class="card">
+      <div class="card-icon card-icon-cyan">&#128221;</div>
+      <h4>Production Log</h4>
+      <p>Pallet-by-pallet records from PROD sheet, line filter, sortable columns, summary cards (Boxes, KG, Pallets)</p>
+      <span class="tag tag-done">&#10003; Live</span>
+    </div>
+    <div class="card">
+      <div class="card-icon card-icon-purple">&#9889;</div>
+      <h4>Efficiency by Line + Leader</h4>
+      <p>Summary/Detail toggle, efficiency tables, Efficiency by Leader JOINs PlnSmy + Effic + Line Yields data</p>
+      <span class="tag tag-done">&#10003; Live</span>
+    </div>
+    <div class="card">
+      <div class="card-icon card-icon-yellow">&#128203;</div>
+      <h4>Plan Summary</h4>
+      <p>Available hrs, earned hrs, lost hrs, Total/Meat/Labour Variance, Effic %, Repack %, Gway %</p>
+      <span class="tag tag-done">&#10003; Live</span>
+    </div>
+    <div class="card">
+      <div class="card-icon card-icon-blue">&#128197;</div>
+      <h4>Production Schedule</h4>
+      <p>Scheduled items by line, Planned Cases/KG/Hours, Std Rate, line filter, summary totals</p>
+      <span class="tag tag-done">&#10003; Live</span>
+    </div>
+    <div class="card">
+      <div class="card-icon card-icon-green">&#128230;</div>
+      <h4>Total Production + Product Master</h4>
+      <p>Product totals (Cases/KG/Packets), product lookup (Cases/Pallet, KG/Case, Flow Rate), search &amp; sort</p>
+      <span class="tag tag-done">&#10003; Live</span>
+    </div>
+  </div>
+
+  <div class="slide-number">5 / 12</div>
+  <div class="slide-logo">IPL MANUFACTURING</div>
+</div>
+
+<!-- SLIDE 6: FEATURES PLANNED -->
+<div class="slide" id="s6">
+  <h2>Features <span class="accent">Planned</span> (16 Remaining)</h2>
+  <div class="divider"></div>
+
+  <div class="two-col">
+    <div>
+      <h3 style="color: var(--primary); margin-bottom: 16px;">&#128197; Historical Data &amp; Trends</h3>
+      <div class="card-grid" style="gap: 12px;">
+        <div class="card" style="padding: 16px;">
+          <h4 style="font-size: 15px;">Date-Keyed Storage</h4>
+          <p>Daily production snapshots archived in IndexedDB &mdash; 365-day retention, auto-migration</p>
+          <span class="tag tag-planned">Planned</span>
+        </div>
+        <div class="card" style="padding: 16px;">
+          <h4 style="font-size: 15px;">Multi-Day Queries</h4>
+          <p>Query by day, week, period, or year &mdash; merge multiple daily snapshots for aggregated views</p>
+          <span class="tag tag-planned">Planned</span>
+        </div>
+        <div class="card" style="padding: 16px;">
+          <h4 style="font-size: 15px;">Production Trends Dashboard</h4>
+          <p>Efficiency/Volume/Variance trend charts across 14 days, 13 weeks, or 13 periods</p>
+          <span class="tag tag-planned">Planned</span>
+        </div>
+        <div class="card" style="padding: 16px;">
+          <h4 style="font-size: 15px;">Weekly Production Report</h4>
+          <p>Auto-generated printable weekly summary with daily breakdown, top/bottom lines</p>
+          <span class="tag tag-planned">Planned</span>
+        </div>
+      </div>
+
+      <h3 style="color: var(--primary); margin-top: 28px; margin-bottom: 16px;">&#128203; Shift Report Analysis</h3>
+      <div class="card-grid" style="gap: 12px;">
+        <div class="card" style="padding: 16px;">
+          <h4 style="font-size: 15px;">Daily Issues Dashboard</h4>
+          <p>Top 3 downtime issues ranked by minutes, categorised as People/Process/Plant</p>
+          <span class="tag tag-planned">Planned</span>
+        </div>
+        <div class="card" style="padding: 16px;">
+          <h4 style="font-size: 15px;">Supervisor Comments Timeline</h4>
+          <p>2-hour review blocks with running KPIs, searchable actions &amp; support requests</p>
+          <span class="tag tag-planned">Planned</span>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <h3 style="color: var(--primary); margin-bottom: 16px;">&#128230; Stock Management</h3>
+      <div class="card-grid" style="gap: 12px;">
+        <div class="card" style="padding: 16px;">
+          <h4 style="font-size: 15px;">Main Chill &mdash; Grid Map</h4>
+          <p>Visual CSS grid of the physical chill store &mdash; 10 lanes, 1,230 locations, colour-coded occupancy</p>
+          <span class="tag tag-planned">Planned</span>
+        </div>
+        <div class="card" style="padding: 16px;">
+          <h4 style="font-size: 15px;">Expiry Alerts</h4>
+          <p>Colour-coded expiry tracking: Expired, Critical (&le;3 days), Warning (&le;7), Attention (&le;14)</p>
+          <span class="tag tag-planned">Planned</span>
+        </div>
+        <div class="card" style="padding: 16px;">
+          <h4 style="font-size: 15px;">HC Chill Table</h4>
+          <p>Filtered stock by location prefix, full 18-column table, search, pagination</p>
+          <span class="tag tag-planned">Planned</span>
+        </div>
+        <div class="card" style="padding: 16px;">
+          <h4 style="font-size: 15px;">Dry Goods Occupancy</h4>
+          <p>5 sectors with capacity bars, over-capacity alerts, expandable location lists</p>
+          <span class="tag tag-planned">Planned</span>
+        </div>
+        <div class="card" style="padding: 16px;">
+          <h4 style="font-size: 15px;">Stock Settings Panel</h4>
+          <p>Configurable location prefixes, sector capacities, expiry thresholds</p>
+          <span class="tag tag-planned">Planned</span>
+        </div>
+        <div class="card" style="padding: 16px;">
+          <h4 style="font-size: 15px;">Stock Trends</h4>
+          <p>Historical stock level trends, expiry risk over time, sector occupancy &mdash; 30/90/365 day ranges</p>
+          <span class="tag tag-planned">Planned</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="slide-number">6 / 12</div>
+  <div class="slide-logo">IPL MANUFACTURING</div>
+</div>
+
+<!-- SLIDE 7: USER ROLES -->
+<div class="slide" id="s7">
+  <h2>Who <span class="accent">Uses</span> It?</h2>
+  <div class="divider"></div>
+
+  <div class="card-grid card-grid-3">
+    <div class="card" style="text-align: center; padding: 32px;">
+      <div style="font-size: 48px; margin-bottom: 16px;">&#128119;</div>
+      <h4 style="font-size: 20px; margin-bottom: 12px;">Line Leaders</h4>
+      <ul class="role-features">
+        <li>&#10003; Personal performance scorecard</li>
+        <li>&#10003; Individual yield &amp; GA trends</li>
+        <li>&#10003; Grade criteria reference</li>
+        <li>&#10003; Own line production data</li>
+        <li>&#10003; Daily production log</li>
+        <li>&#10003; Efficiency by own lines</li>
+      </ul>
+    </div>
+    <div class="card" style="text-align: center; padding: 32px; border: 2px solid var(--primary);">
+      <div style="font-size: 48px; margin-bottom: 16px;">&#128110;</div>
+      <h4 style="font-size: 20px; margin-bottom: 12px;">Supervisors</h4>
+      <ul class="role-features">
+        <li>&#10003; Team overview with all leaders</li>
+        <li>&#10003; Team comparison matrix</li>
+        <li>&#10003; Yield by Line &amp; SKU drill-down</li>
+        <li>&#10003; Giveaway analysis</li>
+        <li>&#10003; Production efficiency by line</li>
+        <li>&#9744; Shift report review (planned)</li>
+        <li>&#9744; Supervisor comments (planned)</li>
+      </ul>
+    </div>
+    <div class="card" style="text-align: center; padding: 32px;">
+      <div style="font-size: 48px; margin-bottom: 16px;">&#128188;</div>
+      <h4 style="font-size: 20px; margin-bottom: 12px;">Management</h4>
+      <ul class="role-features">
+        <li>&#10003; Factory-wide KPI overview</li>
+        <li>&#10003; Period reports (4-4-5)</li>
+        <li>&#10003; Year-over-year comparison</li>
+        <li>&#10003; Plan summary &amp; variances</li>
+        <li>&#10003; Potential savings calculator</li>
+        <li>&#9744; Stock management (planned)</li>
+        <li>&#9744; Weekly production report (planned)</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="highlight-box mt-20">
+    <p>&#128161; All users can access all views &mdash; role-based design means each view is <strong>optimised for the questions that role asks most often</strong></p>
+  </div>
+
+  <div class="slide-number">7 / 12</div>
+  <div class="slide-logo">IPL MANUFACTURING</div>
+</div>
+
+<!-- SLIDE 8: DAILY WORKFLOW -->
+<div class="slide" id="s8">
+  <h2>Daily <span class="accent">Workflow</span></h2>
+  <div class="divider"></div>
+
+  <div class="two-col">
+    <div>
+      <h3>&#9888; Before (Current Process)</h3>
+      <ol class="bullet-list">
+        <li><span class="num" style="background: var(--danger)">1</span> Open Line Yields (80MB) &mdash; wait 2-5 min for Excel to load</li>
+        <li><span class="num" style="background: var(--danger)">2</span> Open Prod Pallets &mdash; wait again</li>
+        <li><span class="num" style="background: var(--danger)">3</span> Manually filter dates, lines, teams in each file</li>
+        <li><span class="num" style="background: var(--danger)">4</span> Copy relevant data into summary spreadsheet</li>
+        <li><span class="num" style="background: var(--danger)">5</span> Calculate KPIs manually / update formulas</li>
+        <li><span class="num" style="background: var(--danger)">6</span> Format charts and tables for reporting</li>
+        <li><span class="num" style="background: var(--danger)">7</span> Email or share reports manually</li>
+      </ol>
+      <p style="margin-top: 16px; font-size: 20px; font-weight: 700; color: var(--danger);">&#9201; ~45-60 minutes daily</p>
+    </div>
+    <div>
+      <h3>&#10003; After (KPI Dashboard)</h3>
+      <ol class="bullet-list">
+        <li><span class="num">1</span> Open dashboard in browser (instant)</li>
+        <li><span class="num">2</span> Drag &amp; drop today's Excel files into sidebar</li>
+        <li><span class="num">3</span> Wait 30-60 seconds for automatic parsing</li>
+        <li><span class="num">4</span> All dashboards, charts, and KPIs are ready</li>
+        <li><span class="num">5</span> Click through views &mdash; drill down as needed</li>
+        <li><span class="num">6</span> Copy-to-clipboard for email, or print reports</li>
+      </ol>
+      <p style="margin-top: 16px; font-size: 20px; font-weight: 700; color: var(--success-dark);">&#9201; ~2-5 minutes daily</p>
+    </div>
+  </div>
+
+  <div class="savings-grid mt-32">
+    <div class="savings-card">
+      <div class="big-number">40+</div>
+      <div class="unit">minutes saved per day</div>
+      <p>No more manual Excel opening, copying, and formatting</p>
+    </div>
+    <div class="savings-card">
+      <div class="big-number">3.5</div>
+      <div class="unit">hours saved per week</div>
+      <p>Time redirected from report building to analysis and action</p>
+    </div>
+    <div class="savings-card">
+      <div class="big-number">180+</div>
+      <div class="unit">hours saved per year</div>
+      <p>Equivalent to ~23 full working days recovered annually</p>
+    </div>
+  </div>
+
+  <div class="slide-number">8 / 12</div>
+  <div class="slide-logo">IPL MANUFACTURING</div>
+</div>
+
+<!-- SLIDE 9: KEY CAPABILITIES -->
+<div class="slide" id="s9">
+  <h2>Key <span class="accent">Capabilities</span></h2>
+  <div class="divider"></div>
+
+  <div class="card-grid card-grid-4">
+    <div class="card" style="text-align: center;">
+      <div style="font-size: 40px; margin-bottom: 12px;">&#128269;</div>
+      <h4>Instant Drill-Down</h4>
+      <p>Factory &rarr; Line &rarr; SKU &rarr; Trend. Click any metric to see the detail behind it</p>
+    </div>
+    <div class="card" style="text-align: center;">
+      <div style="font-size: 40px; margin-bottom: 12px;">&#128200;</div>
+      <h4>13-Week Trends</h4>
+      <p>Every metric shows trend over time. Spot patterns, identify regressions early</p>
+    </div>
+    <div class="card" style="text-align: center;">
+      <div style="font-size: 40px; margin-bottom: 12px;">&#128197;</div>
+      <h4>4-4-5 Calendar</h4>
+      <p>Fiscal period calculations built in. Period, quarter, and year reports match existing format</p>
+    </div>
+    <div class="card" style="text-align: center;">
+      <div style="font-size: 40px; margin-bottom: 12px;">&#128176;</div>
+      <h4>Variance &pound; Analysis</h4>
+      <p>See yield/efficiency variance in pounds. Top gains and losses highlight where to focus</p>
+    </div>
+    <div class="card" style="text-align: center;">
+      <div style="font-size: 40px; margin-bottom: 12px;">&#127919;</div>
+      <h4>Target Comparison</h4>
+      <p>Every KPI compared against target. Colour-coded: green (above), red (below), amber (close)</p>
+    </div>
+    <div class="card" style="text-align: center;">
+      <div style="font-size: 40px; margin-bottom: 12px;">&#128293;</div>
+      <h4>Performance Heatmap</h4>
+      <p>D3.js ranking heatmap for line leaders &mdash; see who is improving and who needs support</p>
+    </div>
+    <div class="card" style="text-align: center;">
+      <div style="font-size: 40px; margin-bottom: 12px;">&#128203;</div>
+      <h4>Copy to Clipboard</h4>
+      <p>One click to copy any table data for pasting into Excel or email</p>
+    </div>
+    <div class="card" style="text-align: center;">
+      <div style="font-size: 40px; margin-bottom: 12px;">&#128424;</div>
+      <h4>Print Reports</h4>
+      <p>Period reports with print-optimised CSS. Clean, professional output for meetings</p>
+    </div>
+  </div>
+
+  <div class="slide-number">9 / 12</div>
+  <div class="slide-logo">IPL MANUFACTURING</div>
+</div>
+
+<!-- SLIDE 10: STOCK MANAGEMENT PREVIEW -->
+<div class="slide" id="s10">
+  <h2>Coming Soon: <span class="accent">Stock Management</span></h2>
+  <div class="divider"></div>
+
+  <p style="font-size: 17px; color: var(--text-secondary); margin-bottom: 28px;">
+    Replaces 3 separate Excel spreadsheets (Main Chill Store View, interactive_stock_yield_report, drygoods.xlsm) with a single upload of the <strong>FORZ On-Hand Stock</strong> file.
+  </p>
+
+  <div class="card-grid card-grid-3">
+    <div class="card">
+      <h4>&#128230; Main Chill &mdash; Grid Map</h4>
+      <div style="background: var(--bg); border-radius: 8px; padding: 16px; margin: 12px 0; text-align: center;">
+        <div style="display: grid; grid-template-columns: repeat(10, 1fr); gap: 3px; max-width: 300px; margin: 0 auto;">
+          <div style="background: var(--success); height: 16px; border-radius: 2px; opacity: 0.7"></div>
+          <div style="background: var(--success); height: 16px; border-radius: 2px; opacity: 0.9"></div>
+          <div style="background: var(--border); height: 16px; border-radius: 2px;"></div>
+          <div style="background: var(--success); height: 16px; border-radius: 2px; opacity: 0.6"></div>
+          <div style="background: var(--success); height: 16px; border-radius: 2px; opacity: 0.8"></div>
+          <div style="background: var(--border); height: 16px; border-radius: 2px;"></div>
+          <div style="background: var(--success); height: 16px; border-radius: 2px; opacity: 0.5"></div>
+          <div style="background: var(--border); height: 16px; border-radius: 2px;"></div>
+          <div style="background: var(--success); height: 16px; border-radius: 2px; opacity: 0.7"></div>
+          <div style="background: var(--success); height: 16px; border-radius: 2px; opacity: 0.9"></div>
+          <div style="background: var(--success); height: 16px; border-radius: 2px; opacity: 0.8"></div>
+          <div style="background: var(--border); height: 16px; border-radius: 2px;"></div>
+          <div style="background: var(--success); height: 16px; border-radius: 2px; opacity: 0.6"></div>
+          <div style="background: var(--success); height: 16px; border-radius: 2px; opacity: 0.9"></div>
+          <div style="background: var(--success); height: 16px; border-radius: 2px; opacity: 0.5"></div>
+          <div style="background: var(--success); height: 16px; border-radius: 2px; opacity: 0.7"></div>
+          <div style="background: var(--border); height: 16px; border-radius: 2px;"></div>
+          <div style="background: var(--success); height: 16px; border-radius: 2px; opacity: 0.8"></div>
+          <div style="background: var(--border); height: 16px; border-radius: 2px;"></div>
+          <div style="background: var(--success); height: 16px; border-radius: 2px; opacity: 0.6"></div>
+          <div style="background: var(--border); height: 16px; border-radius: 2px;"></div>
+          <div style="background: var(--success); height: 16px; border-radius: 2px; opacity: 0.9"></div>
+          <div style="background: var(--success); height: 16px; border-radius: 2px; opacity: 0.7"></div>
+          <div style="background: var(--success); height: 16px; border-radius: 2px; opacity: 0.8"></div>
+          <div style="background: var(--border); height: 16px; border-radius: 2px;"></div>
+          <div style="background: var(--success); height: 16px; border-radius: 2px; opacity: 0.5"></div>
+          <div style="background: var(--success); height: 16px; border-radius: 2px; opacity: 0.9"></div>
+          <div style="background: var(--border); height: 16px; border-radius: 2px;"></div>
+          <div style="background: var(--success); height: 16px; border-radius: 2px; opacity: 0.6"></div>
+          <div style="background: var(--success); height: 16px; border-radius: 2px; opacity: 0.8"></div>
+        </div>
+        <div style="font-size: 11px; color: var(--text-muted); margin-top: 8px;">
+          <span style="display: inline-flex; align-items: center; gap: 4px; margin-right: 12px;"><span style="width: 10px; height: 10px; background: var(--success); border-radius: 2px; display: inline-block;"></span> Occupied</span>
+          <span style="display: inline-flex; align-items: center; gap: 4px;"><span style="width: 10px; height: 10px; background: var(--border); border-radius: 2px; display: inline-block;"></span> Empty</span>
+        </div>
+      </div>
+      <p>10 lanes (A-J) &times; 4 sections, 1,230 total locations. Hover for item details and expiry date</p>
+    </div>
+
+    <div class="card">
+      <h4>&#9888; Expiry Alerts</h4>
+      <div style="margin: 12px 0;">
+        <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+          <div style="flex: 1; background: rgba(255,107,107,0.15); border-radius: 8px; padding: 10px; text-align: center;">
+            <div style="font-size: 24px; font-weight: 800; color: var(--danger);">50</div>
+            <div style="font-size: 10px; color: var(--danger); font-weight: 600;">EXPIRED</div>
+          </div>
+          <div style="flex: 1; background: rgba(255,107,107,0.08); border-radius: 8px; padding: 10px; text-align: center;">
+            <div style="font-size: 24px; font-weight: 800; color: #CC4444;">35</div>
+            <div style="font-size: 10px; color: #CC4444; font-weight: 600;">CRITICAL</div>
+          </div>
+          <div style="flex: 1; background: rgba(254,202,87,0.15); border-radius: 8px; padding: 10px; text-align: center;">
+            <div style="font-size: 24px; font-weight: 800; color: #D4A005;">15</div>
+            <div style="font-size: 10px; color: #D4A005; font-weight: 600;">WARNING</div>
+          </div>
+        </div>
+      </div>
+      <p>Auto-calculated days remaining. Configurable thresholds. Filter by severity. Sorted by urgency</p>
+    </div>
+
+    <div class="card">
+      <h4>&#128230; Dry Goods Occupancy</h4>
+      <div style="margin: 12px 0;">
+        <div style="margin-bottom: 10px;">
+          <div style="display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; margin-bottom: 4px;">
+            <span>drygoods</span><span>64.2%</span>
+          </div>
+          <div style="height: 12px; background: var(--border); border-radius: 6px; overflow: hidden;">
+            <div style="width: 64%; height: 100%; background: var(--success); border-radius: 6px;"></div>
+          </div>
+        </div>
+        <div style="margin-bottom: 10px;">
+          <div style="display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; margin-bottom: 4px;">
+            <span>cns</span><span style="color: var(--danger);">136.8% &#9888;</span>
+          </div>
+          <div style="height: 12px; background: var(--border); border-radius: 6px; overflow: hidden;">
+            <div style="width: 100%; height: 100%; background: var(--danger); border-radius: 6px;"></div>
+          </div>
+        </div>
+        <div style="margin-bottom: 10px;">
+          <div style="display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; margin-bottom: 4px;">
+            <span>box</span><span>67.9%</span>
+          </div>
+          <div style="height: 12px; background: var(--border); border-radius: 6px; overflow: hidden;">
+            <div style="width: 68%; height: 100%; background: var(--success); border-radius: 6px;"></div>
+          </div>
+        </div>
+        <div>
+          <div style="display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; margin-bottom: 4px;">
+            <span>webs</span><span>55.6%</span>
+          </div>
+          <div style="height: 12px; background: var(--border); border-radius: 6px; overflow: hidden;">
+            <div style="width: 56%; height: 100%; background: var(--success); border-radius: 6px;"></div>
+          </div>
+        </div>
+      </div>
+      <p>5 sectors with capacity tracking. Over-capacity alerts. Click to expand location list</p>
+    </div>
+  </div>
+
+  <div class="highlight-box mt-20">
+    <p>&#128161; <strong>One file upload replaces 3 Excel workbooks</strong> &mdash; Main Chill Store View, interactive_stock_yield_report, and drygoods spreadsheets are no longer needed</p>
+  </div>
+
+  <div class="slide-number">10 / 12</div>
+  <div class="slide-logo">IPL MANUFACTURING</div>
+</div>
+
+<!-- SLIDE 11: ROADMAP -->
+<div class="slide" id="s11">
+  <h2>Implementation <span class="accent">Roadmap</span></h2>
+  <div class="divider"></div>
+
+  <div class="two-col">
+    <div>
+      <div class="progress-section">
+        <div class="progress-label">45%</div>
+        <div class="progress-sub">Overall Completion &mdash; 13 of 29 stories</div>
+        <div class="progress-bar-container">
+          <div class="progress-bar-fill" style="width: 45%">45%</div>
+        </div>
+      </div>
+
+      <div class="timeline mt-32">
+        <div class="timeline-item">
+          <div class="timeline-dot timeline-dot-done"></div>
+          <h4>Phase 1: Core Infrastructure</h4>
+          <p>Excel parsing, IndexedDB caching, 4-4-5 calendar, Overview, Yield views</p>
+          <div class="stories">Stories 1.1, 1.2, 2.1, 2.2, 2.3 &bull; &#10003; COMPLETE</div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-dot timeline-dot-done"></div>
+          <h4>Phase 2: Advanced Analytics</h4>
+          <p>Giveaway, Line Leaders, Team Comparison, Period Reports</p>
+          <div class="stories">Stories 3.1, 3.2, 3.3, 3.5 &bull; &#10003; COMPLETE</div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-dot timeline-dot-done"></div>
+          <h4>Phase 2.3: Production Deep Dive</h4>
+          <p>7 production pages, parser fixes, sidebar categories, efficiency integration</p>
+          <div class="stories">Stories 6.1&ndash;6.4 &bull; &#10003; COMPLETE</div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-dot timeline-dot-wip"></div>
+          <h4>Phase 2.4: Historical Data &amp; Trends</h4>
+          <p>Date-keyed storage, multi-day queries, production trends, weekly report</p>
+          <div class="stories">Stories 7.1&ndash;7.6 &bull; NEXT UP</div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-dot timeline-dot-pending"></div>
+          <h4>Phase 2.5: Shift Report Analysis</h4>
+          <p>Shift parsing, top 3 issues, supervisor comments, shift KPIs</p>
+          <div class="stories">Stories 4.1&ndash;4.4</div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-dot timeline-dot-pending"></div>
+          <h4>Phase 2.7: Stock Management</h4>
+          <p>Grid map, expiry alerts, HC chill, dry goods, settings, trends</p>
+          <div class="stories">Stories 5.1&ndash;5.7</div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-dot timeline-dot-pending"></div>
+          <h4>Phase 3: Polish &amp; Deploy</h4>
+          <p>Print export, performance, responsive design, documentation</p>
+          <div class="stories">Final phase</div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <h3>Complete Feature List</h3>
+      <table class="feature-table" style="font-size: 13px;">
+        <thead>
+          <tr><th>Feature</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Excel Parsing Engine (3 files)</td><td><span class="status-badge status-done">&#10003; Done</span></td></tr>
+          <tr><td>4-4-5 Calendar Engine</td><td><span class="status-badge status-done">&#10003; Done</span></td></tr>
+          <tr><td>Factory Overview Dashboard</td><td><span class="status-badge status-done">&#10003; Done</span></td></tr>
+          <tr><td>Yield by Line Analysis</td><td><span class="status-badge status-done">&#10003; Done</span></td></tr>
+          <tr><td>Yield by SKU Drill-Down</td><td><span class="status-badge status-done">&#10003; Done</span></td></tr>
+          <tr><td>Giveaway Analysis</td><td><span class="status-badge status-done">&#10003; Done</span></td></tr>
+          <tr><td>Line Leader Performance</td><td><span class="status-badge status-done">&#10003; Done</span></td></tr>
+          <tr><td>Team Comparison</td><td><span class="status-badge status-done">&#10003; Done</span></td></tr>
+          <tr><td>Period Reports (4-4-5)</td><td><span class="status-badge status-done">&#10003; Done</span></td></tr>
+          <tr><td>Production Log</td><td><span class="status-badge status-done">&#10003; Done</span></td></tr>
+          <tr><td>Efficiency by Line/Leader</td><td><span class="status-badge status-done">&#10003; Done</span></td></tr>
+          <tr><td>Plan Summary &amp; Schedule</td><td><span class="status-badge status-done">&#10003; Done</span></td></tr>
+          <tr><td>Total Production &amp; Master</td><td><span class="status-badge status-done">&#10003; Done</span></td></tr>
+          <tr style="background: rgba(108,92,231,0.03);"><td>Historical Data Storage</td><td><span class="status-badge status-planned">Planned</span></td></tr>
+          <tr style="background: rgba(108,92,231,0.03);"><td>Production Trends</td><td><span class="status-badge status-planned">Planned</span></td></tr>
+          <tr style="background: rgba(108,92,231,0.03);"><td>Weekly Production Report</td><td><span class="status-badge status-planned">Planned</span></td></tr>
+          <tr style="background: rgba(108,92,231,0.03);"><td>Shift Report Parsing</td><td><span class="status-badge status-planned">Planned</span></td></tr>
+          <tr style="background: rgba(108,92,231,0.03);"><td>Daily Issues Dashboard</td><td><span class="status-badge status-planned">Planned</span></td></tr>
+          <tr style="background: rgba(108,92,231,0.03);"><td>Supervisor Comments</td><td><span class="status-badge status-planned">Planned</span></td></tr>
+          <tr style="background: rgba(108,92,231,0.03);"><td>Stock &mdash; Main Chill Grid</td><td><span class="status-badge status-planned">Planned</span></td></tr>
+          <tr style="background: rgba(108,92,231,0.03);"><td>Stock &mdash; Expiry Alerts</td><td><span class="status-badge status-planned">Planned</span></td></tr>
+          <tr style="background: rgba(108,92,231,0.03);"><td>Stock &mdash; HC Chill Table</td><td><span class="status-badge status-planned">Planned</span></td></tr>
+          <tr style="background: rgba(108,92,231,0.03);"><td>Stock &mdash; Dry Goods</td><td><span class="status-badge status-planned">Planned</span></td></tr>
+          <tr style="background: rgba(108,92,231,0.03);"><td>Stock Settings &amp; Trends</td><td><span class="status-badge status-planned">Planned</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="slide-number">11 / 12</div>
+  <div class="slide-logo">IPL MANUFACTURING</div>
+</div>
+
+<!-- SLIDE 12: SUMMARY -->
+<div class="slide" id="s12" style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); color: #fff;">
+  <h2 style="color: #fff; text-align: center;">Summary &amp; <span style="color: var(--success);">Next Steps</span></h2>
+  <div class="divider" style="margin: 20px auto;"></div>
+
+  <div class="card-grid card-grid-3" style="margin-bottom: 40px;">
+    <div class="card" style="background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.1); text-align: center;">
+      <div style="font-size: 48px; margin-bottom: 8px;">&#128200;</div>
+      <h4 style="color: #fff; font-size: 20px;">What It Does</h4>
+      <p style="color: rgba(255,255,255,0.6); font-size: 15px;">Transforms 4 Excel files into 15+ interactive dashboard views with automatic KPI calculation, trend analysis, and drill-down capability</p>
+    </div>
+    <div class="card" style="background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.1); text-align: center;">
+      <div style="font-size: 48px; margin-bottom: 8px;">&#9201;</div>
+      <h4 style="color: #fff; font-size: 20px;">Time Saved</h4>
+      <p style="color: rgba(255,255,255,0.6); font-size: 15px;">40+ minutes per day, 3.5 hours per week, 180+ hours per year &mdash; eliminates manual Excel copy/paste workflows</p>
+    </div>
+    <div class="card" style="background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.1); text-align: center;">
+      <div style="font-size: 48px; margin-bottom: 8px;">&#128274;</div>
+      <h4 style="color: #fff; font-size: 20px;">How It Runs</h4>
+      <p style="color: rgba(255,255,255,0.6); font-size: 15px;">100% local &mdash; runs in your browser from a network drive. No server, no internet, no IT infrastructure needed. All data stays on your machine</p>
+    </div>
+  </div>
+
+  <div style="max-width: 700px; margin: 0 auto;">
+    <h3 style="color: var(--success); margin-bottom: 20px; text-align: center;">Immediate Next Steps</h3>
+    <div style="display: grid; gap: 12px;">
+      <div style="display: flex; align-items: center; gap: 16px; padding: 16px 20px; background: rgba(255,255,255,0.06); border-radius: 10px; border: 1px solid rgba(255,255,255,0.1);">
+        <span style="width: 32px; height: 32px; border-radius: 50%; background: var(--primary); display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0;">1</span>
+        <div>
+          <strong style="color: #fff;">Historical Data Storage</strong>
+          <p style="color: rgba(255,255,255,0.5); font-size: 13px; margin-top: 2px;">Enable date-keyed archival so production data accumulates over time</p>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 16px; padding: 16px 20px; background: rgba(255,255,255,0.06); border-radius: 10px; border: 1px solid rgba(255,255,255,0.1);">
+        <span style="width: 32px; height: 32px; border-radius: 50%; background: var(--primary); display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0;">2</span>
+        <div>
+          <strong style="color: #fff;">Shift Report Integration</strong>
+          <p style="color: rgba(255,255,255,0.5); font-size: 13px; margin-top: 2px;">Top 3 daily issues, supervisor comments, shift KPI cards</p>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 16px; padding: 16px 20px; background: rgba(255,255,255,0.06); border-radius: 10px; border: 1px solid rgba(255,255,255,0.1);">
+        <span style="width: 32px; height: 32px; border-radius: 50%; background: var(--primary); display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0;">3</span>
+        <div>
+          <strong style="color: #fff;">Stock Management</strong>
+          <p style="color: rgba(255,255,255,0.5); font-size: 13px; margin-top: 2px;">Chill store grid map, expiry alerts, dry goods occupancy</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="text-align: center; margin-top: 48px;">
+    <p style="font-size: 14px; color: rgba(255,255,255,0.35);">Manufacturing KPI Dashboard &bull; IPL Manufacturing &bull; February 2026</p>
+  </div>
+
+  <div class="slide-number" style="color: rgba(255,255,255,0.3);">12 / 12</div>
+</div>
+
+<!-- Navigation dots -->
+<nav class="slide-nav" aria-label="Slide navigation">
+  <a href="#s1" title="Title"></a>
+  <a href="#s2" title="Problem"></a>
+  <a href="#s3" title="How It Works"></a>
+  <a href="#s4" title="Preview"></a>
+  <a href="#s5" title="Delivered"></a>
+  <a href="#s6" title="Planned"></a>
+  <a href="#s7" title="Roles"></a>
+  <a href="#s8" title="Workflow"></a>
+  <a href="#s9" title="Capabilities"></a>
+  <a href="#s10" title="Stock"></a>
+  <a href="#s11" title="Roadmap"></a>
+  <a href="#s12" title="Summary"></a>
+</nav>
+
+<script>
+  document.querySelectorAll('.slide-nav a').forEach(a => {
+    a.addEventListener('click', e => {
+      e.preventDefault();
+      document.querySelector(a.getAttribute('href')).scrollIntoView({ behavior: 'smooth' });
+    });
+  });
+
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const id = entry.target.id;
+        document.querySelectorAll('.slide-nav a').forEach(a => {
+          a.style.opacity = a.getAttribute('href') === '#' + id ? '1' : '0.4';
+          a.style.background = a.getAttribute('href') === '#' + id ? 'var(--primary)' : 'var(--text-muted)';
+        });
+      }
+    });
+  }, { threshold: 0.5 });
+
+  document.querySelectorAll('.slide').forEach(slide => observer.observe(slide));
+</script>
+
+</body>
+</html>

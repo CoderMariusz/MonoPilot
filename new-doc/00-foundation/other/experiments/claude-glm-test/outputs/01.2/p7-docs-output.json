@@ -1,0 +1,28 @@
+Traceback (most recent call last):
+  File "C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\.experiments\claude-glm-test\scripts\glm_wrapper.py", line 21, in <module>
+    from glm_call import GLMClient
+  File "C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\.experiments\claude-glm-test\scripts\glm_call.py", line 6, in <module>
+    import requests
+  File "C:\Users\Mariusz K\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\requests\__init__.py", line 43, in <module>
+    import urllib3
+  File "C:\Users\Mariusz K\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\urllib3\__init__.py", line 18, in <module>
+    from .connectionpool import HTTPConnectionPool, HTTPSConnectionPool, connection_from_url
+  File "C:\Users\Mariusz K\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\urllib3\connectionpool.py", line 15, in <module>
+    from ._request_methods import RequestMethods
+  File "C:\Users\Mariusz K\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\urllib3\_request_methods.py", line 10, in <module>
+    from .response import BaseHTTPResponse
+  File "C:\Users\Mariusz K\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\urllib3\response.py", line 49, in <module>
+    from .connection import BaseSSLError, HTTPConnection, HTTPException
+  File "C:\Users\Mariusz K\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\urllib3\connection.py", line 24, in <module>
+    from .http2 import probe as http2_probe
+  File "C:\Users\Mariusz K\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\urllib3\http2\__init__.py", line 3, in <module>
+    from importlib.metadata import version
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.2544.0_x64__qbz5n2kfra8p0\Lib\importlib\metadata\__init__.py", line 12, in <module>
+    import zipfile
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 1023, in exec_module
+  File "<frozen importlib._bootstrap_external>", line 1156, in get_code
+  File "<frozen importlib._bootstrap_external>", line 785, in _compile_bytecode
+ValueError: bad marshal data (invalid reference)

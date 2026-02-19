@@ -1,0 +1,300 @@
+# Story 03.14 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/validation/__tests__/work-order-schemas.test.ts"
+    type: "unit"
+    description: "Unit tests for scheduleWOSchema validation"
+
+  - path: "apps/frontend/lib/services/__tests__/work-order-service.schedule.test.ts"
+    type: "unit"
+    description: "Unit tests for scheduleWorkOrder service method"
+
+  - path: "__tests__/integration/api/planning/work-orders/schedule.test.ts"
+    type: "integration"
+    description: "Integration tests for PATCH /work-orders/:id/schedule endpoint"
+
+# Acceptance Criteria
+acceptance_criteria:
+  - id: "AC-01"
+    title: "Schedule WO with valid times"
+    priority: "P0"
+    given: "A work order in 'draft' status with id 'wo-123'"
+    when: "PATCH /api/planning/work-orders/wo-123/schedule with {scheduled_start_time: '08:00', scheduled_end_time: '16:00'}"
+    then:
+      - "Response status is 200"
+      - "Response contains updated WO with scheduled_start_time = '08:00'"
+      - "Response contains updated WO with scheduled_end_time = '16:00'"
+      - "updated_at is set to current timestamp"
+    test_type: ["unit", "integration"]
+
+  - id: "AC-02"
+    title: "Reject end time before start time"
+    priority: "P0"
+    given: "A work order in 'planned' status"
+    when: "PATCH with {scheduled_start_time: '16:00', scheduled_end_time: '08:00'}"
+    then:
+      - "Response status is 400"
+      - "Error code is 'VALIDATION_ERROR'"
+      - "Error message indicates end time must be after start time"
+    test_type: ["unit", "integration"]
+
+  - id: "AC-03"
+    title: "Reject scheduling completed WO"
+    priority: "P0"
+    given: "A work order with status = 'completed'"
+    when: "PATCH /api/planning/work-orders/:id/schedule with any valid schedule"
+    then:
+      - "Response status is 400"
+      - "Error code is 'CANNOT_SCHEDULE_COMPLETED'"
+      - "WO remains unchanged"
+    test_type: ["integration"]
+
+  - id: "AC-04"
+    title: "Reject scheduling cancelled WO"
+    priority: "P0"
+    given: "A work order with status = 'cancelled'"
+    when: "PATCH /api/planning/work-orders/:id/schedule with any valid schedule"
+    then:
+      - "Response status is 400"
+      - "Error code is 'CANNOT_SCHEDULE_COMPLETED'"
+    test_type: ["integration"]
+
+  - id: "AC-05"
+    title: "Update production line with schedule"
+    priority: "P1"
+    given: "A work order and valid production line 'line-123'"
+    when: "PATCH with {production_line_id: 'line-123', scheduled_start_time: '09:00'}"
+    then:
+      - "Response status is 200"
+      - "WO production_line_id is updated to 'line-123'"
+      - "Response includes line relation with name"
+    test_type: ["integration"]
+
+  - id: "AC-06"
+    title: "Reject invalid production line"
+    priority: "P1"
+    given: "A work order and non-existent line ID"
+    when: "PATCH with {production_line_id: 'non-existent-uuid'}"
+    then:
+      - "Response status is 404"
+      - "Error message indicates line not found"
+    test_type: ["integration"]
+
+  - id: "AC-07"
+    title: "Clear machine assignment"
+    priority: "P2"
+    given: "A work order with machine_id assigned"
+    when: "PATCH with {machine_id: null}"
+    then:
+      - "Response status is 200"
+      - "WO machine_id is set to null"
+    test_type: ["integration"]
+
+  - id: "AC-08"
+    title: "Multi-tenant isolation"
+    priority: "P0"
+    given: "User from Org A and WO belonging to Org B"
+    when: "PATCH /api/planning/work-orders/:orgB_wo_id/schedule"
+    then:
+      - "Response status is 404"
+      - "No information leaked about Org B WO"
+    test_type: ["integration"]
+    security: true
+
+  - id: "AC-09"
+    title: "Permission check"
+    priority: "P0"
+    given: "User with 'viewer' role (no update permission)"
+    when: "PATCH /api/planning/work-orders/:id/schedule"
+    then:
+      - "Response status is 403"
+      - "Error indicates insufficient permissions"
+    test_type: ["integration"]
+    security: true
+
+  - id: "AC-10"
+    title: "Valid date range"
+    priority: "P1"
+    given: "A work order"
+    when: "PATCH with {planned_start_date: '2024-12-20', planned_end_date: '2024-12-22'}"
+    then:
+      - "Response status is 200"
+      - "Both dates are updated correctly"
+    test_type: ["unit", "integration"]
+
+  - id: "AC-11"
+    title: "Reject invalid date range"
+    priority: "P1"
+    given: "A work order"
+    when: "PATCH with {planned_start_date: '2024-12-22', planned_end_date: '2024-12-20'}"
+    then:
+      - "Response status is 400"
+      - "Error indicates end date must be on or after start date"
+    test_type: ["unit", "integration"]
+
+# Unit Test Cases
+unit_tests:
+  validation_schema:
+    file: "apps/frontend/lib/validation/__tests__/work-order-schemas.test.ts"
+    tests:
+      - name: "scheduleWOSchema accepts valid times"
+        input: '{ scheduled_start_time: "08:00", scheduled_end_time: "16:00" }'
+        expected: "Validation passes"
+
+      - name: "scheduleWOSchema rejects end before start"
+        input: '{ scheduled_start_time: "16:00", scheduled_end_time: "08:00" }'
+        expected: "Validation fails with path scheduled_end_time"
+
+      - name: "scheduleWOSchema accepts empty object"
+        input: '{}'
+        expected: "Validation passes (all fields optional)"
+
+      - name: "scheduleWOSchema accepts valid time format"
+        input: '{ scheduled_start_time: "00:00", scheduled_end_time: "23:59" }'
+        expected: "Validation passes"
+
+      - name: "scheduleWOSchema rejects invalid time format"
+        input: '{ scheduled_start_time: "25:00" }'
+        expected: "Validation fails"
+
+      - name: "scheduleWOSchema rejects invalid time format (no colon)"
+        input: '{ scheduled_start_time: "0800" }'
+        expected: "Validation fails"
+
+      - name: "scheduleWOSchema accepts valid date range"
+        input: '{ planned_start_date: "2024-12-20", planned_end_date: "2024-12-22" }'
+        expected: "Validation passes"
+
+      - name: "scheduleWOSchema rejects invalid date range"
+        input: '{ planned_start_date: "2024-12-22", planned_end_date: "2024-12-20" }'
+        expected: "Validation fails with path planned_end_date"
+
+      - name: "scheduleWOSchema accepts same day with valid times"
+        input: '{ planned_start_date: "2024-12-20", scheduled_start_time: "08:00", scheduled_end_time: "16:00" }'
+        expected: "Validation passes"
+
+      - name: "scheduleWOSchema allows multi-day with overnight times"
+        input: '{ planned_start_date: "2024-12-20", planned_end_date: "2024-12-21", scheduled_start_time: "20:00", scheduled_end_time: "04:00" }'
+        expected: "Validation passes (different days allow any times)"
+
+# Integration Test Cases
+integration_tests:
+  file: "__tests__/integration/api/planning/work-orders/schedule.test.ts"
+  setup: |
+    - Create test org with user (planner role)
+    - Create test product
+    - Create test production line
+    - Create test work order in 'draft' status
+
+  tests:
+    - name: "PATCH returns 200 for valid schedule"
+      setup: "WO in draft status"
+      request:
+        method: "PATCH"
+        path: "/api/planning/work-orders/:woId/schedule"
+        body:
+          scheduled_start_time: "08:00"
+          scheduled_end_time: "16:00"
+      expected:
+        status: 200
+        body:
+          success: true
+          data:
+            scheduled_start_time: "08:00"
+            scheduled_end_time: "16:00"
+
+    - name: "PATCH returns 400 for completed WO"
+      setup: "WO with status = 'completed'"
+      request:
+        method: "PATCH"
+        path: "/api/planning/work-orders/:woId/schedule"
+        body:
+          scheduled_start_time: "08:00"
+      expected:
+        status: 400
+
+    - name: "PATCH returns 404 for non-existent WO"
+      setup: "No WO exists"
+      request:
+        method: "PATCH"
+        path: "/api/planning/work-orders/non-existent-uuid/schedule"
+        body:
+          scheduled_start_time: "08:00"
+      expected:
+        status: 404
+
+    - name: "PATCH returns 404 for cross-org WO"
+      setup: "WO from different org"
+      request:
+        method: "PATCH"
+        path: "/api/planning/work-orders/:otherOrgWoId/schedule"
+        body:
+          scheduled_start_time: "08:00"
+      expected:
+        status: 404
+
+    - name: "PATCH updates line assignment"
+      setup: "WO with no line, valid line exists"
+      request:
+        method: "PATCH"
+        path: "/api/planning/work-orders/:woId/schedule"
+        body:
+          production_line_id: ":lineId"
+      expected:
+        status: 200
+        body:
+          data:
+            production_line_id: ":lineId"
+            line:
+              id: ":lineId"
+
+    - name: "PATCH returns 403 for viewer role"
+      setup: "User with viewer role (no update permission)"
+      request:
+        method: "PATCH"
+        path: "/api/planning/work-orders/:woId/schedule"
+        body:
+          scheduled_start_time: "08:00"
+      expected:
+        status: 403
+
+# Definition of Done
+definition_of_done:
+  - "PATCH /work-orders/:id/schedule endpoint implemented"
+  - "Zod validation schema for schedule input"
+  - "Status validation (cannot schedule completed/cancelled)"
+  - "Line/machine existence validation"
+  - "Multi-tenant isolation (404 for other org WOs)"
+  - "Permission check (planning update permission required)"
+  - "Updated WO returned with relations"
+  - "Unit tests >= 90% coverage for validation"
+  - "Integration tests for all error cases"
+  - "API documented with request/response examples"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 90
+    reason: "Validation logic must be thoroughly tested"
+  integration:
+    target: 80
+    reason: "All API error cases covered"
+  files:
+    - "lib/validation/work-order-schemas.ts (scheduleWOSchema): 90%"
+    - "lib/services/work-order-service.ts (scheduleWorkOrder): 85%"
+    - "API route handler: 80%"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "Gantt chart may have specific requirements not covered by this endpoint"
+    mitigation: "Design API to be flexible, Gantt story can extend if needed"
+    severity: "low"
+
+  - id: "RISK-02"
+    description: "Time zone handling for scheduled times"
+    mitigation: "Store times as TIME (no timezone), dates as DATE. Display in org timezone."
+    severity: "medium"

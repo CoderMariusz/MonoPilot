@@ -1,0 +1,517 @@
+# Story 02.4 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# ============================================
+# TEST FILES TO CREATE
+# ============================================
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/bom-service.test.ts"
+    type: "unit"
+    description: "Unit tests for BOM service functions"
+
+  - path: "apps/frontend/lib/validation/__tests__/bom-schema.test.ts"
+    type: "unit"
+    description: "Unit tests for Zod validation schemas"
+
+  - path: "apps/frontend/app/api/v1/technical/boms/__tests__/route.test.ts"
+    type: "integration"
+    description: "Integration tests for BOM API endpoints"
+
+  - path: "supabase/tests/bom-date-overlap.test.sql"
+    type: "integration"
+    description: "Database trigger tests for date overlap prevention"
+
+  - path: "apps/frontend/components/technical/bom/__tests__/BOMVersionTimeline.test.tsx"
+    type: "unit"
+    description: "Component tests for timeline visualization"
+
+# ============================================
+# ACCEPTANCE CRITERIA
+# ============================================
+acceptance_criteria:
+  # AC-1: BOM List Page
+  - id: "AC-01"
+    given: "user navigates to /technical/boms"
+    when: "page loads"
+    then: "BOM list displays within 500ms for up to 500 BOMs"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-02"
+    given: "BOM list displayed"
+    when: "user searches 'BREAD'"
+    then: "filtered results show only BOMs for products containing 'BREAD' in code or name within 300ms"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-03"
+    given: "BOM list displayed"
+    when: "user filters by status 'Active'"
+    then: "only Active BOMs appear"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-04"
+    given: "BOM list displayed"
+    when: "user filters by product type 'Finished Good'"
+    then: "only BOMs for FG products appear"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-05"
+    given: "BOM list displayed"
+    when: "user filters by date 'Currently Effective'"
+    then: "only BOMs where current date is between effective_from and effective_to (or effective_to is NULL) appear"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-06"
+    given: "BOM list has pagination"
+    when: "page 2 clicked"
+    then: "next 50 BOMs display"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-07"
+    given: "BOM table rendered"
+    when: "viewing BOM row"
+    then: "shows: Product (code + name), Version (v1), Status (badge), Eff. From, Eff. To (or -), Output (qty + uom)"
+    test_type: "unit"
+    priority: "P0"
+
+  # AC-2: Create BOM
+  - id: "AC-08"
+    given: "user clicks '[+ Create BOM]'"
+    when: "page loads"
+    then: "create form displays with empty fields and version set to 'v1'"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-09"
+    given: "user selects product 'FG-001 Honey Bread'"
+    when: "form updates"
+    then: "version auto-calculates to next available (v1 if first, v2 if v1 exists)"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-10"
+    given: "valid BOM data (product: FG-001, effective_from: today, output_qty: 100, output_uom: kg)"
+    when: "[Save BOM] clicked"
+    then: "BOM created with status 'draft' and redirects to BOM detail page"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-11"
+    given: "product already has BOM with effective_from=2024-01-01, effective_to=NULL (no end)"
+    when: "user creates new BOM with effective_from=2024-06-01 (overlaps)"
+    then: "error 'Date range overlaps with existing BOM v1 (2024-01-01 to ongoing)' displays"
+    test_type: "integration"
+    priority: "P0"
+    security: false
+
+  - id: "AC-12"
+    given: "effective_to date set before effective_from"
+    when: "save attempted"
+    then: "error 'Effective To must be after Effective From' displays inline"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-13"
+    given: "output_qty is 0 or negative"
+    when: "save attempted"
+    then: "error 'Output quantity must be greater than 0' displays inline"
+    test_type: "unit"
+    priority: "P0"
+
+  # AC-3: Edit BOM
+  - id: "AC-14"
+    given: "user clicks edit on existing BOM v2 (Active)"
+    when: "page loads"
+    then: "current BOM data pre-populates form with product field locked"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-15"
+    given: "user updates effective_to from NULL to '2024-12-31'"
+    when: "save completes"
+    then: "updated date displays in list"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-16"
+    given: "user attempts to change product_id on existing BOM"
+    then: "product field is disabled with tooltip 'Product cannot be changed after BOM creation'"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-17"
+    given: "BOM is Active and user changes status to 'Inactive'"
+    when: "save completes"
+    then: "BOM status updates and warning toast 'BOM deactivated' displays"
+    test_type: "e2e"
+    priority: "P1"
+
+  # AC-4: Date Overlap Prevention
+  - id: "AC-18"
+    given: "product FG-001 has BOM v1 (2024-01-01 to 2024-06-30) and BOM v2 (2024-07-01 to NULL)"
+    when: "user creates BOM v3 with effective_from=2024-04-01"
+    then: "error 'Date range overlaps with BOM v1'"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-19"
+    given: "product FG-001 has BOM v1 (2024-01-01 to 2024-06-30)"
+    when: "user creates BOM v2 with effective_from=2024-07-01"
+    then: "BOM v2 created successfully (no overlap)"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-20"
+    given: "user creates BOM with effective_to=NULL"
+    when: "another BOM exists with effective_to=NULL for same product"
+    then: "error 'Only one BOM can have no end date per product'"
+    test_type: "integration"
+    priority: "P0"
+
+  # AC-5: Version Control
+  - id: "AC-21"
+    given: "product FG-001 has BOMs v1, v2"
+    when: "user creates new BOM for FG-001"
+    then: "version auto-set to v3"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-22"
+    given: "BOM list for product FG-001"
+    when: "viewing version column"
+    then: "versions display chronologically (v1, v2, v3) with newest at top by effective_from"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-23"
+    given: "BOM detail page"
+    when: "viewing header"
+    then: "shows 'BOM v2 - FG-001 Honey Bread' with status badge"
+    test_type: "e2e"
+    priority: "P1"
+
+  # AC-6: Version Timeline Visualization (FR-2.23)
+  - id: "AC-24"
+    given: "user clicks '[View Timeline]' or '[Timeline]' icon on BOM list row"
+    when: "timeline modal/panel opens"
+    then: "all BOM versions for that product display on a horizontal timeline"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-25"
+    given: "timeline displayed"
+    when: "viewing timeline bars"
+    then: "each version shows: version number (v1, v2, v3), effective date range, status (color-coded), and is clickable"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-26"
+    given: "timeline displayed for product with 3 versions"
+    when: "user hovers over version bar"
+    then: "tooltip shows: version, status, effective dates, output qty, notes preview"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-27"
+    given: "timeline displayed"
+    when: "user clicks on a version bar"
+    then: "navigates to that BOM detail page"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-28"
+    given: "product has overlapping draft BOMs"
+    when: "timeline renders"
+    then: "overlapping regions are highlighted with warning color"
+    test_type: "unit"
+    priority: "P1"
+
+  - id: "AC-29"
+    given: "timeline displayed"
+    when: "current date is within a version's effective range"
+    then: "that version is highlighted as 'Currently Active'"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-30"
+    given: "timeline displayed"
+    when: "versions have gaps between effective dates"
+    then: "gaps are visually indicated (no coverage period)"
+    test_type: "unit"
+    priority: "P2"
+
+  # AC-7: Delete BOM
+  - id: "AC-31"
+    given: "user clicks delete on BOM v1 (Draft)"
+    when: "confirmation dialog accepted"
+    then: "BOM deleted and removed from list"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-32"
+    given: "BOM v2 is referenced by Work Order WO-001"
+    when: "delete attempted"
+    then: "error 'Cannot delete BOM used in Work Orders: WO-001'"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-33"
+    given: "user clicks delete on BOM"
+    then: "confirmation dialog shows 'Delete BOM v2 for FG-001 Honey Bread? This will also delete all BOM items. This action cannot be undone.'"
+    test_type: "e2e"
+    priority: "P1"
+
+  # AC-8: Permission Enforcement
+  - id: "AC-34"
+    given: "user has role VIEWER (read-only)"
+    when: "/technical/boms loaded"
+    then: "[+ Create BOM] button hidden, edit/delete actions hidden"
+    test_type: "e2e"
+    priority: "P0"
+    security: true
+
+  - id: "AC-35"
+    given: "user has role PROD_MANAGER"
+    when: "/technical/boms loaded"
+    then: "create/edit/delete actions available"
+    test_type: "e2e"
+    priority: "P0"
+    security: true
+
+  - id: "AC-36"
+    given: "user has role ADMIN"
+    when: "delete action clicked"
+    then: "delete proceeds (only Admin can delete)"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+# ============================================
+# UNIT TEST CASES
+# ============================================
+unit_tests:
+  bom_service:
+    - name: "getNextVersion returns 1 for product with no BOMs"
+      setup: "Mock empty query result"
+      expected: "Returns 1"
+
+    - name: "getNextVersion returns max+1 for product with existing BOMs"
+      setup: "Mock query result with version 3"
+      expected: "Returns 4"
+
+    - name: "checkDateOverlap returns true for overlapping ranges"
+      setup: "Mock existing BOM with overlapping dates"
+      expected: "Returns { overlaps: true, conflictingBom: {...} }"
+
+    - name: "checkDateOverlap returns false for non-overlapping ranges"
+      setup: "Mock existing BOM with non-overlapping dates"
+      expected: "Returns { overlaps: false }"
+
+    - name: "checkDateOverlap handles NULL effective_to correctly"
+      setup: "Mock existing BOM with effective_to=NULL"
+      expected: "Treats NULL as infinite future"
+
+    - name: "createBOM auto-sets version correctly"
+      setup: "Mock getNextVersion to return 3"
+      expected: "Created BOM has version=3"
+
+    - name: "deleteBOM throws error when BOM in use"
+      setup: "Mock work_orders query returning results"
+      expected: "Throws BOM_IN_USE error"
+
+  bom_schema:
+    - name: "createBOMSchema validates required product_id"
+      input: "{ effective_from: '2024-01-01', output_qty: 100, output_uom: 'kg' }"
+      expected: "Fails with 'Invalid product' error"
+
+    - name: "createBOMSchema validates positive output_qty"
+      input: "{ product_id: 'uuid', effective_from: '2024-01-01', output_qty: 0, output_uom: 'kg' }"
+      expected: "Fails with 'Output quantity must be greater than 0'"
+
+    - name: "createBOMSchema validates date range"
+      input: "{ ..., effective_from: '2024-06-01', effective_to: '2024-01-01' }"
+      expected: "Fails with 'Effective To must be after Effective From'"
+
+    - name: "createBOMSchema allows null effective_to"
+      input: "{ ..., effective_from: '2024-01-01', effective_to: null }"
+      expected: "Passes validation"
+
+    - name: "updateBOMSchema allows partial updates"
+      input: "{ status: 'active' }"
+      expected: "Passes validation"
+
+  bom_version_timeline:
+    - name: "renders correct number of version bars"
+      setup: "3 versions in props"
+      expected: "3 timeline bars rendered"
+
+    - name: "highlights currently active version"
+      setup: "Version with is_currently_active=true"
+      expected: "Version has 'active' class/styling"
+
+    - name: "shows overlap warning for overlapping versions"
+      setup: "Version with has_overlap=true"
+      expected: "Warning indicator visible"
+
+    - name: "formats date range correctly"
+      setup: "effective_from='2024-01-01', effective_to='2024-06-30'"
+      expected: "Displays 'Jan 1, 2024 - Jun 30, 2024'"
+
+    - name: "shows 'ongoing' for NULL effective_to"
+      setup: "effective_to=null"
+      expected: "Displays 'Jan 1, 2024 - ongoing'"
+
+# ============================================
+# INTEGRATION TEST CASES
+# ============================================
+integration_tests:
+  api_endpoints:
+    - name: "GET /api/v1/technical/boms returns paginated list"
+      setup: "Create 100 BOMs"
+      action: "GET /api/v1/technical/boms?page=2&limit=25"
+      expected: "Returns BOMs 26-50, total=100"
+
+    - name: "GET /api/v1/technical/boms filters by status"
+      setup: "Create 5 draft, 3 active BOMs"
+      action: "GET /api/v1/technical/boms?status=active"
+      expected: "Returns 3 BOMs"
+
+    - name: "GET /api/v1/technical/boms searches by product code"
+      setup: "Create BOMs for BREAD-001, CAKE-001"
+      action: "GET /api/v1/technical/boms?search=BREAD"
+      expected: "Returns only BREAD-001 BOMs"
+
+    - name: "POST /api/v1/technical/boms creates BOM with auto-version"
+      setup: "Create BOM v1 for product"
+      action: "POST new BOM for same product"
+      expected: "New BOM has version=2"
+
+    - name: "POST /api/v1/technical/boms rejects overlapping dates"
+      setup: "Create BOM 2024-01-01 to 2024-06-30"
+      action: "POST BOM with 2024-04-01 to 2024-12-31"
+      expected: "400 with DATE_OVERLAP error"
+
+    - name: "PUT /api/v1/technical/boms/:id updates BOM"
+      action: "PUT with { status: 'active' }"
+      expected: "BOM status updated"
+
+    - name: "DELETE /api/v1/technical/boms/:id deletes unused BOM"
+      setup: "Create BOM not used in Work Orders"
+      action: "DELETE BOM"
+      expected: "BOM deleted"
+
+    - name: "DELETE /api/v1/technical/boms/:id rejects BOM in use"
+      setup: "Create BOM, reference in Work Order"
+      action: "DELETE BOM"
+      expected: "400 with BOM_IN_USE error"
+
+  database_triggers:
+    - name: "Date overlap trigger blocks insert"
+      setup: "Insert BOM 2024-01-01 to 2024-06-30"
+      action: "Insert overlapping BOM"
+      expected: "Raises exception 'Date range overlaps'"
+
+    - name: "Date overlap trigger blocks update"
+      setup: "Two non-overlapping BOMs"
+      action: "Update second to overlap first"
+      expected: "Raises exception 'Date range overlaps'"
+
+    - name: "Multiple NULL effective_to trigger blocks"
+      setup: "Insert BOM with effective_to=NULL"
+      action: "Insert second BOM with effective_to=NULL"
+      expected: "Raises exception 'Only one BOM can have no end date'"
+
+    - name: "Adjacent dates allowed (no overlap)"
+      setup: "Insert BOM 2024-01-01 to 2024-06-30"
+      action: "Insert BOM 2024-07-01 to 2024-12-31"
+      expected: "Insert succeeds"
+
+  rls_policies:
+    - name: "User can only read BOMs from own org"
+      setup: "Create BOMs in Org A and Org B"
+      action: "User A queries BOMs"
+      expected: "Only Org A BOMs returned"
+
+    - name: "User cannot create BOM in other org"
+      setup: "User A authenticated"
+      action: "Create BOM with Org B org_id"
+      expected: "Insert blocked by RLS"
+
+    - name: "Cross-org BOM access returns 404"
+      setup: "BOM exists in Org B"
+      action: "User A requests BOM by ID"
+      expected: "404 Not Found (not 403)"
+
+# ============================================
+# DEFINITION OF DONE
+# ============================================
+definition_of_done:
+  - "BOM list page loads within 500ms for 500 BOMs"
+  - "Create BOM with auto-versioning works end-to-end"
+  - "Edit BOM updates immediately in UI (product field locked)"
+  - "Date overlap prevented by database trigger with clear error message"
+  - "Delete blocked if BOM used in Work Orders"
+  - "Status badge displays correct colors (Draft/Active/Phased/Inactive)"
+  - "Filters work: status, product type, date range, search"
+  - "Version numbers display correctly (v1, v2, v3)"
+  - "Version timeline displays all versions with correct date ranges (FR-2.23)"
+  - "Timeline highlights currently active version (FR-2.23)"
+  - "Timeline shows overlap warnings visually (FR-2.23)"
+  - "Timeline bars are clickable and navigate to BOM detail (FR-2.23)"
+  - "Permission checks hide unauthorized actions (create/edit/delete)"
+  - "All API endpoints have integration tests"
+  - "Unit tests cover bom-service (>80% coverage)"
+  - "Zod schemas validate all input fields"
+  - "Empty state shows 'Create Your First BOM' CTA"
+  - "Error states display clear messages with retry option"
+
+# ============================================
+# COVERAGE REQUIREMENTS
+# ============================================
+coverage:
+  unit:
+    target: 80
+    reason: "CRUD operations and business logic need thorough testing"
+  integration:
+    target: 80
+    reason: "API endpoints and database triggers need full coverage"
+  files:
+    - "lib/services/bom-service.ts: 80%"
+    - "lib/validation/bom-schema.ts: 95%"
+    - "API routes: 80%"
+    - "Database triggers: 100%"
+    - "RLS policies: 100%"
+
+# ============================================
+# RISKS
+# ============================================
+risks:
+  - id: "RISK-01"
+    description: "Date overlap logic edge cases (NULL effective_to, adjacent dates)"
+    mitigation: "Comprehensive trigger tests with edge cases"
+    severity: "high"
+    test_coverage: "integration_tests.database_triggers"
+
+  - id: "RISK-02"
+    description: "Version auto-increment race condition"
+    mitigation: "Use database transaction with SELECT FOR UPDATE"
+    severity: "medium"
+    test_coverage: "Concurrent insert test"
+
+  - id: "RISK-03"
+    description: "Timeline visualization performance with many versions"
+    mitigation: "Limit to 20 most recent versions, lazy load older"
+    severity: "low"
+    test_coverage: "Performance benchmark"
+
+  - id: "RISK-04"
+    description: "RLS policy bypass on BOM operations"
+    mitigation: "Integration tests verify cross-tenant isolation"
+    severity: "high"
+    test_coverage: "integration_tests.rls_policies"

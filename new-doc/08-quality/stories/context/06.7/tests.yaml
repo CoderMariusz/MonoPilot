@@ -1,0 +1,450 @@
+# Story 06.7 - Test Specifications
+# Purpose: Acceptance criteria, unit tests, integration tests, E2E tests
+# Test coverage target: >90% for critical paths
+
+# Acceptance Criteria (Given/When/Then format)
+acceptance_criteria:
+  AC-7.1_List_Display:
+    title: "Sampling Plans List Display"
+    criteria:
+      - "GIVEN user navigates to Quality > Sampling Plans, WHEN page loads, THEN sampling plans list displays within 500ms showing name, inspection type, lot size range, sample size, Ac/Re, and active status"
+      - "GIVEN org has 50+ sampling plans, WHEN list renders, THEN plans are paginated (20 per page) with search by name and filter by inspection type"
+      - "GIVEN user filters by inspection_type='incoming', WHEN filter applied, THEN only incoming inspection plans display"
+      - "GIVEN user searches for plan name 'Raw Material AQL 2.5', WHEN search entered, THEN matching plans display within 300ms"
+
+  AC-7.2_Create_Plan:
+    title: "Create Sampling Plan"
+    criteria:
+      - "GIVEN user clicks [+ New Sampling Plan], WHEN form opens, THEN fields display: name, description, inspection_type, product (optional), aql_level, lot_size_min, lot_size_max, sample_size, acceptance_number, rejection_number"
+      - "GIVEN user enters valid plan data with aql_level='II', WHEN [Save] clicked, THEN plan created with is_active=true and auto-filled timestamps"
+      - "GIVEN user enters lot_size_min=100 and lot_size_max=50, WHEN [Save] clicked, THEN validation error 'Lot size min must be <= max' displays"
+      - "GIVEN user enters acceptance_number=5 and rejection_number=3, WHEN [Save] clicked, THEN validation error 'Acceptance number must be < rejection number' displays"
+      - "GIVEN user enters sample_size=0, WHEN [Save] clicked, THEN validation error 'Sample size must be > 0' displays"
+
+  AC-7.3_Edit_Plan:
+    title: "Edit Sampling Plan"
+    criteria:
+      - "GIVEN user clicks [Edit] on existing plan, WHEN form opens, THEN all fields pre-populated with current values"
+      - "GIVEN user changes sample_size from 8 to 13, WHEN [Save] clicked, THEN plan updated successfully"
+      - "GIVEN sampling plan is assigned to 5 active inspections, WHEN user tries to delete, THEN warning displays with count of active inspections"
+      - "GIVEN user deactivates plan (is_active=false), WHEN plan list reloads, THEN plan shows 'Inactive' badge"
+
+  AC-7.4_ISO2859_Helper:
+    title: "ISO 2859 Reference Helper"
+    criteria:
+      - "GIVEN user is creating sampling plan, WHEN form displays, THEN [View ISO 2859 Table] button shows"
+      - "GIVEN user clicks [View ISO 2859 Table], WHEN modal opens, THEN ISO 2859 sample size reference table displays with lot size ranges, sample sizes, and Ac/Re numbers"
+      - "GIVEN user selects lot size range 51-90 from table, WHEN [Apply] clicked, THEN form auto-fills: sample_size=8, acceptance_number=1, rejection_number=2"
+      - "GIVEN user selects lot size 151-280 and changes AQL from 2.5 to 1.5, WHEN recalculated, THEN recommendation shows different Ac/Re values"
+
+  AC-7.5_Plan_Assignment:
+    title: "Sampling Plan Assignment to Inspection"
+    criteria:
+      - "GIVEN user is creating incoming inspection with lot_size=75, WHEN inspection form loads, THEN sampling plan dropdown shows plans where lot_size_min <= 75 <= lot_size_max AND inspection_type='incoming'"
+      - "GIVEN user selects sampling plan 'RM Level II (50-90)', WHEN plan selected, THEN inspection.sample_size auto-fills with plan.sample_size (8)"
+      - "GIVEN user creates inspection without sampling plan, WHEN inspection saved, THEN sampling_plan_id=null and sample_size=0 (manual sampling)"
+      - "GIVEN inspection has sampling plan assigned, WHEN inspection detail loads, THEN sampling plan details display (name, Ac/Re, sample size)"
+
+  AC-7.6_Sample_Recording:
+    title: "Sample Recording During Inspection"
+    criteria:
+      - "GIVEN user starts inspection with sampling_plan_id set, WHEN sample recording section loads, THEN sample counter shows '0 / 8 samples recorded'"
+      - "GIVEN user clicks [+ Record Sample], WHEN modal opens, THEN fields display: sample_identifier (auto-increment S-001), location_description, result (pass/fail), defect_type (if fail), notes"
+      - "GIVEN user records sample S-001 with location='Top layer, pallet 1' and result='pass', WHEN [Save] clicked, THEN sampling_records row inserted with sampled_by=current_user, sampled_at=now()"
+      - "GIVEN user records 8 samples matching plan.sample_size, WHEN last sample saved, THEN sample counter shows '8 / 8' and sampling decision auto-calculated"
+      - "GIVEN user records 5 samples out of 8 required, WHEN user tries to complete inspection, THEN warning 'Only 5 of 8 samples recorded. Proceed anyway?' displays"
+
+  AC-7.7_Sample_List_Display:
+    title: "Sample List Display in Inspection Detail"
+    criteria:
+      - "GIVEN inspection has 8 sampling_records, WHEN inspection detail page loads, THEN 'Samples' tab displays list with sample_identifier, location, sampled_by, sampled_at, result (pass/fail badge)"
+      - "GIVEN user views inspection with 10 sampling_records, WHEN samples list renders, THEN samples sorted by sampled_at ASC (chronological order)"
+      - "GIVEN user views inspection without sampling plan, WHEN 'Samples' tab accessed, THEN empty state 'No sampling plan assigned' displays"
+
+  AC-7.8_Lot_Decision:
+    title: "Lot Decision Logic"
+    criteria:
+      - "GIVEN inspection has 8 samples with 2 defects and acceptance_number=3, rejection_number=4, WHEN decision calculated, THEN result='accept' (2 <= 3)"
+      - "GIVEN inspection has 8 samples with 5 defects and acceptance_number=3, rejection_number=4, WHEN decision calculated, THEN result='reject' (5 >= 4) and quality hold auto-created"
+      - "GIVEN inspection has 8 samples with 3.5 defects (impossible), THIS TESTS EDGE CASE between acceptance and rejection"
+      - "GIVEN lot rejected, WHEN NCR creation checkbox enabled, THEN NCR auto-created with sampling details pre-populated"
+
+  AC-7.9_Permissions:
+    title: "Permission Enforcement"
+    criteria:
+      - "GIVEN user with VIEWER role, WHEN Sampling Plans page loads, THEN [+ New Sampling Plan] button hidden"
+      - "GIVEN user with QA_INSPECTOR role, WHEN viewing sampling plan, THEN [Edit] and [Delete] buttons hidden (read-only access)"
+      - "GIVEN user with QA_MANAGER role, WHEN viewing sampling plan, THEN [Edit] and [Delete] buttons visible"
+      - "GIVEN user without Technical write permission, WHEN attempting POST /api/quality/sampling-plans, THEN API returns 403 Forbidden"
+
+# Unit Tests
+unit_tests:
+  SamplingPlanService:
+    file: "apps/frontend/lib/services/__tests__/sampling-plan-service.test.ts"
+    coverage_target: ">90%"
+    tests:
+      - name: "list() returns paginated results"
+        description: "Calls API with correct filters, returns PaginatedResult"
+        assertions:
+          - "API called with correct query params"
+          - "Returns data array with total/page/limit"
+
+      - name: "create() validates input"
+        description: "Validates schema before API call"
+        assertions:
+          - "Throws validation error for invalid name"
+          - "Throws error for lot_size_min >= lot_size_max"
+          - "Throws error for acceptance_number >= rejection_number"
+
+      - name: "update() validates immutable fields"
+        description: "Checks code/country_code immutability"
+        assertions:
+          - "Allows name update"
+          - "Allows rate update"
+          - "Updates created_at only on creation"
+
+      - name: "delete() checks references"
+        description: "Queries related inspections before delete"
+        assertions:
+          - "Allows delete if no references"
+          - "Returns error if referenced by inspections"
+          - "Soft deletes with is_deleted flag"
+
+      - name: "suggest() finds matching plan"
+        description: "Queries plan by product+type+lot_size"
+        assertions:
+          - "Returns matching plan for lot_size in range"
+          - "Returns null if no match"
+          - "Prefers product-specific over generic plan"
+
+  ISO2859Service:
+    file: "apps/frontend/lib/services/__tests__/iso-2859-service.test.ts"
+    coverage_target: ">90%"
+    tests:
+      - name: "lookup() returns correct values for all lot ranges"
+        description: "Tests all 15 lot size ranges from ISO table"
+        test_cases:
+          - lot_size: 5, level: "II", aql: 2.5 => sample_size: 2, accept: 0, reject: 1
+          - lot_size: 50, level: "II", aql: 2.5 => sample_size: 5, accept: 0, reject: 1
+          - lot_size: 75, level: "II", aql: 2.5 => sample_size: 8, accept: 1, reject: 2
+          - lot_size: 250, level: "II", aql: 2.5 => sample_size: 32, accept: 3, reject: 4
+          - lot_size: 5000, level: "II", aql: 2.5 => sample_size: 125, accept: 14, reject: 15
+
+      - name: "calculateDecision() returns correct decision"
+        description: "Tests accept/reject/review logic"
+        test_cases:
+          - defects: 1, ac: 3, re: 4 => "accept"
+          - defects: 5, ac: 3, re: 4 => "reject"
+          - defects: 3, ac: 3, re: 4 => "accept"
+
+      - name: "lookup() handles edge cases"
+        description: "Tests boundary conditions"
+        assertions:
+          - "Exact lot_size boundaries handled correctly"
+          - "All AQL levels return valid Ac/Re pairs"
+          - "All inspection levels (I/II/III) supported"
+
+  SamplingRecordService:
+    file: "apps/frontend/lib/services/__tests__/sampling-record-service.test.ts"
+    coverage_target: ">90%"
+    tests:
+      - name: "create() auto-generates sample identifier"
+        description: "Format: SMP-{product}-{date}-{seq}"
+        assertions:
+          - "Sample #1 generates S-001"
+          - "Sample #2 generates S-002"
+          - "Unique constraint on (inspection_id, identifier)"
+
+      - name: "create() validates defect_type for failures"
+        description: "Requires defect_type when result='fail'"
+        assertions:
+          - "Allows pass without defect_type"
+          - "Requires defect_type for fail"
+          - "Throws validation error if missing"
+
+      - name: "listByInspection() returns chronological order"
+        description: "Samples sorted by sampled_at ASC"
+        assertions:
+          - "First sample has earliest timestamp"
+          - "Last sample has latest timestamp"
+
+      - name: "calculateDecision() returns accept/reject"
+        description: "Compares defects vs acceptance/rejection numbers"
+        assertions:
+          - "2 defects <= 3 acceptance => accept"
+          - "5 defects >= 4 rejection => reject"
+          - "Decision immutable once recorded"
+
+# Integration Tests
+integration_tests:
+  ListEndpoint:
+    file: "apps/frontend/app/api/quality/sampling-plans/__tests__/list.test.ts"
+    tests:
+      - name: "GET /api/quality/sampling-plans returns paginated list"
+        setup: "Create 30 sampling plans in org"
+        assertions:
+          - "Status 200"
+          - "Returns 20 plans (default limit)"
+          - "total: 30"
+          - "page: 1"
+
+      - name: "Filtering by inspection_type works"
+        setup: "Create 10 incoming + 10 in_process plans"
+        query: "?inspection_type=incoming"
+        assertions:
+          - "Returns only incoming plans (10 total)"
+          - "Filters applied correctly"
+
+      - name: "Search by name filters results"
+        setup: "Create plans: 'Flour AQL 2.5', 'Flour Random', 'Oil AQL 1.5'"
+        query: "?search=Flour"
+        assertions:
+          - "Returns 2 plans matching 'Flour'"
+          - "Case-insensitive search"
+
+      - name: "RLS enforces org isolation"
+        setup: "Create plans in org A and org B"
+        assertions:
+          - "Org A user sees only org A plans"
+          - "Org B user sees only org B plans"
+          - "No cross-tenant data leakage"
+
+  CreateEndpoint:
+    file: "apps/frontend/app/api/quality/sampling-plans/__tests__/create.test.ts"
+    tests:
+      - name: "POST creates sampling plan successfully"
+        request: "{ name: 'New Plan', inspection_type: 'incoming', aql_level: 'II', lot_size_min: 50, lot_size_max: 500, sample_size: 13, acceptance_number: 1, rejection_number: 2 }"
+        assertions:
+          - "Status 201"
+          - "Returns created plan with ID"
+          - "created_by set to current user"
+          - "is_active: true by default"
+
+      - name: "Validation rejects invalid data"
+        request: "{ name: 'X', lot_size_min: 100, lot_size_max: 50, ... }"
+        assertions:
+          - "Status 400"
+          - "Error code: VALIDATION_ERROR"
+          - "Details list lot_size field error"
+
+      - name: "Duplicate name rejected"
+        setup: "Plan 'Incoming AQL 2.5' exists"
+        request: "{ name: 'Incoming AQL 2.5', ... }"
+        assertions:
+          - "Status 409"
+          - "Error code: DUPLICATE_CODE"
+
+      - name: "Permission checks enforced"
+        user_role: "VIEWER"
+        assertions:
+          - "Status 403 PERMISSION_DENIED"
+
+  DeleteEndpoint:
+    file: "apps/frontend/app/api/quality/sampling-plans/__tests__/delete.test.ts"
+    tests:
+      - name: "DELETE removes unused plan"
+        setup: "Create plan with no inspections"
+        assertions:
+          - "Status 204"
+          - "Plan soft-deleted (is_active: false)"
+
+      - name: "DELETE blocked if in-use"
+        setup: "Create plan + 3 inspections using it"
+        assertions:
+          - "Status 400"
+          - "Error: REFERENCED"
+          - "Message includes count of inspections"
+
+  SamplingRecordEndpoint:
+    file: "apps/frontend/app/api/quality/sampling-records/__tests__/create.test.ts"
+    tests:
+      - name: "POST creates sampling record"
+        request: "{ inspection_id: uuid, plan_id: uuid, location_description: 'Pallet 1' }"
+        assertions:
+          - "Status 201"
+          - "sample_identifier auto-generated"
+          - "sampled_by set to current user"
+
+      - name: "Duplicate sample ID rejected"
+        setup: "Record S-001 exists"
+        request: "{ ..., sample_identifier: 'S-001' }"
+        assertions:
+          - "Status 400"
+          - "Error: DUPLICATE_SAMPLE"
+
+  ISO2859Endpoint:
+    file: "apps/frontend/app/api/quality/iso-2859-reference/__tests__/route.test.ts"
+    tests:
+      - name: "GET returns full ISO 2859 table"
+        assertions:
+          - "Status 200"
+          - "Returns 15 lot size ranges"
+          - "Each range has sample_size and aql data"
+
+      - name: "Filter by inspection_level works"
+        query: "?inspection_level=II"
+        assertions:
+          - "Returns only Level II rows"
+
+      - name: "No authentication required"
+        auth: "none"
+        assertions:
+          - "Status 200 (public endpoint)"
+
+# End-to-End Tests (Playwright)
+e2e_tests:
+  SamplingPlanCreationFlow:
+    file: "e2e/sampling-plans/create.spec.ts"
+    test_steps:
+      1. "Login as QA_MANAGER"
+      2. "Navigate to Quality > Sampling Plans"
+      3. "Click [+ Create Sampling Plan]"
+      4. "Enter plan name 'E2E Test Flour AQL 2.5'"
+      5. "Select inspection_type='incoming'"
+      6. "Click [View ISO 2859 Table]"
+      7. "Input lot size 250"
+      8. "Verify row highlighted: 151-280, sample_size=32, Ac=3, Re=4"
+      9. "Click [Apply to Plan]"
+      10. "Verify form auto-filled: sample_size=32, acceptance=3, rejection=4"
+      11. "Click [Create Plan]"
+      12. "Verify success toast 'Sampling plan created'"
+      13. "Verify plan appears in list"
+      assertions:
+        - "Plan visible in list within 2 seconds"
+        - "Can filter by new plan name"
+        - "Plan can be edited"
+
+  SamplingRecordingFlow:
+    file: "e2e/sampling-plans/sampling-record.spec.ts"
+    test_steps:
+      1. "Login as QA_INSPECTOR"
+      2. "Navigate to Inspection INS-12345"
+      3. "Plan auto-detected: 'Incoming Flour (50-500)'"
+      4. "Sampling plan details display: sample_size=13, Ac=1, Re=2"
+      5. "Click [+ Record Sample]"
+      6. "Modal opens for Sample #1 of 13"
+      7. "Enter location: 'Pallet 1, Layer 1'"
+      8. "Select result: 'Pass'"
+      9. "Click [Record Sample]"
+      10. "Sample counter updates: 1/13"
+      11. "Repeat for samples 2-12 (pass)"
+      12. "Record sample 13 with result: 'Fail', defect_type: 'Packaging damage'"
+      13. "Defect counter shows: 1 defect (Acceptance limit: 1)"
+      14. "Decision auto-calculated: ACCEPT (1 <= 1)"
+      15. "Decision panel displays: 'Lot ACCEPTED'"
+      16. "Click [Accept Lot & Continue]"
+      17. "Inspection proceeds to next step"
+      assertions:
+        - "All 13 samples recorded within 30 seconds"
+        - "Defect counter accurate"
+        - "Decision calculated correctly"
+        - "Lot hold NOT created (accepted)"
+        - "Samples immutable (no edit option)"
+
+  LotRejectionFlow:
+    file: "e2e/sampling-plans/rejection.spec.ts"
+    test_steps:
+      1. "Setup inspection with plan: Ac=1, Re=2 (8 sample required)"
+      2. "Record 8 samples: 5 pass, 3 fail (defect_type: 'Foreign material')"
+      3. "Decision auto-calculated: REJECT (5 >= 2)"
+      4. "Decision panel displays red banner: 'Lot REJECTED'"
+      5. "Defect summary shows: 'Foreign material: 3 (37.5%)'"
+      6. "Quality alert visible: 'Auto-hold placed on lot'"
+      7. "Disposition required options display"
+      8. "Select 'Reject - Return to supplier'"
+      9. "Enter decision notes: 'Excessive foreign material found'"
+      10. "Enable 'Create NCR' checkbox"
+      11. "Click [Reject Lot & Create NCR]"
+      12. "NCR auto-created with sampling details"
+      13. "Navigate to Warehouse > Holds"
+      14. "Verify quality hold on lot"
+      assertions:
+        - "Lot rejected correctly"
+        - "Quality hold auto-created"
+        - "NCR created with correct details"
+        - "QA Manager notified (email sent)"
+        - "Supplier quality rating updated"
+
+# Performance Tests
+performance_tests:
+  SamplingPlanListLoad:
+    scenario: "List page with 50 sampling plans"
+    measurements:
+      - "Initial page load: < 1 second"
+      - "Search filter response: < 300ms"
+      - "Pagination switch: < 500ms"
+
+  SampleRecordSave:
+    scenario: "Record and save individual sample"
+    measurements:
+      - "Modal open: < 200ms"
+      - "Sample save: < 500ms"
+      - "Defect counter update: < 100ms"
+
+  ISO2859TableLookup:
+    scenario: "Lookup lot size 250 in ISO table"
+    measurements:
+      - "API response: < 100ms"
+      - "Table modal render: < 200ms"
+
+# Test Data
+test_data:
+  SamplingPlans:
+    - name: "Incoming Flour AQL 2.5"
+      inspection_type: "incoming"
+      lot_size_min: 50
+      lot_size_max: 500
+      sample_size: 13
+      acceptance_number: 1
+      rejection_number: 2
+      is_active: true
+
+    - name: "Final Cookie AQL 1.5"
+      inspection_type: "final"
+      lot_size_min: 100
+      lot_size_max: 280
+      sample_size: 32
+      acceptance_number: 3
+      rejection_number: 4
+      is_active: true
+
+    - name: "In-Process Bread (Inactive)"
+      inspection_type: "in_process"
+      lot_size_min: 10
+      lot_size_max: 50
+      sample_size: 8
+      acceptance_number: 0
+      rejection_number: 1
+      is_active: false
+
+  SamplingRecords:
+    - sample_identifier: "S-001"
+      location: "Pallet 1, Layer 1"
+      result: "pass"
+
+    - sample_identifier: "S-002"
+      location: "Pallet 1, Layer 2"
+      result: "fail"
+      defect_type: "Packaging damage"
+
+    - sample_identifier: "S-003"
+      location: "Pallet 2, Layer 1"
+      result: "pass"
+
+# Success Criteria
+success_criteria:
+  coverage:
+    - "Unit tests: >90% coverage for services"
+    - "Integration tests: All 8 API endpoints"
+    - "E2E tests: 3 critical workflows"
+
+  performance:
+    - "Plan list: <1s for 50+ plans"
+    - "Sample save: <500ms"
+    - "Search filter: <300ms"
+
+  quality:
+    - "All AC criteria pass"
+    - "No critical bugs in testing"
+    - "RLS policies verified"
+    - "Permission checks enforced"

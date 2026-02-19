@@ -1,0 +1,535 @@
+# Tests Context for Story 08.8 - Compliance Documents Upload
+
+test_coverage_target: ">80%"
+
+unit_tests:
+  # ==========================================================================
+  # Service Layer Tests
+  # ==========================================================================
+  NPDDocumentService:
+    file: "apps/frontend/lib/services/__tests__/npd-document-service.test.ts"
+    framework: "Vitest"
+
+    test_suites:
+      - name: "list()"
+        tests:
+          - description: "Returns paginated list of documents"
+            setup: "Create 25 test documents"
+            action: "Call list(projectId, { page: 1, limit: 20 })"
+            assertions:
+              - "documents.length === 20"
+              - "pagination.total === 25"
+              - "pagination.pages === 2"
+
+          - description: "Filters by doc_type"
+            setup: "Create 5 HACCP, 3 CoA, 2 Label docs"
+            action: "Call list(projectId, { doc_type: 'haccp_plan' })"
+            assertions:
+              - "documents.length === 5"
+              - "All documents have doc_type === 'haccp_plan'"
+
+          - description: "Sorts by uploaded_at DESC (default)"
+            setup: "Create documents with different timestamps"
+            action: "Call list(projectId, { sort_by: 'uploaded_at', sort_order: 'desc' })"
+            assertions:
+              - "documents[0].uploaded_at > documents[1].uploaded_at"
+
+          - description: "Excludes soft-deleted documents"
+            setup: "Create 5 active, 2 deleted documents"
+            action: "Call list(projectId)"
+            assertions:
+              - "documents.length === 5"
+              - "No document has deleted_at !== null"
+
+      - name: "upload()"
+        tests:
+          - description: "Uploads file to Supabase Storage and creates record"
+            setup: "Mock file (2 MB PDF)"
+            action: "Call upload(projectId, file, 'haccp_plan', metadata)"
+            assertions:
+              - "File uploaded to Storage bucket 'npd-compliance-docs'"
+              - "storage_path matches pattern {org_id}/{project_id}/haccp_plan/{uuid}_{filename}"
+              - "DB record created with correct fields"
+              - "Returns ComplianceDocument object"
+
+          - description: "Validates file type"
+            setup: "Mock .exe file"
+            action: "Call upload(projectId, file, 'haccp_plan', metadata)"
+            assertions:
+              - "Throws error: 'Invalid file type'"
+
+          - description: "Validates file size (50 MB limit)"
+            setup: "Mock 75 MB file"
+            action: "Call upload(projectId, file, 'haccp_plan', metadata)"
+            assertions:
+              - "Throws error: 'File size exceeds limit'"
+
+      - name: "delete()"
+        tests:
+          - description: "Soft deletes document (sets deleted_at)"
+            setup: "Create document"
+            action: "Call delete(documentId)"
+            assertions:
+              - "deleted_at IS NOT NULL"
+              - "deleted_by === current user"
+              - "Record still exists in DB"
+              - "File remains in Storage"
+
+          - description: "Throws error if document not found"
+            action: "Call delete('non-existent-id')"
+            assertions:
+              - "Throws error: 'Document not found'"
+
+      - name: "generateDownloadUrl()"
+        tests:
+          - description: "Generates signed URL with 1-hour expiry"
+            setup: "Create document in Storage"
+            action: "Call generateDownloadUrl(documentId)"
+            assertions:
+              - "Returns URL starting with 'https://storage.supabase.co'"
+              - "URL includes token parameter"
+              - "URL expires in 3600 seconds"
+
+      - name: "validateRequiredDocuments()"
+        tests:
+          - description: "Returns is_valid = true when HACCP exists for G4"
+            setup: "Project at G4 with HACCP doc uploaded"
+            action: "Call validateRequiredDocuments(projectId)"
+            assertions:
+              - "is_valid === true"
+              - "missing.length === 0"
+
+          - description: "Returns is_valid = false when HACCP missing for G4"
+            setup: "Project at G4 without HACCP doc"
+            action: "Call validateRequiredDocuments(projectId)"
+            assertions:
+              - "is_valid === false"
+              - "missing includes 'HACCP Plan'"
+
+          - description: "Returns is_valid = true for G0-G3 (no docs required)"
+            setup: "Project at G2 with no documents"
+            action: "Call validateRequiredDocuments(projectId)"
+            assertions:
+              - "is_valid === true"
+
+      - name: "checkFileType()"
+        tests:
+          - description: "Accepts PDF files"
+            setup: "Mock PDF file (mime_type: application/pdf)"
+            action: "Call checkFileType(file)"
+            assertions:
+              - "Returns true"
+
+          - description: "Accepts DOCX, XLSX, PNG, JPG, JPEG"
+            setup: "Mock files for each type"
+            action: "Call checkFileType(file) for each"
+            assertions:
+              - "All return true"
+
+          - description: "Rejects .exe, .zip, .txt"
+            setup: "Mock invalid files"
+            action: "Call checkFileType(file)"
+            assertions:
+              - "Returns false"
+
+      - name: "checkFileSize()"
+        tests:
+          - description: "Accepts files under 50 MB"
+            setup: "Mock 25 MB file"
+            action: "Call checkFileSize(file, 50)"
+            assertions:
+              - "Returns true"
+
+          - description: "Rejects files over 50 MB"
+            setup: "Mock 75 MB file"
+            action: "Call checkFileSize(file, 50)"
+            assertions:
+              - "Returns false"
+
+integration_tests:
+  # ==========================================================================
+  # API Endpoint Tests
+  # ==========================================================================
+  api_endpoints:
+    file: "apps/frontend/app/api/npd/__tests__/documents.test.ts"
+    framework: "Vitest + Supertest"
+
+    test_suites:
+      - endpoint: "GET /api/npd/projects/:id/documents"
+        tests:
+          - description: "Returns 200 with document list"
+            setup: "Create project with 5 documents"
+            action: "GET /api/npd/projects/{projectId}/documents"
+            assertions:
+              - "status === 200"
+              - "documents.length === 5"
+              - "pagination object present"
+
+          - description: "Returns 404 if project not found"
+            action: "GET /api/npd/projects/non-existent/documents"
+            assertions:
+              - "status === 404"
+              - "error === 'Project not found'"
+
+          - description: "Enforces org isolation (RLS)"
+            setup: "User A from Org A, Project from Org B"
+            action: "GET /api/npd/projects/{orgBProjectId}/documents as User A"
+            assertions:
+              - "status === 404"
+
+      - endpoint: "POST /api/npd/projects/:id/documents"
+        tests:
+          - description: "Uploads document successfully"
+            setup: "Create project, mock 2 MB PDF file"
+            action: "POST /api/npd/projects/{projectId}/documents with multipart form"
+            body:
+              doc_type: "haccp_plan"
+              file: "[PDF file]"
+              version: "v1.2"
+            assertions:
+              - "status === 201"
+              - "document.id exists"
+              - "document.storage_path matches pattern"
+              - "File exists in Supabase Storage"
+
+          - description: "Returns 400 for invalid file type"
+            setup: "Mock .txt file"
+            action: "POST with .txt file"
+            assertions:
+              - "status === 400"
+              - "error includes 'Invalid file type'"
+
+          - description: "Returns 413 for file size exceeding limit"
+            setup: "Mock 75 MB file"
+            action: "POST with large file"
+            assertions:
+              - "status === 413"
+              - "error includes 'File size exceeds limit'"
+
+          - description: "Returns 403 if user lacks permission"
+            setup: "User with VIEWER role"
+            action: "POST /api/npd/projects/{projectId}/documents"
+            assertions:
+              - "status === 403"
+
+      - endpoint: "DELETE /api/npd/documents/:id"
+        tests:
+          - description: "Soft deletes document"
+            setup: "Create document"
+            action: "DELETE /api/npd/documents/{documentId}"
+            assertions:
+              - "status === 200"
+              - "success === true"
+              - "DB record has deleted_at !== null"
+              - "File still in Storage"
+
+          - description: "Returns 404 if document not found"
+            action: "DELETE /api/npd/documents/non-existent"
+            assertions:
+              - "status === 404"
+
+          - description: "Returns 403 if user not owner and not NPD_LEAD"
+            setup: "User B, document owned by User A"
+            action: "DELETE /api/npd/documents/{documentId} as User B"
+            assertions:
+              - "status === 403"
+
+      - endpoint: "GET /api/npd/documents/:id/download"
+        tests:
+          - description: "Returns signed URL"
+            setup: "Create document in Storage"
+            action: "GET /api/npd/documents/{documentId}/download"
+            assertions:
+              - "status === 200"
+              - "download_url starts with 'https://storage.supabase.co'"
+              - "filename matches document.file_name"
+
+          - description: "Returns 404 if document not found"
+            action: "GET /api/npd/documents/non-existent/download"
+            assertions:
+              - "status === 404"
+
+      - endpoint: "GET /api/npd/projects/:id/documents/validate"
+        tests:
+          - description: "Returns is_valid = false when HACCP missing for G4"
+            setup: "Project at G4 without HACCP"
+            action: "GET /api/npd/projects/{projectId}/documents/validate"
+            assertions:
+              - "status === 200"
+              - "is_valid === false"
+              - "missing includes 'HACCP Plan'"
+
+          - description: "Returns is_valid = true when all required docs present"
+            setup: "Project at G4 with HACCP doc"
+            action: "GET /api/npd/projects/{projectId}/documents/validate"
+            assertions:
+              - "status === 200"
+              - "is_valid === true"
+              - "missing.length === 0"
+
+e2e_tests:
+  # ==========================================================================
+  # End-to-End Tests
+  # ==========================================================================
+  document_workflow:
+    file: "apps/frontend/__tests__/e2e/npd-documents.spec.ts"
+    framework: "Playwright"
+
+    test_scenarios:
+      - name: "Complete document upload workflow"
+        steps:
+          - action: "Login as NPD_LEAD"
+          - action: "Navigate to NPD > Projects > {projectId} > Documents"
+          - action: "Click [+ Upload Document]"
+          - assertion: "Upload modal opens"
+          - action: "Select doc_type = 'HACCP Plan'"
+          - action: "Drag and drop HACCP_Plan.pdf file"
+          - assertion: "File preview shows filename and size"
+          - action: "Enter version = 'v1.2'"
+          - action: "Enter description = 'Updated allergen info'"
+          - action: "Click [Upload]"
+          - assertion: "Progress bar appears"
+          - assertion: "Success toast displays"
+          - assertion: "Modal closes"
+          - assertion: "Document appears in list with correct metadata"
+
+      - name: "Preview PDF document"
+        steps:
+          - action: "Navigate to Documents tab"
+          - assertion: "Document list displays"
+          - action: "Click [Preview] on HACCP Plan document"
+          - assertion: "Preview modal opens"
+          - assertion: "PDF viewer displays document"
+          - action: "Click page navigation (next page)"
+          - assertion: "PDF advances to next page"
+          - action: "Click [Close]"
+          - assertion: "Modal closes"
+
+      - name: "Download document"
+        steps:
+          - action: "Navigate to Documents tab"
+          - action: "Click actions menu (three dots) on document"
+          - action: "Click [Download]"
+          - assertion: "New tab opens with signed URL"
+          - assertion: "File downloads to browser"
+
+      - name: "Delete document"
+        steps:
+          - action: "Navigate to Documents tab"
+          - action: "Click actions menu on document"
+          - action: "Click [Delete]"
+          - assertion: "Confirmation dialog displays"
+          - action: "Click [Delete] in dialog"
+          - assertion: "Success toast displays"
+          - assertion: "Document removed from list"
+          - assertion: "DB record has deleted_at timestamp"
+
+      - name: "Required documents validation"
+        steps:
+          - action: "Navigate to project at Gate G4 with no HACCP doc"
+          - assertion: "Required Docs Checklist shows ❌ HACCP Plan"
+          - assertion: "Warning banner displays: 'Required documents missing'"
+          - action: "Upload HACCP Plan"
+          - assertion: "Checklist updates to ✅ HACCP Plan"
+          - assertion: "Warning banner disappears"
+
+      - name: "File type validation error"
+        steps:
+          - action: "Click [+ Upload Document]"
+          - action: "Select doc_type = 'HACCP Plan'"
+          - action: "Upload .exe file"
+          - assertion: "Error message: 'Invalid file type. Allowed: PDF, DOCX, XLSX, PNG, JPG'"
+          - assertion: "Upload prevented"
+
+      - name: "File size validation error"
+        steps:
+          - action: "Click [+ Upload Document]"
+          - action: "Select doc_type = 'HACCP Plan'"
+          - action: "Upload 75 MB PDF file"
+          - assertion: "Error message: 'File size exceeds limit (50 MB)'"
+          - assertion: "Upload prevented"
+
+      - name: "Permission check (VIEWER role)"
+        steps:
+          - action: "Login as VIEWER"
+          - action: "Navigate to Documents tab"
+          - assertion: "[+ Upload Document] button hidden"
+          - assertion: "Can view document list"
+          - assertion: "Can click [Download]"
+          - assertion: "[Delete] option hidden in actions menu"
+
+rls_tests:
+  # ==========================================================================
+  # Row Level Security Tests
+  # ==========================================================================
+  org_isolation:
+    file: "apps/frontend/__tests__/rls/npd-documents-rls.test.ts"
+    framework: "Vitest"
+
+    test_scenarios:
+      - name: "User from Org A cannot view Org B documents"
+        setup:
+          - "Create Org A with User A"
+          - "Create Org B with User B"
+          - "Create document in Org B project"
+        action: "User A queries npd_compliance_docs"
+        assertion: "Returns 0 documents (RLS filters out Org B docs)"
+
+      - name: "User from Org A cannot download Org B document"
+        setup:
+          - "Create Org A with User A"
+          - "Create Org B with document"
+        action: "User A calls GET /api/npd/documents/{orgBDocId}/download"
+        assertion: "Returns 404 (RLS prevents access)"
+
+      - name: "User from Org A cannot delete Org B document"
+        setup:
+          - "Create Org A with User A"
+          - "Create Org B with document"
+        action: "User A calls DELETE /api/npd/documents/{orgBDocId}"
+        assertion: "Returns 404 (RLS prevents access)"
+
+  soft_delete_exclusion:
+    tests:
+      - name: "Soft-deleted documents excluded from SELECT"
+        setup: "Create 5 active, 2 deleted documents"
+        action: "SELECT * FROM npd_compliance_docs WHERE org_id = ?"
+        assertion: "Returns 5 documents (RLS excludes deleted_at IS NOT NULL)"
+
+      - name: "Soft-deleted documents cannot be re-deleted"
+        setup: "Document with deleted_at = yesterday"
+        action: "UPDATE npd_compliance_docs SET deleted_at = now() WHERE id = ?"
+        assertion: "RLS policy prevents update (already deleted)"
+
+validation_tests:
+  # ==========================================================================
+  # Validation Tests
+  # ==========================================================================
+  required_documents:
+    file: "apps/frontend/__tests__/validation/required-documents.test.ts"
+    framework: "Vitest"
+
+    test_scenarios:
+      - name: "check_required_documents() returns false for G4 without HACCP"
+        setup:
+          - "Create project at G4"
+          - "No HACCP document uploaded"
+        action: "SELECT check_required_documents(projectId)"
+        assertion:
+          - "is_valid === false"
+          - "missing === ['HACCP Plan']"
+
+      - name: "check_required_documents() returns true for G4 with HACCP"
+        setup:
+          - "Create project at G4"
+          - "Upload HACCP document"
+        action: "SELECT check_required_documents(projectId)"
+        assertion:
+          - "is_valid === true"
+          - "missing === []"
+
+      - name: "check_required_documents() returns true for G0-G3 (no docs required)"
+        setup: "Create project at G2"
+        action: "SELECT check_required_documents(projectId)"
+        assertion:
+          - "is_valid === true"
+
+storage_tests:
+  # ==========================================================================
+  # Supabase Storage Tests
+  # ==========================================================================
+  file_upload:
+    file: "apps/frontend/__tests__/storage/supabase-storage.test.ts"
+    framework: "Vitest"
+
+    test_scenarios:
+      - name: "Upload file to correct bucket and path"
+        setup: "Mock 2 MB PDF file"
+        action: "Upload file via NPDDocumentService.upload()"
+        assertion:
+          - "File uploaded to bucket 'npd-compliance-docs'"
+          - "storage_path === '{org_id}/{project_id}/{doc_type}/{uuid}_{filename}'"
+          - "File exists in Storage"
+
+      - name: "Generate signed URL with 1-hour expiry"
+        setup: "Upload file to Storage"
+        action: "Call storage.createSignedUrl(path, 3600)"
+        assertion:
+          - "URL returned"
+          - "URL includes token"
+          - "URL expires in 3600 seconds"
+
+      - name: "Signed URL expires after 1 hour"
+        setup: "Generate signed URL"
+        action: "Wait 61 minutes, access URL"
+        assertion: "Error: 'Signed URL expired'"
+
+performance_tests:
+  # ==========================================================================
+  # Performance Tests
+  # ==========================================================================
+  response_times:
+    file: "apps/frontend/__tests__/performance/npd-documents-perf.test.ts"
+    framework: "Vitest + Benchmark"
+
+    benchmarks:
+      - name: "Document list load time (50 documents)"
+        action: "GET /api/npd/projects/{projectId}/documents?limit=20"
+        target: "< 500ms"
+
+      - name: "Document upload (10 MB file)"
+        action: "POST /api/npd/projects/{projectId}/documents with 10 MB file"
+        target: "< 15 seconds"
+
+      - name: "Signed URL generation"
+        action: "GET /api/npd/documents/{documentId}/download"
+        target: "< 200ms"
+
+      - name: "Required documents validation"
+        action: "GET /api/npd/projects/{projectId}/documents/validate"
+        target: "< 300ms"
+
+test_data:
+  # ==========================================================================
+  # Test Data Factories
+  # ==========================================================================
+  factories:
+    - name: "createTestDocument"
+      file: "apps/frontend/__tests__/factories/document.factory.ts"
+      params:
+        - npd_project_id: "UUID (required)"
+        - doc_type: "string (default: 'haccp_plan')"
+        - file_name: "string (default: 'Test_Doc.pdf')"
+        - file_size_bytes: "number (default: 2621440 = 2.5 MB)"
+        - version: "string (default: null)"
+        - deleted_at: "Date (default: null)"
+
+    - name: "createTestFile"
+      file: "apps/frontend/__tests__/factories/file.factory.ts"
+      params:
+        - mime_type: "string (default: 'application/pdf')"
+        - size_mb: "number (default: 2)"
+        - filename: "string (default: 'Test_Document.pdf')"
+
+mocks:
+  # ==========================================================================
+  # Mock Implementations
+  # ==========================================================================
+  supabase_storage:
+    - method: "storage.from().upload()"
+      mock_return: "{ data: { path: 'mock-path' }, error: null }"
+
+    - method: "storage.from().createSignedUrl()"
+      mock_return: "{ data: { signedUrl: 'https://storage.supabase.co/...' }, error: null }"
+
+  file_api:
+    - method: "File constructor"
+      mock: "new File(['content'], 'test.pdf', { type: 'application/pdf' })"
+
+coverage_targets:
+  overall: ">80%"
+  by_layer:
+    service: ">90%"
+    api: ">85%"
+    components: ">75%"
+    database_functions: ">95%"

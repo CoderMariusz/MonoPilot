@@ -1,0 +1,61 @@
+# Story 10.2 - Database Schema
+# Downtime Reason Codes & Categories
+
+migrations:
+  - path: "supabase/migrations/XXX_create_oee_downtime_reasons.sql"
+    type: "migration"
+    description: "Create oee_downtime_reasons table with categories and seed function"
+
+tables:
+  - name: "oee_downtime_reasons"
+    description: "Downtime reason codes organized by category (planned/unplanned)"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id) ON DELETE CASCADE" }
+      - { name: "code", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "description", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "category", type: "TEXT", constraints: "NOT NULL CHECK (category IN ('mechanical', 'electrical', 'material', 'changeover', 'break', 'quality', 'operator', 'utility', 'other'))" }
+      - { name: "is_planned", type: "BOOLEAN", constraints: "NOT NULL DEFAULT false" }
+      - { name: "color_code", type: "TEXT", constraints: "DEFAULT '#6B7280'" }
+      - { name: "icon_name", type: "TEXT", constraints: "NULLABLE" }
+      - { name: "sort_order", type: "INTEGER", constraints: "DEFAULT 100" }
+      - { name: "is_active", type: "BOOLEAN", constraints: "DEFAULT true" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT now()" }
+      - { name: "created_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT now()" }
+      - { name: "updated_by", type: "UUID", constraints: "REFERENCES users(id)" }
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_reasons_org ON oee_downtime_reasons(org_id)"
+      - "idx_reasons_org_active ON oee_downtime_reasons(org_id, is_active) WHERE is_active = true"
+      - "idx_reasons_category ON oee_downtime_reasons(category)"
+      - "idx_reasons_planned ON oee_downtime_reasons(is_planned)"
+      - "idx_reasons_sort ON oee_downtime_reasons(org_id, sort_order, code)"
+    constraints:
+      - "uq_reason_code UNIQUE (org_id, code)"
+
+# Seed Function
+seed_function:
+  name: "seed_default_downtime_reasons"
+  params: ["p_org_id UUID"]
+  returns: "VOID"
+  description: "Creates default reason codes for new organization (20+ codes)"
+  default_codes:
+    mechanical: ["MECH-JAM (Product Jam)", "MECH-BREAKDOWN (Machine Breakdown)", "MECH-MINOR (Minor Mechanical Stop)"]
+    electrical: ["ELEC-SENSOR (Sensor Fault)", "ELEC-MOTOR (Motor Failure)", "ELEC-POWER (Power Outage)"]
+    material: ["MAT-SHORTAGE (Material Shortage)", "MAT-QUALITY (Material Quality Issue)", "MAT-HANDLING (Material Handling Delay)"]
+    changeover: ["CHNG-SETUP (Product Changeover)", "CHNG-TOOLING (Tooling Change)", "CHNG-CLEANING (Post-Changeover Cleaning)"]
+    break: ["BRK-LUNCH (Lunch Break)", "BRK-SHIFT (Shift Break)", "BRK-MEETING (Team Meeting)"]
+    quality: ["QA-HOLD (Quality Hold)", "QA-INSPECTION (Quality Inspection)", "QA-REWORK (Rework Required)"]
+
+rls_policies:
+  pattern: "ADR-013 Users Table Lookup"
+  policies:
+    - { table: "oee_downtime_reasons", name: "reasons_select", operation: "SELECT" }
+    - { table: "oee_downtime_reasons", name: "reasons_insert", operation: "INSERT" }
+    - { table: "oee_downtime_reasons", name: "reasons_update", operation: "UPDATE" }
+    - { table: "oee_downtime_reasons", name: "reasons_delete", operation: "DELETE" }
+
+triggers:
+  - { name: "update_oee_downtime_reasons_updated_at", table: "oee_downtime_reasons", event: "BEFORE UPDATE", function: "update_updated_at_column()" }

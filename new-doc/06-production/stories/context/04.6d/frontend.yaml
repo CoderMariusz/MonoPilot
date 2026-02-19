@@ -1,0 +1,330 @@
+# Story 04.6d - Frontend Specification
+# Purpose: Components, services, UI patterns for consumption reversal
+# Agent: FRONTEND-DEV (UI focus)
+
+# Page (existing - no new page)
+pages:
+  - path: "apps/frontend/app/(authenticated)/production/consumption/[woId]/page.tsx"
+    description: "Material Consumption page - already exists from 04.6a"
+    changes:
+      - "Add Reverse button to consumption history table (Manager/Admin only)"
+      - "Add ReverseConsumptionModal component"
+    existing: true
+
+# Components
+components:
+  - path: "apps/frontend/components/production/consumption/ReverseConsumptionModal.tsx"
+    description: "Modal for reversing a consumption - Manager/Admin only"
+    type: "modal"
+    props:
+      - name: "consumption"
+        type: "ConsumptionHistoryItem"
+        required: true
+        description: "The consumption record to reverse"
+      - name: "open"
+        type: "boolean"
+        required: true
+        description: "Controls modal visibility"
+      - name: "onOpenChange"
+        type: "(open: boolean) => void"
+        required: true
+        description: "Callback when modal opens/closes"
+      - name: "onSuccess"
+        type: "(result: ConsumptionReversalResult) => void"
+        required: true
+        description: "Callback on successful reversal"
+    state:
+      - name: "reason"
+        type: "ReversalReason | null"
+        initial: "null"
+      - name: "notes"
+        type: "string"
+        initial: "''"
+      - name: "isSubmitting"
+        type: "boolean"
+        initial: "false"
+      - name: "error"
+        type: "string | null"
+        initial: "null"
+    sections:
+      - name: "Consumption Details"
+        description: "Read-only display of consumption info"
+        fields:
+          - "Consumption ID"
+          - "WO Number"
+          - "Material (product code + name)"
+          - "LP Number + Batch + Expiry"
+          - "Quantity Consumed"
+          - "Consumed At + By"
+          - "LP Status Before/After"
+      - name: "Warning Message"
+        description: "Alert box explaining reversal effects"
+        items:
+          - "LP quantity will be restored"
+          - "Consumption marked as REVERSED"
+          - "Genealogy record updated"
+          - "Audit log entry created"
+          - "Action is LOGGED and cannot be undone"
+      - name: "Reversal Form"
+        description: "Reason dropdown + notes textarea"
+        fields:
+          - "Reason for Reversal (required dropdown)"
+          - "Additional Notes (optional, required if reason = 'other')"
+    actions:
+      - name: "Cancel"
+        type: "secondary"
+        action: "Close modal"
+      - name: "Confirm Reversal"
+        type: "destructive"
+        action: "Submit reversal"
+        disabled_when: "!reason || isSubmitting || (reason === 'other' && !notes.trim())"
+    wireframe_ref: "PROD-003 - Reverse Consumption Modal"
+
+  - path: "apps/frontend/components/production/consumption/ReverseConsumptionSuccess.tsx"
+    description: "Success confirmation after reversal"
+    type: "modal"
+    props:
+      - name: "result"
+        type: "ConsumptionReversalResult"
+        required: true
+      - name: "onClose"
+        type: "() => void"
+        required: true
+    sections:
+      - name: "Success Message"
+        description: "Green check with 'Reversal Complete' heading"
+      - name: "Changes Applied"
+        description: "List of changes with checkmarks"
+        items:
+          - "LP quantity restored: X kg -> Y kg"
+          - "LP status: Available"
+          - "Consumption marked as REVERSED"
+          - "Genealogy record updated"
+      - name: "Reversal Details"
+        description: "Audit info"
+        fields:
+          - "Reversed by"
+          - "Reversed at"
+          - "Reason"
+          - "Notes (if provided)"
+      - name: "Audit Trail Entry"
+        description: "Confirmation of audit log"
+    wireframe_ref: "PROD-003 - Reverse Consumption - Confirmation Success"
+
+  - path: "apps/frontend/components/production/consumption/ConsumptionHistoryTable.tsx"
+    description: "Consumption history table - UPDATE to add Reverse button"
+    existing: true
+    changes:
+      - "Add 'reversed' column/badge showing 'Active' or 'Reversed' status"
+      - "Add [Rev] button in Actions column - visible only for Manager/Admin"
+      - "Add onClick handler to open ReverseConsumptionModal"
+      - "Disable [Rev] button for already reversed rows"
+      - "Add reversed_at tooltip on Reversed badge"
+    conditional_rendering:
+      - condition: "user.role in ['admin', 'production_manager', 'owner']"
+        element: "[Rev] button"
+        visible: true
+      - condition: "consumption.reversed === true"
+        element: "[Rev] button"
+        visible: false
+
+# Services (frontend hooks)
+services:
+  - path: "apps/frontend/lib/hooks/use-consumption-reversal.ts"
+    description: "React hook for consumption reversal"
+    exports:
+      - name: "useConsumptionReversal"
+        type: "hook"
+        params: []
+        returns:
+          - "reverseConsumption: (consumptionId, reason, notes?) => Promise<ConsumptionReversalResult>"
+          - "isReversing: boolean"
+          - "error: string | null"
+          - "canReverse: (consumption: ConsumptionHistoryItem) => boolean"
+
+  - path: "apps/frontend/lib/hooks/use-user-role.ts"
+    description: "Hook to check user role - may already exist"
+    existing: true
+    exports:
+      - name: "useUserRole"
+        type: "hook"
+        returns:
+          - "role: string"
+          - "isManager: boolean"
+          - "isAdmin: boolean"
+          - "hasPermission: (permission: string) => boolean"
+
+# UI Patterns
+ui_patterns:
+  modal:
+    component: "ShadCN Dialog"
+    pattern: |
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-yellow-600">
+              <AlertTriangle className="h-5 w-5" />
+              Reverse Material Consumption
+            </DialogTitle>
+            <DialogDescription>
+              This action will restore the LP quantity and mark the consumption as reversed.
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Consumption Details Section */}
+          <div className="space-y-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Consumption Details</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {/* Read-only consumption info */}
+              </CardContent>
+            </Card>
+
+            {/* Warning Section */}
+            <Alert variant="warning">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Warning</AlertTitle>
+              <AlertDescription>
+                <ul className="list-disc pl-4 mt-2 space-y-1">
+                  <li>LP quantity will be restored from {currentQty} to {newQty}</li>
+                  <li>Consumption will be marked as REVERSED</li>
+                  <li>Genealogy record will be updated</li>
+                  <li>Audit log entry will be created</li>
+                  <li>This action is LOGGED and cannot be undone</li>
+                </ul>
+              </AlertDescription>
+            </Alert>
+
+            {/* Reversal Form */}
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="reason">Reason for Reversal *</Label>
+                <Select value={reason} onValueChange={setReason}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select reason..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(reversalReasonLabels).map(([value, label]) => (
+                      <SelectItem key={value} value={value}>{label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="notes">Additional Notes {reason === 'other' && '*'}</Label>
+                <Textarea
+                  id="notes"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Enter additional details..."
+                  maxLength={500}
+                />
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleReverse}
+              disabled={!reason || isSubmitting || (reason === 'other' && !notes.trim())}
+            >
+              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Confirm Reversal
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+  status_badge:
+    pattern: |
+      {consumption.reversed ? (
+        <Badge variant="secondary" className="bg-gray-100 text-gray-600">
+          <XCircle className="mr-1 h-3 w-3" />
+          Reversed
+        </Badge>
+      ) : (
+        <Badge variant="default" className="bg-green-100 text-green-700">
+          <CheckCircle className="mr-1 h-3 w-3" />
+          Active
+        </Badge>
+      )}
+
+  reverse_button:
+    pattern: |
+      {/* Only visible for Manager/Admin AND non-reversed consumptions */}
+      {isManagerOrAdmin && !consumption.reversed && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => handleOpenReverseModal(consumption)}
+          className="h-8 w-8 p-0"
+          title="Reverse Consumption"
+        >
+          <Undo2 className="h-4 w-4" />
+          <span className="sr-only">Reverse</span>
+        </Button>
+      )}
+
+# States
+states:
+  - name: "idle"
+    description: "Modal closed, no action"
+  - name: "viewing"
+    description: "Modal open, displaying consumption details"
+  - name: "submitting"
+    description: "Reversal in progress"
+    ui:
+      - "Form inputs disabled"
+      - "Confirm button shows spinner"
+      - "Cancel button disabled"
+  - name: "success"
+    description: "Reversal completed successfully"
+    ui:
+      - "Success modal displayed"
+      - "Consumption history refreshed"
+      - "Toast notification shown"
+  - name: "error"
+    description: "Reversal failed"
+    ui:
+      - "Error message displayed in modal"
+      - "Form re-enabled for retry"
+      - "Toast notification with error"
+
+# Accessibility
+accessibility:
+  touch_targets:
+    - "[Rev] button: 48x48dp minimum"
+    - "Dropdown select: 48dp height"
+    - "Dialog buttons: 40dp height minimum"
+  contrast:
+    - "Warning text: 4.5:1 minimum on yellow background"
+    - "Error text: 4.5:1 minimum on red background"
+    - "Badge text: 4.5:1 minimum"
+  screen_reader:
+    - "Dialog: role='dialog' aria-labelledby aria-describedby"
+    - "Warning: role='alert'"
+    - "Status badges: aria-label='Status Active' or 'Status Reversed'"
+    - "[Rev] button: aria-label='Reverse consumption for LP-xxx'"
+  keyboard:
+    - "Tab: Navigate through form fields"
+    - "Enter: Submit form (when focused on Confirm)"
+    - "Escape: Close modal"
+    - "Space: Toggle dropdown"
+
+# Toast Notifications
+toasts:
+  - type: "success"
+    message: "Consumption reversed successfully"
+    description: "LP-{lp_number} quantity restored to {new_qty} {uom}"
+    duration: 5000
+  - type: "error"
+    message: "Failed to reverse consumption"
+    description: "{error_message}"
+    duration: 7000

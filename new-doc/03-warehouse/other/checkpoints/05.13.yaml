@@ -1,0 +1,59 @@
+# Story 05.13 - Over-Receipt Control
+# Type: fullstack
+# Epic: 05-warehouse
+# Audit Date: 2026-01-08
+
+audit:
+  code_exists: true
+  files_found:
+    - path: "apps/frontend/lib/validation/warehouse-settings.ts"
+      type: validation
+      status: complete
+      notes: "allow_over_receipt, over_receipt_tolerance_pct fields"
+    - path: "apps/frontend/components/settings/warehouse/Phase1ReceiptSettings.tsx"
+      type: component
+      status: complete
+      notes: "Full UI for over-receipt settings"
+    - path: "apps/frontend/lib/services/asn-receive-service.ts"
+      type: service
+      status: complete
+      notes: "validateOverReceipt() method implemented (lines 79-123)"
+    - path: "apps/frontend/lib/services/__tests__/asn-receive-service.test.ts"
+      type: test
+      status: partial
+      notes: "10+ unit tests for over-receipt validation"
+  tests_exist: true
+  test_files:
+    - path: "apps/frontend/lib/services/__tests__/asn-receive-service.test.ts"
+      count: 10
+  estimated_completion: 55%
+
+status: COMPLETE
+
+completed:
+  - "Created migration 110_add_over_receipt_columns_to_grn_items.sql"
+  - "Created migration 111_update_grn_from_po_over_receipt.sql"
+  - "Created comprehensive test file over-receipt-control.test.ts (42 tests)"
+  - "Updated GRNItem interface with over_receipt_flag and over_receipt_percentage"
+  - "Updated CreateGRNFromPOResult interface with over-receipt fields"
+  - "Over-receipt validation logic complete in grn-po-service.ts"
+
+files_created:
+  - "supabase/migrations/110_add_over_receipt_columns_to_grn_items.sql"
+  - "supabase/migrations/111_update_grn_from_po_over_receipt.sql"
+  - "apps/frontend/lib/services/__tests__/over-receipt-control.test.ts"
+
+files_modified:
+  - "apps/frontend/lib/services/grn-service.ts"
+  - "apps/frontend/lib/services/grn-po-service.ts"
+
+test_coverage:
+  - "42 tests for over-receipt control (all passing)"
+  - "AC-1 to AC-8 fully covered"
+
+next_phase: DONE
+P2: + backend-dev 21:45 files:1 tests:42 status:green
+P3: + backend-dev 21:45 files:4 tests:42/42 status:green
+P5: + self-review 21:45 issues:0 decision:approved
+P6: + self-qa 21:45 ac:8/8 bugs:0 decision:pass
+P7: + backend-dev 21:45 summary:done status:COMPLETE

@@ -1,0 +1,528 @@
+# Story 01.8 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/warehouse-service.test.ts"
+    type: "unit"
+    description: "Unit tests for warehouse service methods"
+
+  - path: "apps/frontend/__tests__/integration/api/settings/warehouses.test.ts"
+    type: "integration"
+    description: "Integration tests for warehouse API endpoints"
+
+  - path: "apps/frontend/__tests__/e2e/settings/warehouses.spec.ts"
+    type: "e2e"
+    description: "End-to-end tests for warehouse management flows"
+
+  - path: "supabase/tests/warehouses-rls.test.sql"
+    type: "integration"
+    description: "RLS policy tests for warehouses table"
+
+# Acceptance Criteria (from story)
+acceptance_criteria:
+  - id: "AC-1"
+    name: "Warehouse List Page"
+    priority: "P0"
+    gherkin: |
+      Scenario: View warehouse list
+        Given admin navigates to `/settings/warehouses`
+        When page loads
+        Then warehouse list displays within 300ms
+        And table shows columns: Code, Name, Type, Locations, Default, Status
+
+      Scenario: Search warehouses by code or name
+        Given warehouse list with 10+ warehouses
+        When admin enters search "WH-RAW"
+        Then only warehouses matching code or name display within 200ms
+
+      Scenario: Filter by warehouse type
+        Given warehouse list displayed
+        When admin selects filter "Raw Materials"
+        Then only raw material warehouses appear
+
+      Scenario: Filter by status
+        Given warehouse list displayed
+        When admin filters by status "active"
+        Then only active warehouses appear
+
+      Scenario: Sort warehouse list
+        Given warehouse list displayed
+        When admin clicks "Name" column header
+        Then list sorts alphabetically by name (toggle asc/desc)
+
+      Scenario: Pagination
+        Given 30 warehouses exist
+        When admin views warehouse list
+        Then 20 warehouses display per page with pagination controls
+
+  - id: "AC-2"
+    name: "Create Warehouse"
+    priority: "P0"
+    gherkin: |
+      Scenario: Open create modal
+        Given admin clicks "+ Add Warehouse"
+        When modal opens
+        Then form displays: code, name, type, address (3 lines), contact email, contact phone, active checkbox
+
+      Scenario: Create warehouse with required fields
+        Given admin enters code "WH-001", name "Main Warehouse", type "General"
+        When "Create" clicked
+        Then warehouse created and appears in list within 1 second
+        And toast "Warehouse created successfully" displays
+
+      Scenario: Code uniqueness validation
+        Given warehouse "WH-001" exists
+        When admin creates another with code "WH-001"
+        Then error "Warehouse code must be unique" displays inline
+        And form submission blocked
+
+      Scenario: Code format validation
+        Given admin enters code "invalid code!"
+        When save attempted
+        Then error "Code must be 2-20 uppercase alphanumeric characters with hyphens only" displays
+
+      Scenario: Required field validation
+        Given admin leaves code field empty
+        When save attempted
+        Then error "Code is required" displays inline
+
+  - id: "AC-3"
+    name: "Warehouse Type"
+    priority: "P0"
+    gherkin: |
+      Scenario: Type dropdown options
+        Given warehouse create/edit modal open
+        When admin opens type dropdown
+        Then options display: General, Raw Materials, WIP, Finished Goods, Quarantine
+
+      Scenario: Type badge display
+        Given warehouses with different types exist
+        When viewing warehouse list
+        Then type badges display with correct colors
+
+      Scenario: Type tooltip explanation
+        Given warehouse modal open
+        When admin hovers type dropdown option "Quarantine"
+        Then tooltip displays "Items on hold for quality inspection"
+
+  - id: "AC-4"
+    name: "Warehouse Address and Contact"
+    priority: "P1"
+    gherkin: |
+      Scenario: Address fields display
+        Given warehouse create/edit modal open
+        When form loads
+        Then address section shows 3-line text area (max 500 chars)
+
+      Scenario: Contact email validation
+        Given admin enters contact email "invalid-email"
+        When save attempted
+        Then error "Invalid email format" displays
+
+      Scenario: Contact phone field
+        Given admin enters contact phone "+1-555-123-4567"
+        When save completed
+        Then phone saved (max 20 chars)
+
+      Scenario: Address in list view
+        Given warehouse has address "123 Factory Rd, Springfield"
+        When viewing warehouse list
+        Then second row shows truncated address under warehouse name
+
+  - id: "AC-5"
+    name: "Default Warehouse Assignment"
+    priority: "P0"
+    gherkin: |
+      Scenario: View default warehouse
+        Given one warehouse is marked as default
+        When viewing warehouse list
+        Then default warehouse shows gold star icon in Default column
+
+      Scenario: Set as default from actions menu
+        Given warehouse "WH-002" exists (not default)
+        When admin clicks actions menu > "Set as Default"
+        Then confirmation dialog displays "Set WH-002 as default warehouse?"
+
+      Scenario: Default assignment atomicity
+        Given "WH-001" is current default
+        When admin sets "WH-002" as default
+        Then "WH-002" becomes default
+        And "WH-001" loses default status (atomic operation)
+
+      Scenario: Cannot unset last default
+        Given only one warehouse exists and is default
+        When admin attempts to unset default
+        Then action unavailable (hidden or disabled)
+
+  - id: "AC-6"
+    name: "Edit Warehouse"
+    priority: "P0"
+    gherkin: |
+      Scenario: Open edit modal
+        Given admin clicks edit on warehouse "WH-001"
+        When modal opens
+        Then current warehouse data pre-populates form
+
+      Scenario: Code immutability with inventory
+        Given warehouse "WH-001" has active LPs
+        When edit modal opens
+        Then code field is disabled with tooltip "Cannot change code for warehouse with inventory"
+
+      Scenario: Code editable without inventory
+        Given warehouse "WH-NEW" has no LPs
+        When edit modal opens
+        Then code field is editable
+
+      Scenario: Update warehouse name
+        Given admin changes name from "Warehouse A" to "Warehouse Alpha"
+        When save completed
+        Then updated name displays in list immediately
+
+  - id: "AC-7"
+    name: "Disable/Enable Warehouse"
+    priority: "P0"
+    gherkin: |
+      Scenario: Disable warehouse without inventory
+        Given warehouse "WH-OLD" has no active inventory (qty = 0)
+        When admin clicks "Disable Warehouse"
+        Then confirmation displays "Disable warehouse WH-OLD?"
+        And warehouse status changes to "disabled" within 500ms
+
+      Scenario: Disable warehouse with active inventory blocked
+        Given warehouse "WH-ACTIVE" has LPs with qty > 0
+        When admin clicks "Disable Warehouse"
+        Then error "Cannot disable warehouse with active inventory" displays
+        And status remains "active"
+
+      Scenario: Disable default warehouse blocked
+        Given "WH-001" is default warehouse
+        When admin attempts to disable
+        Then error "Cannot disable default warehouse. Set another warehouse as default first." displays
+
+      Scenario: Enable disabled warehouse
+        Given warehouse "WH-OLD" is disabled
+        When admin clicks "Enable Warehouse"
+        Then status changes to "active" within 500ms
+
+  - id: "AC-8"
+    name: "Permission Enforcement"
+    priority: "P0"
+    gherkin: |
+      Scenario: Admin can manage warehouses
+        Given user has ADMIN role
+        When accessing /settings/warehouses
+        Then all CRUD actions available
+
+      Scenario: Warehouse Manager can manage warehouses
+        Given user has WAREHOUSE_MANAGER role
+        When accessing /settings/warehouses
+        Then can add, edit, set default, disable warehouses
+
+      Scenario: Production Manager view only
+        Given user has PRODUCTION_MANAGER role
+        When accessing /settings/warehouses
+        Then can view list but "Add Warehouse" button hidden
+        And row actions hidden
+
+      Scenario: Viewer read only
+        Given user has VIEWER role
+        When accessing /settings/warehouses
+        Then table displays but all actions hidden
+
+  - id: "AC-9"
+    name: "Multi-tenancy"
+    priority: "P0"
+    security: true
+    gherkin: |
+      Scenario: Org isolation on list
+        Given User A from Org A
+        When requesting /api/settings/warehouses
+        Then only Org A warehouses returned
+
+      Scenario: Cross-tenant access returns 404
+        Given User A from Org A
+        When requesting warehouse ID from Org B
+        Then 404 Not Found returned (not 403)
+
+# Unit Test Cases
+unit_tests:
+  warehouse_service:
+    - name: "list() returns paginated warehouses"
+      setup: "Mock successful API response with 20 warehouses"
+      expected: "Returns PaginatedResult with data and pagination"
+
+    - name: "list() applies search filter"
+      setup: "Mock API with search='WH-RAW'"
+      expected: "Request includes search query parameter"
+
+    - name: "list() applies type filter"
+      setup: "Mock API with type='RAW_MATERIALS'"
+      expected: "Request includes type query parameter"
+
+    - name: "create() validates and creates warehouse"
+      setup: "Mock POST /api/v1/settings/warehouses"
+      expected: "Returns created warehouse with ID"
+
+    - name: "create() rejects duplicate code"
+      setup: "Mock 409 response"
+      expected: "Throws error with 'Warehouse code already exists'"
+
+    - name: "update() prevents code change with inventory"
+      setup: "Warehouse has active inventory, attempt code change"
+      expected: "Returns 400 error 'Cannot change code'"
+
+    - name: "setDefault() unsets previous default"
+      setup: "Warehouse A is default, set B as default"
+      expected: "B becomes default, A loses default status"
+
+    - name: "disable() blocks with active inventory"
+      setup: "Warehouse has LPs with qty > 0"
+      expected: "canDisable() returns { allowed: false, reason: '...' }"
+
+    - name: "disable() blocks default warehouse"
+      setup: "Warehouse is default"
+      expected: "canDisable() returns { allowed: false, reason: '...' }"
+
+    - name: "enable() activates disabled warehouse"
+      setup: "Warehouse is disabled"
+      expected: "Returns warehouse with is_active = true"
+
+    - name: "validateCode() returns availability"
+      setup: "Mock GET /api/v1/settings/warehouses/validate-code?code=WH-NEW"
+      expected: "Returns { available: true }"
+
+    - name: "validateCode() returns unavailable for duplicate"
+      setup: "Code already exists"
+      expected: "Returns { available: false }"
+
+    - name: "hasActiveInventory() checks license plates"
+      setup: "Mock Supabase query for license_plates with qty > 0"
+      expected: "Returns true if count > 0"
+
+# Integration Test Cases
+integration_tests:
+  api_endpoints:
+    - name: "GET /warehouses returns paginated list"
+      setup: "Create 25 warehouses in test org"
+      action: "GET /api/v1/settings/warehouses?page=1&limit=20"
+      expected: "Returns 20 warehouses, pagination.total=25, total_pages=2"
+
+    - name: "GET /warehouses?type=RAW_MATERIALS filters correctly"
+      setup: "Create warehouses with mixed types"
+      action: "GET /api/v1/settings/warehouses?type=RAW_MATERIALS"
+      expected: "Returns only RAW_MATERIALS warehouses"
+
+    - name: "GET /warehouses?search=WH-001 filters by code"
+      setup: "Create warehouses WH-001, WH-002, MAIN"
+      action: "GET /api/v1/settings/warehouses?search=WH-001"
+      expected: "Returns only WH-001"
+
+    - name: "POST /warehouses creates with validation"
+      setup: "Prepare valid warehouse data"
+      action: "POST /api/v1/settings/warehouses with body"
+      expected: "Returns 201 with created warehouse"
+
+    - name: "POST /warehouses duplicate code returns 400"
+      setup: "Warehouse WH-001 exists"
+      action: "POST /api/v1/settings/warehouses with code WH-001"
+      expected: "Returns 400 'Warehouse code already exists'"
+
+    - name: "PUT /warehouses/:id updates mutable fields"
+      setup: "Warehouse exists"
+      action: "PUT /api/v1/settings/warehouses/:id with name='Updated'"
+      expected: "Returns 200 with updated warehouse"
+
+    - name: "PUT /warehouses/:id code immutable with LPs"
+      setup: "Warehouse has active inventory"
+      action: "PUT /api/v1/settings/warehouses/:id with new code"
+      expected: "Returns 400 'Cannot change code'"
+
+    - name: "PATCH /warehouses/:id/set-default atomicity"
+      setup: "WH-001 is default, WH-002 exists"
+      action: "PATCH /api/v1/settings/warehouses/WH-002/set-default"
+      expected: "WH-002 default=true, WH-001 default=false (atomic)"
+
+    - name: "PATCH /warehouses/:id/disable with inventory"
+      setup: "Warehouse has active inventory"
+      action: "PATCH /api/v1/settings/warehouses/:id/disable"
+      expected: "Returns 400 'Cannot disable warehouse with active inventory'"
+
+    - name: "PATCH /warehouses/:id/disable default warehouse"
+      setup: "Warehouse is default"
+      action: "PATCH /api/v1/settings/warehouses/:id/disable"
+      expected: "Returns 400 'Cannot disable default warehouse'"
+
+    - name: "PATCH /warehouses/:id/enable works"
+      setup: "Warehouse is disabled"
+      action: "PATCH /api/v1/settings/warehouses/:id/enable"
+      expected: "Returns 200 with is_active=true"
+
+    - name: "Cross-org access returns 404"
+      setup: "User A from Org A, Warehouse B from Org B"
+      action: "User A requests GET /warehouses/:warehouse_b_id"
+      expected: "Returns 404 Not Found (not 403)"
+
+    - name: "Permission denied returns 403"
+      setup: "User with VIEWER role"
+      action: "POST /api/v1/settings/warehouses"
+      expected: "Returns 403 Forbidden"
+
+  rls_policies:
+    - name: "User can only read own org warehouses"
+      setup: "Create Org A with warehouses WH-A1, WH-A2; Org B with WH-B1"
+      action: "User A queries warehouses"
+      expected: "Returns WH-A1, WH-A2; WH-B1 not visible"
+
+    - name: "Admin can create warehouse"
+      setup: "User with ADMIN role"
+      action: "Insert into warehouses"
+      expected: "Insert succeeds"
+
+    - name: "Warehouse Manager can create warehouse"
+      setup: "User with WAREHOUSE_MANAGER role"
+      action: "Insert into warehouses"
+      expected: "Insert succeeds"
+
+    - name: "Production Manager cannot create warehouse"
+      setup: "User with PRODUCTION_MANAGER role"
+      action: "Insert into warehouses"
+      expected: "RLS blocks insert"
+
+    - name: "Cross-tenant write blocked"
+      setup: "Admin A from Org A, Warehouse B from Org B"
+      action: "Admin A attempts to update Warehouse B"
+      expected: "RLS blocks update, 0 rows affected"
+
+# E2E Test Cases
+e2e_tests:
+  - name: "Create warehouse flow"
+    steps:
+      - "Navigate to /settings/warehouses"
+      - "Click '+ Add Warehouse' button"
+      - "Fill form: code='WH-TEST', name='Test Warehouse', type='General'"
+      - "Click 'Create' button"
+      - "Wait for toast 'Warehouse created successfully'"
+      - "Verify warehouse appears in list"
+    expected: "Warehouse created and visible in list"
+
+  - name: "Edit warehouse flow"
+    steps:
+      - "Navigate to /settings/warehouses"
+      - "Click actions menu on warehouse row"
+      - "Click 'Edit'"
+      - "Change name to 'Updated Warehouse'"
+      - "Click 'Save'"
+      - "Wait for toast 'Warehouse updated successfully'"
+      - "Verify updated name in list"
+    expected: "Warehouse name updated"
+
+  - name: "Set default warehouse"
+    steps:
+      - "Navigate to /settings/warehouses"
+      - "Click actions menu on non-default warehouse"
+      - "Click 'Set as Default'"
+      - "Confirm in dialog"
+      - "Wait for toast 'Warehouse set as default'"
+      - "Verify gold star icon appears"
+    expected: "Warehouse becomes default"
+
+  - name: "Disable warehouse"
+    steps:
+      - "Navigate to /settings/warehouses"
+      - "Click actions menu on warehouse without inventory"
+      - "Click 'Disable'"
+      - "Confirm in dialog"
+      - "Wait for toast 'Warehouse disabled'"
+      - "Verify status badge shows 'Disabled'"
+    expected: "Warehouse disabled"
+
+  - name: "Search and filter"
+    steps:
+      - "Navigate to /settings/warehouses"
+      - "Type 'WH-RAW' in search box"
+      - "Wait for results to filter"
+      - "Select 'Raw Materials' from type filter"
+      - "Verify only matching warehouses shown"
+    expected: "Filters apply correctly"
+
+  - name: "Permission-based UI"
+    steps:
+      - "Login as user with VIEWER role"
+      - "Navigate to /settings/warehouses"
+      - "Verify '+ Add Warehouse' button is hidden"
+      - "Verify actions menu is hidden on all rows"
+    expected: "UI reflects permission restrictions"
+
+# Definition of Done
+definition_of_done:
+  - "All 9 acceptance criteria pass"
+  - "Unit test coverage >= 80% for warehouse service"
+  - "Integration test coverage >= 80% for API endpoints"
+  - "E2E tests pass for critical flows (create, edit, set default, disable)"
+  - "RLS policies tested with 2-org isolation"
+  - "Cross-tenant access returns 404 (verified)"
+  - "Permission matrix enforced (tested for all roles)"
+  - "Loading, empty, error states tested"
+  - "Toast notifications tested"
+  - "No console errors in E2E tests"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    critical_paths:
+      - "warehouse-service.ts: 85%"
+      - "Code validation logic: 100%"
+      - "Business rules (canDisable, hasActiveInventory): 100%"
+
+  integration:
+    target: 80
+    critical_paths:
+      - "All API endpoints: 100%"
+      - "RLS policies: 100%"
+      - "Permission enforcement: 100%"
+
+  e2e:
+    target: "Critical flows only"
+    flows:
+      - "Create warehouse: PASS"
+      - "Edit warehouse: PASS"
+      - "Set default: PASS"
+      - "Disable/Enable: PASS"
+      - "Search/Filter: PASS"
+
+# Test Data Fixtures
+test_fixtures:
+  - name: "test-org-a"
+    org_name: "Test Org A"
+    warehouses:
+      - { code: "WH-A1", name: "Warehouse A1", type: "GENERAL", is_default: true, is_active: true }
+      - { code: "WH-A2", name: "Warehouse A2", type: "RAW_MATERIALS", is_default: false, is_active: true }
+      - { code: "WH-A3", name: "Warehouse A3", type: "FINISHED_GOODS", is_default: false, is_active: false }
+
+  - name: "test-org-b"
+    org_name: "Test Org B"
+    warehouses:
+      - { code: "WH-B1", name: "Warehouse B1", type: "GENERAL", is_default: true, is_active: true }
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "Default warehouse trigger race condition"
+    mitigation: "Database trigger ensures atomicity, integration test verifies"
+    severity: "medium"
+    test_coverage: "integration_tests.api_endpoints[7]"
+
+  - id: "RISK-02"
+    description: "Disable warehouse with inventory could cause data loss"
+    mitigation: "Business rule blocks disable, tested in canDisable()"
+    severity: "high"
+    test_coverage: "unit_tests.warehouse_service[7,8], integration_tests.api_endpoints[8]"
+
+  - id: "RISK-03"
+    description: "Cross-tenant access could leak data"
+    mitigation: "RLS policies + 404 response, tested with 2-org fixture"
+    severity: "high"
+    test_coverage: "integration_tests.api_endpoints[11], integration_tests.rls_policies[0,4]"

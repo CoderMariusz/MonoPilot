@@ -1,0 +1,374 @@
+# Story 03.9a - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  - method: "POST"
+    path: "/api/planning/transfer-orders/:id/ship"
+    description: "Ship Transfer Order (partial or full)"
+    file: "apps/frontend/app/api/planning/transfer-orders/[id]/ship/route.ts"
+    auth: "required"
+    roles: ["admin", "warehouse_manager", "warehouse_operator"]
+    status: "update_existing"
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+        Content-Type: "application/json"
+      params:
+        id: "Transfer Order UUID"
+      body:
+        shipment_date:
+          type: "string"
+          format: "YYYY-MM-DD"
+          required: true
+          validation: "Cannot be in the future"
+        lines:
+          type: "array"
+          min_items: 1
+          items:
+            line_id:
+              type: "string"
+              format: "UUID"
+              required: true
+            ship_qty:
+              type: "number"
+              min: 0
+              max: 99999.9999
+              required: true
+        notes:
+          type: "string"
+          max_length: 1000
+          required: false
+
+    response:
+      status: 200
+      schema:
+        success: "boolean"
+        transfer_order: "TransferOrder"
+        message: "string"
+
+    errors:
+      - status: 400
+        code: "INVALID_QUANTITY"
+        message: "Line X: Cannot ship Y units, only Z remaining"
+        when: "shipped_qty + ship_qty > quantity"
+      - status: 400
+        code: "NO_QUANTITY"
+        message: "At least one line must have quantity > 0"
+        when: "All lines have ship_qty = 0"
+      - status: 400
+        code: "INVALID_STATUS"
+        message: "Cannot ship Transfer Order with status: X"
+        when: "Status not in (planned, partially_shipped)"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Insufficient permissions"
+        when: "User lacks warehouse role"
+      - status: 404
+        code: "NOT_FOUND"
+        message: "Transfer Order not found"
+        when: "TO ID not found or wrong org"
+
+  - method: "POST"
+    path: "/api/planning/transfer-orders/:id/receive"
+    description: "Receive Transfer Order (partial or full)"
+    file: "apps/frontend/app/api/planning/transfer-orders/[id]/receive/route.ts"
+    auth: "required"
+    roles: ["admin", "warehouse_manager", "warehouse_operator"]
+    status: "new"
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+        Content-Type: "application/json"
+      params:
+        id: "Transfer Order UUID"
+      body:
+        receipt_date:
+          type: "string"
+          format: "YYYY-MM-DD"
+          required: true
+          validation: "Cannot be in the future"
+        lines:
+          type: "array"
+          min_items: 1
+          items:
+            line_id:
+              type: "string"
+              format: "UUID"
+              required: true
+            receive_qty:
+              type: "number"
+              min: 0
+              max: 99999.9999
+              required: true
+        notes:
+          type: "string"
+          max_length: 1000
+          required: false
+
+    response:
+      status: 200
+      schema:
+        success: "boolean"
+        transfer_order: "TransferOrder"
+        message: "string"
+
+    errors:
+      - status: 400
+        code: "INVALID_QUANTITY"
+        message: "Line X: Cannot receive Y units, only Z shipped"
+        when: "received_qty + receive_qty > shipped_qty"
+      - status: 400
+        code: "NO_QUANTITY"
+        message: "At least one line must have quantity > 0"
+        when: "All lines have receive_qty = 0"
+      - status: 400
+        code: "INVALID_STATUS"
+        message: "Cannot receive Transfer Order with status: X"
+        when: "Status not in (shipped, partially_shipped, partially_received)"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Insufficient permissions"
+        when: "User lacks warehouse role"
+      - status: 404
+        code: "NOT_FOUND"
+        message: "Transfer Order not found"
+        when: "TO ID not found or wrong org"
+
+# Service methods
+services:
+  - path: "apps/frontend/lib/services/transfer-order-service.ts"
+    description: "Transfer Order service - extend existing"
+    methods:
+      - name: "shipTransferOrder"
+        status: "update_existing"
+        params:
+          - "transferOrderId: string"
+          - "input: ShipTOInput"
+          - "userId: string"
+        returns: "ServiceResult<TransferOrder>"
+        description: "Ship TO (partial or full), update shipped_qty cumulatively"
+        logic:
+          - "1. Validate TO exists and status in (planned, partially_shipped)"
+          - "2. Validate each line: shipped_qty + ship_qty <= quantity"
+          - "3. Validate at least one line has ship_qty > 0"
+          - "4. Check settings: to_allow_partial_shipments"
+          - "5. Update to_lines.shipped_qty (cumulative)"
+          - "6. Update transfer_orders: actual_ship_date (if first), shipped_by, status"
+          - "7. Return updated TO with lines"
+
+      - name: "receiveTransferOrder"
+        status: "new"
+        params:
+          - "transferOrderId: string"
+          - "input: ReceiveTOInput"
+          - "userId: string"
+        returns: "ServiceResult<TransferOrder>"
+        description: "Receive TO (partial or full), update received_qty cumulatively"
+        logic:
+          - "1. Validate TO exists and status in (shipped, partially_shipped, partially_received)"
+          - "2. Validate each line: received_qty + receive_qty <= shipped_qty"
+          - "3. Validate at least one line has receive_qty > 0"
+          - "4. Check settings: to_allow_partial_shipments"
+          - "5. Update to_lines.received_qty (cumulative)"
+          - "6. Update transfer_orders: actual_receive_date (if first), received_by, status"
+          - "7. Return updated TO with lines"
+
+      - name: "determineStatusAfterShip"
+        status: "update_existing"
+        params:
+          - "lines: TOLine[]"
+        returns: "TOStatus"
+        description: "Calculate status after ship operation"
+        logic:
+          - "If all lines have shipped_qty >= quantity: return 'shipped'"
+          - "Else: return 'partially_shipped'"
+
+      - name: "determineStatusAfterReceive"
+        status: "new"
+        params:
+          - "lines: TOLine[]"
+        returns: "TOStatus"
+        description: "Calculate status after receive operation"
+        logic:
+          - "If all lines have received_qty >= shipped_qty: return 'received'"
+          - "Else: return 'partially_received'"
+
+      - name: "calculateLineShipProgress"
+        status: "new"
+        params:
+          - "line: TOLine"
+        returns: "{ shipped: number, total: number, percent: number, remaining: number }"
+        description: "Calculate ship progress for a line"
+
+      - name: "calculateLineReceiveProgress"
+        status: "new"
+        params:
+          - "line: TOLine"
+        returns: "{ received: number, total: number, percent: number, remaining: number }"
+        description: "Calculate receive progress for a line (received vs shipped)"
+
+# Validation schemas
+validation:
+  - path: "apps/frontend/lib/validation/transfer-order-schemas.ts"
+    description: "Extend existing validation schemas"
+    schemas:
+      - name: "shipTORequestSchema"
+        status: "update_existing"
+        fields:
+          shipment_date:
+            type: "z.string()"
+            validation: "regex(/^\\d{4}-\\d{2}-\\d{2}$/), refine(date <= today)"
+          lines:
+            type: "z.array(shipLineSchema)"
+            validation: "min(1), refine(some(ship_qty > 0))"
+          notes:
+            type: "z.string().max(1000).optional()"
+
+      - name: "receiveTORequestSchema"
+        status: "new"
+        fields:
+          receipt_date:
+            type: "z.string()"
+            validation: "regex(/^\\d{4}-\\d{2}-\\d{2}$/), refine(date <= today)"
+          lines:
+            type: "z.array(receiveLineSchema)"
+            validation: "min(1), refine(some(receive_qty > 0))"
+          notes:
+            type: "z.string().max(1000).optional()"
+
+      - name: "shipLineSchema"
+        status: "existing"
+        fields:
+          line_id:
+            type: "z.string().uuid()"
+          ship_qty:
+            type: "z.number().nonnegative().max(99999.9999)"
+
+      - name: "receiveLineSchema"
+        status: "new"
+        fields:
+          line_id:
+            type: "z.string().uuid()"
+          receive_qty:
+            type: "z.number().nonnegative().max(99999.9999)"
+
+# Implementation patterns
+patterns:
+  api_route: |
+    // apps/frontend/app/api/planning/transfer-orders/[id]/receive/route.ts
+    import { NextRequest, NextResponse } from 'next/server';
+    import { receiveTransferOrder } from '@/lib/services/transfer-order-service';
+    import { receiveTORequestSchema } from '@/lib/validation/transfer-order-schemas';
+    import { getCurrentUserId } from '@/lib/services/auth-service';
+
+    export async function POST(
+      request: NextRequest,
+      { params }: { params: { id: string } }
+    ) {
+      try {
+        const userId = await getCurrentUserId();
+        if (!userId) {
+          return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const body = await request.json();
+        const validated = receiveTORequestSchema.parse(body);
+
+        const result = await receiveTransferOrder(params.id, validated, userId);
+
+        if (!result.success) {
+          return NextResponse.json({ error: result.error }, { status: 400 });
+        }
+
+        return NextResponse.json({
+          success: true,
+          transfer_order: result.data,
+          message: `Transfer Order ${result.data.to_number} received successfully`,
+        });
+      } catch (error) {
+        if (error instanceof z.ZodError) {
+          return NextResponse.json({ error: error.errors }, { status: 400 });
+        }
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+      }
+    }
+
+  service_pattern: |
+    // receiveTransferOrder implementation pattern
+    export async function receiveTransferOrder(
+      transferOrderId: string,
+      input: ReceiveTOInput,
+      userId: string
+    ): Promise<ServiceResult<TransferOrder>> {
+      const supabaseAdmin = createServerSupabaseAdmin();
+
+      // 1. Validate TO exists and status
+      const { data: existingTo } = await supabaseAdmin
+        .from('transfer_orders')
+        .select('status, actual_receive_date')
+        .eq('id', transferOrderId)
+        .single();
+
+      if (!existingTo) {
+        return { success: false, error: 'Transfer Order not found', code: 'NOT_FOUND' };
+      }
+
+      if (!['shipped', 'partially_shipped', 'partially_received'].includes(existingTo.status)) {
+        return { success: false, error: 'Cannot receive TO with status: ' + existingTo.status, code: 'INVALID_STATUS' };
+      }
+
+      // 2. Get lines and validate quantities
+      const { data: lines } = await supabaseAdmin
+        .from('to_lines')
+        .select('id, shipped_qty, received_qty')
+        .eq('transfer_order_id', transferOrderId);
+
+      for (const lineItem of input.lines) {
+        const line = lines.find(l => l.id === lineItem.line_id);
+        if (!line) {
+          return { success: false, error: `Line ${lineItem.line_id} not found`, code: 'NOT_FOUND' };
+        }
+        if (line.received_qty + lineItem.receive_qty > line.shipped_qty) {
+          return { success: false, error: `Cannot receive more than shipped`, code: 'INVALID_QUANTITY' };
+        }
+      }
+
+      // 3. Update lines received_qty
+      for (const lineItem of input.lines) {
+        const line = lines.find(l => l.id === lineItem.line_id);
+        await supabaseAdmin
+          .from('to_lines')
+          .update({ received_qty: line.received_qty + lineItem.receive_qty })
+          .eq('id', lineItem.line_id);
+      }
+
+      // 4. Update TO status and audit fields
+      const updateData: any = { updated_by: userId };
+      if (!existingTo.actual_receive_date) {
+        updateData.actual_receive_date = input.receipt_date;
+        updateData.received_by = userId;
+      }
+
+      const newStatus = await calculateToStatus(transferOrderId);
+      updateData.status = newStatus;
+
+      const { data } = await supabaseAdmin
+        .from('transfer_orders')
+        .update(updateData)
+        .eq('id', transferOrderId)
+        .select('*, lines:to_lines(*)')
+        .single();
+
+      return { success: true, data };
+    }

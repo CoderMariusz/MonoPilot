@@ -1,0 +1,155 @@
+# Story 08.1 - Database Schema
+# Purpose: NPD settings table, RLS policies, extensions to existing tables
+# Agent: BACKEND-DEV
+
+migrations:
+  - path: "supabase/migrations/XXX_create_npd_settings_table.sql"
+    type: "migration"
+    description: "Create npd_settings table with RLS policies"
+  - path: "supabase/migrations/XXX_extend_tables_for_npd.sql"
+    type: "migration"
+    description: "Add NPD-related columns to work_orders, products, boms"
+
+tables:
+  - name: "npd_settings"
+    description: "Organization-level NPD module configuration"
+    columns:
+      - { name: "id", type: "SERIAL", constraints: "PRIMARY KEY" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id) ON DELETE CASCADE" }
+
+      # Module activation
+      - { name: "enable_npd_module", type: "BOOLEAN", constraints: "DEFAULT false NOT NULL" }
+      - { name: "npd_only_mode", type: "BOOLEAN", constraints: "DEFAULT false NOT NULL" }
+
+      # Pilot WO settings
+      - { name: "enable_pilot_wo", type: "BOOLEAN", constraints: "DEFAULT true NOT NULL" }
+      - { name: "default_pilot_routing", type: "INTEGER", constraints: "REFERENCES routings(id) ON DELETE SET NULL" }
+
+      # Costing settings
+      - { name: "require_costing_approval", type: "BOOLEAN", constraints: "DEFAULT true NOT NULL" }
+      - { name: "cost_variance_warning_pct", type: "DECIMAL(5,2)", constraints: "DEFAULT 20.00 NOT NULL CHECK (cost_variance_warning_pct >= 0)" }
+      - { name: "cost_variance_blocker_pct", type: "DECIMAL(5,2)", constraints: "DEFAULT 50.00 NOT NULL CHECK (cost_variance_blocker_pct >= 0)" }
+
+      # Compliance settings
+      - { name: "require_compliance_docs", type: "BOOLEAN", constraints: "DEFAULT true NOT NULL" }
+
+      # Formulation settings
+      - { name: "max_formulation_versions", type: "INTEGER", constraints: "DEFAULT 10 NOT NULL CHECK (max_formulation_versions > 0)" }
+      - { name: "enable_formulation_export", type: "BOOLEAN", constraints: "DEFAULT true NOT NULL" }
+
+      # Event sourcing settings
+      - { name: "event_retention_days", type: "INTEGER", constraints: "DEFAULT 90 NOT NULL CHECK (event_retention_days >= 0)" }
+
+      # Timestamps
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+
+    rls: true
+    rls_pattern: "org_id = auth org_id, admins can update"
+
+    indexes:
+      - "idx_npd_settings_org_id ON npd_settings(org_id)"
+      - "idx_npd_settings_enabled ON npd_settings(org_id) WHERE enable_npd_module = true"
+
+    constraints:
+      - "npd_settings_org_unique UNIQUE (org_id)"
+      - "cost_variance_order CHECK (cost_variance_warning_pct <= cost_variance_blocker_pct)"
+
+    notes:
+      - "One row per organization (UNIQUE org_id)"
+      - "Auto-created on first access with defaults"
+      - "default_pilot_routing is nullable (soft FK to routings)"
+      - "Cost variance constraint ensures warning <= blocker"
+      - "All boolean fields default to sensible values"
+
+  - name: "work_orders (extended)"
+    action: "ALTER TABLE"
+    columns:
+      - { name: "type", type: "VARCHAR(20)", constraints: "DEFAULT 'production'" }
+      - { name: "npd_project_id", type: "INTEGER", constraints: "" }
+    notes:
+      - "type: 'production' (default) or 'pilot'"
+      - "npd_project_id: Links to npd_projects table (added in Story 08.3)"
+      - "Foreign key constraint added when npd_projects table created"
+
+  - name: "products (extended)"
+    action: "ALTER TABLE"
+    columns:
+      - { name: "npd_project_id", type: "INTEGER", constraints: "" }
+      - { name: "source", type: "VARCHAR(30)", constraints: "" }
+    notes:
+      - "npd_project_id: Links to npd_projects table (Story 08.3)"
+      - "source: 'manual', 'npd_handoff', etc."
+
+  - name: "boms (extended)"
+    action: "ALTER TABLE"
+    columns:
+      - { name: "npd_formulation_id", type: "INTEGER", constraints: "" }
+      - { name: "source", type: "VARCHAR(30)", constraints: "" }
+    notes:
+      - "npd_formulation_id: Links to npd_formulations table (Story 08.4)"
+      - "source: 'manual', 'npd_handoff', etc."
+
+# Triggers
+triggers:
+  - name: "npd_settings_updated_at"
+    function: "update_updated_at()"
+    timing: "BEFORE UPDATE"
+    table: "npd_settings"
+    for_each: "ROW"
+    description: "Auto-update updated_at timestamp on changes"
+
+# RLS Policies
+rls_policies:
+  npd_settings:
+    - name: "npd_settings_org_read"
+      operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      description: "Users can read their own org settings"
+
+    - name: "npd_settings_admin_update"
+      operation: "UPDATE"
+      using: |
+        org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        AND (
+          SELECT r.code FROM roles r
+          JOIN users u ON u.role_id = r.id
+          WHERE u.id = auth.uid()
+        ) IN ('SUPER_ADMIN', 'ADMIN')
+      description: "Only admins can update settings"
+
+    - name: "npd_settings_admin_insert"
+      operation: "INSERT"
+      with_check: |
+        org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        AND (
+          SELECT r.code FROM roles r
+          JOIN users u ON u.role_id = r.id
+          WHERE u.id = auth.uid()
+        ) IN ('SUPER_ADMIN', 'ADMIN')
+      description: "Only admins can create settings"
+
+# Default values reference
+default_values:
+  enable_npd_module: false
+  npd_only_mode: false
+  enable_pilot_wo: true
+  default_pilot_routing: null
+  require_costing_approval: true
+  cost_variance_warning_pct: 20.00
+  cost_variance_blocker_pct: 50.00
+  require_compliance_docs: true
+  max_formulation_versions: 10
+  enable_formulation_export: true
+  event_retention_days: 90
+
+# Migration dependencies
+dependencies:
+  required_tables:
+    - "organizations (FK)"
+    - "routings (FK - nullable)"
+    - "work_orders (extension)"
+    - "products (extension)"
+    - "boms (extension)"
+  required_functions:
+    - "update_updated_at() - standard timestamp updater"

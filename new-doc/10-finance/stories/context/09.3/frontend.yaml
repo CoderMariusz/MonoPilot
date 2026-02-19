@@ -1,0 +1,23 @@
+pages:
+  - path: "/finance/work-orders/:id/costs"
+    component: "WorkOrderCostsPage"
+    sections:
+      - name: "Material Costs"
+        component: "MaterialCostsTable"
+        columns: ["Product", "Quantity", "Unit Cost", "Total Cost", "Cost Method"]
+        summary: "Total Material Cost"
+
+components:
+  - "MaterialCostsTable.tsx - DataTable with material cost breakdown"
+  - "CostMethodBadge.tsx - Badge showing FIFO/WAC/Standard"
+
+ui_patterns:
+  - "Read-only cost view (no editing)"
+  - "Cost method indicator badge"
+  - "Summary totals at bottom"
+
+ux:
+  wireframes:
+    - id: "FIN-003"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/FIN-003-wo-cost-summary-card.md"
+      relevance: "Work Order cost summary card showing material costs with FIFO/WAC/Standard methods"

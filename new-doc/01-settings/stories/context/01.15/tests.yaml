@@ -1,0 +1,539 @@
+# Story 01.15 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/session-service.test.ts"
+    type: "unit"
+    description: "Unit tests for session management"
+  - path: "apps/frontend/lib/services/__tests__/password-service.test.ts"
+    type: "unit"
+    description: "Unit tests for password validation and change"
+  - path: "apps/frontend/components/settings/security/__tests__/ActiveSessionsList.test.tsx"
+    type: "component"
+    description: "Component tests for sessions list"
+  - path: "apps/frontend/components/settings/security/__tests__/ChangePasswordForm.test.tsx"
+    type: "component"
+    description: "Component tests for password change form"
+  - path: "apps/frontend/app/api/v1/settings/sessions/__tests__/route.test.ts"
+    type: "integration"
+    description: "Integration tests for session API"
+  - path: "apps/frontend/app/api/v1/settings/password/__tests__/route.test.ts"
+    type: "integration"
+    description: "Integration tests for password API"
+  - path: "e2e/settings/session-management.spec.ts"
+    type: "e2e"
+    description: "E2E tests for session management"
+  - path: "e2e/settings/password-change.spec.ts"
+    type: "e2e"
+    description: "E2E tests for password change"
+
+# Acceptance Criteria
+acceptance_criteria:
+  # Session Management
+  - id: "AC-S-01"
+    given: "user logs in successfully"
+    when: "session created"
+    then: "session token valid for 24 hours (default)"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-S-02"
+    given: "session created"
+    when: "session data stored"
+    then: "device type, IP address, user agent, and timestamps are recorded"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-S-03"
+    given: "user is authenticated"
+    when: "they navigate to Security settings"
+    then: "list of all active sessions displays"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-S-04"
+    given: "active sessions list"
+    when: "rendered"
+    then: "current session is marked with 'Current session' badge"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-S-05"
+    given: "user views session list"
+    when: "they click 'Revoke' on a specific session"
+    then: "confirmation dialog appears"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-S-06"
+    given: "user confirms session termination"
+    when: "action completes"
+    then: "that session is invalidated immediately"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-S-07"
+    given: "terminated session"
+    when: "device with that session makes request"
+    then: "401 Unauthorized returns"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-S-08"
+    given: "user clicks 'Logout All Devices'"
+    when: "confirmed"
+    then: "all sessions except current are terminated"
+    test_type: "integration"
+    priority: "P0"
+
+  # Password Management
+  - id: "AC-P-01"
+    given: "user sets password 'abc'"
+    when: "form submitted"
+    then: "error 'Password must be at least 8 characters' displays"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-P-02"
+    given: "user sets password 'Abcdefg1!'"
+    when: "form submitted"
+    then: "password accepted and saved"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-P-03"
+    given: "real-time validation enabled"
+    when: "user types password"
+    then: "checklist updates showing met/unmet requirements"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-P-04"
+    given: "user attempts to reuse one of last 5 passwords"
+    when: "form submitted"
+    then: "error 'Cannot reuse recent passwords' displays"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-P-05"
+    given: "user changes password"
+    when: "password update completes"
+    then: "all other sessions terminated (security)"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-P-06"
+    given: "current password incorrect"
+    when: "form submitted"
+    then: "error 'Current password is incorrect' displays"
+    test_type: "integration"
+    priority: "P0"
+
+  # Admin Session Management
+  - id: "AC-A-01"
+    given: "admin views user detail"
+    when: "sessions tab clicked"
+    then: "all user sessions display"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-A-02"
+    given: "admin with SUPER_ADMIN or ADMIN role"
+    when: "viewing user sessions"
+    then: "'Terminate All' button visible"
+    test_type: "unit"
+    priority: "P1"
+
+  - id: "AC-A-03"
+    given: "non-admin user"
+    when: "attempting to view other user sessions"
+    then: "403 Forbidden returns"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  # Multi-tenancy
+  - id: "AC-T-01"
+    given: "User A from Org A"
+    when: "requesting sessions"
+    then: "only Org A sessions returned"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-T-02"
+    given: "User A from Org A"
+    when: "attempting to terminate Org B session"
+    then: "404 Not Found returns (not 403)"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+# Unit Test Cases
+unit_tests:
+  session_service:
+    - name: "createSession creates session with correct expiry based on org settings"
+      setup: "Mock org with session_timeout_hours=24"
+      expected: "Session expires_at = now + 24 hours"
+
+    - name: "parseUserAgent parses Chrome correctly"
+      setup: "User agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0'"
+      expected: "device_type='browser', device_name='Chrome on Windows'"
+
+    - name: "parseUserAgent parses Safari on iPhone correctly"
+      setup: "User agent: Safari iPhone string"
+      expected: "device_type='mobile', device_name='Safari on iPhone'"
+
+    - name: "terminateSession marks session as revoked"
+      setup: "Mock session with id"
+      expected: "Session revoked_at set, revocation_reason='user_logout'"
+
+    - name: "terminateAllSessions terminates all except current"
+      setup: "3 sessions, current_id specified"
+      expected: "2 sessions revoked, current_id not revoked"
+
+    - name: "validateSession returns valid=true for active session"
+      setup: "Session with expires_at in future, revoked_at=null"
+      expected: "Returns { valid: true, expired: false, revoked: false }"
+
+    - name: "validateSession returns expired=true for timed out session"
+      setup: "Session with expires_at in past"
+      expected: "Returns { valid: false, expired: true }"
+
+    - name: "validateSession returns revoked=true for terminated session"
+      setup: "Session with revoked_at set"
+      expected: "Returns { valid: false, revoked: true }"
+
+  password_service:
+    - name: "validatePassword rejects password under 8 characters"
+      setup: "Password: 'Abc123!'"
+      expected: "Returns { valid: false, errors: ['Password must be at least 8 characters'] }"
+
+    - name: "validatePassword rejects password without uppercase"
+      setup: "Password: 'abcdefg1!'"
+      expected: "Returns { valid: false, errors: ['Password must contain at least one uppercase letter'] }"
+
+    - name: "validatePassword rejects password without lowercase"
+      setup: "Password: 'ABCDEFG1!'"
+      expected: "Returns { valid: false, errors: ['Password must contain at least one lowercase letter'] }"
+
+    - name: "validatePassword rejects password without number"
+      setup: "Password: 'Abcdefgh!'"
+      expected: "Returns { valid: false, errors: ['Password must contain at least one number'] }"
+
+    - name: "validatePassword rejects password without special character"
+      setup: "Password: 'Abcdefg1'"
+      expected: "Returns { valid: false, errors: ['Password must contain at least one special character'] }"
+
+    - name: "validatePassword accepts valid password"
+      setup: "Password: 'Abcdefg1!'"
+      expected: "Returns { valid: true, errors: [], strength: 'strong' }"
+
+    - name: "validatePassword calculates strength correctly"
+      setup: "Password: 'Abcdefg1!'"
+      expected: "strength: 'strong' (meets all requirements)"
+
+    - name: "checkPasswordHistory rejects password in last 5"
+      setup: "5 passwords in history, testing 3rd password"
+      expected: "Returns true (should reject)"
+
+    - name: "checkPasswordHistory accepts password not in history"
+      setup: "5 passwords in history, testing new password"
+      expected: "Returns false (allow)"
+
+    - name: "changePassword verifies current password before change"
+      setup: "Current password incorrect"
+      expected: "Throws error: 'Current password is incorrect'"
+
+    - name: "changePassword terminates other sessions after change"
+      setup: "User has 3 active sessions"
+      expected: "2 sessions terminated (all except current)"
+
+# Component Test Cases
+component_tests:
+  ActiveSessionsList:
+    - name: "Renders all sessions with device info"
+      setup: "Mock 3 sessions"
+      expected: "3 session cards visible with device names"
+
+    - name: "Marks current session correctly"
+      setup: "Mock 3 sessions, current_id specified"
+      expected: "One card shows 'Current session' badge"
+
+    - name: "Revoke button disabled on current session"
+      setup: "Current session card"
+      expected: "No revoke button visible"
+
+    - name: "Shows termination confirmation dialog"
+      setup: "Click 'Revoke' on session"
+      expected: "Confirmation dialog displays"
+
+    - name: "Shows empty state when no other sessions"
+      setup: "Only current session exists"
+      expected: "'No other sessions active' message displays"
+
+  ChangePasswordForm:
+    - name: "Validates required current password"
+      setup: "Submit form with empty current password"
+      expected: "Error message displays"
+
+    - name: "Shows real-time password requirements"
+      setup: "Type password 'Abc123'"
+      expected: "Checklist shows met/unmet requirements"
+
+    - name: "Password strength indicator updates"
+      setup: "Type progressively stronger passwords"
+      expected: "Strength changes: weak -> medium -> strong"
+
+    - name: "Validates password confirmation match"
+      setup: "new_password='Abc123!', confirm='Abc124!'"
+      expected: "Error: 'Passwords do not match'"
+
+    - name: "Shows success message after change"
+      setup: "Submit valid password change"
+      expected: "Success toast displays"
+
+  PasswordRequirements:
+    - name: "All requirements show checkmarks when met"
+      setup: "Password: 'Abcdefg1!'"
+      expected: "All 5 requirements show green checkmarks"
+
+    - name: "Unmet requirements show red X"
+      setup: "Password: 'abc'"
+      expected: "All requirements show red X"
+
+    - name: "Updates in real-time as user types"
+      setup: "Type 'Abc' then '123' then '!'"
+      expected: "Checkmarks appear progressively"
+
+# Integration Test Cases
+integration_tests:
+  session_api:
+    - name: "GET /api/v1/settings/sessions returns only own sessions"
+      setup: "User A has 2 sessions, User B has 1 session"
+      action: "User A calls GET /sessions"
+      expected: "Returns 2 sessions, not User B's session"
+
+    - name: "GET /api/v1/settings/sessions marks current session correctly"
+      setup: "User has 3 sessions"
+      action: "GET /sessions with current session token"
+      expected: "One session has is_current=true"
+
+    - name: "GET /api/v1/settings/sessions returns 401 for unauthenticated"
+      setup: "No auth token"
+      action: "GET /sessions"
+      expected: "401 Unauthorized"
+
+    - name: "DELETE /api/v1/settings/sessions/:id terminates own session"
+      setup: "User has session with id=xxx"
+      action: "DELETE /sessions/xxx"
+      expected: "Session revoked_at set, 204 response"
+
+    - name: "DELETE /api/v1/settings/sessions/:id returns 404 for other user session"
+      setup: "User A tries to delete User B's session"
+      action: "DELETE /sessions/user-b-session-id"
+      expected: "404 Not Found (not 403)"
+
+    - name: "DELETE /api/v1/settings/users/:userId/sessions terminates all (admin)"
+      setup: "Admin user, target user has 3 sessions"
+      action: "DELETE /users/target-id/sessions"
+      expected: "3 sessions revoked, terminated_count=3"
+
+    - name: "DELETE /api/v1/settings/users/:userId/sessions returns 403 for non-admin"
+      setup: "Viewer user tries to terminate other user sessions"
+      action: "DELETE /users/other-id/sessions"
+      expected: "403 Forbidden"
+
+  password_api:
+    - name: "POST /password/change changes password with valid data"
+      setup: "User with password 'OldPass1!', submitting new 'NewPass1!'"
+      action: "POST /password/change"
+      expected: "Password updated, other sessions terminated"
+
+    - name: "POST /password/change rejects incorrect current password"
+      setup: "Current password is 'OldPass1!', submitted 'WrongPass1!'"
+      action: "POST /password/change"
+      expected: "400 error: 'Current password is incorrect'"
+
+    - name: "POST /password/change rejects weak new password"
+      setup: "New password 'abc'"
+      action: "POST /password/change"
+      expected: "400 error with validation failures"
+
+    - name: "POST /password/change rejects password in history"
+      setup: "User has 'OldPass1!' in last 5 passwords, tries to reuse"
+      action: "POST /password/change with 'OldPass1!'"
+      expected: "400 error: 'Cannot reuse recent passwords'"
+
+    - name: "POST /password/change terminates other sessions"
+      setup: "User has 3 active sessions"
+      action: "POST /password/change"
+      expected: "2 sessions terminated (all except current)"
+
+    - name: "POST /password/validate returns validation results without auth"
+      setup: "No auth token, password 'Abc123!'"
+      action: "POST /password/validate"
+      expected: "Returns validation result (no auth required)"
+
+# E2E Test Cases
+e2e_tests:
+  - name: "Session Management: displays active sessions list"
+    steps:
+      - "Login as user"
+      - "Navigate to Settings > Security"
+      - "View sessions list"
+    expected: "All active sessions visible with device info"
+
+  - name: "Session Management: shows current session badge"
+    steps:
+      - "Login as user"
+      - "Navigate to Settings > Security"
+      - "View sessions list"
+    expected: "Current session shows 'Current session' badge"
+
+  - name: "Session Management: terminates single session"
+    steps:
+      - "Login as user on two devices"
+      - "On device 1, navigate to Security"
+      - "Click 'Revoke' on device 2 session"
+      - "Confirm dialog"
+    expected: "Device 2 session terminated, device 1 still active"
+
+  - name: "Session Management: terminates all sessions"
+    steps:
+      - "Login as user on three devices"
+      - "On device 1, navigate to Security"
+      - "Click 'Logout All Devices'"
+      - "Confirm dialog"
+    expected: "Devices 2 and 3 terminated, device 1 still active"
+
+  - name: "Password Change: displays requirements in real-time"
+    steps:
+      - "Navigate to Settings > Security"
+      - "Click 'Change Password'"
+      - "Type in new password field"
+    expected: "Requirements checklist updates as user types"
+
+  - name: "Password Change: shows checkmarks as requirements met"
+    steps:
+      - "Start typing password 'Abc123!'"
+      - "Observe checklist"
+    expected: "Checkmarks appear progressively"
+
+  - name: "Password Change: shows strength indicator"
+    steps:
+      - "Type weak password 'abc'"
+      - "Type medium password 'Abc123'"
+      - "Type strong password 'Abc123!'"
+    expected: "Strength bar updates: weak -> medium -> strong"
+
+  - name: "Password Change: prevents submission until requirements met"
+    steps:
+      - "Type weak password 'abc'"
+      - "Try to submit"
+    expected: "Submit button disabled or shows validation errors"
+
+  - name: "Password Change: shows success message after change"
+    steps:
+      - "Submit valid password change"
+    expected: "Success toast displays, other sessions terminated"
+
+# Definition of Done
+definition_of_done:
+  - "user_sessions table created with indexes and RLS"
+  - "password_history table created with cleanup trigger"
+  - "Sessions created on login with device info and expiry"
+  - "Session timeout configurable per organization (default 24h)"
+  - "Active sessions list displays all user sessions"
+  - "Current session correctly identified and badged"
+  - "Single session termination works with confirmation"
+  - "'Terminate All' terminates all sessions except current"
+  - "Terminated sessions return 401 on next request"
+  - "Password change terminates all other sessions"
+  - "Password validation enforces all complexity requirements"
+  - "Real-time password requirements checklist works"
+  - "Password strength indicator displays correctly"
+  - "Password history prevents reuse of last 5 passwords"
+  - "Admins can view and terminate user sessions"
+  - "Non-admins cannot view other users' sessions"
+  - "Cross-tenant session access returns 404 (not 403)"
+  - "Unit test coverage >= 90% (security critical)"
+  - "Integration tests pass"
+  - "E2E tests pass"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 90
+    reason: "Security-critical code requires very high coverage"
+  component:
+    target: 85
+    reason: "Password and session components are critical UX"
+  integration:
+    target: 85
+    reason: "Session and password APIs must work correctly"
+  files:
+    - "lib/services/session-service.ts: 90%"
+    - "lib/services/password-service.ts: 95%"
+    - "components/settings/security/ChangePasswordForm.tsx: 85%"
+    - "components/settings/security/ActiveSessionsList.tsx: 85%"
+
+# Security Test Requirements
+security_tests:
+  - name: "Session token cannot be guessed"
+    description: "Tokens must be cryptographically secure (32+ bytes)"
+    test: "Verify token generation uses crypto.randomBytes"
+
+  - name: "Password hashing uses bcrypt or Argon2id"
+    description: "Password storage must use industry-standard hashing"
+    test: "Verify password hashed before storage"
+
+  - name: "Rate limiting prevents brute force"
+    description: "Max 5 failed password attempts per 15 minutes"
+    test: "Integration test for rate limiting"
+
+  - name: "Constant-time password comparison"
+    description: "Prevent timing attacks on password verification"
+    test: "Verify using constant-time comparison function"
+
+  - name: "Session termination immediate"
+    description: "Terminated sessions immediately invalid"
+    test: "Integration test: terminate session, verify 401 on next request"
+
+# Performance Requirements
+performance:
+  - endpoint: "GET /api/v1/settings/sessions"
+    target: "< 200ms"
+  - endpoint: "DELETE /api/v1/settings/sessions/:id"
+    target: "< 300ms"
+  - endpoint: "POST /api/v1/settings/password/change"
+    target: "< 2s (includes bcrypt hashing)"
+  - component: "PasswordRequirements real-time validation"
+    target: "< 50ms per keystroke"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "Session hijacking via token exposure"
+    mitigation: "Use HttpOnly, Secure, SameSite cookies, HTTPS only"
+    severity: "high"
+    test_coverage: "security_tests"
+
+  - id: "RISK-02"
+    description: "Password brute force attacks"
+    mitigation: "Rate limiting, account lockout, strong password requirements"
+    severity: "high"
+    test_coverage: "security_tests"
+
+  - id: "RISK-03"
+    description: "Password history stored insecurely"
+    mitigation: "Hash all historical passwords, use RLS to prevent direct access"
+    severity: "medium"
+    test_coverage: "integration_tests.password_api"

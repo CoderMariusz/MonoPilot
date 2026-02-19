@@ -1,0 +1,386 @@
+# Story 05.7 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  # ==========================================================================
+  # Dashboard KPIs Endpoint
+  # ==========================================================================
+  - method: "GET"
+    path: "/api/warehouse/dashboard/kpis"
+    description: "Returns aggregated KPIs for warehouse dashboard"
+    file: "apps/frontend/app/api/warehouse/dashboard/kpis/route.ts"
+    auth: "required"
+    roles: ["*"]  # All authenticated users with warehouse read permission
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      query_params: []  # No params - org_id from session
+
+    response:
+      status: 200
+      type: "DashboardKPIs"
+      schema:
+        total_lps: "number"
+        available_lps: "number"
+        reserved_lps: "number"
+        consumed_today: "number"
+        expiring_soon: "number"
+      example:
+        total_lps: 8452
+        available_lps: 5200
+        reserved_lps: 2100
+        consumed_today: 45
+        expiring_soon: 12
+
+    caching:
+      redis_key: "dashboard:kpis:{org_id}"
+      ttl_seconds: 60
+      cache_control: "private, max-age=60"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token provided"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Insufficient permissions"
+        when: "User lacks warehouse read permission"
+      - status: 500
+        code: "INTERNAL_ERROR"
+        message: "Failed to fetch dashboard KPIs"
+        when: "Database or cache error"
+
+  # ==========================================================================
+  # Dashboard Alerts Endpoint
+  # ==========================================================================
+  - method: "GET"
+    path: "/api/warehouse/dashboard/alerts"
+    description: "Returns alert data for low stock, expiring items, blocked LPs"
+    file: "apps/frontend/app/api/warehouse/dashboard/alerts/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      query_params: []
+
+    response:
+      status: 200
+      type: "DashboardAlerts"
+      schema:
+        low_stock:
+          - product_id: "UUID"
+            product_name: "string"
+            product_code: "string"
+            current_count: "number"
+            min_stock: "number"
+        expiring_items:
+          - lp_id: "UUID"
+            lp_number: "string"
+            product_name: "string"
+            expiry_date: "string (ISO date)"
+            days_until_expiry: "number"
+        blocked_lps:
+          - lp_id: "UUID"
+            lp_number: "string"
+            product_name: "string"
+            qa_status: "'quarantine' | 'failed'"
+            block_reason: "string | null"
+      example:
+        low_stock:
+          - product_id: "uuid-123"
+            product_name: "Cocoa Mass"
+            product_code: "RM-COCOA-001"
+            current_count: 5
+            min_stock: 10
+        expiring_items:
+          - lp_id: "uuid-456"
+            lp_number: "LP00000123"
+            product_name: "Milk Powder"
+            expiry_date: "2025-12-25"
+            days_until_expiry: 9
+        blocked_lps:
+          - lp_id: "uuid-789"
+            lp_number: "LP00000456"
+            product_name: "Sugar"
+            qa_status: "quarantine"
+            block_reason: "Quality check pending"
+
+    caching:
+      redis_key: "dashboard:alerts:{org_id}"
+      ttl_seconds: 60
+      cache_control: "private, max-age=60"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token provided"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Insufficient permissions"
+        when: "User lacks warehouse read permission"
+      - status: 500
+        code: "INTERNAL_ERROR"
+        message: "Failed to fetch dashboard alerts"
+        when: "Database or cache error"
+
+  # ==========================================================================
+  # Dashboard Activity Endpoint
+  # ==========================================================================
+  - method: "GET"
+    path: "/api/warehouse/dashboard/activity"
+    description: "Returns recent LP operations for activity feed"
+    file: "apps/frontend/app/api/warehouse/dashboard/activity/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      query_params:
+        - name: "limit"
+          type: "number"
+          default: 20
+          max: 50
+          description: "Number of activities to return"
+
+    response:
+      status: 200
+      type: "DashboardActivity"
+      schema:
+        activities:
+          - timestamp: "string (ISO datetime)"
+            operation_type: "'create' | 'consume' | 'split' | 'merge' | 'move'"
+            lp_id: "UUID"
+            lp_number: "string"
+            user_name: "string"
+            description: "string"
+      example:
+        activities:
+          - timestamp: "2025-12-17T14:32:00Z"
+            operation_type: "consume"
+            lp_id: "uuid-123"
+            lp_number: "LP00000789"
+            user_name: "John Smith"
+            description: "Consumed 50kg for WO-00123"
+
+    caching:
+      redis_key: null  # NOT cached - real-time data
+      cache_control: "no-cache"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token provided"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Insufficient permissions"
+        when: "User lacks warehouse read permission"
+      - status: 500
+        code: "INTERNAL_ERROR"
+        message: "Failed to fetch recent activity"
+        when: "Database error"
+
+# ==========================================================================
+# Services
+# ==========================================================================
+services:
+  - path: "apps/frontend/lib/services/warehouse-dashboard-service.ts"
+    description: "Dashboard data aggregation with caching"
+    exports:
+      - name: "getDashboardKPIs"
+        type: "async function"
+        params:
+          - "orgId: string"
+        returns: "Promise<DashboardKPIs>"
+        description: "Get cached KPIs or compute from database"
+
+      - name: "getDashboardAlerts"
+        type: "async function"
+        params:
+          - "orgId: string"
+        returns: "Promise<DashboardAlerts>"
+        description: "Get cached alerts or compute from database"
+
+      - name: "getRecentActivity"
+        type: "async function"
+        params:
+          - "orgId: string"
+          - "limit?: number"
+        returns: "Promise<ActivityItem[]>"
+        description: "Get recent LP operations (not cached)"
+
+      - name: "invalidateDashboardCache"
+        type: "async function"
+        params:
+          - "orgId: string"
+        returns: "Promise<void>"
+        description: "Clear dashboard cache keys for org"
+
+# ==========================================================================
+# Types
+# ==========================================================================
+types:
+  - path: "apps/frontend/lib/types/warehouse-dashboard.ts"
+    description: "Dashboard TypeScript interfaces"
+    content: |
+      export interface DashboardKPIs {
+        total_lps: number;
+        available_lps: number;
+        reserved_lps: number;
+        consumed_today: number;
+        expiring_soon: number;
+      }
+
+      export interface LowStockAlert {
+        product_id: string;
+        product_name: string;
+        product_code: string;
+        current_count: number;
+        min_stock: number;
+      }
+
+      export interface ExpiringItemAlert {
+        lp_id: string;
+        lp_number: string;
+        product_name: string;
+        expiry_date: string;
+        days_until_expiry: number;
+      }
+
+      export interface BlockedLPAlert {
+        lp_id: string;
+        lp_number: string;
+        product_name: string;
+        qa_status: 'quarantine' | 'failed';
+        block_reason: string | null;
+      }
+
+      export interface DashboardAlerts {
+        low_stock: LowStockAlert[];
+        expiring_items: ExpiringItemAlert[];
+        blocked_lps: BlockedLPAlert[];
+      }
+
+      export type OperationType = 'create' | 'consume' | 'split' | 'merge' | 'move';
+
+      export interface ActivityItem {
+        timestamp: string;
+        operation_type: OperationType;
+        lp_id: string;
+        lp_number: string;
+        user_name: string;
+        description: string;
+      }
+
+      export interface DashboardActivity {
+        activities: ActivityItem[];
+      }
+
+# ==========================================================================
+# Implementation Patterns
+# ==========================================================================
+patterns:
+  kpis_route: |
+    // apps/frontend/app/api/warehouse/dashboard/kpis/route.ts
+    import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+    import { cookies } from 'next/headers';
+    import { NextResponse } from 'next/server';
+    import { getDashboardKPIs } from '@/lib/services/warehouse-dashboard-service';
+    import { getOrgContext } from '@/lib/services/org-context-service';
+    import { hasPermission } from '@/lib/services/permission-service';
+
+    export async function GET() {
+      const context = await getOrgContext();
+      if (!context) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      if (!hasPermission(context, 'warehouse', 'R')) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+
+      try {
+        const kpis = await getDashboardKPIs(context.org_id);
+        return NextResponse.json(kpis, {
+          headers: {
+            'Cache-Control': 'private, max-age=60',
+          },
+        });
+      } catch (error) {
+        console.error('Dashboard KPIs error:', error);
+        return NextResponse.json(
+          { error: 'Failed to fetch dashboard KPIs' },
+          { status: 500 }
+        );
+      }
+    }
+
+  service_pattern: |
+    // apps/frontend/lib/services/warehouse-dashboard-service.ts
+    import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+    import { redis } from '@/lib/cache/redis';
+    import type { DashboardKPIs, DashboardAlerts, ActivityItem } from '@/lib/types/warehouse-dashboard';
+
+    const CACHE_TTL = 60; // 1 minute
+
+    export async function getDashboardKPIs(orgId: string): Promise<DashboardKPIs> {
+      const cacheKey = `dashboard:kpis:${orgId}`;
+
+      // Check Redis cache first
+      const cached = await redis.get(cacheKey);
+      if (cached) {
+        return JSON.parse(cached);
+      }
+
+      // Execute aggregation queries
+      const supabase = createClientComponentClient();
+
+      const [totalRes, availableRes, reservedRes, consumedRes, expiringRes] = await Promise.all([
+        supabase.rpc('count_total_lps', { p_org_id: orgId }),
+        supabase.rpc('count_available_lps', { p_org_id: orgId }),
+        supabase.rpc('count_reserved_lps', { p_org_id: orgId }),
+        supabase.rpc('count_consumed_today', { p_org_id: orgId }),
+        supabase.rpc('count_expiring_soon', { p_org_id: orgId }),
+      ]);
+
+      const kpis: DashboardKPIs = {
+        total_lps: totalRes.data ?? 0,
+        available_lps: availableRes.data ?? 0,
+        reserved_lps: reservedRes.data ?? 0,
+        consumed_today: consumedRes.data ?? 0,
+        expiring_soon: expiringRes.data ?? 0,
+      };
+
+      // Cache for 1 minute
+      await redis.set(cacheKey, JSON.stringify(kpis), 'EX', CACHE_TTL);
+
+      return kpis;
+    }
+
+    export async function invalidateDashboardCache(orgId: string): Promise<void> {
+      await redis.del(`dashboard:kpis:${orgId}`);
+      await redis.del(`dashboard:alerts:${orgId}`);
+    }
+
+# ==========================================================================
+# Redis Cache Configuration
+# ==========================================================================
+cache_config:
+  path: "apps/frontend/lib/cache/dashboard-cache.ts"
+  content: |
+    export const DASHBOARD_CACHE_KEYS = {
+      KPIS: (orgId: string) => `dashboard:kpis:${orgId}`,
+      ALERTS: (orgId: string) => `dashboard:alerts:${orgId}`,
+    };
+
+    export const DASHBOARD_CACHE_TTL = {
+      KPIS: 60,      // 1 minute
+      ALERTS: 60,    // 1 minute
+    };

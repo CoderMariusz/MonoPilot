@@ -1,0 +1,831 @@
+# Story 06.17 - API Context
+# Generated: 2026-01-15
+# Purpose: API endpoints, request/response schemas, auth requirements
+
+# =============================================================================
+# ENDPOINTS
+# =============================================================================
+
+endpoints:
+  # ---------------------------------------------------------------------------
+  # GET /api/quality/alerts - List user's alerts
+  # ---------------------------------------------------------------------------
+  - method: GET
+    path: /api/quality/alerts
+    description: "List user's alerts with pagination and filters"
+    auth:
+      required: true
+      roles: ["*"]  # Any authenticated user
+    query_params:
+      severity:
+        type: enum
+        values: ["critical", "high", "medium", "low"]
+        required: false
+      status:
+        type: enum
+        values: ["pending", "delivered", "read", "acknowledged", "expired"]
+        required: false
+      alert_type:
+        type: string
+        required: false
+        description: "ccp_deviation, ncr_critical, etc."
+      unread_only:
+        type: boolean
+        required: false
+        default: false
+      date_from:
+        type: string
+        format: ISO8601
+        required: false
+      date_to:
+        type: string
+        format: ISO8601
+        required: false
+      page:
+        type: integer
+        required: false
+        default: 1
+        min: 1
+      limit:
+        type: integer
+        required: false
+        default: 20
+        min: 1
+        max: 50
+    response:
+      success:
+        status: 200
+        body:
+          alerts:
+            type: array
+            items: QualityAlert
+          pagination:
+            type: object
+            properties:
+              total: integer
+              page: integer
+              limit: integer
+              pages: integer
+          unread_count:
+            type: object
+            properties:
+              total: integer
+              critical: integer
+              high: integer
+              medium: integer
+              low: integer
+    error_codes:
+      - status: 401
+        code: UNAUTHORIZED
+        message: "Authentication required"
+
+  # ---------------------------------------------------------------------------
+  # GET /api/quality/alerts/unread-count - Badge count
+  # ---------------------------------------------------------------------------
+  - method: GET
+    path: /api/quality/alerts/unread-count
+    description: "Get unread alert count by severity for badge"
+    auth:
+      required: true
+      roles: ["*"]
+    response:
+      success:
+        status: 200
+        body:
+          count:
+            type: object
+            properties:
+              total: integer
+              critical: integer
+              high: integer
+              medium: integer
+              low: integer
+    performance:
+      target_ms: 100
+      notes: "Must be fast for header badge polling"
+
+  # ---------------------------------------------------------------------------
+  # GET /api/quality/alerts/:id - Get single alert
+  # ---------------------------------------------------------------------------
+  - method: GET
+    path: /api/quality/alerts/:id
+    description: "Get single alert detail"
+    auth:
+      required: true
+      roles: ["*"]
+    path_params:
+      id:
+        type: uuid
+        required: true
+    response:
+      success:
+        status: 200
+        body:
+          alert: QualityAlert
+          source:
+            type: object
+            nullable: true
+            properties:
+              type: string
+              id: string
+              display_name: string
+              link: string
+          recipients:
+            type: array
+            items: AlertRecipient
+            description: "Only visible to admins"
+    error_codes:
+      - status: 404
+        code: NOT_FOUND
+        message: "Alert not found or not a recipient"
+
+  # ---------------------------------------------------------------------------
+  # POST /api/quality/alerts/:id/acknowledge - Acknowledge alert
+  # ---------------------------------------------------------------------------
+  - method: POST
+    path: /api/quality/alerts/:id/acknowledge
+    description: "Acknowledge an alert"
+    auth:
+      required: true
+      roles: ["*"]  # Must be a recipient
+    path_params:
+      id:
+        type: uuid
+        required: true
+    request_body:
+      notes:
+        type: string
+        required: false
+        max_length: 500
+    response:
+      success:
+        status: 200
+        body:
+          message: "Alert acknowledged"
+          acknowledged_at: string
+    error_codes:
+      - status: 400
+        code: ALREADY_ACKNOWLEDGED
+        message: "Alert already acknowledged by you"
+      - status: 404
+        code: NOT_FOUND
+        message: "Alert not found or not a recipient"
+
+  # ---------------------------------------------------------------------------
+  # PUT /api/quality/alerts/:id/read - Mark as read
+  # ---------------------------------------------------------------------------
+  - method: PUT
+    path: /api/quality/alerts/:id/read
+    description: "Mark alert as read"
+    auth:
+      required: true
+      roles: ["*"]
+    path_params:
+      id:
+        type: uuid
+        required: true
+    request_body: null  # No body needed
+    response:
+      success:
+        status: 200
+        body:
+          message: "Alert marked as read"
+          read_at: string
+    error_codes:
+      - status: 404
+        code: NOT_FOUND
+        message: "Alert not found or not a recipient"
+
+  # ---------------------------------------------------------------------------
+  # GET /api/quality/alerts/preferences - Get preferences
+  # ---------------------------------------------------------------------------
+  - method: GET
+    path: /api/quality/alerts/preferences
+    description: "Get user's alert preferences"
+    auth:
+      required: true
+      roles: ["*"]
+    response:
+      success:
+        status: 200
+        body:
+          preferences: UserAlertPreferences
+
+  # ---------------------------------------------------------------------------
+  # PUT /api/quality/alerts/preferences - Update preferences
+  # ---------------------------------------------------------------------------
+  - method: PUT
+    path: /api/quality/alerts/preferences
+    description: "Update user's alert preferences"
+    auth:
+      required: true
+      roles: ["*"]
+    request_body:
+      alerts_enabled:
+        type: boolean
+        required: false
+      email_enabled:
+        type: boolean
+        required: false
+      sms_enabled:
+        type: boolean
+        required: false
+      sms_phone_number:
+        type: string
+        required: false
+        pattern: "^\\+[1-9]\\d{1,14}$"
+        description: "E.164 format required"
+      push_enabled:
+        type: boolean
+        required: false
+      quiet_hours_enabled:
+        type: boolean
+        required: false
+      quiet_hours_start:
+        type: string
+        required: false
+        pattern: "^([01]\\d|2[0-3]):([0-5]\\d)$"
+        description: "HH:MM format"
+      quiet_hours_end:
+        type: string
+        required: false
+        pattern: "^([01]\\d|2[0-3]):([0-5]\\d)$"
+      quiet_hours_timezone:
+        type: string
+        required: false
+      severity_preferences:
+        type: object
+        required: false
+        description: "Per-severity channel overrides"
+      alert_type_preferences:
+        type: object
+        required: false
+        description: "Per-alert-type channel overrides"
+    response:
+      success:
+        status: 200
+        body:
+          message: "Preferences updated"
+          preferences: UserAlertPreferences
+    validation_rules:
+      - "If sms_enabled=true, sms_phone_number is required"
+      - "Phone number must be valid E.164 format"
+      - "Time format must be HH:MM"
+    error_codes:
+      - status: 400
+        code: VALIDATION_ERROR
+        message: "Invalid input"
+      - status: 400
+        code: PHONE_REQUIRED
+        message: "Phone number required when SMS is enabled"
+
+  # ---------------------------------------------------------------------------
+  # POST /api/quality/alerts/send - Admin send alert
+  # ---------------------------------------------------------------------------
+  - method: POST
+    path: /api/quality/alerts/send
+    description: "Admin sends a manual alert"
+    auth:
+      required: true
+      roles: ["SUPER_ADMIN", "ADMIN", "QA_MANAGER"]
+    request_body:
+      template_code:
+        type: string
+        required: false
+        description: "Optional template to use"
+      alert_type:
+        type: string
+        required: true
+        min_length: 1
+      severity:
+        type: enum
+        values: ["critical", "high", "medium", "low"]
+        required: true
+      subject:
+        type: string
+        required: true
+        min_length: 5
+        max_length: 200
+      body:
+        type: string
+        required: true
+        min_length: 10
+        max_length: 2000
+      sms_body:
+        type: string
+        required: false
+        max_length: 160
+      recipients:
+        type: array
+        items: uuid
+        required: true
+        min_items: 1
+        description: "User IDs to send to"
+      source_type:
+        type: string
+        required: false
+      source_id:
+        type: uuid
+        required: false
+      source_reference:
+        type: string
+        required: false
+    response:
+      success:
+        status: 201
+        body:
+          alert: QualityAlert
+          recipients_count: integer
+          message: "Alert sent to N recipients"
+    error_codes:
+      - status: 400
+        code: VALIDATION_ERROR
+        message: "Invalid input"
+      - status: 403
+        code: FORBIDDEN
+        message: "Only QA Manager or Admin can send alerts"
+
+  # ---------------------------------------------------------------------------
+  # POST /api/quality/alerts/test - Send test notification
+  # ---------------------------------------------------------------------------
+  - method: POST
+    path: /api/quality/alerts/test
+    description: "Send test alert to current user only"
+    auth:
+      required: true
+      roles: ["*"]
+    request_body: null  # No body needed
+    response:
+      success:
+        status: 200
+        body:
+          message: "Test alert sent"
+          alert_id: string
+    notes:
+      - "Alert is only sent to current user"
+      - "alert.metadata.is_test = true"
+      - "Subject: 'Test Alert - Delivery Verification'"
+
+# =============================================================================
+# SCHEMAS
+# =============================================================================
+
+schemas:
+  QualityAlert:
+    type: object
+    properties:
+      id:
+        type: string
+        format: uuid
+      alert_number:
+        type: string
+        description: "QA-YYYY-NNNNN"
+      alert_type:
+        type: string
+      severity:
+        type: enum
+        values: ["critical", "high", "medium", "low"]
+      subject:
+        type: string
+      body:
+        type: string
+      sms_body:
+        type: string
+        nullable: true
+      source_type:
+        type: string
+        nullable: true
+      source_id:
+        type: string
+        format: uuid
+        nullable: true
+      source_reference:
+        type: string
+        nullable: true
+      status:
+        type: enum
+        values: ["pending", "delivered", "read", "acknowledged", "expired"]
+      created_at:
+        type: string
+        format: ISO8601
+      read_at:
+        type: string
+        format: ISO8601
+        nullable: true
+      acknowledged_at:
+        type: string
+        format: ISO8601
+        nullable: true
+      acknowledged_by:
+        type: string
+        format: uuid
+        nullable: true
+      escalation_level:
+        type: integer
+
+  AlertRecipient:
+    type: object
+    properties:
+      user_id:
+        type: string
+        format: uuid
+      user_name:
+        type: string
+      status:
+        type: enum
+        values: ["pending", "delivered", "read", "acknowledged"]
+      read_at:
+        type: string
+        format: ISO8601
+        nullable: true
+      acknowledged_at:
+        type: string
+        format: ISO8601
+        nullable: true
+      escalation_level:
+        type: integer
+
+  UserAlertPreferences:
+    type: object
+    properties:
+      alerts_enabled:
+        type: boolean
+      websocket_enabled:
+        type: boolean
+      email_enabled:
+        type: boolean
+      sms_enabled:
+        type: boolean
+      sms_phone_number:
+        type: string
+        nullable: true
+      push_enabled:
+        type: boolean
+      quiet_hours_enabled:
+        type: boolean
+      quiet_hours_start:
+        type: string
+        nullable: true
+        description: "HH:MM"
+      quiet_hours_end:
+        type: string
+        nullable: true
+        description: "HH:MM"
+      quiet_hours_timezone:
+        type: string
+      severity_preferences:
+        type: object
+        nullable: true
+        additionalProperties:
+          type: object
+          properties:
+            websocket: boolean
+            email: boolean
+            sms: boolean
+            push: boolean
+      alert_type_preferences:
+        type: object
+        nullable: true
+        additionalProperties:
+          type: object
+          properties:
+            websocket: boolean
+            email: boolean
+            sms: boolean
+            push: boolean
+
+  ChannelConfig:
+    type: object
+    properties:
+      websocket:
+        type: boolean
+      email:
+        type: boolean
+      sms:
+        type: boolean
+      push:
+        type: boolean
+
+# =============================================================================
+# VALIDATION SCHEMAS (ZOD)
+# =============================================================================
+
+zod_schemas:
+  - name: alertSeverityEnum
+    definition: "z.enum(['critical', 'high', 'medium', 'low'])"
+
+  - name: alertStatusEnum
+    definition: "z.enum(['pending', 'delivered', 'read', 'acknowledged', 'expired'])"
+
+  - name: acknowledgeAlertSchema
+    definition: |
+      z.object({
+        notes: z.string().max(500).optional(),
+      })
+
+  - name: updatePreferencesSchema
+    definition: |
+      z.object({
+        alerts_enabled: z.boolean().optional(),
+        email_enabled: z.boolean().optional(),
+        sms_enabled: z.boolean().optional(),
+        sms_phone_number: z.string()
+          .regex(/^\+[1-9]\d{1,14}$/, 'Invalid phone number. Use E.164 format (+1234567890)')
+          .optional()
+          .nullable(),
+        push_enabled: z.boolean().optional(),
+        quiet_hours_enabled: z.boolean().optional(),
+        quiet_hours_start: z.string()
+          .regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Invalid time format (HH:MM)')
+          .optional()
+          .nullable(),
+        quiet_hours_end: z.string()
+          .regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Invalid time format (HH:MM)')
+          .optional()
+          .nullable(),
+        quiet_hours_timezone: z.string().optional(),
+        severity_preferences: z.record(z.object({
+          websocket: z.boolean().optional(),
+          email: z.boolean().optional(),
+          sms: z.boolean().optional(),
+          push: z.boolean().optional(),
+        })).optional(),
+        alert_type_preferences: z.record(z.object({
+          websocket: z.boolean().optional(),
+          email: z.boolean().optional(),
+          sms: z.boolean().optional(),
+          push: z.boolean().optional(),
+        })).optional(),
+      }).refine(
+        (data) => {
+          if (data.sms_enabled && !data.sms_phone_number) {
+            return false;
+          }
+          return true;
+        },
+        { message: 'Phone number required when SMS is enabled', path: ['sms_phone_number'] }
+      )
+
+  - name: sendAlertSchema
+    definition: |
+      z.object({
+        template_code: z.string().optional(),
+        alert_type: z.string().min(1),
+        severity: alertSeverityEnum,
+        subject: z.string().min(5).max(200),
+        body: z.string().min(10).max(2000),
+        sms_body: z.string().max(160).optional(),
+        recipients: z.array(z.string().uuid()).min(1),
+        source_type: z.string().optional(),
+        source_id: z.string().uuid().optional(),
+        source_reference: z.string().optional(),
+      })
+
+  - name: alertListQuerySchema
+    definition: |
+      z.object({
+        severity: alertSeverityEnum.optional(),
+        status: alertStatusEnum.optional(),
+        alert_type: z.string().optional(),
+        unread_only: z.coerce.boolean().optional(),
+        date_from: z.string().optional(),
+        date_to: z.string().optional(),
+        page: z.coerce.number().int().positive().default(1),
+        limit: z.coerce.number().int().min(1).max(50).default(20),
+      })
+
+# =============================================================================
+# SERVICE INTERFACE
+# =============================================================================
+
+service:
+  name: AlertService
+  path: lib/services/alert-service.ts
+  methods:
+    # CRUD
+    - name: createAlert
+      description: "Create and send alert"
+      params:
+        - name: input
+          type: CreateAlertInput
+      returns: QualityAlert
+
+    - name: getUserAlerts
+      description: "Get user's alerts with pagination"
+      params:
+        - name: userId
+          type: string
+        - name: params
+          type: AlertListParams
+      returns: PaginatedResult<QualityAlert>
+
+    - name: getById
+      description: "Get single alert"
+      params:
+        - name: alertId
+          type: string
+        - name: userId
+          type: string
+      returns: QualityAlert | null
+
+    - name: getUnreadCount
+      description: "Get unread count by severity"
+      params:
+        - name: userId
+          type: string
+      returns: UnreadCount
+
+    # Actions
+    - name: markAsRead
+      description: "Mark alert as read"
+      params:
+        - name: alertId
+          type: string
+        - name: userId
+          type: string
+      returns: void
+
+    - name: acknowledge
+      description: "Acknowledge alert"
+      params:
+        - name: alertId
+          type: string
+        - name: userId
+          type: string
+        - name: notes
+          type: string
+          optional: true
+      returns: void
+
+    # Delivery
+    - name: deliverAlert
+      description: "Send alert to all recipients via enabled channels"
+      params:
+        - name: alert
+          type: QualityAlert
+      returns: void
+
+    - name: sendWebSocket
+      description: "Send WebSocket notification"
+      params:
+        - name: userId
+          type: string
+        - name: alert
+          type: QualityAlert
+      returns: boolean
+
+    - name: sendEmail
+      description: "Queue email notification"
+      params:
+        - name: userId
+          type: string
+        - name: alert
+          type: QualityAlert
+      returns: void
+
+    - name: sendSMS
+      description: "Queue SMS notification"
+      params:
+        - name: userId
+          type: string
+        - name: alert
+          type: QualityAlert
+      returns: void
+
+    # Preferences
+    - name: getPreferences
+      description: "Get user preferences"
+      params:
+        - name: userId
+          type: string
+      returns: UserAlertPreferences
+
+    - name: updatePreferences
+      description: "Update user preferences"
+      params:
+        - name: userId
+          type: string
+        - name: prefs
+          type: Partial<UserAlertPreferences>
+      returns: void
+
+    - name: isChannelEnabled
+      description: "Check if channel is enabled for user/severity/type"
+      params:
+        - name: userId
+          type: string
+        - name: channel
+          type: AlertChannel
+        - name: severity
+          type: AlertSeverity
+        - name: alertType
+          type: string
+      returns: boolean
+
+    # Escalation
+    - name: processEscalations
+      description: "Process pending escalations (cron job)"
+      returns: number
+      notes: "Returns count of escalated alerts"
+
+    - name: escalateAlert
+      description: "Escalate single alert"
+      params:
+        - name: alertId
+          type: string
+      returns: void
+
+    # Templates
+    - name: getTemplate
+      description: "Get template by code"
+      params:
+        - name: orgId
+          type: string
+        - name: templateCode
+          type: string
+      returns: AlertTemplate | null
+
+    - name: renderTemplate
+      description: "Render template with data"
+      params:
+        - name: template
+          type: string
+        - name: data
+          type: Record<string, unknown>
+      returns: string
+
+    # Utility
+    - name: generateAlertNumber
+      description: "Generate alert number"
+      params:
+        - name: orgId
+          type: string
+      returns: string
+
+    - name: resolveRecipients
+      description: "Resolve user IDs from role codes"
+      params:
+        - name: orgId
+          type: string
+        - name: roles
+          type: string[]
+      returns: string[]
+
+# =============================================================================
+# WEBSOCKET EVENTS
+# =============================================================================
+
+websocket:
+  events:
+    - name: quality_alert
+      direction: server_to_client
+      channel: "user:{userId}:alerts"
+      payload:
+        alert_id:
+          type: string
+        alert_number:
+          type: string
+        alert_type:
+          type: string
+        severity:
+          type: string
+        subject:
+          type: string
+        source_reference:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: ISO8601
+
+    - name: alert_acknowledged
+      direction: server_to_client
+      channel: "user:{userId}:alerts"
+      description: "Notify when alert is acknowledged (by any recipient)"
+      payload:
+        alert_id:
+          type: string
+        acknowledged_by:
+          type: string
+        acknowledged_at:
+          type: string
+
+# =============================================================================
+# CRON JOBS
+# =============================================================================
+
+cron_jobs:
+  - name: process_alert_escalations
+    schedule: "*/5 * * * *"  # Every 5 minutes
+    function: AlertService.processEscalations
+    description: "Check for alerts pending escalation and escalate if needed"
+
+  - name: retry_failed_deliveries
+    schedule: "*/10 * * * *"  # Every 10 minutes
+    function: AlertService.retryFailedDeliveries
+    description: "Retry failed email/SMS deliveries with exponential backoff"
+
+  - name: expire_old_alerts
+    schedule: "0 2 * * *"  # Daily at 2 AM
+    function: AlertService.expireOldAlerts
+    description: "Mark old unacknowledged alerts as expired (configurable threshold)"

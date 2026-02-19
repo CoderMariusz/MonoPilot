@@ -1,0 +1,156 @@
+# AGENT HANDOFF: Users - Add Actions Menu & 10 PRD Roles
+
+agent: frontend-dev
+epic: "01-settings"
+story: "01.2"
+phase: "REFACTOR"
+priority: HIGH
+task: "Rebuild Users page with Actions menu [⋮] and 10 PRD roles (keep Tabs from v1)"
+
+# ============================================
+# CONTEXT
+# ============================================
+
+wireframes:
+  - docs/3-ARCHITECTURE/ux/wireframes/SET-008-user-list.md
+  - docs/3-ARCHITECTURE/ux/wireframes/SET-009-user-create-edit-modal.md
+  - docs/3-ARCHITECTURE/ux/wireframes/SET-010-user-invitations.md
+
+migration_plan:
+
+reference_code:
+  old_v1: apps/frontend/app/(authenticated)/settings/users/page.tsx
+  keep_from_v1: "Tabs pattern (Users + Invitations) - this is GOOD addition not in wireframe"
+  must_replace: "Inline Edit/Delete buttons → Actions menu [⋮]"
+  must_fix: "Role names (admin/manager → Super Admin/Production Manager)"
+
+# ============================================
+# ARCHITECTURE
+# ============================================
+
+architecture:
+  keep_from_v1:
+    - Tabs: "Users" | "Invitations" (good UX improvement)
+    - InvitationsTable component (if SET-010 compliant)
+    - InvitationModal component
+
+  replace:
+    - Inline buttons (Edit, Delete) → Actions menu [⋮]
+    - Simplified roles → 10 PRD roles
+
+  add:
+    - Actions menu with 5 options
+    - Activity Log panel
+    - Change Role modal
+
+  role_mapping:
+    old_v1: [admin, manager, operator, viewer, planner, technical, purchasing, warehouse, qc, finance]
+    new_v2:
+      - Super Admin (SUPER_ADMIN)
+      - Admin (ADMIN)
+      - Production Manager (PRODUCTION_MANAGER)
+      - Quality Manager (QUALITY_MANAGER)
+      - Warehouse Manager (WAREHOUSE_MANAGER)
+      - Production Operator (PRODUCTION_OPERATOR)
+      - Quality Inspector (QUALITY_INSPECTOR)
+      - Warehouse Operator (WAREHOUSE_OPERATOR)
+      - Planner (PLANNER)
+      - Viewer (VIEWER)
+
+# ============================================
+# OUTPUT
+# ============================================
+
+output:
+  pages:
+    - apps/frontend/app/(authenticated)/settings/users/page.tsx
+
+  components:
+    - components/settings/users/UsersDataTable.tsx
+    - components/settings/users/UserModal.tsx (SET-009)
+    - components/settings/users/UserActionsMenu.tsx ([⋮] menu component)
+    - components/settings/users/InvitationsTable.tsx (migrate from v1 if compliant)
+    - components/settings/users/ChangeRoleModal.tsx (NEW)
+    - components/settings/users/ResendInviteButton.tsx (inline in Users tab)
+    - components/settings/users/DeactivateConfirmDialog.tsx
+
+# ============================================
+# REQUIREMENTS
+# ============================================
+
+requirements:
+
+  actions_menu:
+    items:
+      - Edit User (opens UserModal in edit mode)
+      - Change Role (Super Admin only, opens ChangeRoleModal)
+      - Disable User (confirmation dialog, sets status = disabled)
+      - Resend Invite (only if status = invited, inline action)
+      - View Activity Log (opens ActivityLogPanel)
+    location: Last column (Actions)
+    icon: [⋮] (MoreVertical from lucide-react)
+
+  tabs_pattern:
+    keep: true # Good addition from v1
+    tabs:
+      - Users: Main user list
+      - Invitations: Pending invitations table (SET-010)
+
+  role_display:
+    use: 10 PRD roles (not simplified v1 roles)
+    format: "Super Admin" (display label)
+    value: "SUPER_ADMIN" (enum value)
+    badges: Color-coded per role
+
+  resend_invite:
+    location: Inline link in Users tab (for status = invited)
+    format: "Invited: 3 days ago • [Resend Invite]"
+    action: Re-sends invitation email
+
+# ============================================
+# REUSABLE
+# ============================================
+
+reusable:
+  services:
+    - lib/services/user-service.ts ✅
+
+  shared:
+    - settings/shared/ActionsMenu.tsx (use for [⋮])
+    - settings/shared/StatusBadge.tsx
+    - settings/shared/ActivityLogPanel.tsx
+
+  from_v1_if_compliant:
+    - InvitationsTable.tsx (check vs SET-010)
+    - InvitationModal.tsx (check compliance)
+
+# ============================================
+# ISOLATION
+# ============================================
+
+isolation:
+  allowed:
+    - Migrate: InvitationsTable if SET-010 compliant
+    - Use: lib/services/user-service.ts
+    - Create in: settings/users/
+
+  forbidden:
+    - Copy inline button pattern (must use actions menu)
+    - Use old role names (must use 10 PRD roles)
+
+# ============================================
+# ACCEPTANCE
+# ============================================
+
+acceptance:
+  - [ ] Actions menu [⋮] with 5 options
+  - [ ] 10 PRD roles displayed correctly
+  - [ ] Tabs (Users + Invitations) work
+  - [ ] Change Role modal works (Super Admin only)
+  - [ ] Disable user confirmation works
+  - [ ] Resend Invite inline link works
+  - [ ] Activity Log panel opens
+  - [ ] All 4 states work
+
+estimated_hours: 8-10
+complexity: MEDIUM

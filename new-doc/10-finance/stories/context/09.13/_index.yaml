@@ -1,0 +1,141 @@
+story:
+  id: "09.13"
+  name: "Material Variance (Price vs Quantity)"
+  epic: "09-finance"
+  phase: "2"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "fullstack"
+
+dependencies:
+  required:
+    - story: "01.1"
+      provides: ["organizations", "users"]
+    - story: "02.1"
+      provides: ["products"]
+    - story: "02.2"
+      provides: ["boms", "bom_items"]
+    - story: "04.2"
+      provides: ["material_consumption"]
+    - story: "09.2"
+      provides: ["standard_costs"]
+    - story: "09.3"
+      provides: ["material_consumption_costs"]
+    - story: "09.6"
+      provides: ["work_order_costs"]
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/finance.md"
+  prd_sections: ["FR-9.4.1", "FR-9.4.2", "FR-FIN-052"]
+  story: "docs/2-MANAGEMENT/epics/current/09-finance/09.13.material-variance.md"
+  patterns:
+    - "apps/frontend/lib/services/work-order-cost-service.ts"
+
+files_to_create:
+  database:
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_create_material_variance.sql"
+      type: "migration"
+  api:
+    - path: "apps/frontend/app/api/finance/work-order-costs/[id]/material-breakdown/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/finance/variances/material/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/finance/reports/material-variance/route.ts"
+      methods: ["GET"]
+  services:
+    - path: "apps/frontend/lib/services/material-variance-service.ts"
+  validation:
+    - path: "apps/frontend/lib/validation/finance.ts"
+      note: "Extend existing"
+  components:
+    - path: "apps/frontend/components/finance/MaterialVarianceBreakdownCard.tsx"
+    - path: "apps/frontend/components/finance/VarianceSummary.tsx"
+    - path: "apps/frontend/components/finance/VarianceItemsTable.tsx"
+    - path: "apps/frontend/components/finance/VarianceStatusBadge.tsx"
+
+database:
+  tables:
+    - name: "cost_variances"
+      new_columns: ["bom_item_id", "product_id", "lot_number", "standard_price", "actual_price", "standard_quantity", "actual_quantity", "price_variance_amount", "quantity_variance_amount"]
+      indexes: ["product_id", "bom_item_id", "org_id+variance_type"]
+  functions:
+    - name: "calculate_material_price_variance"
+      type: "calculation"
+      formula: "(actual_price - standard_price) × actual_quantity"
+    - name: "calculate_material_quantity_variance"
+      type: "calculation"
+      formula: "(actual_quantity - standard_quantity) × standard_price"
+    - name: "calculate_work_order_material_variance"
+      type: "aggregation"
+      returns: "table (per BOM item breakdown)"
+  triggers:
+    - name: "wo_material_variance"
+      on: "work_orders UPDATE"
+      event: "status = 'completed'"
+
+api_endpoints:
+  - method: "GET"
+    path: "/api/finance/work-order-costs/:id/material-breakdown"
+    auth: true
+    roles: ["viewer", "finance_manager"]
+  - method: "GET"
+    path: "/api/finance/variances/material"
+    auth: true
+    roles: ["viewer", "finance_manager"]
+  - method: "GET"
+    path: "/api/finance/reports/material-variance"
+    auth: true
+    roles: ["viewer", "finance_manager"]
+
+ux:
+  wireframes:
+    - id: "FIN-007"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/FIN-007-material-variance-report.md"
+      relevance: "Material variance breakdown card on WO detail page with summary card showing total/price/quantity variances, variance items table, and status badges for favorable/unfavorable variances"
+  patterns:
+    card: "ShadCN Card pattern"
+    table: "ShadCN DataTable pattern"
+    badge: "ShadCN Badge with color variants"
+  states:
+    - "loading"
+    - "no_variance"
+    - "favorable"
+    - "unfavorable"
+    - "error"
+
+validation_rules:
+  standard_price: "numeric >= 0"
+  actual_price: "numeric >= 0"
+  standard_quantity: "numeric >= 0"
+  actual_quantity: "numeric >= 0"
+  variance_type: "enum: material_price, material_usage"
+
+patterns:
+  rls: "ADR-013"
+  api: "REST with org_id filter"
+  service: "class-based with static methods"
+  validation: "zod schemas"
+  triggers: "Auto-create variance on WO completion"
+
+acceptance_checklist:
+  - "MPV calculated correctly (formula verified)"
+  - "MQV calculated correctly (formula verified)"
+  - "Variance decomposition works per BOM item"
+  - "Auto-create variance on WO completion"
+  - "API returns price vs quantity breakdown"
+  - "Variance report generates < 2s"
+  - "UI displays variance breakdown"
+  - "Status badges show favorable/unfavorable"
+  - "RLS enforces org isolation"
+  - "All tests pass (unit, integration, edge cases)"
+
+output_artifacts:
+  - "Migration: extend cost_variances table"
+  - "Function: calculate_material_price_variance()"
+  - "Function: calculate_material_quantity_variance()"
+  - "Function: calculate_work_order_material_variance()"
+  - "Trigger: wo_material_variance"
+  - "API: 3 endpoints"
+  - "Service: MaterialVarianceService with 4 methods"
+  - "Components: 4 UI components"
+  - "Tests: Unit, integration, edge cases"

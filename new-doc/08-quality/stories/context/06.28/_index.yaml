@@ -1,0 +1,77 @@
+# Story 06.28 - CoA Generation Engine Context (Entry Point)
+# Generated: 2025-01-15
+# Purpose: Story metadata, dependencies, and overview
+# Phase: 3 (CoA & HACCP)
+
+story:
+  id: "06.28"
+  name: "CoA Generation Engine"
+  slug: "coa-generation-engine"
+  epic: "06-quality"
+  phase: "3"
+  complexity: "L"
+  estimate_days: 4-5
+  type: "backend"
+  state: "ready"
+  priority: "P0"
+
+context_files:
+  - _index.yaml
+  - database.yaml
+  - api.yaml
+  - frontend.yaml
+  - tests.yaml
+
+dependencies:
+  required:
+    - story: "01.1"
+      provides: ["organizations", "users"]
+    - story: "02.1"
+      provides: ["products"]
+    - story: "04.1"
+      provides: ["work_orders for batch reference"]
+    - story: "06.3"
+      provides: ["quality_specifications"]
+    - story: "06.4"
+      provides: ["quality_spec_parameters"]
+    - story: "06.11"
+      provides: ["quality_inspections", "quality_test_results"]
+    - story: "06.12"
+      provides: ["batch_release triggers CoA generation"]
+    - story: "06.27"
+      provides: ["coa_templates"]
+
+  blocks:
+    - story: "06.29"
+      name: "CoA PDF Export"
+      reason: "CoA data required for PDF generation"
+
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "certificates_of_analysis + coa_parameters + sequences"
+  - type: "api"
+    count: 8
+    description: "List, generate, approve, void, regenerate"
+  - type: "service"
+    count: 1
+    description: "CoAService with generation and approval"
+
+technical_notes:
+  - "CoA number format: COA-YYYY-NNNNN"
+  - "Test results snapshot from quality_test_results"
+  - "Template data snapshot from coa_templates"
+  - "E-signature with password verification (FDA 21 CFR Part 11)"
+  - "CoA immutability after approval (is_locked = true)"
+  - "Trigger: lock_coa_on_approval() prevents edits"
+  - "Void workflow preserves immutability"
+
+business_rules:
+  - rule: "CoA Generated After Batch Release"
+    enforcement: "Batch release triggers CoA generation"
+  - rule: "QA Manager Approval Required"
+    enforcement: "E-signature with password + approval_meaning"
+  - rule: "Immutability After Approval"
+    enforcement: "Database trigger prevents updates when is_locked = true"
+  - rule: "Void Instead of Delete"
+    enforcement: "Approved CoAs can only be voided, not deleted"

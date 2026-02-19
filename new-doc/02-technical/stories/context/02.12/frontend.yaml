@@ -1,0 +1,406 @@
+# Story 02.12 - Frontend Specification
+# Purpose: Page, components, services, hooks
+# Agent: FRONTEND-DEV
+
+# This is a full-stack dashboard story with significant frontend work
+is_frontend_focused: true
+
+# Page
+pages:
+  - path: "apps/frontend/app/(authenticated)/technical/page.tsx"
+    description: "Technical Module Dashboard Page"
+    route: "/technical"
+    components_used:
+      - "TechnicalDashboardPage"
+      - "DashboardStatsCard"
+      - "AllergenMatrixPanel"
+      - "BomTimelinePanel"
+      - "RecentActivityPanel"
+      - "CostTrendsChart"
+      - "QuickActionsBar"
+    states:
+      - "loading"
+      - "empty"
+      - "error"
+      - "success"
+
+# Components
+components:
+  - path: "apps/frontend/app/(authenticated)/technical/components/TechnicalDashboardPage.tsx"
+    description: "Main dashboard page layout component"
+    props: []
+    children:
+      - "DashboardStatsCards"
+      - "AllergenMatrixPanel"
+      - "BomTimelinePanel"
+      - "RecentActivityPanel"
+      - "CostTrendsChart"
+      - "QuickActionsBar"
+    responsive: true
+    breakpoints:
+      desktop: "4 cards row, 2-column panels"
+      tablet: "2x2 card grid, single-column panels"
+      mobile: "single column, all stacked"
+
+  - path: "apps/frontend/app/(authenticated)/technical/components/DashboardStatsCard.tsx"
+    description: "Reusable stats card with icon, value, breakdown, click action"
+    props:
+      - "icon: LucideIcon"
+      - "title: string"
+      - "value: number | string"
+      - "breakdown?: { label: string; value: number; type: 'active' | 'inactive' }[]"
+      - "trend?: { percent: number; direction: 'up' | 'down' | 'neutral' }"
+      - "onClick?: () => void"
+      - "href?: string"
+      - "loading?: boolean"
+    styling:
+      - "Material Design elevated card (2dp)"
+      - "Hover: elevation 4dp, cursor pointer"
+      - "Border radius: 8px"
+      - "Padding: 16px"
+
+  - path: "apps/frontend/app/(authenticated)/technical/components/AllergenMatrixPanel.tsx"
+    description: "Products x Allergens heatmap grid"
+    props:
+      - "data: AllergenMatrixResponse"
+      - "onCellClick?: (productId: string, allergenId: string) => void"
+      - "onExportPdf?: () => void"
+      - "loading?: boolean"
+      - "error?: string"
+    features:
+      - "Product type filter dropdown"
+      - "Export PDF button"
+      - "Color-coded cells (red/yellow/green)"
+      - "Click cell to navigate to allergen management"
+      - "Legend at bottom"
+    colors:
+      contains: "#EF4444"  # Red
+      may_contain: "#FBBF24"  # Yellow
+      free_from: "#10B981"  # Green
+
+  - path: "apps/frontend/app/(authenticated)/technical/components/BomTimelinePanel.tsx"
+    description: "Horizontal BOM version timeline with dots"
+    props:
+      - "data: BomTimelineResponse"
+      - "onDotClick?: (bomId: string) => void"
+      - "onProductFilterChange?: (productId: string | null) => void"
+      - "loading?: boolean"
+      - "error?: string"
+    features:
+      - "Horizontal timeline (last 6 months)"
+      - "Dots represent BOM version changes"
+      - "Hover tooltip: product name, version, date, changed_by"
+      - "Click dot to navigate to BOM detail"
+      - "Product filter dropdown"
+
+  - path: "apps/frontend/app/(authenticated)/technical/components/RecentActivityPanel.tsx"
+    description: "Activity feed list (last 10 events)"
+    props:
+      - "data: RecentActivityResponse"
+      - "onActivityClick?: (entityType: string, entityId: string) => void"
+      - "loading?: boolean"
+      - "error?: string"
+    features:
+      - "Icon + Description + User + Timestamp"
+      - "Relative time display (2 hours ago)"
+      - "Click row to navigate to detail page"
+      - "View All Activity link"
+    icons:
+      product: "Package"
+      bom: "ClipboardList"
+      routing: "Settings"
+
+  - path: "apps/frontend/app/(authenticated)/technical/components/CostTrendsChart.tsx"
+    description: "Recharts line chart for cost trends"
+    props:
+      - "data: CostTrendsResponse"
+      - "onChartClick?: () => void"
+      - "loading?: boolean"
+      - "error?: string"
+    features:
+      - "Toggle buttons: Material / Labor / Overhead / Total"
+      - "Line chart (Recharts LineChart)"
+      - "Y-axis: Cost (PLN), X-axis: Months"
+      - "Hover tooltip with cost breakdown"
+      - "Click to navigate to cost history"
+    library: "recharts"
+
+  - path: "apps/frontend/app/(authenticated)/technical/components/QuickActionsBar.tsx"
+    description: "Quick action buttons at bottom of dashboard"
+    props:
+      - "onNewProduct?: () => void"
+      - "onNewBom?: () => void"
+      - "onNewRouting?: () => void"
+    features:
+      - "Three buttons: + New Product, + New BOM, + New Routing"
+      - "Opens respective create modals"
+      - "Responsive: desktop inline, mobile stacked"
+
+# TypeScript Types
+types:
+  - path: "apps/frontend/lib/types/dashboard.ts"
+    content: |
+      export type TrendDirection = 'up' | 'down' | 'neutral';
+      export type ActivityType = 'product_created' | 'product_updated' | 'bom_created' | 'bom_activated' | 'routing_created' | 'routing_updated';
+      export type EntityType = 'product' | 'bom' | 'routing';
+      export type AllergenRelation = 'contains' | 'may_contain' | null;
+
+      export interface DashboardStatsResponse {
+        products: {
+          total: number;
+          active: number;
+          inactive: number;
+        };
+        boms: {
+          total: number;
+          active: number;
+          phased: number;
+        };
+        routings: {
+          total: number;
+          reusable: number;
+        };
+        avg_cost: {
+          value: number;
+          currency: string;
+          trend_percent: number;
+          trend_direction: TrendDirection;
+        };
+      }
+
+      export interface AllergenMatrixResponse {
+        allergens: Array<{
+          id: string;
+          code: string;
+          name: string;
+        }>;
+        products: Array<{
+          id: string;
+          code: string;
+          name: string;
+          allergen_relations: Record<string, AllergenRelation>;
+        }>;
+      }
+
+      export interface BomTimelineResponse {
+        timeline: Array<{
+          bom_id: string;
+          product_id: string;
+          product_code: string;
+          product_name: string;
+          version: number;
+          effective_from: string;
+          changed_by: string;
+          changed_by_name: string;
+          changed_at: string;
+        }>;
+        limit_reached: boolean;
+      }
+
+      export interface RecentActivityResponse {
+        activities: Array<{
+          id: string;
+          type: ActivityType;
+          entity_type: EntityType;
+          entity_id: string;
+          description: string;
+          user_id: string;
+          user_name: string;
+          timestamp: string;
+          relative_time: string;
+          link: string;
+        }>;
+      }
+
+      export interface CostTrendsResponse {
+        months: string[];
+        data: Array<{
+          month: string;
+          material_cost: number;
+          labor_cost: number;
+          overhead_cost: number;
+          total_cost: number;
+        }>;
+        currency: string;
+      }
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-dashboard.ts"
+    description: "React Query hooks for dashboard data"
+    exports:
+      - name: "useDashboardStats"
+        returns: "UseQueryResult<DashboardStatsResponse>"
+        staleTime: 60000  # 1 minute
+      - name: "useAllergenMatrix"
+        params: ["productType?: string"]
+        returns: "UseQueryResult<AllergenMatrixResponse>"
+        staleTime: 600000  # 10 minutes
+      - name: "useBomTimeline"
+        params: ["productId?: string", "months?: number"]
+        returns: "UseQueryResult<BomTimelineResponse>"
+        staleTime: 300000  # 5 minutes
+      - name: "useRecentActivity"
+        params: ["limit?: number"]
+        returns: "UseQueryResult<RecentActivityResponse>"
+        staleTime: 30000  # 30 seconds
+      - name: "useCostTrends"
+        params: ["months?: number"]
+        returns: "UseQueryResult<CostTrendsResponse>"
+        staleTime: 300000  # 5 minutes
+    pattern: |
+      import { useQuery } from '@tanstack/react-query';
+      import { fetchDashboardStats, fetchAllergenMatrix, fetchBomTimeline, fetchRecentActivity, fetchCostTrends } from '@/lib/services/dashboard-service';
+
+      export function useDashboardStats() {
+        return useQuery({
+          queryKey: ['dashboard', 'stats'],
+          queryFn: fetchDashboardStats,
+          staleTime: 60 * 1000,
+          refetchOnWindowFocus: true,
+        });
+      }
+
+      export function useAllergenMatrix(productType?: string) {
+        return useQuery({
+          queryKey: ['dashboard', 'allergen-matrix', productType],
+          queryFn: () => fetchAllergenMatrix(productType),
+          staleTime: 10 * 60 * 1000,
+        });
+      }
+
+      // ... similar for other hooks
+
+# UX Wireframe Reference
+ux:
+  wireframes:
+    - id: "TEC-017"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-017-dashboard.md"
+      description: "Full dashboard wireframe with all widgets"
+      components:
+        - "Stats Cards (4)"
+        - "Allergen Matrix Panel"
+        - "BOM Timeline Panel"
+        - "Recent Activity Panel"
+        - "Cost Trends Chart"
+        - "Quick Actions Bar"
+
+  states:
+    loading:
+      description: "Skeleton loaders for all cards and panels"
+      text: "Loading dashboard data..."
+    empty:
+      description: "Welcome message with CTAs"
+      icon: "Factory"
+      title: "Welcome to Technical Module"
+      message: "No data yet. Start by creating products, BOMs, and routings."
+      ctas:
+        - "Create Your First Product"
+        - "Create First BOM"
+        - "Create First Routing"
+    error:
+      description: "Error state with retry"
+      icon: "AlertTriangle"
+      title: "Failed to Load Dashboard Data"
+      message: "Unable to retrieve dashboard statistics. Please try again."
+      actions:
+        - "Retry"
+        - "Contact Support"
+    success:
+      description: "Full dashboard with data"
+
+  responsive:
+    desktop:
+      breakpoint: ">1024px"
+      layout:
+        - "Stats cards: 4 in row (25% each)"
+        - "Allergen matrix: left panel (60%)"
+        - "BOM timeline: right panel (40%)"
+        - "Recent activity: bottom left (60%)"
+        - "Cost trends: bottom right (40%)"
+    tablet:
+      breakpoint: "768-1024px"
+      layout:
+        - "Stats cards: 2x2 grid (50% each)"
+        - "All panels: 100% width, stack vertically"
+        - "Allergen matrix: horizontal scroll"
+    mobile:
+      breakpoint: "<768px"
+      layout:
+        - "Stats cards: single column (100%)"
+        - "All panels: 100% width, stack vertically"
+        - "Allergen matrix: scroll both axes"
+        - "Quick actions: full width, stacked"
+
+# Accessibility
+accessibility:
+  touch_targets: "48x48dp minimum"
+  contrast:
+    text: "4.5:1 minimum"
+    charts: "3:1 minimum (thick lines)"
+    heatmap: "WCAG AA for red/yellow/green"
+  screen_reader:
+    stats_cards: "Products card: 247 total, 215 active, 32 inactive, click to view all products"
+    allergen_matrix: "Allergen matrix: SKU-001 Wheat Flour, Gluten: Contains, Dairy: Free From..."
+    timeline: "BOM version timeline: Wheat Bread version 5, March 15th, click for details"
+  keyboard:
+    - "Tab navigation through all cards and panels"
+    - "Enter to activate card click or chart click"
+    - "Arrow keys for timeline navigation"
+  aria:
+    cards: "role='region' aria-label='Products statistics'"
+    chart: "role='img' aria-label='Cost trends chart, last 6 months'"
+    matrix: "role='grid' with proper row/column headers"
+    timeline: "role='list' with list items"
+
+# Visual Design
+visual_design:
+  card_styling:
+    elevation: "2dp (hover: 4dp)"
+    border_radius: "8px"
+    padding: "16px"
+    background: "#FFFFFF"
+  colors:
+    primary_blue: "#3B82F6"
+    success_green: "#10B981"
+    warning_yellow: "#FBBF24"
+    danger_red: "#EF4444"
+    gray_neutral: "#6B7280"
+  icons:
+    products: "Package"
+    boms: "ClipboardList"
+    routings: "Settings"
+    cost: "DollarSign"
+    empty_state: "Factory"
+    error_state: "AlertTriangle"
+  typography:
+    card_titles: "14px, font-weight: 500, color: #111827"
+    card_values: "28px, font-weight: 700, color: #111827"
+    card_subtext: "12px, font-weight: 400, color: #6B7280"
+    panel_titles: "16px, font-weight: 600, color: #111827"
+
+# PDF Export
+pdf_export:
+  library: "jsPDF or pdfmake"
+  features:
+    - "Organization logo"
+    - "Timestamp"
+    - "Product rows"
+    - "Allergen columns"
+    - "Color legend"
+  orientation: "Landscape"
+  filename: "allergen-matrix-{org_id}-{YYYY-MM-DD}.pdf"
+
+# Dependencies
+dependencies:
+  npm:
+    - "recharts"  # For cost trends chart
+    - "jspdf"  # For PDF export
+    - "date-fns"  # For relative time formatting
+  shadcn:
+    - "Card"
+    - "Button"
+    - "Select"
+    - "Skeleton"
+    - "Tooltip"
+    - "Badge"

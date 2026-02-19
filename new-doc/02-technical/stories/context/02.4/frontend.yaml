@@ -1,0 +1,479 @@
+# Story 02.4 - Frontend Specification
+# Purpose: Pages, components, hooks, services, validation
+# Agent: FRONTEND-DEV
+
+# Story type - this is a full-stack story with significant frontend work
+is_backend_focused: false
+
+# ============================================
+# PAGES TO CREATE
+# ============================================
+pages:
+  - path: "apps/frontend/app/(authenticated)/technical/boms/page.tsx"
+    description: "BOMs list page with DataTable, search, filters, pagination"
+    wireframe: "TEC-005"
+    features:
+      - DataTable with sorting
+      - Search by product code/name (debounced 300ms)
+      - Filter by status, product type, effective date
+      - Pagination (50 per page)
+      - Row actions (View, Edit, Clone, Delete, Timeline)
+      - Create BOM button
+      - Empty state with CTA
+      - Error state with retry
+      - Loading skeleton
+
+  - path: "apps/frontend/app/(authenticated)/technical/boms/new/page.tsx"
+    description: "Create BOM page with header form"
+    wireframe: "TEC-006"
+    features:
+      - Product selector (searchable dropdown)
+      - Auto-version display
+      - Status selector
+      - Effective date pickers (from/to)
+      - Output quantity + UoM
+      - Notes field
+      - Form validation (Zod)
+      - Save Draft / Save BOM buttons
+      - Unsaved changes warning
+
+  - path: "apps/frontend/app/(authenticated)/technical/boms/[id]/page.tsx"
+    description: "BOM detail/view page"
+    wireframe: "TEC-006"
+    features:
+      - Read-only header display
+      - Status badge
+      - Version display
+      - Effective dates
+      - Output quantity
+      - Edit button (navigates to edit page)
+      - Timeline button (opens modal)
+      - Delete button (with confirmation)
+
+  - path: "apps/frontend/app/(authenticated)/technical/boms/[id]/edit/page.tsx"
+    description: "Edit BOM page with locked product field"
+    wireframe: "TEC-006"
+    features:
+      - Product field LOCKED (read-only with tooltip)
+      - All other header fields editable
+      - Status change warning (Active BOM)
+      - Date overlap validation
+      - Save / Cancel buttons
+
+# ============================================
+# COMPONENTS TO CREATE
+# ============================================
+components:
+  - path: "apps/frontend/components/technical/bom/BOMsDataTable.tsx"
+    description: "DataTable for BOMs list with sorting, filtering, pagination"
+    props:
+      - { name: "data", type: "BOMWithProduct[]" }
+      - { name: "isLoading", type: "boolean" }
+      - { name: "onEdit", type: "(id: string) => void" }
+      - { name: "onDelete", type: "(id: string) => void" }
+      - { name: "onViewTimeline", type: "(productId: string) => void" }
+    libraries:
+      - "@tanstack/react-table"
+      - "ShadCN Table"
+      - "ShadCN DropdownMenu"
+
+  - path: "apps/frontend/components/technical/bom/BOMHeaderForm.tsx"
+    description: "Reusable form for BOM header fields (create/edit)"
+    props:
+      - { name: "mode", type: "'create' | 'edit'" }
+      - { name: "defaultValues", type: "Partial<BOMFormData>", optional: true }
+      - { name: "onSubmit", type: "(data: BOMFormData) => void" }
+      - { name: "isSubmitting", type: "boolean" }
+    features:
+      - react-hook-form integration
+      - Zod validation
+      - Product selector (locked in edit mode)
+      - Version auto-display
+      - Date pickers with validation
+    libraries:
+      - "react-hook-form"
+      - "@hookform/resolvers/zod"
+      - "ShadCN Form"
+      - "ShadCN DatePicker"
+      - "ShadCN Select"
+
+  - path: "apps/frontend/components/technical/bom/ProductSelector.tsx"
+    description: "Searchable combobox for selecting finished products"
+    props:
+      - { name: "value", type: "string | null" }
+      - { name: "onChange", type: "(productId: string) => void" }
+      - { name: "disabled", type: "boolean", optional: true }
+      - { name: "error", type: "string", optional: true }
+    features:
+      - Search-as-you-type
+      - Filter by product type (FG, WIP only)
+      - Display code + name
+      - Loading state
+    libraries:
+      - "ShadCN Combobox"
+      - "ShadCN Popover"
+
+  - path: "apps/frontend/components/technical/bom/BOMStatusBadge.tsx"
+    description: "Status indicator badge with colors"
+    props:
+      - { name: "status", type: "'draft' | 'active' | 'phased_out' | 'inactive'" }
+    colors:
+      draft: "gray with warning icon"
+      active: "green with check icon"
+      phased_out: "yellow with clock icon"
+      inactive: "gray outline"
+
+  - path: "apps/frontend/components/technical/bom/DeleteBOMDialog.tsx"
+    description: "Confirmation dialog for BOM deletion"
+    props:
+      - { name: "open", type: "boolean" }
+      - { name: "onOpenChange", type: "(open: boolean) => void" }
+      - { name: "bom", type: "BOMWithProduct" }
+      - { name: "onConfirm", type: "() => void" }
+      - { name: "isDeleting", type: "boolean" }
+    libraries:
+      - "ShadCN AlertDialog"
+
+  - path: "apps/frontend/components/technical/bom/BOMVersionTimeline.tsx"
+    description: "Timeline visualization component showing all BOM versions"
+    props:
+      - { name: "versions", type: "BOMTimelineVersion[]" }
+      - { name: "currentDate", type: "string" }
+      - { name: "onVersionClick", type: "(bomId: string) => void" }
+    features:
+      - Horizontal timeline bars
+      - Color-coded by status
+      - Currently active highlighted
+      - Overlap warning indicators
+      - Hover tooltips with details
+      - Click to navigate
+
+  - path: "apps/frontend/components/technical/bom/BOMTimelineModal.tsx"
+    description: "Modal wrapper for timeline visualization"
+    props:
+      - { name: "open", type: "boolean" }
+      - { name: "onOpenChange", type: "(open: boolean) => void" }
+      - { name: "productId", type: "string" }
+      - { name: "productName", type: "string" }
+    features:
+      - Fetch timeline data on open
+      - Loading state
+      - Error state
+      - Close button
+    libraries:
+      - "ShadCN Dialog"
+
+# ============================================
+# HOOKS TO CREATE
+# ============================================
+hooks:
+  - path: "apps/frontend/lib/hooks/use-boms.ts"
+    exports:
+      - name: "useBOMs"
+        description: "React Query hook for fetching BOMs list"
+        params: ["filters: BOMFilters"]
+        returns: "UseQueryResult<BOMsListResponse>"
+
+      - name: "useBOM"
+        description: "React Query hook for fetching single BOM"
+        params: ["id: string"]
+        returns: "UseQueryResult<BOMWithProduct>"
+
+      - name: "useCreateBOM"
+        description: "React Query mutation for creating BOM"
+        returns: "UseMutationResult<BOMWithProduct, Error, CreateBOMRequest>"
+
+      - name: "useUpdateBOM"
+        description: "React Query mutation for updating BOM"
+        returns: "UseMutationResult<BOMWithProduct, Error, { id: string; data: UpdateBOMRequest }>"
+
+      - name: "useDeleteBOM"
+        description: "React Query mutation for deleting BOM"
+        returns: "UseMutationResult<void, Error, string>"
+
+      - name: "useBOMTimeline"
+        description: "React Query hook for fetching BOM timeline"
+        params: ["productId: string"]
+        returns: "UseQueryResult<BOMTimelineResponse>"
+
+      - name: "useNextBOMVersion"
+        description: "React Query hook for fetching next version number"
+        params: ["productId: string"]
+        returns: "UseQueryResult<number>"
+
+# ============================================
+# TYPES TO CREATE
+# ============================================
+types:
+  - path: "apps/frontend/lib/types/bom.ts"
+    content: |
+      export interface BOM {
+        id: string;
+        org_id: string;
+        product_id: string;
+        version: number;
+        bom_type: string;
+        routing_id: string | null;
+        effective_from: string;
+        effective_to: string | null;
+        status: BOMStatus;
+        output_qty: number;
+        output_uom: string;
+        units_per_box: number | null;
+        boxes_per_pallet: number | null;
+        notes: string | null;
+        created_at: string;
+        updated_at: string;
+        created_by: string | null;
+        updated_by: string | null;
+      }
+
+      export type BOMStatus = 'draft' | 'active' | 'phased_out' | 'inactive';
+
+      export interface BOMWithProduct extends BOM {
+        product: {
+          id: string;
+          code: string;
+          name: string;
+          type: string;
+          uom: string;
+        };
+      }
+
+      export interface BOMsListResponse {
+        boms: BOMWithProduct[];
+        total: number;
+        page: number;
+        limit: number;
+      }
+
+      export interface BOMFilters {
+        page?: number;
+        limit?: number;
+        search?: string;
+        status?: BOMStatus;
+        product_type?: string;
+        effective_date?: 'current' | 'future' | 'expired';
+        product_id?: string;
+        sortBy?: string;
+        sortOrder?: 'asc' | 'desc';
+      }
+
+      export interface CreateBOMRequest {
+        product_id: string;
+        effective_from: string;
+        effective_to?: string | null;
+        status?: 'draft' | 'active';
+        output_qty: number;
+        output_uom: string;
+        notes?: string | null;
+      }
+
+      export interface UpdateBOMRequest {
+        effective_from?: string;
+        effective_to?: string | null;
+        status?: BOMStatus;
+        output_qty?: number;
+        output_uom?: string;
+        notes?: string | null;
+      }
+
+      export interface BOMTimelineResponse {
+        product: {
+          id: string;
+          code: string;
+          name: string;
+        };
+        versions: BOMTimelineVersion[];
+        current_date: string;
+      }
+
+      export interface BOMTimelineVersion {
+        id: string;
+        version: number;
+        status: BOMStatus;
+        effective_from: string;
+        effective_to: string | null;
+        output_qty: number;
+        output_uom: string;
+        notes: string | null;
+        is_currently_active: boolean;
+        has_overlap: boolean;
+      }
+
+      export interface BOMFormData {
+        product_id: string;
+        effective_from: string;
+        effective_to: string | null;
+        status: 'draft' | 'active';
+        output_qty: number;
+        output_uom: string;
+        notes: string | null;
+      }
+
+# ============================================
+# VALIDATION SCHEMAS
+# ============================================
+validation:
+  - path: "apps/frontend/lib/validation/bom-schema.ts"
+    content: |
+      import { z } from 'zod';
+
+      export const createBOMSchema = z.object({
+        product_id: z.string().uuid('Invalid product'),
+        effective_from: z.string()
+          .refine((val) => !isNaN(Date.parse(val)), 'Invalid date'),
+        effective_to: z.string()
+          .refine((val) => !val || !isNaN(Date.parse(val)), 'Invalid date')
+          .nullable()
+          .optional(),
+        status: z.enum(['draft', 'active']).default('draft'),
+        output_qty: z.number()
+          .positive('Output quantity must be greater than 0')
+          .max(999999999, 'Output quantity too large'),
+        output_uom: z.string()
+          .min(1, 'Unit of measure is required')
+          .max(20, 'Unit of measure too long'),
+        notes: z.string().max(2000, 'Notes too long').optional().nullable(),
+      }).refine((data) => {
+        if (data.effective_to && data.effective_from) {
+          return new Date(data.effective_to) >= new Date(data.effective_from);
+        }
+        return true;
+      }, {
+        message: 'Effective To must be after Effective From',
+        path: ['effective_to'],
+      });
+
+      export const updateBOMSchema = z.object({
+        effective_from: z.string()
+          .refine((val) => !isNaN(Date.parse(val)), 'Invalid date')
+          .optional(),
+        effective_to: z.string()
+          .refine((val) => !val || !isNaN(Date.parse(val)), 'Invalid date')
+          .nullable()
+          .optional(),
+        status: z.enum(['draft', 'active', 'phased_out', 'inactive']).optional(),
+        output_qty: z.number()
+          .positive('Output quantity must be greater than 0')
+          .max(999999999, 'Output quantity too large')
+          .optional(),
+        output_uom: z.string()
+          .min(1, 'Unit of measure is required')
+          .max(20, 'Unit of measure too long')
+          .optional(),
+        notes: z.string().max(2000, 'Notes too long').nullable().optional(),
+      }).refine((data) => {
+        if (data.effective_to && data.effective_from) {
+          return new Date(data.effective_to) >= new Date(data.effective_from);
+        }
+        return true;
+      }, {
+        message: 'Effective To must be after Effective From',
+        path: ['effective_to'],
+      });
+
+      export type CreateBOMInput = z.infer<typeof createBOMSchema>;
+      export type UpdateBOMInput = z.infer<typeof updateBOMSchema>;
+
+# ============================================
+# UX SPECIFICATIONS
+# ============================================
+ux:
+  wireframes:
+    - id: "TEC-005"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-005-boms-list.md"
+      description: "BOMs list page wireframe"
+      components:
+        - "BOMsDataTable"
+        - "BOMStatusBadge"
+        - "DeleteBOMDialog"
+        - "BOMTimelineModal"
+
+    - id: "TEC-006"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-006-bom-modal.md"
+      description: "BOM create/edit page wireframe"
+      components:
+        - "BOMHeaderForm"
+        - "ProductSelector"
+        - "BOMStatusBadge"
+
+  patterns:
+    table: "ShadCN DataTable with @tanstack/react-table"
+    form: "react-hook-form with Zod resolver"
+    modal: "ShadCN Dialog/AlertDialog"
+    combobox: "ShadCN Combobox with Popover"
+    datePicker: "ShadCN DatePicker with calendar"
+    toast: "ShadCN Toast via useToast hook"
+
+  states:
+    loading:
+      - "Skeleton rows for table"
+      - "Spinner for form submission"
+      - "Disabled buttons during save"
+    empty:
+      - "Empty illustration + 'Create Your First BOM' CTA"
+      - "Helpful description text"
+    error:
+      - "Error banner with retry button"
+      - "Inline field errors (red border + message)"
+      - "Toast for API errors"
+    success:
+      - "Toast confirmation on save/delete"
+      - "Redirect to list after create"
+      - "Optimistic update on status change"
+
+# ============================================
+# STATE MANAGEMENT
+# ============================================
+state_management:
+  filters:
+    storage: "URL query params"
+    fields:
+      - search
+      - status
+      - product_type
+      - effective_date
+      - page
+
+  form:
+    library: "react-hook-form"
+    validation: "Zod schema"
+    mode: "onChange"
+
+  server_state:
+    library: "@tanstack/react-query"
+    cache:
+      boms_list: "5 min staleTime"
+      bom_detail: "5 min staleTime"
+      bom_timeline: "5 min staleTime"
+    invalidation:
+      - "On create: invalidate list"
+      - "On update: invalidate list + detail"
+      - "On delete: invalidate list"
+
+# ============================================
+# ACCESSIBILITY
+# ============================================
+accessibility:
+  - "All form fields have labels and aria-describedby for errors"
+  - "Table has proper headers and role='table'"
+  - "Focus trap in modals"
+  - "Keyboard navigation: Tab through fields, Enter to submit"
+  - "Screen reader announcements for status changes"
+  - "Touch targets >= 48x48dp"
+  - "Color contrast WCAG AA (4.5:1)"
+  - "Error states announced"
+
+# ============================================
+# NOTES
+# ============================================
+notes:
+  - "Product selector only shows FG (Finished Good) and WIP products"
+  - "Version is auto-calculated on product selection"
+  - "Product field is LOCKED in edit mode (cannot change)"
+  - "Date overlap validation happens on blur (client) and on submit (server)"
+  - "Delete confirmation shows BOM version and product name"
+  - "Timeline modal fetches data on open, not on page load"
+  - "Status change from Active to Inactive shows warning toast"
+  - "Empty effective_to means 'no end date' (ongoing)"

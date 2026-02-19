@@ -1,0 +1,73 @@
+endpoints:
+  get_finance_settings:
+    method: GET
+    path: "/api/finance/settings"
+    description: "Get finance settings for organization"
+    auth: true
+    roles: ["admin", "finance_manager", "cost_accountant", "viewer"]
+    request: null
+    response:
+      success:
+        status: 200
+        body:
+          settings:
+            id: "uuid"
+            org_id: "uuid"
+            finance_enabled: "boolean"
+            valuation_method: "string"
+            variance_warning_percent: "number"
+            variance_critical_percent: "number"
+            overhead_allocation_method: "string"
+            cost_center_hierarchy_levels: "number"
+            base_currency_id: "uuid"
+            base_currency_code: "string"
+      error:
+        status: 404
+        message: "Finance settings not initialized"
+
+  update_finance_settings:
+    method: PUT
+    path: "/api/finance/settings"
+    description: "Update finance settings"
+    auth: true
+    roles: ["admin", "finance_manager"]
+    request:
+      body:
+        finance_enabled: "boolean (optional)"
+        valuation_method: "string (optional)"
+        variance_warning_percent: "number (optional)"
+        variance_critical_percent: "number (optional)"
+        overhead_allocation_method: "string (optional)"
+        cost_center_hierarchy_levels: "number (optional)"
+        base_currency_id: "uuid (optional)"
+    response:
+      success:
+        status: 200
+        body:
+          settings: "FinanceSettings object"
+          audit_log_id: "uuid"
+    validation:
+      - "Validate using updateFinanceSettingsSchema"
+      - "Check critical >= warning"
+      - "Check hierarchy 1-5"
+
+  initialize_finance_settings:
+    method: POST
+    path: "/api/finance/settings/initialize"
+    description: "Initialize default settings for org"
+    auth: true
+    roles: ["admin"]
+    request:
+      body:
+        base_currency_code: "string (default: PLN)"
+    response:
+      success:
+        status: 201
+        body:
+          settings: "FinanceSettings object"
+          message: "Finance settings initialized successfully"
+
+implementation:
+  file: "apps/frontend/app/api/finance/settings/route.ts"
+  service: "FinanceSettingsService"
+  validation: "updateFinanceSettingsSchema"

@@ -1,0 +1,1826 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MonoPilot — Scanner Prototype</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{font-family:Inter,system-ui,-apple-system,sans-serif;font-size:14px;background:#060a12;color:#f1f5f9;min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:30px 0 60px}
+/* Device frame */
+.device{width:390px;background:#0f172a;border-radius:44px;overflow:hidden;position:relative;box-shadow:0 0 0 10px #1e293b,0 30px 80px rgba(0,0,0,.8);display:flex;flex-direction:column}
+.statusbar{height:44px;background:#0f172a;display:flex;align-items:center;justify-content:space-between;padding:0 22px;font-size:12px;color:#475569;flex-shrink:0}
+/* App shell */
+.app{display:flex;flex-direction:column;height:800px;overflow:hidden}
+.topbar{height:56px;background:#1e293b;display:flex;align-items:center;padding:0 4px;gap:4px;border-bottom:1px solid #334155;flex-shrink:0;z-index:10}
+.tbtn{width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:8px;cursor:pointer;color:#94a3b8;font-size:22px;border:none;background:transparent;transition:background .1s}
+.tbtn:active,.tbtn:hover{background:#334155}
+.ttitle{flex:1;font-size:16px;font-weight:600;color:#f1f5f9;padding:0 4px}
+.tbadge{font-size:10px;color:#94a3b8;background:#0f172a;padding:3px 7px;border-radius:20px;margin-right:6px}
+.content{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.content::-webkit-scrollbar{width:3px}
+.content::-webkit-scrollbar-thumb{background:#334155;border-radius:3px}
+/* Home menu */
+.msection{padding:10px 16px 3px;font-size:10px;color:#475569;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+.mitem{display:flex;align-items:center;gap:14px;padding:0 16px;height:68px;cursor:pointer;position:relative;transition:background .1s}
+.mitem:after{content:'';position:absolute;bottom:0;left:72px;right:0;height:1px;background:#1e293b}
+.mitem:hover,.mitem:active{background:#1a2332}
+.micon{width:46px;height:46px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0}
+.micon-blue{background:#172554}.micon-green{background:#052e16}.micon-amber{background:#431407}.micon-purple{background:#2e1065}.micon-cyan{background:#083344}.micon-red{background:#450a0a}
+.minfo{flex:1}
+.mtitle{font-size:14px;font-weight:600;color:#f1f5f9}
+.mdesc{font-size:11px;color:#64748b;margin-top:2px}
+.mchev{font-size:20px;color:#334155}
+.mbadge{background:#3b82f6;color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:12px;min-width:22px;text-align:center}
+/* Status badges */
+.status{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600}
+.status::before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor;flex-shrink:0}
+.st-planned{background:#172554;color:#60a5fa}
+.st-released{background:#052e16;color:#4ade80}
+.st-inprog{background:#431407;color:#fb923c}
+.st-onhold{background:#1c1917;color:#78716c}
+.st-done{background:#052e16;color:#4ade80}
+/* List items */
+.litem{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid #1a2332;cursor:pointer;transition:background .1s}
+.litem:hover,.litem:active{background:#1a2332}
+.licon{width:42px;height:42px;border-radius:10px;background:#1e293b;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.linfo{flex:1;min-width:0}
+.ltitle{font-size:13px;font-weight:600;color:#f1f5f9}
+.lsub{font-size:11px;color:#64748b;margin-top:2px}
+.lchev{font-size:18px;color:#334155;flex-shrink:0;margin-left:4px}
+/* WO Card */
+.wo-card{background:#1e293b;border-radius:12px;padding:16px;margin:12px 16px}
+.wo-num{font-size:18px;font-weight:700;color:#f1f5f9}
+.wo-prod{font-size:12px;color:#64748b;margin-top:2px}
+.wo-meta{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px}
+.wm{background:#0f172a;border-radius:8px;padding:8px 10px}
+.wm-label{font-size:10px;color:#475569;margin-bottom:2px}
+.wm-val{font-size:13px;font-weight:600}
+/* Progress */
+.pbar-wrap{padding:0 16px;margin-bottom:10px}
+.pbar-header{display:flex;justify-content:space-between;font-size:11px;color:#64748b;margin-bottom:5px}
+.pbar{height:4px;background:#1e293b;border-radius:2px}
+.pbar-fill{height:100%;border-radius:2px;transition:width .3s}
+/* Tabs */
+.tabs{display:flex;background:#1e293b;border-bottom:1px solid #334155;flex-shrink:0}
+.tab{flex:1;padding:11px 8px;text-align:center;font-size:12px;font-weight:600;color:#64748b;cursor:pointer;border-bottom:2px solid transparent;transition:all .15s}
+.tab.on{color:#3b82f6;border-bottom-color:#3b82f6}
+.tcnt{background:#0f172a;border-radius:10px;padding:1px 5px;font-size:10px;margin-left:4px}
+/* Component rows */
+.crow{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid #1a2332}
+.ccheck{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0}
+.cck-ok{background:#052e16;color:#4ade80}
+.cck-warn{background:#431407;color:#fb923c}
+.cck-empty{background:#1e293b;color:#334155;border:2px dashed #334155}
+.cinfo{flex:1;min-width:0}
+.cname{font-size:13px;font-weight:500;color:#f1f5f9}
+.cdet{font-size:11px;color:#64748b;margin-top:1px}
+.cmini-bar{height:3px;background:#0f172a;border-radius:2px;width:80px;margin-top:4px}
+.cqty{text-align:right;flex-shrink:0}
+.cqty-val{font-size:13px;font-weight:700}
+.cqty-of{font-size:10px;color:#475569}
+/* Scanned rows */
+.srow{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid #1a2332}
+.sicon{width:36px;height:36px;border-radius:8px;background:#1e293b;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.sinfo{flex:1;min-width:0}
+.sname{font-size:13px;font-weight:500}
+.smeta{font-size:11px;color:#64748b;margin-top:1px}
+.sqty{font-size:13px;font-weight:700;color:#4ade80;white-space:nowrap}
+/* Scan input */
+.sinput-area{padding:14px 16px;background:#1e293b;border-bottom:1px solid #334155}
+.sinput{width:100%;background:#0f172a;border:2px solid #3b82f6;border-radius:10px;padding:13px 16px;font-size:16px;color:#f1f5f9;font-family:inherit;text-align:center;letter-spacing:.5px}
+.sinput::placeholder{color:#334155;font-size:14px}
+.sinput:focus{outline:none;border-color:#60a5fa;box-shadow:0 0 0 3px rgba(59,130,246,.2)}
+.shint{text-align:center;font-size:11px;color:#334155;margin-top:5px}
+/* Banners */
+.warn-banner{margin:10px 16px;background:#431407;border:1px solid #9a3412;border-radius:10px;padding:11px 13px;display:flex;gap:10px}
+.info-banner{margin:10px 16px;background:#172554;border:1px solid #1e40af;border-radius:10px;padding:11px 13px;display:flex;gap:10px}
+.banner-icon{font-size:18px;flex-shrink:0}
+.banner-title{font-size:12px;font-weight:700;margin-bottom:3px}
+.warn-banner .banner-title{color:#fdba74}
+.info-banner .banner-title{color:#93c5fd}
+.banner-text{font-size:11px;line-height:1.5}
+.warn-banner .banner-text{color:#fed7aa}
+.info-banner .banner-text{color:#bfdbfe}
+/* Next suggestion */
+.next-sug{margin:8px 16px 0;background:#0c4a6e;border:1px solid #0369a1;border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:10px;cursor:pointer}
+.next-sug:hover{background:#075985}
+.ninfo{flex:1}
+.nlabel{font-size:10px;color:#7dd3fc;text-transform:uppercase;letter-spacing:.05em}
+.nname{font-size:13px;font-weight:600;color:#f0f9ff}
+/* Buttons */
+.brow{display:grid;gap:8px;padding:12px 16px}
+.btn{height:50px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;border:none;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;transition:filter .1s}
+.btn:hover{filter:brightness(1.1)}
+.btn:active{filter:brightness(.9)}
+.btn-p{background:#3b82f6;color:#fff}
+.btn-s{background:#16a34a;color:#fff}
+.btn-v{background:#7c3aed;color:#fff}
+.btn-w{background:#d97706;color:#fff}
+.btn-sec{background:#1e293b;color:#cbd5e1;border:1px solid #334155}
+.btn-ghost{background:transparent;color:#64748b;height:40px;font-size:13px;border:none}
+.btn-sm{height:40px;font-size:12px}
+/* Form fields */
+.fgroup{padding:12px 16px;border-bottom:1px solid #1a2332}
+.flabel{font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
+.req{color:#ef4444}
+.fvalue{font-size:14px;color:#f1f5f9;font-weight:500}
+.finput{width:100%;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px 14px;font-size:14px;color:#f1f5f9;font-family:inherit}
+.finput.big{font-size:24px;text-align:center;font-weight:700;padding:14px;letter-spacing:1px}
+.finput:focus{outline:none;border-color:#3b82f6}
+.fhint{font-size:11px;color:#475569;margin-top:4px}
+select.finput{appearance:auto}
+/* Mini info grid */
+.mini-grid{background:#1e293b;border-radius:10px;overflow:hidden;margin:10px 16px}
+.mini-row{display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid #334155}
+.mini-row:last-child{border-bottom:none}
+.mini-cell{padding:9px 12px;border-right:1px solid #334155}
+.mini-cell:last-child{border-right:none}
+.mini-label{font-size:10px;color:#475569;margin-bottom:2px}
+.mini-val{font-size:12px;font-weight:600;color:#f1f5f9}
+/* Steps indicator */
+.steps{display:flex;gap:5px;padding:12px 16px 0;align-items:center}
+.step{flex:1;height:3px;border-radius:2px;background:#1e293b}
+.step.done{background:#16a34a}
+.step.active{background:#3b82f6}
+/* LP created card */
+.lp-card{background:#052e16;border:1px solid #16a34a;border-radius:12px;padding:18px;margin:12px 16px;text-align:center}
+.lp-num{font-size:26px;font-weight:700;color:#4ade80;font-family:'Courier New',monospace;letter-spacing:3px}
+.lp-sub{font-size:11px;color:#86efac;margin-top:4px}
+/* Split result */
+.split-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:10px 16px}
+.split-orig{background:#1e293b;border-radius:10px;padding:14px;text-align:center}
+.split-new{background:#052e16;border:1px solid #16a34a;border-radius:10px;padding:14px;text-align:center}
+.split-lp-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+.split-orig .split-lp-label{color:#64748b}
+.split-new .split-lp-label{color:#86efac}
+.split-lp-num{font-size:14px;font-weight:700;font-family:'Courier New',monospace;letter-spacing:2px}
+.split-orig .split-lp-num{color:#f1f5f9}
+.split-new .split-lp-num{color:#4ade80}
+.split-qty{font-size:12px;margin-top:4px}
+.split-orig .split-qty{color:#94a3b8}
+.split-new .split-qty{color:#86efac}
+/* Search bar */
+.sbar{padding:10px 16px;background:#1e293b;border-bottom:1px solid #334155}
+.sinp2{width:100%;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:9px 14px;font-size:13px;color:#f1f5f9;font-family:inherit}
+.sinp2::placeholder{color:#475569}
+.sinp2:focus{outline:none;border-color:#3b82f6}
+/* Pills */
+.pills{display:flex;gap:6px;padding:8px 16px;flex-wrap:wrap}
+.pill{padding:4px 11px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;background:#1e293b;color:#64748b;border:1px solid transparent}
+.pill.on{background:#172554;color:#60a5fa;border-color:#1d4ed8}
+/* Success screen */
+.success-wrap{padding:40px 16px 20px;text-align:center}
+.success-icon{font-size:64px;margin-bottom:14px}
+.success-title{font-size:22px;font-weight:700;margin-bottom:6px}
+.success-sub{font-size:13px;color:#64748b}
+/* Desktop side nav */
+.side-nav{position:fixed;left:20px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:4px;z-index:999}
+.sn-item{background:#1e293b;color:#94a3b8;padding:5px 10px;border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap;border:1px solid #334155;transition:all .1s}
+.sn-item:hover{background:#334155;color:#f1f5f9}
+.sn-item.on{background:#3b82f6;color:#fff;border-color:#3b82f6}
+.sn-group{font-size:10px;color:#334155;padding:4px 10px 2px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+/* Spacer */
+.sp{height:20px}
+</style>
+</head>
+<body>
+
+<!-- Desktop side navigation -->
+<div class="side-nav" id="sideNav"></div>
+
+<!-- Device frame -->
+<div class="device">
+  <div class="statusbar">
+    <span>9:41</span>
+    <span style="font-size:10px;color:#334155">MonoPilot MES</span>
+    <span>📶 🔋</span>
+  </div>
+  <div class="app">
+    <div class="topbar" id="topbar">
+      <button class="tbtn" id="backBtn" onclick="goBack()" style="visibility:hidden">←</button>
+      <span class="ttitle" id="pageTitle">Scanner</span>
+      <span class="tbadge" id="userBadge">JK</span>
+      <button class="tbtn" onclick="">⋮</button>
+    </div>
+    <div class="content" id="content"></div>
+  </div>
+</div>
+
+<script>
+// ─── Navigation ───────────────────────────────────────────────────────────────
+const stack = [];
+let cur = 'home';
+const STATE = { woTab: 0 };
+
+const SCREENS = {
+  'login': renderLogin,
+  'login-pin': renderLoginPin,
+  'site-select': renderSiteSelect,
+  'home': renderHome,
+  'wo-list': renderWoList,
+  'wo-detail': renderWoDetail,
+  'wo-execute': renderWoExecute,
+  'wo-scan': renderWoScan,
+  'wo-output': renderWoOutput,
+  'wo-output-done': renderWoOutputDone,
+  'wo-coproduct': renderWoCoproduct,
+  'wo-coproduct-done': renderWoCoproductDone,
+  'wo-waste': renderWoWaste,
+  'wo-waste-done': renderWoWasteDone,
+  'pick-wo-list': renderPickWoList,
+  'pick-list': renderPickList,
+  'pick-scan': renderPickScan,
+  'pick-done': renderPickDone,
+  'po-list': renderPoList,
+  'po-lines': renderPoLines,
+  'po-item': renderPoItem,
+  'po-done': renderPoDone,
+  'to-list': renderToList,
+  'to-scan': renderToScan,
+  'to-done': renderToDone,
+  'putaway-scan': renderPutawayScan,
+  'putaway-suggest': renderPutawaySuggest,
+  'putaway-done': renderPutawayDone,
+  'move-lp': renderMoveLp,
+  'move-done': renderMoveDone,
+  'split-lp': renderSplitLp,
+  'split-done': renderSplitDone,
+  'qa-list': renderQaList,
+  'qa-inspect': renderQaInspect,
+  'qa-fail-reason': renderQaFailReason,
+  'qa-done': renderQaDone,
+};
+
+function go(screen) { stack.push(cur); cur = screen; render(); }
+function goBack() { if (stack.length) { cur = stack.pop(); render(); } }
+
+function render() {
+  document.getElementById('backBtn').style.visibility = stack.length ? 'visible' : 'hidden';
+  const el = document.getElementById('content');
+  const title = document.getElementById('pageTitle');
+  el.scrollTop = 0;
+  if (SCREENS[cur]) SCREENS[cur](el, title);
+  document.querySelectorAll('.sn-item').forEach(n => n.classList.toggle('on', n.dataset.s === cur));
+}
+
+// ─── Login ────────────────────────────────────────────────────────────────────
+function renderLogin(el, t) {
+  t.textContent = 'MonoPilot Scanner';
+  el.innerHTML = `
+    <!-- Logo block -->
+    <div style="padding:40px 16px 24px;text-align:center">
+      <div style="width:72px;height:72px;background:#172554;border-radius:20px;display:inline-flex;align-items:center;justify-content:center;font-size:36px;margin-bottom:16px">🏭</div>
+      <div style="font-size:22px;font-weight:700;color:#f1f5f9">MonoPilot</div>
+      <div style="font-size:13px;color:#64748b;margin-top:4px">Scanner · MES System</div>
+    </div>
+    <!-- Scan badge -->
+    <div style="padding:0 16px 12px">
+      <div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;text-align:center">Zeskanuj kartę pracownika</div>
+      <div class="sinput-area" style="border-radius:12px;margin:0;padding:16px">
+        <input class="sinput" placeholder="▍  Skanuj kartę lub wpisz ID..." autofocus style="font-size:15px" />
+        <div class="shint" style="margin-top:8px">Przyłóż kartę do czytnika lub użyj skanera</div>
+      </div>
+    </div>
+    <!-- Divider -->
+    <div style="display:flex;align-items:center;gap:12px;padding:4px 24px">
+      <div style="flex:1;height:1px;background:#1e293b"></div>
+      <span style="font-size:11px;color:#334155">lub zaloguj ręcznie</span>
+      <div style="flex:1;height:1px;background:#1e293b"></div>
+    </div>
+    <!-- Manual login -->
+    <div style="padding:12px 16px">
+      <div class="fgroup" style="border:none;padding:0;margin-bottom:10px">
+        <div class="flabel">Email / Login</div>
+        <input class="finput" type="email" placeholder="jan.kowalski@firma.pl" style="font-size:14px" />
+      </div>
+      <div class="fgroup" style="border:none;padding:0;margin-bottom:4px">
+        <div class="flabel">Hasło</div>
+        <input class="finput" type="password" placeholder="••••••••" style="font-size:14px" />
+      </div>
+    </div>
+    <div class="brow" style="padding-top:4px">
+      <button class="btn btn-p" onclick="go('site-select')" style="height:52px;font-size:15px">Zaloguj się →</button>
+      <button class="btn btn-ghost" onclick="go('login-pin')">🔢 Zaloguj przez PIN</button>
+    </div>
+    <!-- Version -->
+    <div style="text-align:center;padding:16px;font-size:10px;color:#334155">v2.1.0 · MonoPilot MES</div>`;
+}
+
+function renderLoginPin(el, t) {
+  t.textContent = 'Zaloguj przez PIN';
+  el.innerHTML = `
+    <div style="padding:24px 16px 16px;text-align:center">
+      <div style="font-size:14px;color:#94a3b8;margin-bottom:6px">Wpisz swój 6-cyfrowy PIN</div>
+      <!-- PIN dots -->
+      <div style="display:flex;justify-content:center;gap:12px;margin:16px 0" id="pinDots">
+        ${[1,2,3,4,5,6].map(i=>`<div id="d${i}" style="width:14px;height:14px;border-radius:50%;border:2px solid #334155;background:transparent;transition:all .15s"></div>`).join('')}
+      </div>
+    </div>
+    <!-- Numpad -->
+    <div style="padding:0 24px">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px" id="numpad">
+        ${[1,2,3,4,5,6,7,8,9,'','0','⌫'].map(k => `
+          <button onclick="pinPress('${k}')"
+            style="height:64px;border-radius:12px;font-size:${k==='⌫'?'22':'24'}px;font-weight:${k==='⌫'?'400':'600'};
+            background:${k===''?'transparent':'#1e293b'};border:${k===''?'none':'1px solid #334155'};
+            color:${k==='⌫'?'#64748b':'#f1f5f9'};cursor:${k===''?'default':'pointer'};
+            font-family:inherit;transition:background .1s"
+            ${k===''?'disabled':''}>
+            ${k}
+          </button>`).join('')}
+      </div>
+    </div>
+    <div class="brow" style="margin-top:8px">
+      <button class="btn btn-ghost" onclick="go('login')">← Inne metody logowania</button>
+    </div>`;
+}
+
+let PIN = '';
+function pinPress(k) {
+  if (k === '') return;
+  if (k === '⌫') { PIN = PIN.slice(0,-1); }
+  else if (PIN.length < 6) { PIN += k; }
+  // update dots
+  for (let i=1;i<=6;i++) {
+    const d = document.getElementById('d'+i);
+    if (d) d.style.background = i <= PIN.length ? '#3b82f6' : 'transparent';
+  }
+  if (PIN.length === 6) {
+    setTimeout(() => { PIN = ''; go('site-select'); }, 300);
+  }
+}
+
+function renderSiteSelect(el, t) {
+  t.textContent = 'Wybierz zakład i zmianę';
+  el.innerHTML = `
+    <!-- User confirmed -->
+    <div style="padding:12px 16px;background:#1e293b;border-bottom:1px solid #334155;display:flex;align-items:center;gap:12px">
+      <div style="width:40px;height:40px;border-radius:50%;background:#172554;display:flex;align-items:center;justify-content:center;font-size:20px">👷</div>
+      <div>
+        <div style="font-size:14px;font-weight:600">Jan Kowalski</div>
+        <div style="font-size:11px;color:#64748b">jan.kowalski@forz.pl · Operator</div>
+      </div>
+      <div style="margin-left:auto;background:#052e16;border-radius:6px;padding:3px 8px">
+        <div style="font-size:10px;color:#4ade80;font-weight:600">ZALOG.</div>
+      </div>
+    </div>
+    <!-- Site selection -->
+    <div style="padding:12px 16px 6px;font-size:11px;color:#475569;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Zakład / Firma</div>
+    <div style="padding:0 16px;display:grid;gap:8px">
+      ${siteCard('FORZ','🧀','Forz Sp. z o.o.','Zakład Kraków — Nabiał','selected')}
+      ${siteCard('KOBE','🥛','Kobe Dairy','Zakład Warszawa — Mleczarnia','')}
+    </div>
+    <!-- Line selection -->
+    <div style="padding:14px 16px 6px;font-size:11px;color:#475569;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Linia produkcyjna</div>
+    <div style="padding:0 16px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      ${lineBtn('Linia A','Nabiał · Aktywna','active','selected')}
+      ${lineBtn('Linia B','Nabiał · Aktywna','active','')}
+      ${lineBtn('Linia C','Pakowanie · Przerwa','pause','')}
+      ${lineBtn('Magazyn','Przyjęcia / Wysyłka','active','')}
+    </div>
+    <!-- Shift selection -->
+    <div style="padding:14px 16px 6px;font-size:11px;color:#475569;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Zmiana</div>
+    <div style="padding:0 16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:4px">
+      ${shiftBtn('Ranna','06:00–14:00','selected')}
+      ${shiftBtn('Popołudniowa','14:00–22:00','')}
+      ${shiftBtn('Nocna','22:00–06:00','')}
+    </div>
+    <div class="brow" style="margin-top:8px">
+      <button class="btn btn-p" onclick="go('home')" style="height:52px;font-size:15px">▶ Rozpocznij zmianę</button>
+      <div style="font-size:11px;color:#475569;text-align:center;padding:4px 0">
+        FORZ · Linia A · Zmiana ranna · 06:00–14:00
+      </div>
+    </div>`;
+}
+function siteCard(code, icon, name, sub, sel) {
+  const on = sel==='selected';
+  return `<div onclick="this.closest('div').querySelectorAll('.sc').forEach(c=>{c.style.borderColor='#334155';c.style.background='#1e293b'});this.style.borderColor='#3b82f6';this.style.background='#0d2149'"
+    class="sc" style="background:${on?'#0d2149':'#1e293b'};border:2px solid ${on?'#3b82f6':'#334155'};border-radius:10px;padding:12px 14px;cursor:pointer;display:flex;align-items:center;gap:12px">
+    <div style="width:40px;height:40px;border-radius:10px;background:#172554;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">${icon}</div>
+    <div style="flex:1">
+      <div style="font-size:13px;font-weight:700;color:${on?'#60a5fa':'#f1f5f9'}">${code} — ${name}</div>
+      <div style="font-size:11px;color:#64748b;margin-top:2px">${sub}</div>
+    </div>
+    ${on?'<span style="color:#60a5fa;font-size:18px">✓</span>':''}
+  </div>`;
+}
+function lineBtn(name, sub, state, sel) {
+  const on = sel==='selected';
+  const dot = state==='active'?'#4ade80':'#f59e0b';
+  return `<div onclick="this.closest('div').querySelectorAll('.lb').forEach(b=>{b.style.borderColor='#334155';b.style.background='#1e293b'});this.style.borderColor='#3b82f6';this.style.background='#0d2149'"
+    class="lb" style="background:${on?'#0d2149':'#1e293b'};border:2px solid ${on?'#3b82f6':'#334155'};border-radius:8px;padding:10px 10px;cursor:pointer;text-align:center">
+    <div style="display:flex;align-items:center;justify-content:center;gap:5px;margin-bottom:3px">
+      <div style="width:6px;height:6px;border-radius:50%;background:${dot}"></div>
+      <span style="font-size:12px;font-weight:600;color:${on?'#60a5fa':'#f1f5f9'}">${name}</span>
+    </div>
+    <div style="font-size:10px;color:#64748b">${sub}</div>
+  </div>`;
+}
+function shiftBtn(name, hours, sel) {
+  const on = sel==='selected';
+  return `<div onclick="this.closest('div').querySelectorAll('.shb').forEach(b=>{b.style.borderColor='#334155';b.style.background='#1e293b'});this.style.borderColor='#3b82f6';this.style.background='#0d2149'"
+    class="shb" style="background:${on?'#0d2149':'#1e293b'};border:2px solid ${on?'#3b82f6':'#334155'};border-radius:8px;padding:10px 8px;cursor:pointer;text-align:center">
+    <div style="font-size:12px;font-weight:600;color:${on?'#60a5fa':'#f1f5f9'}">${name}</div>
+    <div style="font-size:10px;color:#64748b;margin-top:2px">${hours}</div>
+  </div>`;
+}
+
+// ─── Home ─────────────────────────────────────────────────────────────────────
+function renderHome(el, t) {
+  t.textContent = 'Scanner';
+  el.innerHTML = `
+    <div style="padding:12px 16px 8px">
+      <div style="background:#1e293b;border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:12px">
+        <div style="width:36px;height:36px;border-radius:50%;background:#172554;display:flex;align-items:center;justify-content:center;font-size:18px">👷</div>
+        <div>
+          <div style="font-size:13px;font-weight:600">Jan Kowalski</div>
+          <div style="font-size:11px;color:#64748b">Linia A · Zmiana ranna · 09:41</div>
+        </div>
+        <div style="margin-left:auto;background:#052e16;border-radius:6px;padding:3px 8px">
+          <div style="font-size:10px;color:#4ade80;font-weight:600">ONLINE</div>
+        </div>
+      </div>
+    </div>
+    <div class="msection">Produkcja</div>
+    ${mi('🏭','micon-blue','Work Order','Konsumpcja + rejestracja wyrobu','wo-list','3')}
+    ${mi('🧺','micon-purple','Pick dla WO','Zbierz materiały z magazynu','pick-wo-list','')}
+    <div class="msection">Magazyn</div>
+    ${mi('📦','micon-green','Przyjęcie PO','Odbierz zamówienie zakupu','po-list','')}
+    ${mi('🔄','micon-cyan','Przyjęcie TO','Transfer Orders do odbioru','to-list','')}
+    ${mi('📍','micon-green','Putaway','Odłóż LP — sugestia FIFO/FEFO','putaway-scan','')}
+    ${mi('🚚','micon-amber','Przesuń LP','Przenieś paletę / pojemnik','move-lp','')}
+    ${mi('✂️','micon-purple','Part Movement','Podziel License Plate','split-lp','')}
+    <div class="msection">Jakość</div>
+    ${mi('🔍','micon-red','Inspekcja QC','Zatwierdź, odrzuć lub wstrzymaj partię','qa-list','5')}
+    ${mi('📊','micon-blue','Inwentaryzacja','Licz i weryfikuj stany','#','')}
+    <div class="sp"></div>`;
+}
+function mi(icon, icls, title, desc, screen, badge) {
+  const right = badge
+    ? `<span class="mbadge">${badge}</span>`
+    : `<span class="mchev">›</span>`;
+  return `<div class="mitem" onclick="go('${screen}')">
+    <div class="micon ${icls}">${icon}</div>
+    <div class="minfo"><div class="mtitle">${title}</div><div class="mdesc">${desc}</div></div>
+    ${right}
+  </div>`;
+}
+
+// ─── WO List ──────────────────────────────────────────────────────────────────
+function renderWoList(el, t) {
+  t.textContent = 'Work Orders';
+  el.innerHTML = `
+    <div class="sbar"><input class="sinp2" placeholder="🔍  Szukaj WO lub skanuj kod..." /></div>
+    <div class="pills">
+      ${pill('Wszystkie', true)}${pill('Moja linia', false)}${pill('Aktywne', false)}
+    </div>
+    ${woRow('WO-2025-0142','Serek waniliowy 250g','IN_PROGRESS','Linia A','180 / 500 kg','Dziś 08:00')}
+    ${woRow('WO-2025-0143','Jogurt truskawkowy 400g','RELEASED','Linia A','0 / 300 kg','Dziś 10:00')}
+    ${woRow('WO-2025-0144','Twaróg naturalny 500g','RELEASED','Linia B','0 / 200 kg','Dziś 12:00')}
+    ${woRow('WO-2025-0138','Śmietana 18% 400ml','DONE','Linia A','450 / 450 kg','Wczoraj')}
+    <div class="sp"></div>`;
+}
+function pill(label, on) {
+  return `<span class="pill ${on?'on':''}" onclick="
+    this.closest('.pills').querySelectorAll('span').forEach(s=>s.classList.remove('on'));
+    this.classList.add('on')">${label}</span>`;
+}
+function woRow(id, prod, status, line, qty, time) {
+  const map = {RELEASED:['st-released','Zwolnione'],IN_PROGRESS:['st-inprog','W toku'],DONE:['st-done','Gotowe'],ON_HOLD:['st-onhold','Wstrzymane']};
+  const [cls, lbl] = map[status]||['st-planned','Zaplanowane'];
+  return `<div class="litem" onclick="go('wo-detail')">
+    <div class="licon">📋</div>
+    <div class="linfo">
+      <div class="ltitle">${id}</div>
+      <div class="lsub">${prod} · ${line}</div>
+      <div style="margin-top:5px"><span class="status ${cls}">${lbl}</span></div>
+    </div>
+    <div style="text-align:right;flex-shrink:0">
+      <div style="font-size:11px;color:#64748b">${time}</div>
+      <div style="font-size:12px;color:#94a3b8;margin-top:2px">${qty}</div>
+    </div>
+    <span class="lchev">›</span>
+  </div>`;
+}
+
+// ─── WO Detail ────────────────────────────────────────────────────────────────
+function renderWoDetail(el, t) {
+  t.textContent = 'WO-2025-0142';
+  el.innerHTML = `
+    <div class="wo-card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <div class="wo-num">WO-2025-0142</div>
+          <div class="wo-prod">Serek waniliowy 250g · <span style="color:#60a5fa">Linia A</span></div>
+          <div style="margin-top:7px"><span class="status st-inprog">W toku</span></div>
+        </div>
+        <div style="text-align:right;font-size:11px;color:#475569">
+          <div>Zmiana ranna</div>
+          <div style="margin-top:2px">Priorytet: <span style="color:#fb923c;font-weight:600">Wysoki</span></div>
+        </div>
+      </div>
+      <div class="wo-meta">
+        <div class="wm"><div class="wm-label">Cel</div><div class="wm-val" style="color:#60a5fa">500 kg</div></div>
+        <div class="wm"><div class="wm-label">Wyprod.</div><div class="wm-val" style="color:#4ade80">180 kg</div></div>
+        <div class="wm"><div class="wm-label">Czas trwania</div><div class="wm-val">1h 41min</div></div>
+        <div class="wm"><div class="wm-label">Operator</div><div class="wm-val">Jan K.</div></div>
+      </div>
+    </div>
+    <div class="pbar-wrap">
+      <div class="pbar-header"><span>Postęp produkcji</span><span style="color:#4ade80;font-weight:700">36%</span></div>
+      <div class="pbar"><div class="pbar-fill" style="width:36%;background:#22c55e"></div></div>
+    </div>
+    <div class="brow">
+      <button class="btn btn-p" onclick="go('wo-execute')">▶ Kontynuuj produkcję</button>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <button class="btn btn-sec btn-sm">⏸ Wstrzymaj</button>
+        <button class="btn btn-sec btn-sm">📋 Szczegóły BOM</button>
+      </div>
+    </div>
+    <div style="padding:2px 16px 6px"><div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Komponenty (BOM)</div></div>
+    ${compRow('✓','cck-ok','Twaróg naturalny','LP-00234','#4ade80',50,50,'kg')}
+    ${compRow('!','cck-warn','Śmietana 36%','LP-00240 · brakuje 4 kg','#fb923c',8,12,'kg')}
+    ${compRow('○','cck-empty','Cukier waniliowy','— nie zeskanowano —','#334155',0,2,'kg')}
+    ${compRow('○','cck-empty','Opakowania 250g','— nie zeskanowano —','#334155',0,2000,'szt')}
+    <div class="sp"></div>`;
+}
+function compRow(ic, cls, name, det, color, sc, need, unit) {
+  const pct = need > 0 ? Math.min(Math.round(sc/need*100),100) : 0;
+  return `<div class="crow">
+    <div class="ccheck ${cls}">${ic}</div>
+    <div class="cinfo">
+      <div class="cname">${name}</div>
+      <div class="cdet">${det}</div>
+      ${sc>0?`<div class="cmini-bar"><div style="width:${pct}%;height:100%;background:${color};border-radius:2px"></div></div>`:''}
+    </div>
+    <div class="cqty">
+      <div class="cqty-val" style="color:${color}">${sc}</div>
+      <div class="cqty-of">/ ${need} ${unit}</div>
+    </div>
+  </div>`;
+}
+
+// ─── WO Execute (combined consume + output) ───────────────────────────────────
+function renderWoExecute(el, t) {
+  t.textContent = 'WO-2025-0142';
+  const tab = STATE.woTab;
+  el.innerHTML = `
+    <!-- Strip -->
+    <div style="padding:8px 16px;background:#1e293b;border-bottom:1px solid #334155">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+        <span style="font-size:11px;color:#64748b">Serek waniliowy 250g</span>
+        <span style="font-size:11px;font-weight:700;color:#4ade80">180 / 500 kg (36%)</span>
+      </div>
+      <div class="pbar"><div class="pbar-fill" style="width:36%;background:#22c55e"></div></div>
+    </div>
+    <!-- Warning -->
+    <div class="warn-banner">
+      <div class="banner-icon">⚠️</div>
+      <div>
+        <div class="banner-title">Brakuje składnika</div>
+        <div class="banner-text">Śmietana 36%: zeskanowano 8/12 kg. Zeskanuj więcej przed rejestracją wyrobu gotowego.</div>
+      </div>
+    </div>
+    <!-- Next suggestion -->
+    <div class="next-sug" onclick="go('wo-scan')">
+      <span style="font-size:18px">💡</span>
+      <div class="ninfo">
+        <div class="nlabel">Następny do zeskanowania</div>
+        <div class="nname">Śmietana 36% · potrzeba jeszcze 4 kg</div>
+      </div>
+      <span style="font-size:18px;color:#7dd3fc">›</span>
+    </div>
+    <!-- Tabs -->
+    <div class="tabs" style="margin-top:8px">
+      <div class="tab ${tab===0?'on':''}" onclick="STATE.woTab=0;render()">
+        📦 Komponenty <span class="tcnt">4</span>
+      </div>
+      <div class="tab ${tab===1?'on':''}" onclick="STATE.woTab=1;render()">
+        📝 Zeskanowane <span class="tcnt">3</span>
+      </div>
+    </div>
+    ${tab===0 ? compTab() : scannedTab()}
+    <!-- Actions -->
+    <div class="brow">
+      <button class="btn btn-p" onclick="go('wo-scan')">📷 Skanuj komponent</button>
+      <div style="height:1px;background:#1e293b;margin:0 -16px"></div>
+      <div style="font-size:10px;color:#475569;font-weight:700;text-transform:uppercase;letter-spacing:.08em;padding-top:2px">Rejestracja wyrobów</div>
+      <button class="btn btn-v" onclick="go('wo-output')">🏷️ Wyrób gotowy — nowy LP</button>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <button class="btn btn-sec" style="border-color:#7c3aed;color:#a78bfa;height:44px;font-size:12px" onclick="go('wo-coproduct')">🔄 Co-product</button>
+        <button class="btn btn-sec" style="border-color:#475569;color:#94a3b8;height:44px;font-size:12px" onclick="go('wo-waste')">🗑️ Odpad</button>
+      </div>
+    </div>
+    <div class="sp"></div>`;
+}
+function compTab() {
+  return `<div>
+    ${compRowFull('✓','cck-ok','Twaróg naturalny','LP-00234 · Partia 2025-01-05','#4ade80',50,50,'kg',100)}
+    ${compRowFull('!','cck-warn','Śmietana 36%','LP-00240 · brakuje 4 kg','#fb923c',8,12,'kg',67)}
+    ${compRowFull('○','cck-empty','Cukier waniliowy','— nie zeskanowano —','#334155',0,2,'kg',0)}
+    ${compRowFull('○','cck-empty','Opakowania 250g','— nie zeskanowano —','#334155',0,2000,'szt',0)}
+  </div>`;
+}
+function compRowFull(ic, cls, name, det, color, sc, need, unit, pct) {
+  return `<div class="crow" style="align-items:flex-start">
+    <div class="ccheck ${cls}" style="margin-top:2px">${ic}</div>
+    <div class="cinfo">
+      <div class="cname">${name}</div>
+      <div class="cdet">${det}</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
+        <div class="cmini-bar" style="width:120px"><div style="width:${pct}%;height:100%;background:${color};border-radius:2px"></div></div>
+        <span style="font-size:10px;color:${color};font-weight:700">${pct}%</span>
+      </div>
+    </div>
+    <div class="cqty">
+      <div class="cqty-val" style="color:${color}">${sc}</div>
+      <div class="cqty-of">/ ${need} ${unit}</div>
+    </div>
+  </div>`;
+}
+function scannedTab() {
+  return `<div>
+    ${scanRow('🥛','Twaróg naturalny','LP-00234 · 10:12 · Jan K.','+50 kg')}
+    ${scanRow('🥛','Śmietana 36%','LP-00240 · 10:15 · Jan K.','+5 kg')}
+    ${scanRow('🥛','Śmietana 36%','LP-00241 · 10:18 · Jan K.','+3 kg')}
+    <div style="padding:12px 16px;text-align:center;font-size:11px;color:#334155">Wszystkie zeskanowane pozycje (3)</div>
+  </div>`;
+}
+function scanRow(icon, name, meta, qty) {
+  return `<div class="srow">
+    <div class="sicon">${icon}</div>
+    <div class="sinfo"><div class="sname">${name}</div><div class="smeta">${meta}</div></div>
+    <div class="sqty">${qty}</div>
+  </div>`;
+}
+
+// ─── WO Scan Component ────────────────────────────────────────────────────────
+function renderWoScan(el, t) {
+  t.textContent = 'Skanuj komponent';
+  el.innerHTML = `
+    <div class="info-banner">
+      <div class="banner-icon">💡</div>
+      <div>
+        <div class="banner-title">Proponowany składnik</div>
+        <div class="banner-text">Śmietana 36% — potrzeba jeszcze <strong>4 kg</strong></div>
+      </div>
+    </div>
+    <div class="sinput-area">
+      <div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Zeskanuj kod LP lub GS1-128</div>
+      <input class="sinput" placeholder="▍  LP-XXXXX lub skanuj..." autofocus />
+      <div class="shint">📷 Skieruj czytnik na kod kreskowy</div>
+    </div>
+    <!-- Scanned LP card (after scan) -->
+    <div class="mini-grid">
+      <div class="mini-row">
+        <div class="mini-cell"><div class="mini-label">Zeskanowano LP</div><div class="mini-val" style="color:#4ade80;font-family:monospace">LP-00241</div></div>
+        <div class="mini-cell"><div class="mini-label">Produkt</div><div class="mini-val">Śmietana 36%</div></div>
+      </div>
+      <div class="mini-row">
+        <div class="mini-cell"><div class="mini-label">Partia</div><div class="mini-val">2025-01-06</div></div>
+        <div class="mini-cell"><div class="mini-label">Dostępne</div><div class="mini-val">18.5 kg</div></div>
+      </div>
+      <div class="mini-row">
+        <div class="mini-cell"><div class="mini-label">Data ważności</div><div class="mini-val">2025-01-20</div></div>
+        <div class="mini-cell"><div class="mini-label">Lokalizacja</div><div class="mini-val">MAG-B · R3</div></div>
+      </div>
+    </div>
+    <div class="fgroup">
+      <div class="flabel">Ilość do pobrania (kg) <span class="req">*</span></div>
+      <input class="finput big" type="number" value="4" />
+      <div class="fhint">Potrzeba: 4 kg · Dostępne: 18.5 kg</div>
+    </div>
+    <div class="fgroup">
+      <div class="flabel">Nr partii / Batch <span class="req">*</span></div>
+      <input class="finput" value="2025-01-06" />
+      <div class="fhint">Wypełnione automatycznie z LP — wymagane</div>
+    </div>
+    <div class="brow">
+      <button class="btn btn-s" onclick="go('wo-execute')">✓ Potwierdź pobranie 4 kg</button>
+      <button class="btn btn-ghost" onclick="goBack()">Anuluj</button>
+    </div>`;
+}
+
+// ─── WO Output (Register finished good) ──────────────────────────────────────
+function renderWoOutput(el, t) {
+  t.textContent = 'Zarejestruj wyrób';
+  el.innerHTML = `
+    <div class="steps">
+      <div class="step done"></div><div class="step active"></div><div class="step"></div>
+    </div>
+    <div class="warn-banner" style="margin-top:10px">
+      <div class="banner-icon">⚠️</div>
+      <div>
+        <div class="banner-title">Niekompletna konsumpcja</div>
+        <div class="banner-text">Śmietana 36%: brakuje 4 kg. Możesz kontynuować — odchylenie zostanie zapisane w logu audytowym.</div>
+      </div>
+    </div>
+    <div class="fgroup" style="background:#1e293b">
+      <div class="flabel">Wyrób gotowy</div>
+      <div class="fvalue">Serek waniliowy 250g</div>
+      <div style="font-size:11px;color:#64748b;margin-top:2px">WO-2025-0142</div>
+    </div>
+    <div class="fgroup">
+      <div class="flabel">Ilość wyrobu (kg) <span class="req">*</span></div>
+      <input class="finput big" type="number" value="50" />
+    </div>
+    <div class="fgroup">
+      <div class="flabel">Nr partii / Batch <span class="req">*</span></div>
+      <input class="finput" value="2025-01-09-A" />
+      <div class="fhint">Obowiązkowe — identyfikuje serię produkcyjną</div>
+    </div>
+    <div class="fgroup">
+      <div class="flabel">Data ważności <span class="req">*</span></div>
+      <input class="finput" type="date" value="2025-02-09" />
+    </div>
+    <div class="fgroup">
+      <div class="flabel">Lokalizacja docelowa</div>
+      <div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px 14px;font-size:13px;color:#f1f5f9;cursor:pointer;display:flex;justify-content:space-between">
+        <span>MAGAZYN-A · Regał-3</span><span style="color:#64748b">zmień ›</span>
+      </div>
+    </div>
+    <div style="margin:8px 16px;background:#172554;border:1px solid #1e3a8a;border-radius:8px;padding:10px 12px;font-size:11px;color:#93c5fd">
+      ℹ️ Odpad i co-product rejestruje się osobno — przyciski dostępne na ekranie WO Execute
+    </div>
+    <div class="brow">
+      <button class="btn btn-s" onclick="go('wo-output-done')">✓ Utwórz nowy LP i zarejestruj</button>
+      <div style="background:#1e293b;border-radius:8px;padding:10px 12px;font-size:11px;color:#64748b;text-align:center">
+        🏷️ Zostanie automatycznie utworzony <strong>nowy LP</strong> dla tego wyrobu
+      </div>
+    </div>
+    <div class="sp"></div>`;
+}
+
+// ─── WO Output Done ───────────────────────────────────────────────────────────
+function renderWoOutputDone(el, t) {
+  t.textContent = 'Zarejestrowano!';
+  el.innerHTML = `
+    <div class="success-wrap">
+      <div class="success-icon">✅</div>
+      <div class="success-title" style="color:#4ade80">Wyrób zarejestrowany!</div>
+      <div class="success-sub">Serek waniliowy 250g · 50 kg · Partia 2025-01-09-A</div>
+    </div>
+    <div class="lp-card">
+      <div class="lp-sub">Nowy License Plate</div>
+      <div class="lp-num">LP-00 249</div>
+      <div class="lp-sub">50 kg · MAGAZYN-A · Regał-3 · ważny do 2025-02-09</div>
+    </div>
+    <div style="margin:12px 16px;background:#1e293b;border-radius:10px;padding:12px 14px">
+      <div style="font-size:11px;color:#64748b;margin-bottom:6px;font-weight:600">Podsumowanie nowego LP</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px">
+        <div><span style="color:#475569">Ten sam produkt w 2 LP:</span></div>
+        <div></div>
+        <div style="padding:6px;background:#0f172a;border-radius:6px">
+          <div style="color:#64748b;font-size:10px">Poprzedni LP</div>
+          <div style="font-family:monospace;color:#f1f5f9">LP-00234</div>
+          <div style="color:#64748b;font-size:10px">130 kg pozostało</div>
+        </div>
+        <div style="padding:6px;background:#052e16;border-radius:6px;border:1px solid #16a34a">
+          <div style="color:#86efac;font-size:10px">Nowy LP ✨</div>
+          <div style="font-family:monospace;color:#4ade80">LP-00249</div>
+          <div style="color:#86efac;font-size:10px">50 kg</div>
+        </div>
+      </div>
+    </div>
+    <div class="brow">
+      <button class="btn btn-p" onclick="go('wo-execute')">↩ Kontynuuj WO-2025-0142</button>
+      <button class="btn btn-sec" onclick="go('home')">🏠 Strona główna</button>
+    </div>`;
+}
+
+// ─── Receive PO ───────────────────────────────────────────────────────────────
+function renderPoList(el, t) {
+  t.textContent = 'Przyjęcie PO';
+  el.innerHTML = `
+    <div class="sinput-area">
+      <input class="sinput" placeholder="Skanuj kod PO lub wpisz numer..." />
+      <div class="shint">Lub wybierz z listy poniżej</div>
+    </div>
+    <div style="padding:8px 16px;font-size:11px;color:#475569">Oczekujące zamówienia zakupu</div>
+    ${poRow('PO-2025-0089','Mleczarnia Łowicz','Dziś · 4 pozycje','🟡','po-lines')}
+    ${poRow('PO-2025-0090','Cukiernia Krakowska','Jutro · 2 pozycje','🔵','po-lines')}
+    ${poRow('PO-2025-0085','Opakowania SP','Zaległe · 6 pozycji','🔴','po-lines')}
+    <div class="sp"></div>`;
+}
+function poRow(id, sup, detail, dot, target) {
+  return `<div class="litem" onclick="go('${target}')">
+    <div class="licon">📋</div>
+    <div class="linfo">
+      <div class="ltitle">${id}</div>
+      <div class="lsub">${sup}</div>
+      <div style="font-size:11px;color:#94a3b8;margin-top:2px">${detail}</div>
+    </div>
+    <div style="font-size:20px">${dot}</div>
+    <span class="lchev">›</span>
+  </div>`;
+}
+
+function renderPoLines(el, t) {
+  t.textContent = 'PO-2025-0089';
+  el.innerHTML = `
+    <div style="padding:10px 16px;background:#1e293b;border-bottom:1px solid #334155">
+      <div style="font-size:12px;color:#64748b">Dostawca</div>
+      <div style="font-size:14px;font-weight:600">Mleczarnia Łowicz</div>
+      <div style="font-size:11px;color:#94a3b8;margin-top:2px">Data dostawy: 09.01.2025 · 4 pozycje · Oczekiwanie na odbiór</div>
+    </div>
+    <div style="padding:8px 16px;font-size:11px;color:#475569">Wybierz pozycję do odbioru</div>
+    ${poLine(1,'Twaróg naturalny 40%','500 kg','0 kg','○','#475569','po-item')}
+    ${poLine(2,'Śmietana 36%','200 kg','200 kg','✓','#4ade80','po-item')}
+    ${poLine(3,'Mleko 3.2%','1000 L','500 L','½','#fb923c','po-item')}
+    ${poLine(4,'Serwatka','300 kg','0 kg','○','#475569','po-item')}
+    <div class="sp"></div>`;
+}
+function poLine(n, name, ordered, received, ic, color, target) {
+  return `<div class="litem" onclick="go('${target}')">
+    <div style="width:36px;height:36px;border-radius:8px;background:#0f172a;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#64748b;flex-shrink:0">#${n}</div>
+    <div class="linfo">
+      <div class="ltitle">${name}</div>
+      <div class="lsub">Zam: ${ordered} · Odebrano: <span style="color:${color}">${received}</span></div>
+    </div>
+    <div style="width:30px;height:30px;border-radius:50%;border:2px solid ${color};display:flex;align-items:center;justify-content:center;color:${color};font-weight:700;font-size:13px;flex-shrink:0">${ic}</div>
+    <span class="lchev">›</span>
+  </div>`;
+}
+
+function renderPoItem(el, t) {
+  t.textContent = 'Odbierz pozycję';
+  el.innerHTML = `
+    <div class="steps">
+      <div class="step active"></div><div class="step"></div><div class="step"></div>
+    </div>
+    <div class="fgroup" style="background:#1e293b">
+      <div class="flabel">Pozycja PO #1</div>
+      <div class="fvalue">Twaróg naturalny 40%</div>
+      <div style="font-size:11px;color:#64748b;margin-top:2px">Zamówiono: 500 kg · Odebrano dotychczas: 0 kg</div>
+    </div>
+    <div class="sinput-area">
+      <div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Skanuj LP dostawcy lub etykietę GS1</div>
+      <input class="sinput" placeholder="Skanuj lub wpisz LP / SSCC..." autofocus />
+      <div class="shint">Jeśli brak kodu — wypełnij pola ręcznie</div>
+    </div>
+    <div class="fgroup">
+      <div class="flabel">Nr partii dostawcy <span class="req">*</span></div>
+      <input class="finput" placeholder="Numer partii / LOT..." />
+    </div>
+    <div class="fgroup">
+      <div class="flabel">Data ważności <span class="req">*</span></div>
+      <input class="finput" type="date" />
+    </div>
+    <div class="fgroup">
+      <div class="flabel">Ilość odebrana (kg) <span class="req">*</span></div>
+      <input class="finput big" type="number" placeholder="0.00" />
+    </div>
+    <div class="fgroup">
+      <div class="flabel">Lokalizacja przyjęcia</div>
+      <div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px 14px;font-size:13px;color:#f1f5f9;cursor:pointer;display:flex;justify-content:space-between">
+        <span>PRZYJĘCIA-1</span><span style="color:#64748b">zmień ›</span>
+      </div>
+    </div>
+    <div class="brow">
+      <button class="btn btn-s" onclick="go('po-done')">✓ Przyjmij i utwórz LP</button>
+      <button class="btn btn-ghost" onclick="goBack()">Anuluj</button>
+    </div>`;
+}
+
+function renderPoDone(el, t) {
+  t.textContent = 'Przyjęto!';
+  el.innerHTML = `
+    <div class="success-wrap">
+      <div class="success-icon">📦</div>
+      <div class="success-title" style="color:#4ade80">Przyjęto pomyślnie!</div>
+      <div class="success-sub">Twaróg naturalny 40% · 500 kg</div>
+    </div>
+    <div class="lp-card">
+      <div class="lp-sub">Nowy License Plate (LP)</div>
+      <div class="lp-num">LP-00 247</div>
+      <div class="lp-sub">Partia: 2025-01-06 · 500 kg · PRZYJĘCIA-1</div>
+    </div>
+    <div class="brow" style="margin-top:16px">
+      <button class="btn btn-p" onclick="go('po-lines')">← Kolejna pozycja PO</button>
+      <button class="btn btn-sec" onclick="go('home')">🏠 Strona główna</button>
+    </div>`;
+}
+
+// ─── Receive TO ───────────────────────────────────────────────────────────────
+function renderToList(el, t) {
+  t.textContent = 'Przyjęcie TO';
+  el.innerHTML = `
+    <div class="sinput-area">
+      <div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Skanuj Transfer Order lub wybierz</div>
+      <input class="sinput" placeholder="TO-XXXX lub skanuj..." />
+    </div>
+    <div style="padding:8px 16px;font-size:11px;color:#475569">Oczekujące transfery</div>
+    ${toRow('TO-2025-0023','Magazyn Centralny → Linia A','3 LP · 450 kg','to-scan')}
+    ${toRow('TO-2025-0024','Magazyn Centralny → Linia B','1 LP · 200 kg','to-scan')}
+    <div class="sp"></div>`;
+}
+function toRow(id, route, detail, target) {
+  return `<div class="litem" onclick="go('${target}')">
+    <div class="licon">🔄</div>
+    <div class="linfo">
+      <div class="ltitle">${id}</div>
+      <div class="lsub">${route}</div>
+      <div style="font-size:11px;color:#94a3b8;margin-top:2px">${detail}</div>
+    </div>
+    <span class="status st-released" style="font-size:10px;flex-shrink:0">Oczekuje</span>
+    <span class="lchev">›</span>
+  </div>`;
+}
+
+function renderToScan(el, t) {
+  t.textContent = 'TO-2025-0023';
+  el.innerHTML = `
+    <div style="padding:10px 16px;background:#1e293b;border-bottom:1px solid #334155">
+      <div style="font-size:13px;font-weight:600">Magazyn Centralny → Linia A</div>
+      <div style="font-size:11px;color:#64748b;margin-top:2px">3 LP do potwierdzenia</div>
+    </div>
+    <div style="padding:8px 16px;font-size:11px;color:#475569">Zeskanuj każdy LP z listy</div>
+    ${toLP('LP-00201','Śmietana 36%','150 kg','ok')}
+    ${toLP('LP-00202','Śmietana 36%','150 kg','ok')}
+    ${toLP('LP-00203','Twaróg naturalny','150 kg','empty')}
+    <div class="sinput-area" style="margin-top:8px">
+      <input class="sinput" placeholder="Skanuj LP..." />
+    </div>
+    <div class="info-banner" style="margin:8px 16px">
+      <div class="banner-icon">ℹ️</div>
+      <div class="banner-text">Potwierdź odbiór po zeskanowaniu wszystkich LP</div>
+    </div>
+    <div class="brow">
+      <button class="btn btn-s" onclick="go('to-done')">✓ Potwierdź przyjęcie (2/3)</button>
+    </div>`;
+}
+function toLP(lp, name, qty, state) {
+  const c = state==='ok'?'#4ade80':'#334155';
+  const ic = state==='ok'?'✓':'○';
+  return `<div class="litem">
+    <div style="width:32px;height:32px;border-radius:50%;border:2px solid ${c};display:flex;align-items:center;justify-content:center;color:${c};font-weight:700;font-size:13px;flex-shrink:0">${ic}</div>
+    <div class="linfo">
+      <div class="ltitle" style="font-family:monospace">${lp}</div>
+      <div class="lsub">${name} · ${qty}</div>
+    </div>
+  </div>`;
+}
+
+function renderToDone(el, t) {
+  t.textContent = 'Przyjęto!';
+  el.innerHTML = `
+    <div class="success-wrap">
+      <div class="success-icon">🔄</div>
+      <div class="success-title" style="color:#4ade80">Transfer przyjęty!</div>
+      <div class="success-sub">TO-2025-0023 · 2/3 LP potwierdzono</div>
+    </div>
+    <div style="background:#1e293b;border-radius:10px;margin:0 16px;padding:14px">
+      <div style="font-size:11px;color:#64748b;margin-bottom:8px;font-weight:600">Przyjęte LP</div>
+      ${toLP('LP-00201','Śmietana 36% · 150 kg','','ok')}
+      ${toLP('LP-00202','Śmietana 36% · 150 kg','','ok')}
+      <div style="font-size:11px;color:#fb923c;margin-top:8px">⚠️ LP-00203 — niezeskanowane, wymaga ręcznego potwierdzenia</div>
+    </div>
+    <div class="brow" style="margin-top:16px">
+      <button class="btn btn-p" onclick="go('to-list')">← Powrót do TO</button>
+      <button class="btn btn-sec" onclick="go('home')">🏠 Strona główna</button>
+    </div>`;
+}
+
+// ─── Move LP ──────────────────────────────────────────────────────────────────
+function renderMoveLp(el, t) {
+  t.textContent = 'Przesuń LP';
+  el.innerHTML = `
+    <div class="steps">
+      <div class="step active"></div><div class="step"></div><div class="step"></div>
+    </div>
+    <div class="sinput-area">
+      <div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Krok 1: Zeskanuj LP do przesunięcia</div>
+      <input class="sinput" placeholder="Skanuj LP..." autofocus />
+      <div class="shint">Lub wpisz numer LP ręcznie</div>
+    </div>
+    <!-- LP result -->
+    <div class="mini-grid">
+      <div class="mini-row">
+        <div class="mini-cell"><div class="mini-label">LP</div><div class="mini-val" style="font-family:monospace;color:#4ade80">LP-00234</div></div>
+        <div class="mini-cell"><div class="mini-label">Produkt</div><div class="mini-val">Twaróg naturalny</div></div>
+      </div>
+      <div class="mini-row">
+        <div class="mini-cell"><div class="mini-label">Ilość</div><div class="mini-val">50 kg</div></div>
+        <div class="mini-cell"><div class="mini-label">Aktualna lok.</div><div class="mini-val">MAG-B · R2</div></div>
+      </div>
+    </div>
+    <div class="fgroup">
+      <div class="flabel">Krok 2: Lokalizacja docelowa <span class="req">*</span></div>
+      <input class="sinput" placeholder="Skanuj lokalizację..." style="margin-bottom:10px" />
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+        ${locBtn('MAG-A · R1')}${locBtn('LINIA-A · Start')}
+        ${locBtn('PRZYJĘCIA-1')}${locBtn('KWARANTANNA')}
+      </div>
+    </div>
+    <div class="brow">
+      <button class="btn btn-s" onclick="go('move-done')">✓ Przesuń LP-00234</button>
+      <button class="btn btn-ghost" onclick="goBack()">Anuluj</button>
+    </div>`;
+}
+function locBtn(loc) {
+  return `<div onclick="
+    this.closest('div').querySelectorAll('div').forEach(d=>d.style.borderColor='#334155');
+    this.style.borderColor='#3b82f6'"
+    style="background:#0f172a;border:2px solid #334155;border-radius:8px;padding:9px 10px;font-size:12px;color:#94a3b8;cursor:pointer;text-align:center;transition:border-color .1s">${loc}</div>`;
+}
+
+function renderMoveDone(el, t) {
+  t.textContent = 'Przesunięto!';
+  el.innerHTML = `
+    <div class="success-wrap">
+      <div class="success-icon">🚚</div>
+      <div class="success-title" style="color:#4ade80">Przesunięto!</div>
+      <div class="success-sub">LP-00234 przeniesiono pomyślnie</div>
+    </div>
+    <div class="mini-grid">
+      <div class="mini-row">
+        <div class="mini-cell"><div class="mini-label">LP</div><div class="mini-val" style="font-family:monospace">LP-00234</div></div>
+        <div class="mini-cell"><div class="mini-label">Produkt</div><div class="mini-val">Twaróg naturalny · 50 kg</div></div>
+      </div>
+      <div class="mini-row">
+        <div class="mini-cell"><div class="mini-label">Z lokalizacji</div><div class="mini-val" style="color:#fb923c">MAG-B · R2</div></div>
+        <div class="mini-cell"><div class="mini-label">Do lokalizacji</div><div class="mini-val" style="color:#4ade80">LINIA-A · Start</div></div>
+      </div>
+    </div>
+    <div class="brow" style="margin-top:16px">
+      <button class="btn btn-p" onclick="go('move-lp')">↩ Przesuń kolejny LP</button>
+      <button class="btn btn-sec" onclick="go('home')">🏠 Strona główna</button>
+    </div>`;
+}
+
+// ─── Split LP ─────────────────────────────────────────────────────────────────
+function renderSplitLp(el, t) {
+  t.textContent = 'Part Movement';
+  el.innerHTML = `
+    <div class="info-banner" style="margin-top:10px">
+      <div class="banner-icon">ℹ️</div>
+      <div>
+        <div class="banner-title">Podział License Plate</div>
+        <div class="banner-text">Tworzy nowy LP z częścią ilości. Oryginalny LP zostaje pomniejszony. Partia i data ważności są dziedziczone.</div>
+      </div>
+    </div>
+    <div class="sinput-area">
+      <div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Zeskanuj LP do podziału</div>
+      <input class="sinput" placeholder="Skanuj LP..." autofocus />
+    </div>
+    <div class="mini-grid">
+      <div class="mini-row">
+        <div class="mini-cell"><div class="mini-label">LP</div><div class="mini-val" style="font-family:monospace;color:#4ade80">LP-00234</div></div>
+        <div class="mini-cell"><div class="mini-label">Produkt</div><div class="mini-val">Twaróg naturalny 40%</div></div>
+      </div>
+      <div class="mini-row">
+        <div class="mini-cell"><div class="mini-label">Dostępna ilość</div><div class="mini-val">50 kg</div></div>
+        <div class="mini-cell"><div class="mini-label">Partia</div><div class="mini-val">2025-01-06</div></div>
+      </div>
+    </div>
+    <div class="fgroup">
+      <div class="flabel">Ilość do wydzielenia (kg) <span class="req">*</span></div>
+      <input class="finput big" type="number" value="20" id="splitQty" oninput="updateSplit(this.value)" />
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-top:8px;padding:8px;background:#0f172a;border-radius:6px">
+        <div>Oryginał po podziale: <strong id="origLeft" style="color:#f1f5f9">30 kg</strong></div>
+        <div>Nowy LP: <strong id="newQty" style="color:#4ade80">20 kg</strong></div>
+      </div>
+    </div>
+    <div class="fgroup">
+      <div class="flabel">Lokalizacja nowego LP</div>
+      <div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px 14px;font-size:13px;color:#f1f5f9;cursor:pointer;display:flex;justify-content:space-between">
+        <span>MAG-B · R2 (bez zmian)</span><span style="color:#64748b">zmień ›</span>
+      </div>
+    </div>
+    <div class="brow">
+      <button class="btn btn-p" onclick="go('split-done')">✂️ Podziel LP — utwórz nowy</button>
+      <button class="btn btn-ghost" onclick="goBack()">Anuluj</button>
+    </div>`;
+}
+
+function updateSplit(val) {
+  const v = parseFloat(val)||0;
+  const orig = Math.max(0, 50-v);
+  const el1 = document.getElementById('origLeft');
+  const el2 = document.getElementById('newQty');
+  if(el1) el1.textContent = orig + ' kg';
+  if(el2) el2.textContent = v + ' kg';
+}
+
+function renderSplitDone(el, t) {
+  t.textContent = 'Podzielono!';
+  el.innerHTML = `
+    <div class="success-wrap">
+      <div class="success-icon">✂️</div>
+      <div class="success-title" style="color:#f1f5f9">Podzielono LP!</div>
+      <div class="success-sub">Twaróg naturalny 40% · Partia 2025-01-06</div>
+    </div>
+    <div class="split-grid">
+      <div class="split-orig">
+        <div class="split-lp-label">Oryginalny LP</div>
+        <div class="split-lp-num">LP-00234</div>
+        <div class="split-qty">30 kg</div>
+        <div style="font-size:10px;color:#64748b;margin-top:4px">MAG-B · R2</div>
+      </div>
+      <div class="split-new">
+        <div class="split-lp-label">Nowy LP ✨</div>
+        <div class="split-lp-num">LP-00250</div>
+        <div class="split-qty">20 kg</div>
+        <div style="font-size:10px;color:#86efac;margin-top:4px">MAG-B · R2</div>
+      </div>
+    </div>
+    <div style="margin:10px 16px;background:#1e293b;border-radius:8px;padding:10px 12px;font-size:11px;color:#64748b">
+      Partia: 2025-01-06 · Data ważności: 2025-01-20 · dziedziczone z LP-00234
+    </div>
+    <div class="brow">
+      <button class="btn btn-p" onclick="go('split-lp')">↩ Podziel kolejny LP</button>
+      <button class="btn btn-sec" onclick="go('home')">🏠 Strona główna</button>
+    </div>`;
+}
+
+// ─── WO Co-product ────────────────────────────────────────────────────────────
+function renderWoCoproduct(el, t) {
+  t.textContent = 'Rejestruj co-product';
+  el.innerHTML = `
+    <div style="padding:10px 16px;background:#2e1065;border-bottom:1px solid #6d28d9">
+      <div style="font-size:11px;color:#c4b5fd;margin-bottom:2px">Co-product · WO-2025-0142</div>
+      <div style="font-size:13px;font-weight:600;color:#f1f5f9">Serek waniliowy 250g</div>
+      <div style="font-size:11px;color:#a78bfa;margin-top:2px">Produkt uboczny powstały przy tej produkcji</div>
+    </div>
+    <div class="info-banner" style="margin-top:10px">
+      <div class="banner-icon">ℹ️</div>
+      <div>
+        <div class="banner-title">Co-product — osobna rejestracja</div>
+        <div class="banner-text">Rejestruje produkt uboczny (np. serwatka, tłuszcz mleczny). Tworzy nowy LP z innym produktem. Możesz mieć wiele rejestracji co-product dla jednego WO.</div>
+      </div>
+    </div>
+    <div class="fgroup">
+      <div class="flabel">Produkt uboczny (co-product) <span class="req">*</span></div>
+      <select class="finput" style="font-size:13px">
+        <option value="">— wybierz co-product —</option>
+        <option selected>Serwatka słodka</option>
+        <option>Tłuszcz mleczny</option>
+        <option>Maślanka</option>
+        <option>Krem z twarogu (odpad produkcyjny)</option>
+      </select>
+      <div class="fhint">Co-producty zdefiniowane w BOM / konfiguracji WO</div>
+    </div>
+    <div class="fgroup">
+      <div class="flabel">Ilość (kg) <span class="req">*</span></div>
+      <input class="finput big" type="number" placeholder="0.00" value="12" />
+    </div>
+    <div class="fgroup">
+      <div class="flabel">Nr partii / Batch <span class="req">*</span></div>
+      <input class="finput" value="2025-01-09-CP1" placeholder="Numer partii..." />
+      <div class="fhint">Obowiązkowe — powiązane z partią głównego WO</div>
+    </div>
+    <div class="fgroup">
+      <div class="flabel">Data ważności <span class="req">*</span></div>
+      <input class="finput" type="date" value="2025-01-16" />
+    </div>
+    <div class="fgroup">
+      <div class="flabel">Lokalizacja docelowa</div>
+      <div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px 14px;font-size:13px;color:#f1f5f9;cursor:pointer;display:flex;justify-content:space-between">
+        <span>CO-PROD · Strefa B</span><span style="color:#64748b">zmień ›</span>
+      </div>
+    </div>
+    <div class="brow">
+      <button class="btn btn-v" onclick="go('wo-coproduct-done')">🔄 Utwórz nowy LP (co-product)</button>
+      <button class="btn btn-ghost" onclick="goBack()">Anuluj</button>
+    </div>`;
+}
+
+function renderWoCoproductDone(el, t) {
+  t.textContent = 'Co-product zapisany!';
+  el.innerHTML = `
+    <div class="success-wrap">
+      <div class="success-icon">🔄</div>
+      <div class="success-title" style="color:#a78bfa">Co-product zapisany!</div>
+      <div class="success-sub">Serwatka słodka · 12 kg · Partia 2025-01-09-CP1</div>
+    </div>
+    <div style="background:#2e1065;border:1px solid #6d28d9;border-radius:12px;padding:16px;margin:0 16px;text-align:center">
+      <div style="font-size:11px;color:#c4b5fd;margin-bottom:4px">Nowy LP (co-product)</div>
+      <div style="font-size:22px;font-weight:700;font-family:monospace;color:#a78bfa;letter-spacing:3px">LP-00 251</div>
+      <div style="font-size:11px;color:#c4b5fd;margin-top:4px">12 kg · CO-PROD · Strefa B · ważny 2025-01-16</div>
+    </div>
+    <div style="margin:10px 16px;background:#1e293b;border-radius:8px;padding:10px 12px;font-size:11px;color:#64748b">
+      Genealogia: LP-00251 powiązany z WO-2025-0142 (Serek waniliowy 250g)
+    </div>
+    <div class="brow">
+      <button class="btn btn-v" style="background:#5b21b6" onclick="go('wo-coproduct')">🔄 Zarejestruj kolejny co-product</button>
+      <button class="btn btn-sec" onclick="go('wo-execute')">↩ Wróć do WO Execute</button>
+    </div>`;
+}
+
+// ─── WO Waste ─────────────────────────────────────────────────────────────────
+function renderWoWaste(el, t) {
+  t.textContent = 'Rejestruj odpad';
+  el.innerHTML = `
+    <div style="padding:10px 16px;background:#1c1917;border-bottom:1px solid #57534e">
+      <div style="font-size:11px;color:#a8a29e;margin-bottom:2px">Odpad · WO-2025-0142</div>
+      <div style="font-size:13px;font-weight:600;color:#f1f5f9">Serek waniliowy 250g</div>
+      <div style="font-size:11px;color:#78716c;margin-top:2px">Odpad nie tworzy LP — tylko wpis w logu</div>
+    </div>
+    <div class="warn-banner" style="margin-top:10px">
+      <div class="banner-icon">🗑️</div>
+      <div>
+        <div class="banner-title">Rejestracja odpadu — osobna akcja</div>
+        <div class="banner-text">Odpad nie tworzy License Plate. Rejestruje tylko ilość i kategorię w logu produkcyjnym. Można rejestrować wielokrotnie w trakcie WO.</div>
+      </div>
+    </div>
+    <div class="fgroup">
+      <div class="flabel">Kategoria odpadu <span class="req">*</span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px">
+        ${wasteBtn('fat','🧈','Tłuszczowy','fat')}
+        ${wasteBtn('floor','🏭','Podłogowy','floor')}
+        ${wasteBtn('giveaway','⚖️','Naddatek','giveaway')}
+        ${wasteBtn('rework','♻️','Przeroby','rework')}
+      </div>
+      <div style="margin-top:8px">${wasteBtn('other','❓','Inny','other',true)}</div>
+    </div>
+    <div class="fgroup">
+      <div class="flabel">Ilość odpadu (kg) <span class="req">*</span></div>
+      <input class="finput big" type="number" placeholder="0.00" value="2.5" />
+    </div>
+    <div class="fgroup">
+      <div class="flabel">Faza produkcji</div>
+      <select class="finput" style="font-size:13px">
+        <option>— wybierz fazę —</option>
+        <option selected>Mieszanie</option>
+        <option>Formowanie</option>
+        <option>Pakowanie</option>
+        <option>Mycie / CIP</option>
+        <option>Inna</option>
+      </select>
+    </div>
+    <div class="fgroup">
+      <div class="flabel">Notatki (opcjonalne)</div>
+      <textarea class="finput" rows="2" placeholder="Np. odpad przy starcie linii..." style="resize:none;padding:10px 14px;font-size:13px"></textarea>
+    </div>
+    <div class="brow">
+      <button class="btn btn-sec" style="border-color:#57534e;color:#a8a29e;background:#1c1917" onclick="go('wo-waste-done')">🗑️ Zarejestruj odpad 2.5 kg</button>
+      <button class="btn btn-ghost" onclick="goBack()">Anuluj</button>
+    </div>`;
+}
+function wasteBtn(id, icon, label, val, full) {
+  const w = full ? 'grid-column:1/-1;' : '';
+  return `<div onclick="
+    this.closest('.fgroup').querySelectorAll('.wb').forEach(b=>{b.style.borderColor='#334155';b.style.background='#0f172a'});
+    this.style.borderColor='#57534e';this.style.background='#1c1917'"
+    class="wb" style="background:#0f172a;border:2px solid #334155;border-radius:8px;padding:10px 12px;cursor:pointer;display:flex;align-items:center;gap:8px;${w}">
+    <span style="font-size:18px">${icon}</span>
+    <div>
+      <div style="font-size:12px;font-weight:600;color:#f1f5f9">${label}</div>
+      <div style="font-size:10px;color:#475569">${val}</div>
+    </div>
+  </div>`;
+}
+
+function renderWoWasteDone(el, t) {
+  t.textContent = 'Odpad zapisany!';
+  el.innerHTML = `
+    <div class="success-wrap">
+      <div class="success-icon">🗑️</div>
+      <div class="success-title" style="color:#a8a29e">Odpad zapisany!</div>
+      <div class="success-sub">Tłuszczowy · 2.5 kg · WO-2025-0142</div>
+    </div>
+    <div style="background:#1c1917;border:1px solid #57534e;border-radius:12px;padding:14px;margin:0 16px">
+      <div style="font-size:11px;color:#78716c;margin-bottom:8px;font-weight:600">Podsumowanie rejestracji</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px">
+        <div style="background:#0f172a;border-radius:6px;padding:8px">
+          <div style="color:#475569;font-size:10px">Kategoria</div>
+          <div style="color:#a8a29e;font-weight:600">Tłuszczowy (fat)</div>
+        </div>
+        <div style="background:#0f172a;border-radius:6px;padding:8px">
+          <div style="color:#475569;font-size:10px">Ilość</div>
+          <div style="color:#a8a29e;font-weight:600">2.5 kg</div>
+        </div>
+        <div style="background:#0f172a;border-radius:6px;padding:8px">
+          <div style="color:#475569;font-size:10px">Faza</div>
+          <div style="color:#a8a29e;font-weight:600">Mieszanie</div>
+        </div>
+        <div style="background:#0f172a;border-radius:6px;padding:8px">
+          <div style="color:#475569;font-size:10px">Czas</div>
+          <div style="color:#a8a29e;font-weight:600">11:23</div>
+        </div>
+      </div>
+      <div style="margin-top:8px;font-size:11px;color:#57534e;text-align:center">Brak LP — odpad nie trafia do magazynu</div>
+    </div>
+    <div class="brow" style="margin-top:16px">
+      <button class="btn btn-sec" style="border-color:#57534e;color:#a8a29e;background:#1c1917" onclick="go('wo-waste')">🗑️ Zarejestruj kolejny odpad</button>
+      <button class="btn btn-sec" onclick="go('wo-execute')">↩ Wróć do WO Execute</button>
+    </div>`;
+}
+
+// ─── WO Pick ──────────────────────────────────────────────────────────────────
+function renderPickWoList(el, t) {
+  t.textContent = 'Pick dla WO';
+  el.innerHTML = `
+    <div class="sbar"><input class="sinp2" placeholder="🔍  Szukaj WO lub skanuj kod..." /></div>
+    <div style="padding:8px 16px;font-size:11px;color:#475569">Aktywne zlecenia wymagające kompletacji</div>
+    ${pickWoRow('WO-2025-0143','Jogurt truskawkowy 400g','0/4 pozycje','Linia A','RELEASED')}
+    ${pickWoRow('WO-2025-0144','Twaróg naturalny 500g','0/3 pozycje','Linia B','RELEASED')}
+    ${pickWoRow('WO-2025-0142','Serek waniliowy 250g','3/4 pozycje','Linia A','IN_PROGRESS')}
+    <div class="sp"></div>`;
+}
+function pickWoRow(id, prod, progress, line, status) {
+  const map = {RELEASED:['st-released','Zwolnione'],IN_PROGRESS:['st-inprog','W toku']};
+  const [cls, lbl] = map[status]||['st-planned','Zaplanowane'];
+  return `<div class="litem" onclick="go('pick-list')">
+    <div class="licon">🧺</div>
+    <div class="linfo">
+      <div class="ltitle">${id}</div>
+      <div class="lsub">${prod} · ${line}</div>
+      <div style="margin-top:4px;display:flex;align-items:center;gap:6px">
+        <span class="status ${cls}" style="font-size:10px">${lbl}</span>
+        <span style="font-size:11px;color:#64748b">${progress} skomp.</span>
+      </div>
+    </div>
+    <span class="lchev">›</span>
+  </div>`;
+}
+
+function renderPickList(el, t) {
+  t.textContent = 'Pick: WO-2025-0143';
+  el.innerHTML = `
+    <div style="padding:10px 16px;background:#1e293b;border-bottom:1px solid #334155">
+      <div style="font-size:13px;font-weight:600">Jogurt truskawkowy 400g</div>
+      <div style="font-size:11px;color:#64748b;margin-top:2px">WO-2025-0143 · Linia A · Cel: 300 kg</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+        <div style="flex:1;height:3px;background:#0f172a;border-radius:2px">
+          <div style="width:0%;height:100%;background:#3b82f6;border-radius:2px"></div>
+        </div>
+        <span style="font-size:11px;color:#64748b">0/4 pozycje</span>
+      </div>
+    </div>
+    <div style="padding:8px 16px;font-size:11px;color:#475569">Lista kompletacji (FIFO/FEFO)</div>
+    ${pickItem(1,'Mleko 3.2%','MAG-A · R2','LP-00210','120 kg','2025-01-05','suggested')}
+    ${pickItem(2,'Jogurt naturalny bazowy','MAG-A · R4','LP-00215','80 kg','2025-01-06','pending')}
+    ${pickItem(3,'Cukier','MAG-B · R1','LP-00198','12 kg','—','pending')}
+    ${pickItem(4,'Aromaty truskawkowe','MAG-B · R3','LP-00220','0.5 kg','—','pending')}
+    <div class="brow">
+      <button class="btn btn-p" onclick="go('pick-scan')">▶ Zacznij kompletację</button>
+    </div>`;
+}
+function pickItem(n, name, loc, lp, qty, expiry, state) {
+  const isNext = state==='suggested';
+  const border = isNext ? 'border:1px solid #3b82f6;' : 'border:1px solid #1a2332;';
+  const bg = isNext ? 'background:#0d2149;' : 'background:#0f172a;';
+  return `<div style="margin:6px 16px;border-radius:10px;overflow:hidden;${border}${bg}cursor:pointer" onclick="go('pick-scan')">
+    <div style="padding:10px 14px;display:flex;align-items:center;gap:10px">
+      <div style="width:24px;height:24px;border-radius:50%;${isNext?'background:#172554;border:2px solid #3b82f6;':'background:#1e293b;border:2px dashed #334155;'}display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:${isNext?'#60a5fa':'#475569'};flex-shrink:0">${n}</div>
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:600;color:${isNext?'#f1f5f9':'#94a3b8'}">${name}</div>
+        <div style="font-size:11px;color:#475569;margin-top:1px">${loc} · ${lp}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:13px;font-weight:700;color:${isNext?'#60a5fa':'#64748b'}">${qty}</div>
+        ${expiry!=='—'?`<div style="font-size:10px;color:#64748b">ważny: ${expiry}</div>`:''}
+      </div>
+    </div>
+    ${isNext?`<div style="padding:4px 14px 8px;font-size:11px;color:#60a5fa;display:flex;align-items:center;gap:4px">
+      <span>→</span><span>FIFO — najstarsza partia · zrób to jako pierwsza</span>
+    </div>`:''}
+  </div>`;
+}
+
+function renderPickScan(el, t) {
+  t.textContent = 'Skanuj LP';
+  el.innerHTML = `
+    <div style="padding:10px 16px;background:#1e293b;border-bottom:1px solid #334155">
+      <div style="font-size:11px;color:#64748b">Pozycja 1/4</div>
+      <div style="font-size:14px;font-weight:600">Mleko 3.2%</div>
+      <div style="font-size:11px;color:#64748b;margin-top:2px">Idź do: <span style="color:#60a5fa;font-weight:600">MAG-A · Rząd 2</span></div>
+    </div>
+    <div class="sinput-area">
+      <div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Krok 1: Skanuj lokalizację</div>
+      <input class="sinput" placeholder="Skanuj lokalizację MAG-A·R2..." />
+      <div class="shint">Zeskanuj etykietę przy regale</div>
+    </div>
+    <div class="info-banner">
+      <div class="banner-icon">💡</div>
+      <div>
+        <div class="banner-title">Sugestia FIFO</div>
+        <div class="banner-text">Sugerowany LP: <strong>LP-00210</strong> · Partia 2025-01-05 · 120 kg dostępne<br>Najstarsza partia z Mleka 3.2% w tym magazynie.</div>
+      </div>
+    </div>
+    <!-- After scanning location -->
+    <div style="margin:0 16px;background:#052e16;border:1px solid #16a34a;border-radius:8px;padding:8px 12px;font-size:11px;color:#4ade80;display:flex;align-items:center;gap:6px">
+      <span>✓</span><span>MAG-A · R2 — lokalizacja potwierdzona</span>
+    </div>
+    <div class="sinput-area" style="margin-top:8px">
+      <div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Krok 2: Skanuj LP</div>
+      <input class="sinput" placeholder="Skanuj LP..." />
+    </div>
+    <div class="mini-grid">
+      <div class="mini-row">
+        <div class="mini-cell"><div class="mini-label">Zeskanowany LP</div><div class="mini-val" style="font-family:monospace;color:#4ade80">LP-00210</div></div>
+        <div class="mini-cell"><div class="mini-label">Zgodność FIFO</div><div class="mini-val" style="color:#4ade80">✓ OK</div></div>
+      </div>
+      <div class="mini-row">
+        <div class="mini-cell"><div class="mini-label">Dostępne</div><div class="mini-val">120 kg</div></div>
+        <div class="mini-cell"><div class="mini-label">Partia</div><div class="mini-val">2025-01-05</div></div>
+      </div>
+    </div>
+    <div class="fgroup">
+      <div class="flabel">Ilość do pobrania (kg) <span class="req">*</span></div>
+      <input class="finput big" type="number" value="120" />
+      <div class="fhint">Wymagana: 120 kg · Dostępne: 120 kg</div>
+    </div>
+    <div class="brow">
+      <button class="btn btn-s" onclick="go('pick-done')">✓ Potwierdź pobranie 120 kg</button>
+      <button class="btn btn-ghost" onclick="goBack()">Anuluj</button>
+    </div>`;
+}
+
+function renderPickDone(el, t) {
+  t.textContent = 'Pobrano!';
+  el.innerHTML = `
+    <div class="success-wrap">
+      <div class="success-icon">🧺</div>
+      <div class="success-title" style="color:#4ade80">Pobrano!</div>
+      <div class="success-sub">Mleko 3.2% · 120 kg · LP-00210</div>
+    </div>
+    <div style="background:#1e293b;border-radius:10px;margin:0 16px;padding:14px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+        <span style="font-size:12px;color:#64748b;font-weight:600">Postęp kompletacji WO-2025-0143</span>
+        <span style="font-size:12px;color:#3b82f6;font-weight:700">1/4</span>
+      </div>
+      <div style="height:4px;background:#0f172a;border-radius:2px">
+        <div style="width:25%;height:100%;background:#3b82f6;border-radius:2px"></div>
+      </div>
+      <div style="margin-top:10px;font-size:12px;color:#64748b">
+        Następna: <strong style="color:#f1f5f9">Jogurt naturalny bazowy</strong> · MAG-A · R4
+      </div>
+    </div>
+    <div class="brow" style="margin-top:16px">
+      <button class="btn btn-p" onclick="go('pick-scan')">→ Następna pozycja</button>
+      <button class="btn btn-sec" onclick="go('pick-list')">↩ Lista kompletacji</button>
+    </div>`;
+}
+
+// ─── Putaway ──────────────────────────────────────────────────────────────────
+function renderPutawayScan(el, t) {
+  t.textContent = 'Putaway';
+  el.innerHTML = `
+    <div class="info-banner" style="margin-top:10px">
+      <div class="banner-icon">📍</div>
+      <div>
+        <div class="banner-title">Odłóż LP do magazynu</div>
+        <div class="banner-text">System zasugeruje optymalną lokalizację na podstawie FIFO/FEFO i strefy produktu.</div>
+      </div>
+    </div>
+    <div class="sinput-area">
+      <div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Skanuj LP do odłożenia</div>
+      <input class="sinput" placeholder="Skanuj LP z doku przyjęć..." autofocus />
+      <div class="shint">LP z doku przyjęć, np. z GRN</div>
+    </div>
+    <!-- Scanned LP -->
+    <div class="mini-grid">
+      <div class="mini-row">
+        <div class="mini-cell"><div class="mini-label">LP</div><div class="mini-val" style="font-family:monospace;color:#4ade80">LP-00247</div></div>
+        <div class="mini-cell"><div class="mini-label">Produkt</div><div class="mini-val">Twaróg naturalny 40%</div></div>
+      </div>
+      <div class="mini-row">
+        <div class="mini-cell"><div class="mini-label">Ilość</div><div class="mini-val">500 kg</div></div>
+        <div class="mini-cell"><div class="mini-label">Data ważności</div><div class="mini-val">2025-01-20</div></div>
+      </div>
+      <div class="mini-row">
+        <div class="mini-cell"><div class="mini-label">Partia</div><div class="mini-val">2025-01-06</div></div>
+        <div class="mini-cell"><div class="mini-label">Aktualna lok.</div><div class="mini-val" style="color:#fb923c">PRZYJĘCIA-1</div></div>
+      </div>
+    </div>
+    <div class="brow">
+      <button class="btn btn-p" onclick="go('putaway-suggest')">→ Pokaż sugestię lokalizacji</button>
+    </div>`;
+}
+
+function renderPutawaySuggest(el, t) {
+  t.textContent = 'Sugestia Putaway';
+  el.innerHTML = `
+    <!-- LP summary strip -->
+    <div style="padding:10px 16px;background:#1e293b;border-bottom:1px solid #334155;display:flex;align-items:center;gap:10px">
+      <div style="font-family:monospace;font-size:12px;background:#0f172a;padding:4px 8px;border-radius:6px;color:#4ade80">LP-00247</div>
+      <div style="font-size:12px;color:#94a3b8">Twaróg naturalny 40% · 500 kg · ważny 2025-01-20</div>
+    </div>
+    <!-- Suggestion card -->
+    <div style="margin:14px 16px;background:#0d2149;border:2px solid #3b82f6;border-radius:12px;padding:16px">
+      <div style="font-size:10px;color:#60a5fa;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">
+        ✦ Sugerowana lokalizacja
+      </div>
+      <div style="font-size:28px;font-weight:700;font-family:monospace;color:#f1f5f9;letter-spacing:2px">MAG-A · R3</div>
+      <div style="font-size:12px;color:#94a3b8;margin-top:4px">Strefa: Nabiał · Chłodnia A</div>
+      <div style="display:inline-flex;align-items:center;gap:5px;margin-top:8px;background:#172554;border-radius:20px;padding:3px 10px">
+        <span style="font-size:10px;color:#60a5fa">❄️</span>
+        <span style="font-size:11px;color:#93c5fd;font-weight:600">FEFO — podobna data ważności w strefie</span>
+      </div>
+      <div style="margin-top:10px;font-size:11px;color:#64748b">Pojemność: 1200 kg · Zajęte: 680 kg · Wolne: 520 kg ✓</div>
+    </div>
+    <!-- Alternatives -->
+    <div style="padding:0 16px;margin-bottom:6px;font-size:11px;color:#475569;font-weight:600">Alternatywy</div>
+    ${putawayAlt('MAG-A · R4','Nabiał · Chłodnia A','FEFO','820 kg wolne','#334155')}
+    ${putawayAlt('MAG-B · R1','Strefa sucha','Strefa produktu','1200 kg wolne','#334155')}
+    <!-- Scan destination -->
+    <div class="sinput-area" style="margin-top:8px">
+      <div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Zeskanuj lokalizację docelową</div>
+      <input class="sinput" placeholder="Skanuj etykietę regału..." />
+      <div class="shint">Zeskanuj sugestię lub inną lokalizację</div>
+    </div>
+    <!-- Match scenario (green) -->
+    <div style="margin:8px 16px;background:#052e16;border:1px solid #16a34a;border-radius:8px;padding:10px 12px;font-size:12px;color:#4ade80;display:flex;align-items:center;justify-content:space-between">
+      <span>✓ MAG-A · R3 — zgodna z sugestią</span>
+      <span style="background:#16a34a;color:#fff;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600">MATCH</span>
+    </div>
+    <div class="brow">
+      <button class="btn btn-s" onclick="go('putaway-done')">✓ Odłóż LP-00247 do MAG-A · R3</button>
+      <button class="btn btn-sec btn-sm" style="font-size:11px" onclick="showPutawayOverride()">⚠️ Użyj innej lokalizacji (override)</button>
+    </div>`;
+}
+function putawayAlt(loc, zone, strategy, free, border) {
+  return `<div style="margin:4px 16px;background:#1e293b;border-radius:8px;padding:10px 12px;display:flex;align-items:center;gap:10px">
+    <div style="flex:1">
+      <div style="font-size:13px;font-weight:600;font-family:monospace;color:#94a3b8">${loc}</div>
+      <div style="font-size:11px;color:#475569;margin-top:2px">${zone} · ${free}</div>
+    </div>
+    <div style="background:#172554;border-radius:20px;padding:2px 8px;font-size:10px;color:#60a5fa;font-weight:600">${strategy}</div>
+  </div>`;
+}
+function showPutawayOverride() {
+  const el = document.getElementById('content');
+  const override = `<div class="warn-banner" style="margin:10px 16px">
+    <div class="banner-icon">⚠️</div>
+    <div>
+      <div class="banner-title">Override — inna lokalizacja</div>
+      <div class="banner-text">Sugestia: MAG-A · R3. Wybierasz inną. Odchylenie zostanie zapisane w logu audytowym.</div>
+    </div>
+  </div>
+  <div class="fgroup">
+    <div class="flabel">Powód override (opcjonalnie)</div>
+    <select class="finput" style="font-size:13px">
+      <option>— wybierz powód —</option>
+      <option>Lokalizacja zajęta</option>
+      <option>Nieodpowiednia temperatura</option>
+      <option>Polecenie przełożonego</option>
+      <option>Inny</option>
+    </select>
+  </div>
+  <div class="brow">
+    <button class="btn btn-w" onclick="go('putaway-done')">⚠️ Potwierdź override i odłóż LP</button>
+    <button class="btn btn-ghost" onclick="render()">← Powrót do sugestii</button>
+  </div>`;
+  el.innerHTML = el.innerHTML + override;
+  el.scrollTop = el.scrollHeight;
+}
+
+function renderPutawayDone(el, t) {
+  t.textContent = 'Odłożono!';
+  el.innerHTML = `
+    <div class="success-wrap">
+      <div class="success-icon">📍</div>
+      <div class="success-title" style="color:#4ade80">LP odłożony!</div>
+      <div class="success-sub">LP-00247 umieszczony w MAG-A · R3</div>
+    </div>
+    <div class="mini-grid">
+      <div class="mini-row">
+        <div class="mini-cell"><div class="mini-label">LP</div><div class="mini-val" style="font-family:monospace">LP-00247</div></div>
+        <div class="mini-cell"><div class="mini-label">Produkt</div><div class="mini-val">Twaróg naturalny · 500 kg</div></div>
+      </div>
+      <div class="mini-row">
+        <div class="mini-cell"><div class="mini-label">Z lokalizacji</div><div class="mini-val" style="color:#fb923c">PRZYJĘCIA-1</div></div>
+        <div class="mini-cell"><div class="mini-label">Do lokalizacji</div><div class="mini-val" style="color:#4ade80">MAG-A · R3</div></div>
+      </div>
+      <div class="mini-row">
+        <div class="mini-cell"><div class="mini-label">Strategia</div><div class="mini-val" style="color:#60a5fa">FEFO</div></div>
+        <div class="mini-cell"><div class="mini-label">Override</div><div class="mini-val" style="color:#4ade80">Nie</div></div>
+      </div>
+    </div>
+    <div class="brow" style="margin-top:16px">
+      <button class="btn btn-p" onclick="go('putaway-scan')">↩ Odłóż kolejny LP</button>
+      <button class="btn btn-sec" onclick="go('home')">🏠 Strona główna</button>
+    </div>`;
+}
+
+// ─── QA Inspection ────────────────────────────────────────────────────────────
+const QA_STATE = { result: 'pass' };
+
+function renderQaList(el, t) {
+  t.textContent = 'Inspekcja QC';
+  el.innerHTML = `
+    <div class="sinput-area">
+      <input class="sinput" placeholder="Skanuj LP do inspekcji..." autofocus />
+      <div class="shint">Lub wybierz z listy oczekujących</div>
+    </div>
+    <div style="padding:8px 16px;display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:11px;color:#475569">Oczekujące inspekcje (5)</span>
+      <span style="font-size:11px;color:#fb923c;font-weight:600">2 przekroczone 48h</span>
+    </div>
+    ${qaRow('LP-00247','Twaróg naturalny 40%','500 kg · Partia 2025-01-06','2h temu','warn')}
+    ${qaRow('LP-00248','Serek waniliowy 250g','50 kg · Partia 2025-01-09','3h temu','warn')}
+    ${qaRow('LP-00245','Śmietana 36%','300 kg · Partia 2025-01-05','52h temu','critical')}
+    ${qaRow('LP-00246','Mleko 3.2%','200 L · Partia 2025-01-05','50h temu','critical')}
+    ${qaRow('LP-00249','Jogurt bazowy','150 kg · Partia 2025-01-08','1h temu','ok')}
+    <div class="sp"></div>`;
+}
+function qaRow(lp, name, detail, age, urgency) {
+  const uc = {warn:'#fb923c',critical:'#ef4444',ok:'#64748b'}[urgency];
+  const dot = `<div style="width:8px;height:8px;border-radius:50%;background:${uc};flex-shrink:0"></div>`;
+  return `<div class="litem" onclick="go('qa-inspect')">
+    <div class="licon">🔍</div>
+    <div class="linfo">
+      <div class="ltitle" style="font-family:monospace;font-size:12px">${lp}</div>
+      <div style="font-size:12px;font-weight:500;color:#f1f5f9;margin-top:1px">${name}</div>
+      <div class="lsub">${detail}</div>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
+      ${dot}
+      <div style="font-size:10px;color:${uc}">${age}</div>
+      <span class="status" style="background:#431407;color:#fbbf24;font-size:10px;padding:2px 6px">QC</span>
+    </div>
+    <span class="lchev">›</span>
+  </div>`;
+}
+
+function renderQaInspect(el, t) {
+  t.textContent = 'Inspekcja LP';
+  el.innerHTML = `
+    <!-- LP Card -->
+    <div style="margin:12px 16px;background:#1e293b;border-radius:12px;padding:16px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <div style="font-size:11px;color:#64748b;margin-bottom:3px">License Plate</div>
+          <div style="font-size:20px;font-weight:700;font-family:monospace;color:#f1f5f9">LP-00247</div>
+        </div>
+        <span class="status" style="background:#431407;color:#fbbf24">QC Pending · 2h</span>
+      </div>
+      <div class="wo-meta" style="margin-top:10px">
+        <div class="wm"><div class="wm-label">Produkt</div><div class="wm-val" style="font-size:12px">Twaróg naturalny 40%</div></div>
+        <div class="wm"><div class="wm-label">Ilość</div><div class="wm-val">500 kg</div></div>
+        <div class="wm"><div class="wm-label">Partia</div><div class="wm-val">2025-01-06</div></div>
+        <div class="wm"><div class="wm-label">Data ważności</div><div class="wm-val">2025-01-20</div></div>
+        <div class="wm"><div class="wm-label">Źródło</div><div class="wm-val">WO-2025-0140</div></div>
+        <div class="wm"><div class="wm-label">Lokalizacja</div><div class="wm-val">MAG-A · R3</div></div>
+      </div>
+    </div>
+    <!-- Result buttons -->
+    <div style="padding:0 16px 6px;font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Wynik inspekcji</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;padding:0 16px">
+      <button onclick="QA_STATE.result='pass';go('qa-done')"
+        style="height:80px;border-radius:12px;background:#052e16;border:2px solid #16a34a;color:#4ade80;font-size:13px;font-weight:700;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-family:inherit">
+        <span style="font-size:28px">✓</span>PASS
+      </button>
+      <button onclick="QA_STATE.result='fail';go('qa-fail-reason')"
+        style="height:80px;border-radius:12px;background:#450a0a;border:2px solid #dc2626;color:#ef4444;font-size:13px;font-weight:700;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-family:inherit">
+        <span style="font-size:28px">✗</span>FAIL
+      </button>
+      <button onclick="QA_STATE.result='hold';go('qa-done')"
+        style="height:80px;border-radius:12px;background:#431407;border:2px solid #d97706;color:#f59e0b;font-size:13px;font-weight:700;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-family:inherit">
+        <span style="font-size:28px">⏸</span>HOLD
+      </button>
+    </div>
+    <div style="padding:10px 16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;text-align:center">
+      <div style="font-size:10px;color:#64748b">LP → Dostępny<br>Dalej do produkcji</div>
+      <div style="font-size:10px;color:#64748b">LP → Zablokowany<br>Tworzy NCR</div>
+      <div style="font-size:10px;color:#64748b">LP → QA Hold<br>Czeka na decyzję</div>
+    </div>
+    <div class="fgroup" style="border-top:1px solid #1a2332">
+      <div class="flabel">Notatki (opcjonalne)</div>
+      <textarea class="finput" rows="2" placeholder="Uwagi inspektora..." style="resize:none;padding:10px 14px;font-size:13px"></textarea>
+    </div>
+    <div class="sp"></div>`;
+}
+
+function renderQaFailReason(el, t) {
+  t.textContent = 'Przyczyna odrzucenia';
+  el.innerHTML = `
+    <div style="padding:10px 16px;background:#450a0a;border-bottom:1px solid #dc2626;display:flex;align-items:center;gap:10px">
+      <span style="font-size:20px">✗</span>
+      <div>
+        <div style="font-size:13px;font-weight:600;color:#fca5a5">LP-00247 — Odrzucony</div>
+        <div style="font-size:11px;color:#f87171">Wybierz przyczynę odrzucenia</div>
+      </div>
+    </div>
+    <div style="padding:8px 16px;font-size:11px;color:#475569">Przyczyna (wymagana)</div>
+    ${qaReason('🦠','Zanieczyszczenie / Contamination')}
+    ${qaReason('🏷️','Błędna etykieta / Wrong label')}
+    ${qaReason('🌡️','Przekroczona temperatura')}
+    ${qaReason('👁️','Wada wizualna / Visual defect')}
+    ${qaReason('⚖️','Odchylenie masy / Weight variance')}
+    ${qaReason('📅','Przekroczona data ważności')}
+    ${qaReason('❓','Inny powód')}
+    <div class="fgroup">
+      <div class="flabel">Szczegóły (wymagane przy "Inny")</div>
+      <textarea class="finput" rows="2" placeholder="Opisz przyczynę odrzucenia..." style="resize:none;padding:10px 14px;font-size:13px"></textarea>
+    </div>
+    <div class="brow">
+      <button class="btn btn-danger" onclick="go('qa-done')" style="background:#dc2626">✗ Potwierdź odrzucenie + utwórz NCR</button>
+      <button class="btn btn-ghost" onclick="goBack()">← Wróć</button>
+    </div>`;
+}
+function qaReason(icon, label) {
+  return `<div onclick="
+    this.closest('.content').querySelectorAll('.qa-reason').forEach(r=>r.style.borderColor='#334155');
+    this.style.borderColor='#dc2626'"
+    class="qa-reason litem" style="border:2px solid #334155;margin:4px 16px;border-radius:8px;cursor:pointer">
+    <span style="font-size:20px">${icon}</span>
+    <span style="font-size:13px;color:#f1f5f9">${label}</span>
+  </div>`;
+}
+
+function renderQaDone(el, t) {
+  const r = QA_STATE.result;
+  const cfg = {
+    pass: { icon:'✅', title:'PASS — Zatwierdzono!', color:'#4ade80', sub:'LP-00247 → status: Dostępny', note:'LP gotowy do użycia w produkcji lub wysyłce.' },
+    fail: { icon:'❌', title:'FAIL — Odrzucono!', color:'#ef4444', sub:'LP-00247 → status: Zablokowany · NCR-2025-0034 utworzone', note:'Produkt zablokowany. Utworzono raport NCR.' },
+    hold: { icon:'⏸️', title:'HOLD — Wstrzymano!', color:'#f59e0b', sub:'LP-00247 → status: QA Hold', note:'LP oczekuje na dalszą decyzję przełożonego.' },
+  }[r];
+  t.textContent = 'Wynik QC';
+  el.innerHTML = `
+    <div class="success-wrap">
+      <div class="success-icon">${cfg.icon}</div>
+      <div class="success-title" style="color:${cfg.color}">${cfg.title}</div>
+      <div class="success-sub">${cfg.sub}</div>
+    </div>
+    <div style="margin:0 16px;background:#1e293b;border-left:3px solid ${cfg.color};border-radius:8px;padding:12px 14px;font-size:12px;color:#94a3b8">
+      ${cfg.note}
+    </div>
+    <div style="margin:10px 16px;background:#1e293b;border-radius:10px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:12px;color:#64748b">Inspekcje: <strong style="color:#f1f5f9">1 z 5</strong> ukończone</span>
+      <div style="height:3px;width:80px;background:#0f172a;border-radius:2px">
+        <div style="width:20%;height:100%;background:#3b82f6;border-radius:2px"></div>
+      </div>
+    </div>
+    <div class="brow">
+      <button class="btn btn-p" onclick="go('qa-inspect')">→ Następna inspekcja</button>
+      <button class="btn btn-sec" onclick="go('qa-list')">↩ Lista inspekcji</button>
+    </div>`;
+}
+
+// ─── Desktop side nav init ─────────────────────────────────────────────────────
+(function initNav() {
+  const groups = [
+    { label: 'Login Flow', items: [
+      {s:'login',l:'🔑 Login'},
+      {s:'login-pin',l:'🔢 PIN Entry'},
+      {s:'site-select',l:'🏭 Site & Shift'},
+    ]},
+    { label: 'Navigation', items: [
+      {s:'home',l:'🏠 Home'},
+    ]},
+    { label: 'Work Order', items: [
+      {s:'wo-list',l:'📋 WO List'},
+      {s:'wo-detail',l:'📋 WO Detail'},
+      {s:'wo-execute',l:'▶ WO Execute'},
+      {s:'wo-scan',l:'📷 Scan Component'},
+      {s:'wo-output',l:'🏷️ Register Output'},
+      {s:'wo-output-done',l:'✅ Output Done'},
+      {s:'wo-coproduct',l:'🔄 Co-product'},
+      {s:'wo-coproduct-done',l:'✅ Co-product Done'},
+      {s:'wo-waste',l:'🗑️ Register Waste'},
+      {s:'wo-waste-done',l:'✅ Waste Done'},
+    ]},
+    { label: 'WO Pick', items: [
+      {s:'pick-wo-list',l:'🧺 WO Pick List'},
+      {s:'pick-list',l:'🧺 Pick Items'},
+      {s:'pick-scan',l:'📷 Scan LP'},
+      {s:'pick-done',l:'✅ Pick Done'},
+    ]},
+    { label: 'Receive PO', items: [
+      {s:'po-list',l:'📦 PO List'},
+      {s:'po-lines',l:'📦 PO Lines'},
+      {s:'po-item',l:'📦 PO Item'},
+      {s:'po-done',l:'✅ PO Done'},
+    ]},
+    { label: 'Receive TO', items: [
+      {s:'to-list',l:'🔄 TO List'},
+      {s:'to-scan',l:'🔄 TO Scan'},
+      {s:'to-done',l:'✅ TO Done'},
+    ]},
+    { label: 'Putaway', items: [
+      {s:'putaway-scan',l:'📍 Scan LP'},
+      {s:'putaway-suggest',l:'📍 FIFO/FEFO Suggest'},
+      {s:'putaway-done',l:'✅ Putaway Done'},
+    ]},
+    { label: 'Move / Split', items: [
+      {s:'move-lp',l:'🚚 Move LP'},
+      {s:'move-done',l:'✅ Move Done'},
+      {s:'split-lp',l:'✂️ Split LP'},
+      {s:'split-done',l:'✅ Split Done'},
+    ]},
+    { label: 'QA Inspection', items: [
+      {s:'qa-list',l:'🔍 Pending List'},
+      {s:'qa-inspect',l:'🔍 Inspect LP'},
+      {s:'qa-fail-reason',l:'✗ Fail Reason'},
+      {s:'qa-done',l:'✅ QA Done'},
+    ]},
+  ];
+  const nav = document.getElementById('sideNav');
+  nav.innerHTML = groups.map(g =>
+    `<div class="sn-group">${g.label}</div>` +
+    g.items.map(i =>
+      `<div class="sn-item" data-s="${i.s}" onclick="stack.length=0;cur='${i.s}';render()">${i.l}</div>`
+    ).join('')
+  ).join('');
+})();
+
+// ─── Boot ──────────────────────────────────────────────────────────────────────
+cur = 'login';
+render();
+</script>
+</body>
+</html>

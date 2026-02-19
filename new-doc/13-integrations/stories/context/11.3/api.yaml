@@ -1,0 +1,236 @@
+# Story 11.3 - API Context
+# Endpoints for Integration Logs & Audit Trail
+
+endpoints:
+  - method: GET
+    path: "/api/integrations/logs"
+    description: "List integration logs with filters and pagination"
+    auth: true
+    roles: ["ADMIN", "IT_MANAGER"]
+    query_params:
+      - name: "page"
+        type: "number"
+        required: false
+        default: 1
+      - name: "page_size"
+        type: "number"
+        required: false
+        default: 50
+        max: 100
+      - name: "status"
+        type: "string"
+        required: false
+        enum: ["success", "warning", "error"]
+      - name: "integration_type"
+        type: "string"
+        required: false
+        enum: ["api", "webhook", "edi", "comarch", "import", "export"]
+      - name: "date_range"
+        type: "string"
+        required: false
+        enum: ["last_24_hours", "last_7_days", "last_30_days", "custom"]
+        default: "last_7_days"
+      - name: "start_date"
+        type: "string"
+        required: false
+        format: "ISO 8601"
+        description: "Custom start date"
+      - name: "end_date"
+        type: "string"
+        required: false
+        format: "ISO 8601"
+        description: "Custom end date"
+      - name: "external_system"
+        type: "string"
+        required: false
+      - name: "search"
+        type: "string"
+        required: false
+        max: 255
+        description: "Full-text search in request/response bodies"
+
+    response_success:
+      status: 200
+      body:
+        logs:
+          type: "array<IntegrationLog>"
+          description: "Paginated log entries"
+        pagination:
+          type: "object"
+          properties:
+            total: "number"
+            page: "number"
+            page_size: "number"
+            total_pages: "number"
+
+    response_error:
+      - status: 403
+        description: "User lacks admin/IT manager role"
+        body:
+          error: "Insufficient permissions"
+
+    performance:
+      target: "< 800ms"
+      database_queries: "≤ 2"
+      note: "Uses indexes for fast filtering"
+
+  - method: GET
+    path: "/api/integrations/logs/:id"
+    description: "Get single log entry detail"
+    auth: true
+    roles: ["ADMIN", "IT_MANAGER"]
+
+    response_success:
+      status: 200
+      body:
+        log:
+          type: "IntegrationLog"
+          description: "Full log details with formatted JSON"
+
+    response_error:
+      - status: 404
+        description: "Log not found or not in user's org"
+        body:
+          error: "Log not found"
+
+  - method: GET
+    path: "/api/integrations/logs/stats"
+    description: "Get log statistics for dashboard"
+    auth: true
+    roles: ["ADMIN", "IT_MANAGER"]
+    query_params:
+      - name: "date_range"
+        type: "string"
+        required: false
+        default: "last_24_hours"
+
+    response_success:
+      status: 200
+      body:
+        total_logs: "number"
+        success_count: "number"
+        error_count: "number"
+        warning_count: "number"
+        success_rate: "number (0-100%)"
+        avg_duration_ms: "number"
+        by_type:
+          type: "object"
+          description: "Counts per integration type"
+        by_status:
+          type: "object"
+          description: "Counts per status"
+
+  - method: POST
+    path: "/api/integrations/logs/export"
+    description: "Export logs to CSV"
+    auth: true
+    roles: ["ADMIN", "IT_MANAGER"]
+
+    request_body:
+      filters:
+        type: "LogsQueryParams"
+        description: "Same filters as list endpoint"
+      format:
+        type: "string"
+        enum: ["csv"]
+        required: true
+
+    response_success:
+      status: 200
+      body:
+        download_url:
+          type: "string"
+          description: "Presigned S3 URL or direct download"
+        expires_at:
+          type: "string (ISO 8601)"
+          description: "URL expiration"
+
+    note: "Max 10,000 logs per export"
+
+types:
+  IntegrationLog:
+    properties:
+      id: "string (UUID)"
+      org_id: "string (UUID)"
+      timestamp: "string (ISO 8601)"
+      integration_type: "string"
+      event_type: "string"
+      direction: "inbound | outbound"
+      status: "success | warning | error"
+      http_status: "number | null"
+      request_body: "object | null (JSON)"
+      response_body: "object | null (JSON)"
+      error_message: "string | null"
+      api_key_id: "string (UUID) | null"
+      webhook_id: "string (UUID) | null"
+      external_system: "string | null"
+      external_id: "string | null"
+      retry_count: "number"
+      duration_ms: "number | null"
+      metadata: "object"
+
+validation:
+  logsQuerySchema:
+    library: "zod"
+    schema: |
+      z.object({
+        page: z.coerce.number().int().min(1).default(1),
+        page_size: z.coerce.number().int().min(1).max(100).default(50),
+        status: z.enum(['success', 'warning', 'error']).optional(),
+        integration_type: z.enum(['api', 'webhook', 'edi', 'comarch', 'import', 'export']).optional(),
+        date_range: z.enum(['last_24_hours', 'last_7_days', 'last_30_days', 'custom']).optional(),
+        start_date: z.string().datetime().optional(),
+        end_date: z.string().datetime().optional(),
+        external_system: z.string().max(100).optional(),
+        search: z.string().max(255).optional(),
+      })
+
+  exportLogsSchema:
+    library: "zod"
+    schema: |
+      z.object({
+        filters: logsQuerySchema,
+        format: z.literal('csv'),
+      })
+
+sensitive_data_masking:
+  masked_fields:
+    - "password"
+    - "api_key"
+    - "api_secret"
+    - "Authorization (header)"
+    - "X-API-Key (header)"
+    - "credit_card"
+    - "ssn"
+  masking_value: "***REDACTED***"
+  partial_masking:
+    - field: "Authorization"
+      keep: "Bearer mp_live_abc***"
+      description: "Keep prefix only"
+
+search:
+  implementation: "PostgreSQL GIN indexes on JSONB"
+  fields:
+    - "request_body"
+    - "response_body"
+    - "error_message"
+    - "external_id"
+  operators:
+    - "@>" (contains)
+    - "@@" (full-text search)
+
+pagination:
+  default_page_size: 50
+  max_page_size: 100
+  sort_order: "timestamp DESC"
+
+error_handling:
+  - scenario: "User not admin/IT_MANAGER"
+    response: "403 Forbidden"
+  - scenario: "Invalid filters"
+    response: "400 Bad Request"
+  - scenario: "Database query timeout"
+    response: "500 Internal Server Error"
+  - scenario: "Export too large (>10K rows)"
+    response: "400 Bad Request"
+    message: "Export limit exceeded, please narrow filters"

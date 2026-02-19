@@ -1,0 +1,12 @@
+# Story 06.33 - Database Schema
+
+tables:
+  - name: "capa_effectiveness_checks"
+    columns:
+      - id, org_id, capa_id
+      - check_date
+      - check_method (data_review/audit/inspection/trend_analysis)
+      - result (effective/ineffective/partially_effective)
+      - evidence_url, notes
+      - checked_by, checked_at
+      - created_at, created_by, updated_at

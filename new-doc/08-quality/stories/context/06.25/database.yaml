@@ -1,0 +1,280 @@
+# Story 06.25 - CCP Deviation Handling - Database Context
+# Generated: 2025-01-15
+
+tables:
+  haccp_ccp_deviations:
+    description: "CCP deviation records auto-created on monitoring fail"
+    columns:
+      # Identity
+      - name: "id"
+        type: "UUID"
+        constraints: "PRIMARY KEY DEFAULT gen_random_uuid()"
+      - name: "org_id"
+        type: "UUID"
+        constraints: "NOT NULL REFERENCES organizations(id)"
+
+      # CCP Monitoring Reference
+      - name: "ccp_monitoring_id"
+        type: "UUID"
+        constraints: "NOT NULL REFERENCES haccp_ccp_monitoring(id)"
+        description: "Link to monitoring record that triggered deviation"
+      - name: "ccp_id"
+        type: "UUID"
+        constraints: "NOT NULL REFERENCES haccp_ccp(id)"
+      - name: "ccp_number"
+        type: "TEXT"
+        constraints: "NOT NULL"
+        description: "Denormalized for performance"
+
+      # Deviation Classification
+      - name: "severity"
+        type: "TEXT"
+        constraints: "NOT NULL CHECK (severity IN ('critical', 'major', 'minor'))"
+        description: "Auto-calculated based on deviation percentage"
+      - name: "deviation_type"
+        type: "TEXT"
+        constraints: "NOT NULL DEFAULT 'out_of_spec' CHECK (deviation_type IN ('out_of_spec', 'equipment_failure', 'procedure_violation'))"
+
+      # Deviation Details
+      - name: "monitored_value"
+        type: "NUMERIC"
+        constraints: "NOT NULL"
+        description: "Value that triggered deviation"
+      - name: "critical_limit_min"
+        type: "NUMERIC"
+        constraints: "NULL"
+        description: "Snapshot from monitoring record"
+      - name: "critical_limit_max"
+        type: "NUMERIC"
+        constraints: "NULL"
+        description: "Snapshot from monitoring record"
+      - name: "deviation_amount"
+        type: "NUMERIC"
+        constraints: "NULL"
+        description: "How much over/under limit (e.g., +2.5°C)"
+      - name: "deviation_percentage"
+        type: "NUMERIC"
+        constraints: "NULL"
+        description: "% deviation from limit (used for severity)"
+
+      # Work Order and Batch Context
+      - name: "wo_id"
+        type: "UUID"
+        constraints: "REFERENCES work_orders(id)"
+        description: "From monitoring record"
+      - name: "batch_number"
+        type: "TEXT"
+        constraints: "NULL"
+        description: "From monitoring record"
+      - name: "lp_id"
+        type: "UUID"
+        constraints: "REFERENCES license_plates(id)"
+        description: "From monitoring record"
+
+      # Corrective Action
+      - name: "corrective_action"
+        type: "TEXT"
+        constraints: "NOT NULL"
+        description: "Initial corrective action from monitoring record"
+      - name: "corrective_action_by"
+        type: "UUID"
+        constraints: "REFERENCES users(id)"
+        description: "User who took corrective action"
+      - name: "corrective_action_at"
+        type: "TIMESTAMPTZ"
+        constraints: "NULL"
+
+      # Resolution Workflow
+      - name: "status"
+        type: "TEXT"
+        constraints: "NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'investigating', 'resolved', 'verified', 'closed'))"
+      - name: "resolution_notes"
+        type: "TEXT"
+        constraints: "NULL"
+        description: "Additional notes on resolution"
+      - name: "resolved_by"
+        type: "UUID"
+        constraints: "REFERENCES users(id)"
+      - name: "resolved_at"
+        type: "TIMESTAMPTZ"
+        constraints: "NULL"
+      - name: "verified_by"
+        type: "UUID"
+        constraints: "REFERENCES users(id)"
+        description: "QA verification"
+      - name: "verified_at"
+        type: "TIMESTAMPTZ"
+        constraints: "NULL"
+
+      # NCR Linkage (if critical)
+      - name: "ncr_id"
+        type: "UUID"
+        constraints: "REFERENCES ncr_reports(id)"
+        description: "Auto-created NCR if severity='critical'"
+
+      # Audit
+      - name: "created_at"
+        type: "TIMESTAMPTZ"
+        constraints: "NOT NULL DEFAULT now()"
+      - name: "created_by"
+        type: "UUID"
+        constraints: "REFERENCES users(id)"
+      - name: "updated_at"
+        type: "TIMESTAMPTZ"
+        constraints: "NOT NULL DEFAULT now()"
+
+    indexes:
+      - name: "idx_ccp_deviations_org"
+        columns: ["org_id"]
+        type: "BTREE"
+      - name: "idx_ccp_deviations_ccp"
+        columns: ["ccp_id"]
+        type: "BTREE"
+      - name: "idx_ccp_deviations_monitoring"
+        columns: ["ccp_monitoring_id"]
+        type: "BTREE"
+      - name: "idx_ccp_deviations_severity"
+        columns: ["org_id", "severity"]
+        type: "BTREE"
+      - name: "idx_ccp_deviations_status"
+        columns: ["org_id", "status"]
+        type: "BTREE"
+      - name: "idx_ccp_deviations_open"
+        columns: ["org_id", "status"]
+        type: "BTREE"
+        where: "status IN ('open', 'investigating')"
+        description: "Fast query for active deviations"
+      - name: "idx_ccp_deviations_wo"
+        columns: ["wo_id"]
+        type: "BTREE"
+        where: "wo_id IS NOT NULL"
+      - name: "idx_ccp_deviations_batch"
+        columns: ["org_id", "batch_number"]
+        type: "BTREE"
+        where: "batch_number IS NOT NULL"
+      - name: "idx_ccp_deviations_ncr"
+        columns: ["ncr_id"]
+        type: "BTREE"
+        where: "ncr_id IS NOT NULL"
+
+    rls:
+      enabled: true
+      policies:
+        - name: "ccp_deviations_select"
+          command: "SELECT"
+          using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+        - name: "ccp_deviations_insert"
+          command: "INSERT"
+          with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+        - name: "ccp_deviations_update"
+          command: "UPDATE"
+          using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+        - name: "ccp_deviations_delete"
+          command: "DELETE"
+          using: "false"
+          description: "No deletes allowed (audit trail)"
+
+triggers:
+  - name: "update_ccp_deviations_updated_at"
+    table: "haccp_ccp_deviations"
+    timing: "BEFORE UPDATE"
+    for_each: "ROW"
+    function: "update_updated_at_column()"
+
+functions:
+  - name: "determine_deviation_severity"
+    returns: "TEXT"
+    language: "plpgsql"
+    description: "Calculate deviation severity based on % over limit"
+    params:
+      - name: "p_value"
+        type: "NUMERIC"
+      - name: "p_min"
+        type: "NUMERIC"
+      - name: "p_max"
+        type: "NUMERIC"
+    logic: |
+      DECLARE
+        v_deviation_pct NUMERIC;
+      BEGIN
+        -- Calculate deviation percentage
+        IF p_max IS NOT NULL AND p_value > p_max THEN
+          v_deviation_pct := ((p_value - p_max) / p_max) * 100;
+        ELSIF p_min IS NOT NULL AND p_value < p_min THEN
+          v_deviation_pct := ((p_min - p_value) / p_min) * 100;
+        ELSE
+          RETURN NULL; -- Not a deviation
+        END IF;
+
+        -- Severity classification
+        IF v_deviation_pct >= 100 THEN
+          RETURN 'critical'; -- 100%+ over limit
+        ELSIF v_deviation_pct >= 50 THEN
+          RETURN 'major'; -- 50-99% over limit
+        ELSE
+          RETURN 'minor'; -- <50% over limit
+        END IF;
+      END;
+
+  - name: "calculate_deviation_amount"
+    returns: "NUMERIC"
+    language: "plpgsql"
+    description: "Calculate how much over/under limit"
+    params:
+      - name: "p_value"
+        type: "NUMERIC"
+      - name: "p_min"
+        type: "NUMERIC"
+      - name: "p_max"
+        type: "NUMERIC"
+    logic: |
+      BEGIN
+        IF p_max IS NOT NULL AND p_value > p_max THEN
+          RETURN p_value - p_max; -- e.g., 6.5 - 4 = +2.5
+        ELSIF p_min IS NOT NULL AND p_value < p_min THEN
+          RETURN p_min - p_value; -- e.g., 0 - (-1.5) = +1.5
+        ELSE
+          RETURN NULL;
+        END IF;
+      END;
+
+migration_file: "YYYYMMDDHHMMSS_create_haccp_ccp_deviations.sql"
+migration_order: "After haccp_ccp_monitoring table (story 06.23)"
+
+# Sample Data
+sample_data:
+  - severity: "critical"
+    ccp_number: "CCP-1"
+    monitored_value: 10
+    critical_limit_max: 4
+    deviation_amount: 6
+    deviation_percentage: 150
+    corrective_action: "Rejected shipment, notified supplier, temperature log attached"
+    status: "open"
+
+  - severity: "major"
+    ccp_number: "CCP-2"
+    monitored_value: 70
+    critical_limit_min: 75
+    deviation_amount: 5
+    deviation_percentage: 6.67
+    corrective_action: "Continued cooking until 75°C reached"
+    status: "resolved"
+
+  - severity: "minor"
+    ccp_number: "CCP-1"
+    monitored_value: 4.8
+    critical_limit_max: 4
+    deviation_amount: 0.8
+    deviation_percentage: 20
+    corrective_action: "Monitored closely, no action required"
+    status: "verified"
+
+# Performance Notes
+performance:
+  - "Index on (org_id, status) for fast active deviation queries"
+  - "Index on (org_id, severity) for severity filtering"
+  - "Partial index on open/investigating for dashboard"
+  - "Index on ccp_monitoring_id for reverse lookup"
+  - "Expected query patterns: list by status, list by severity, list by CCP, list by batch"
+  - "Typical org has 10-50 deviations per month"

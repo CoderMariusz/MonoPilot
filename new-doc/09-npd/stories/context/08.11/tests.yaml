@@ -1,0 +1,47 @@
+# Story 08.11 - Test Specifications
+# Purpose: Handoff wizard acceptance criteria
+# Agent: TEST-WRITER, QA-AGENT
+# SEE: docs/2-MANAGEMENT/epics/current/08-npd/08.11.handoff-wizard.md (lines 80-593)
+
+test_files:
+  unit:
+    - "lib/services/handoff-service.test.ts"
+  integration:
+    - "app/api/npd/projects/[id]/handoff/validate/route.test.ts"
+    - "app/api/npd/projects/[id]/handoff/execute/route.test.ts"
+  e2e:
+    - "e2e/npd-handoff-wizard.spec.ts"
+
+key_tests:
+  validation:
+    - "All validation checks pass → [Next] enabled"
+    - "Validation failure → blocker message, [Next] disabled"
+    - "Re-check validation updates status"
+
+  product_decision:
+    - "Create new product with valid data"
+    - "Update existing product with new BOM"
+    - "Duplicate product code → error"
+
+  bom_preview:
+    - "Formulation items mapped 1:1 to BOM items"
+    - "BOM number auto-generated correctly"
+    - "Effective date validation (to >= from)"
+
+  execution:
+    - "Execute handoff completes < 5 seconds"
+    - "Transaction rolls back on failure"
+    - "Project status updated to 'launched'"
+    - "Formulation locked"
+    - "Event logged to npd_events"
+
+  success:
+    - "Success page shows links to created records"
+    - "Links navigate to product, BOM, pilot WO details"
+
+  error_handling:
+    - "Network error → rollback + retry option"
+    - "Validation failure after start → abort with error"
+    - "Constraint violation → rollback + clear message"
+
+coverage_target: ">= 85% (critical path)"

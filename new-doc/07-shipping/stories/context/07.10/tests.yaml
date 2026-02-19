@@ -1,0 +1,542 @@
+# Story 07.10 - Tests Specification
+# Purpose: Unit tests, integration tests, E2E tests, acceptance criteria
+# Agent: QA, FRONTEND-DEV, BACKEND-DEV
+
+# Acceptance Criteria (from story MD)
+acceptance_criteria:
+  ac_1_my_picks_list:
+    description: "Select pick list from My Picks"
+    given: "Picker user with 3 assigned pick lists"
+    when: "Navigator to /scanner/shipping/pick"
+    then:
+      - "Display list of assigned pick lists"
+      - "Show pick list # (large text, 24px)"
+      - "Show priority badge (color coded)"
+      - "Show line count"
+      - "Show status (assigned/in_progress)"
+      - "Lists sorted by priority DESC, created_at ASC"
+      - "Each row 64px height minimum"
+      - "Start button for assigned, Continue for in_progress"
+
+  ac_2_start_pick:
+    description: "Start pick list"
+    given: "Picker selects assigned pick list"
+    when: "Taps Start button"
+    then:
+      - "Update pick_list.status to in_progress"
+      - "Update pick_list.started_at to current timestamp"
+      - "Display first unpicked line (pick_sequence=1)"
+      - "Auto-focus on scan input"
+      - "Play start audio cue (440Hz, 100ms)"
+
+  ac_3_display_pick_line:
+    description: "Display current pick line with all details"
+    given: "Pick list with 12 lines in progress"
+    when: "System displays current pick line"
+    then:
+      - "Show Location Card (zone, path in bold 32px)"
+      - "Show Product Card (name 24px, SKU, lot, BBD)"
+      - "Show Quantity Card (32px green, expected LP)"
+      - "Show Progress Bar (X of Y)"
+      - "Show Skip Line and Confirm buttons"
+
+  ac_4_valid_lp_scan:
+    description: "Scan valid LP barcode"
+    given: "Picker on line expecting LP-2025-00042"
+    when: "Picker scans LP-2025-00042"
+    then:
+      - "Validate LP matches expected"
+      - "Display green flash overlay (200ms fade)"
+      - "Play success tone (880Hz, 150ms)"
+      - "Trigger vibration (100ms)"
+      - "Enable quantity input"
+      - "Focus on quantity input"
+      - "Display 'LP Verified' badge in green"
+
+  ac_5_invalid_lp_scan:
+    description: "Scan wrong LP barcode"
+    given: "Picker on line expecting LP-2025-00042"
+    when: "Picker scans different LP LP-2025-00099"
+    then:
+      - "Display red flash overlay (300ms fade)"
+      - "Play error tone (220Hz, 300ms)"
+      - "Trigger vibration ([200, 100, 200])"
+      - "Display error: 'Wrong LP - Expected LP-2025-00042'"
+      - "Keep focus on scan input"
+      - "Do NOT enable quantity input"
+      - "Log error for analytics"
+
+  ac_6_lp_not_found:
+    description: "Scan LP not in system"
+    given: "Barcode is not a valid LP"
+    when: "Picker scans barcode"
+    then:
+      - "Query returns 404"
+      - "Display red flash overlay"
+      - "Play error tone"
+      - "Display 'LP Not Found - Check barcode'"
+      - "Keep focus on scan input"
+
+  ac_7_quantity_confirmation:
+    description: "Enter quantity via number pad"
+    given: "Valid LP scanned, quantity_to_pick=24"
+    when: "System displays quantity form"
+    then:
+      - "Show large input field (64px height)"
+      - "Pre-fill with 24"
+      - "Show number pad (64x64 buttons)"
+      - "Pressing 1-9, 0, C, backspace updates value"
+      - "Confirm Pick button enabled"
+      - "On confirm: update pick_list_lines, advance to next"
+
+  ac_8_short_pick:
+    description: "Handle insufficient inventory"
+    given: "Available qty < quantity_to_pick"
+    when: "Picker taps Skip or scans insufficient qty"
+    then:
+      - "Display Short Pick modal"
+      - "Show quantity available input"
+      - "Show reason dropdown (required)"
+      - "Show notes text (optional)"
+      - "On confirm: create short pick record"
+      - "Trigger backorder workflow"
+      - "Play short pick audio (440+554Hz, 200ms)"
+      - "Advance to next line"
+
+  ac_9_audio_feedback:
+    description: "Audio tones for all events"
+    given: "Scanner app is active"
+    when: "Various events occur"
+    then:
+      - "Start pick: 440Hz, 100ms"
+      - "Valid scan: 880Hz, 150ms"
+      - "Invalid scan: 220Hz, 300ms"
+      - "Qty confirmed: 660->880Hz, 200ms"
+      - "Line complete: 880Hz x2, 100ms each"
+      - "Pick complete: 440->880Hz, 500ms sweep"
+      - "Error: 220Hz x2, 200ms each"
+      - "Short pick: 440+554Hz chord, 200ms"
+      - "Volume configurable (0-100%, default 70%)"
+      - "Mute toggle in settings"
+
+  ac_10_visual_feedback:
+    description: "Visual feedback for scans"
+    given: "Scanner app active"
+    when: "Scan events occur"
+    then:
+      - "Valid: green flash (#22C55E, 200ms)"
+      - "Invalid: red flash (#EF4444, 300ms)"
+      - "Warning: amber flash (#F59E0B, 250ms)"
+      - "Complete: full screen green (300ms)"
+      - "High contrast mode available"
+
+  ac_11_vibration:
+    description: "Vibration feedback on mobile"
+    given: "Mobile device with vibration support"
+    when: "Scan events occur"
+    then:
+      - "Valid: 100ms"
+      - "Invalid: [200, 100, 200]"
+      - "Complete: [100, 50, 100]"
+      - "Error: [300, 100, 300]"
+      - "Vibration can be disabled in settings"
+      - "Graceful fallback if not supported"
+
+  ac_12_auto_advance:
+    description: "Auto-advance to next line"
+    given: "Pick confirmed"
+    when: "System saves pick confirmation"
+    then:
+      - "Auto-advance to next unpicked line"
+      - "Next line determined by pick_sequence"
+      - "Display new line (location/product/qty)"
+      - "Auto-focus scan input"
+      - "Play double beep (line complete)"
+      - "Update progress bar"
+
+  ac_13_complete_pick:
+    description: "Complete pick list when all lines done"
+    given: "Picker picked/short all lines"
+    when: "System detects all done"
+    then:
+      - "Update pick_list.status to completed"
+      - "Update pick_list.completed_at"
+      - "Display completion celebration screen"
+      - "Show checkmark, summary, next steps"
+      - "Play victory sweep (440->880Hz, 500ms)"
+      - "Trigger [100, 50, 100] vibration"
+
+  ac_14_allergen_banner:
+    description: "Allergen warning for customer restrictions"
+    given: "Product with allergens matching customer restrictions"
+    when: "System displays pick line"
+    then:
+      - "Show red banner (#DC2626)"
+      - "Show warning icon"
+      - "Text: 'ALLERGEN ALERT: Contains Milk, Eggs'"
+      - "Banner persistent (not dismissible)"
+      - "Height 48px minimum"
+      - "Picker must acknowledge checkbox"
+
+  ac_15_fifo_fefo:
+    description: "FIFO/FEFO warning when picking different LP"
+    given: "Suggested LP is oldest lot"
+    when: "Picker scans newer lot"
+    then:
+      - "Display amber warning banner"
+      - "Text: 'Older lot available - LP-2025-00040'"
+      - "Show 'Use Suggested LP' button"
+      - "Show 'Continue Anyway' button"
+      - "Log override if proceed"
+
+  ac_16_lp_lookup_api:
+    description: "Fast LP lookup endpoint"
+    given: "Scanner validates LP barcode"
+    when: "Call GET /api/shipping/scanner/lookup/lp/:barcode"
+    then:
+      - "Return LP details (name, product, lot, BBD, qty, location, allergens, QA status)"
+      - "Return 404 if not found"
+      - "Response time <100ms"
+      - "Filter by org_id (RLS)"
+
+  ac_17_scanner_pick_api:
+    description: "Pick confirmation endpoint"
+    given: "Picker confirms pick"
+    when: "Call POST /api/shipping/scanner/pick"
+    then:
+      - "Accept pick_line_id, scanned_lp, qty, short_pick, reason"
+      - "Validate LP matches expected"
+      - "Update database"
+      - "Return next_line preview"
+      - "Return progress"
+      - "Response time <200ms"
+
+  ac_18_touch_targets:
+    description: "WCAG AA touch target sizes"
+    given: "Scanner UI rendered"
+    when: "Buttons and inputs displayed"
+    then:
+      - "All buttons 48x48px minimum"
+      - "Primary buttons 56px height"
+      - "Number pad 64x64px"
+      - "Input fields 56px height"
+      - "List rows 64px minimum"
+      - "Spacing 8px minimum between targets"
+      - "Visible focus states"
+
+  ac_19_scanner_settings:
+    description: "Customizable scanner settings"
+    given: "Picker wants to configure behavior"
+    when: "Access settings modal"
+    then:
+      - "Audio volume slider (0-100%, default 70%)"
+      - "Audio mute toggle"
+      - "Test audio button"
+      - "Vibration enable/disable"
+      - "High contrast toggle"
+      - "Large text toggle"
+      - "Camera/hardware scanner mode"
+      - "Persist to localStorage"
+      - "Sync across sessions"
+
+  ac_20_rls_enforcement:
+    description: "Prevent cross-org access"
+    given: "Two organizations (Org A, Org B)"
+    when: "Org A picker uses scanner"
+    then:
+      - "Only return org A pick lists"
+      - "Prevent access to org B picks"
+      - "Scanner endpoints filter by org_id"
+      - "LP lookup only within org"
+
+# Unit Tests
+unit_tests:
+  - file: "apps/frontend/lib/services/__tests__/scanner-pick-service.test.ts"
+    test_cases:
+      - name: "confirmPick - valid scan"
+        given: "Valid pick_line_id, matching LP, correct qty"
+        when: "Call confirmPick()"
+        then: "Return success, update database, return next_line"
+
+      - name: "confirmPick - LP mismatch"
+        given: "Scanned LP != expected LP"
+        when: "Call confirmPick()"
+        then: "Throw error 'LP_MISMATCH'"
+
+      - name: "confirmPick - qty exceeds available"
+        given: "quantity_picked > license_plate.on_hand"
+        when: "Call confirmPick()"
+        then: "Throw error 'QUANTITY_EXCEEDS'"
+
+      - name: "confirmPick - short pick missing reason"
+        given: "short_pick=true but reason not provided"
+        when: "Call confirmPick()"
+        then: "Throw error 'REASON_REQUIRED'"
+
+      - name: "lookupLP - found"
+        given: "Valid LP barcode"
+        when: "Call lookupLP()"
+        then: "Return LP details with product, location, allergens"
+
+      - name: "lookupLP - not found"
+        given: "Invalid LP barcode"
+        when: "Call lookupLP()"
+        then: "Return null or throw 404"
+
+      - name: "suggestPick - FIFO"
+        given: "Multiple LPs for product, FIFO strategy"
+        when: "Call suggestPick()"
+        then: "Return oldest mfg_date LP as suggested"
+
+      - name: "suggestPick - FEFO"
+        given: "Multiple LPs for product, FEFO strategy"
+        when: "Call suggestPick()"
+        then: "Return earliest bbd_date LP as suggested"
+
+      - name: "startPickList"
+        given: "Pick list with status='assigned'"
+        when: "Call startPickList()"
+        then: "Update status to 'in_progress', set started_at"
+
+      - name: "completePickList - success"
+        given: "All lines picked or short"
+        when: "Call completePickList()"
+        then: "Update status to 'completed', return summary"
+
+      - name: "completePickList - not ready"
+        given: "Some lines still pending"
+        when: "Call completePickList()"
+        then: "Throw error 'NOT_ALL_PICKED'"
+
+# Integration Tests
+integration_tests:
+  - file: "apps/frontend/__tests__/integration/scanner-pick-api.test.ts"
+    test_cases:
+      - name: "POST /api/shipping/scanner/pick - valid"
+        given: "Valid request with all required fields"
+        when: "POST to endpoint"
+        then: "Return 200, update database, return next_line"
+
+      - name: "POST /api/shipping/scanner/pick - validation error"
+        given: "Missing required field"
+        when: "POST to endpoint"
+        then: "Return 400, describe missing field"
+
+      - name: "POST /api/shipping/scanner/pick - not found"
+        given: "Invalid pick_line_id"
+        when: "POST to endpoint"
+        then: "Return 404"
+
+      - name: "POST /api/shipping/scanner/pick - forbidden"
+        given: "User lacks PICKER role"
+        when: "POST to endpoint"
+        then: "Return 403"
+
+      - name: "GET /api/shipping/scanner/lookup/lp - found"
+        given: "Valid LP barcode"
+        when: "GET endpoint"
+        then: "Return 200 with LP details"
+
+      - name: "GET /api/shipping/scanner/lookup/lp - not found"
+        given: "Invalid barcode"
+        when: "GET endpoint"
+        then: "Return 404"
+
+      - name: "GET /api/shipping/scanner/suggest-pick"
+        given: "Valid line_id"
+        when: "GET endpoint"
+        then: "Return suggested LP + alternates + FIFO/FEFO flags"
+
+      - name: "RLS policy enforcement"
+        given: "Org A user queries Org B picks"
+        when: "Call scanner endpoint"
+        then: "Return empty or 403"
+
+# E2E Tests
+e2e_tests:
+  - file: "tests/e2e/shipping/scanner-pick.spec.ts"
+    test_cases:
+      - name: "Full pick workflow - happy path"
+        steps:
+          - "Navigate to /scanner/shipping/pick"
+          - "Load My Picks list"
+          - "Select pick list"
+          - "Tap Start button"
+          - "Verify first pick line displayed"
+          - "Scan valid LP barcode"
+          - "Verify green flash + success tone"
+          - "Enter qty via number pad (24)"
+          - "Tap Confirm Pick"
+          - "Verify auto-advance to next line"
+          - "Progress bar updates (2/12)"
+          - "Repeat for all lines"
+          - "Verify completion screen"
+          - "Tap Return to My Picks"
+        assertions:
+          - "All picks confirmed in database"
+          - "Pick list status = 'completed'"
+          - "Completion time < 2 minutes for 12 items"
+
+      - name: "Short pick workflow"
+        steps:
+          - "Start pick list"
+          - "Scan valid LP"
+          - "On line with insufficient qty, tap Skip Line"
+          - "Short Pick modal appears"
+          - "Select reason from dropdown"
+          - "Add notes (optional)"
+          - "Tap Confirm Short Pick"
+          - "Verify backorder created"
+          - "Progress bar shows 1 short pick"
+        assertions:
+          - "pick_list_lines.status = 'short'"
+          - "short_pick_reason stored"
+          - "Backorder created in database"
+
+      - name: "Invalid LP scan error handling"
+        steps:
+          - "Start pick list"
+          - "Scan invalid LP barcode"
+          - "Verify red flash overlay"
+          - "Verify error tone played"
+          - "Verify error message displayed"
+          - "Verify scan input still focused"
+          - "Retry with correct LP"
+        assertions:
+          - "Scanner stays ready for retry"
+          - "No database changes on error"
+
+      - name: "FIFO warning workflow"
+        steps:
+          - "Start pick list"
+          - "System suggests LP-2025-00040 (oldest)"
+          - "Picker scans LP-2025-00042 (newer)"
+          - "Verify amber warning banner"
+          - "Tap Continue Anyway"
+          - "Verify warning logged"
+          - "Pick confirmed with newer LP"
+        assertions:
+          - "Override event logged"
+          - "picked_license_plate_id = newer LP"
+          - "Pick completed successfully"
+
+      - name: "Allergen alert workflow"
+        steps:
+          - "Pick line for product with allergens"
+          - "Allergen banner displayed (red)"
+          - "Verify banner text: 'ALLERGEN ALERT: Contains X'"
+          - "Verify checkbox unchecked"
+          - "Attempt to confirm pick - blocked"
+          - "Check acknowledgment checkbox"
+          - "Tap Confirm Pick"
+          - "Pick completed"
+        assertions:
+          - "Allergen acknowledgment logged"
+          - "Pick recorded successfully"
+
+      - name: "Settings persistence"
+        steps:
+          - "Tap Settings gear icon"
+          - "Set volume to 50%"
+          - "Disable vibration"
+          - "Enable high contrast"
+          - "Close settings"
+          - "Navigate away and back"
+          - "Open settings again"
+        assertions:
+          - "Volume still 50%"
+          - "Vibration still disabled"
+          - "High contrast still enabled"
+          - "Settings persisted to localStorage"
+
+      - name: "Responsive - landscape orientation"
+        steps:
+          - "Device in portrait"
+          - "Start picking"
+          - "Rotate device to landscape"
+          - "Verify layout adapts"
+          - "Verify stats visible (left) + form visible (right)"
+          - "Continue picking in landscape"
+        assertions:
+          - "No app crash on rotation"
+          - "All elements still accessible"
+          - "Touch targets still >= 48px"
+
+      - name: "Accessibility - screen reader"
+        steps:
+          - "Enable screen reader"
+          - "Navigate to /scanner/shipping/pick"
+          - "Tab through all elements"
+          - "Verify ARIA labels announced"
+          - "Verify form labels announced"
+          - "Verify status updates announced (aria-live)"
+        assertions:
+          - "All interactive elements labeled"
+          - "Status changes announced"
+          - "No missing ARIA labels"
+
+      - name: "Performance - load time"
+        steps:
+          - "Measure page load"
+          - "Load My Picks list"
+          - "Open pick line"
+          - "Scan LP barcode"
+          - "Measure each operation"
+        assertions:
+          - "Page load < 500ms"
+          - "Pick line < 200ms"
+          - "LP lookup < 100ms"
+          - "Pick confirmation < 200ms"
+
+# Performance Tests
+performance_tests:
+  - metric: "Page Load Time"
+    target: "<500ms"
+    test: "Load /scanner/shipping/pick, measure FCP"
+
+  - metric: "My Picks List Load"
+    target: "<200ms"
+    test: "Query and render 20 pick lists"
+
+  - metric: "LP Lookup Response"
+    target: "<100ms"
+    test: "GET /api/shipping/scanner/lookup/lp/:barcode"
+
+  - metric: "Pick Confirmation"
+    target: "<200ms"
+    test: "POST /api/shipping/scanner/pick"
+
+  - metric: "Next Line Display"
+    target: "<100ms"
+    test: "Show next pick line after confirmation"
+
+  - metric: "Audio Feedback Latency"
+    target: "<100ms"
+    test: "Time from scan to audio feedback"
+
+  - metric: "Memory Usage"
+    target: "<100MB"
+    test: "Measure memory during 1 hour of picking"
+
+# Test Coverage Requirements
+coverage:
+  services: ">=80% (ScannerPickService)"
+  components: ">=70% (UI components)"
+  api_routes: ">=85% (all endpoints)"
+  hooks: ">=75% (custom hooks)"
+  overall_goal: ">=75% across codebase"
+
+# Notes for QA Team
+qa_notes:
+  - "Test on actual hardware scanners (Zebra TC52, Honeywell CT40)"
+  - "Test camera barcode scanning on iOS/Android"
+  - "Test in bright warehouse lighting (outdoor conditions)"
+  - "Test with gloved hands (large touch targets critical)"
+  - "Test with various network latencies (4G, LTE, WiFi)"
+  - "Test audio feedback in noisy warehouse"
+  - "Test vibration on multiple phone models"
+  - "Test short pick creation workflow with backorder system"
+  - "Test allergen alert with customer restriction data"
+  - "Verify FIFO/FEFO enforcement matches business rules"
+  - "Test offline mode manually (should be Phase 2, but prepare)"
+  - "Verify all scanned data appears in audit trail"

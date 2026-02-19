@@ -1,0 +1,88 @@
+# Story 08.15 - Database Schema
+# Purpose: Event sourcing and notifications tables
+# Agent: BACKEND-DEV
+# SEE: _index.yaml and markdown lines 415-498
+
+migrations:
+  - path: "supabase/migrations/XXX_create_npd_events_table.sql"
+    type: "migration"
+    description: "Create npd_events table with RLS"
+  - path: "supabase/migrations/XXX_create_notifications_table.sql"
+    type: "migration"
+    description: "Create notifications and user_notification_preferences tables"
+
+tables:
+  - name: "npd_events"
+    description: "Event log for critical NPD events with retry mechanism"
+    columns:
+      - { name: "id", type: "SERIAL", constraints: "PRIMARY KEY" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id)" }
+      - { name: "event_type", type: "VARCHAR(50)", constraints: "NOT NULL" }
+      - { name: "entity_type", type: "VARCHAR(50)", constraints: "NOT NULL" }
+      - { name: "entity_id", type: "INTEGER", constraints: "NOT NULL" }
+      - { name: "payload", type: "JSONB", constraints: "NOT NULL" }
+      - { name: "status", type: "VARCHAR(20)", constraints: "NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'failed'))" }
+      - { name: "retry_count", type: "INTEGER", constraints: "DEFAULT 0" }
+      - { name: "error_message", type: "TEXT" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT NOW()" }
+      - { name: "processed_at", type: "TIMESTAMPTZ" }
+    rls: true
+    rls_pattern: "org_id = auth org_id, admin only"
+    indexes:
+      - "idx_npd_events_org_status ON npd_events(org_id, status)"
+      - "idx_npd_events_type ON npd_events(event_type)"
+      - "idx_npd_events_created ON npd_events(created_at)"
+      - "idx_npd_events_retry ON npd_events(status, retry_count) WHERE status = 'failed' AND retry_count < 3"
+
+  - name: "notifications"
+    description: "In-app notifications for NPD events"
+    columns:
+      - { name: "id", type: "SERIAL", constraints: "PRIMARY KEY" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id)" }
+      - { name: "user_id", type: "UUID", constraints: "NOT NULL REFERENCES auth.users(id)" }
+      - { name: "type", type: "VARCHAR(50)", constraints: "NOT NULL" }
+      - { name: "title", type: "VARCHAR(200)", constraints: "NOT NULL" }
+      - { name: "body", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "link", type: "VARCHAR(500)" }
+      - { name: "priority", type: "VARCHAR(20)", constraints: "DEFAULT 'normal' CHECK (priority IN ('low', 'normal', 'high', 'urgent'))" }
+      - { name: "is_read", type: "BOOLEAN", constraints: "DEFAULT false" }
+      - { name: "email_sent_at", type: "TIMESTAMPTZ" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT NOW()" }
+    rls: true
+    rls_pattern: "user_id = auth.uid()"
+    indexes:
+      - "idx_notifications_user_read ON notifications(user_id, is_read)"
+      - "idx_notifications_created ON notifications(created_at DESC)"
+
+  - name: "user_notification_preferences"
+    description: "Per-user notification preferences (email/in-app toggles)"
+    columns:
+      - { name: "id", type: "SERIAL", constraints: "PRIMARY KEY" }
+      - { name: "user_id", type: "UUID", constraints: "NOT NULL REFERENCES auth.users(id) UNIQUE" }
+      - { name: "gate_approvals_email", type: "BOOLEAN", constraints: "DEFAULT true" }
+      - { name: "gate_approvals_in_app", type: "BOOLEAN", constraints: "DEFAULT true" }
+      - { name: "costing_approvals_email", type: "BOOLEAN", constraints: "DEFAULT true" }
+      - { name: "costing_approvals_in_app", type: "BOOLEAN", constraints: "DEFAULT true" }
+      - { name: "cost_variance_email", type: "BOOLEAN", constraints: "DEFAULT true" }
+      - { name: "cost_variance_in_app", type: "BOOLEAN", constraints: "DEFAULT true" }
+      - { name: "compliance_docs_email", type: "BOOLEAN", constraints: "DEFAULT true" }
+      - { name: "compliance_docs_in_app", type: "BOOLEAN", constraints: "DEFAULT true" }
+      - { name: "handoff_completed_email", type: "BOOLEAN", constraints: "DEFAULT true" }
+      - { name: "handoff_completed_in_app", type: "BOOLEAN", constraints: "DEFAULT true" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT NOW()" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT NOW()" }
+    rls: true
+    rls_pattern: "user_id = auth.uid()"
+
+event_types:
+  - "NPD.GateAdvanced"
+  - "NPD.FormulationLocked"
+  - "NPD.CostingSubmitted"
+  - "NPD.HandoffCompleted"
+
+notification_types:
+  - "gate_approval_required"
+  - "costing_approval_required"
+  - "cost_variance_alert"
+  - "missing_compliance_docs"
+  - "handoff_completed"

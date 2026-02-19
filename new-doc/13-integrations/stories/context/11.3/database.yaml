@@ -1,0 +1,174 @@
+# Story 11.3 - Database Context
+# Tables, indexes, RLS policies for Integration Logs
+
+tables:
+  integration_logs:
+    purpose: "Immutable audit trail of all integration events"
+    columns:
+      - name: "id"
+        type: "UUID PRIMARY KEY"
+        description: "Log entry ID"
+      - name: "org_id"
+        type: "UUID NOT NULL REFERENCES organizations(id)"
+        description: "Organization (multi-tenant)"
+      - name: "timestamp"
+        type: "TIMESTAMPTZ NOT NULL DEFAULT now()"
+        description: "Event timestamp"
+      - name: "integration_type"
+        type: "VARCHAR(50) NOT NULL"
+        constraint: "CHECK (integration_type IN ('api', 'webhook', 'edi', 'comarch', 'import', 'export'))"
+      - name: "event_type"
+        type: "VARCHAR(100) NOT NULL"
+        description: "Specific event (e.g., 'invoice.created', 'webhook.delivered')"
+      - name: "direction"
+        type: "VARCHAR(10) NOT NULL"
+        constraint: "CHECK (direction IN ('inbound', 'outbound'))"
+      - name: "status"
+        type: "VARCHAR(20) NOT NULL"
+        constraint: "CHECK (status IN ('success', 'warning', 'error'))"
+      - name: "http_status"
+        type: "INTEGER"
+        description: "HTTP status code (if applicable)"
+      - name: "request_body"
+        type: "JSONB"
+        description: "Request payload (masked sensitive fields)"
+      - name: "response_body"
+        type: "JSONB"
+        description: "Response payload"
+      - name: "error_message"
+        type: "TEXT"
+        description: "Error details"
+      - name: "api_key_id"
+        type: "UUID REFERENCES integration_api_keys(id) ON DELETE SET NULL"
+        description: "API key used (if applicable)"
+      - name: "webhook_id"
+        type: "UUID REFERENCES integration_webhooks(id) ON DELETE SET NULL"
+        description: "Webhook ID (if applicable)"
+      - name: "external_system"
+        type: "VARCHAR(100)"
+        description: "External system name"
+      - name: "external_id"
+        type: "VARCHAR(255)"
+        description: "External reference (PO number, invoice ID, etc.)"
+      - name: "retry_count"
+        type: "INTEGER DEFAULT 0"
+      - name: "duration_ms"
+        type: "INTEGER"
+        description: "Processing time"
+      - name: "metadata"
+        type: "JSONB DEFAULT '{}'"
+        description: "Additional context"
+
+    indexes:
+      - name: "idx_integration_logs_org_timestamp"
+        columns: ["org_id", "timestamp DESC"]
+        description: "Primary query index"
+      - name: "idx_integration_logs_status"
+        columns: ["org_id", "status", "timestamp DESC"]
+        description: "Filter by status"
+      - name: "idx_integration_logs_type"
+        columns: ["org_id", "integration_type", "timestamp DESC"]
+        description: "Filter by type"
+      - name: "idx_integration_logs_external"
+        columns: ["org_id", "external_system", "timestamp DESC"]
+        description: "Filter by external system"
+      - name: "idx_integration_logs_api_key"
+        columns: ["api_key_id", "timestamp DESC"]
+        where: "api_key_id IS NOT NULL"
+      - name: "idx_integration_logs_external_id"
+        columns: ["external_id"]
+        where: "external_id IS NOT NULL"
+      - name: "idx_integration_logs_request_body"
+        type: "GIN"
+        columns: ["request_body"]
+        description: "Full-text search"
+      - name: "idx_integration_logs_response_body"
+        type: "GIN"
+        columns: ["response_body"]
+        description: "Full-text search"
+
+    constraints:
+      - type: "CHECK"
+        name: "no_updates"
+        check: "false"
+        description: "Disable updates via trigger (immutable logs)"
+
+    rls_policies:
+      - name: "integration_logs_select"
+        operation: "SELECT"
+        using: |
+          org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+          AND (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid()) IN ('SUPER_ADMIN', 'ADMIN', 'IT_MANAGER')
+      - name: "integration_logs_insert"
+        operation: "INSERT"
+        check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      - name: "integration_logs_no_update"
+        operation: "UPDATE"
+        using: "false"
+        description: "Prevent updates"
+      - name: "integration_logs_no_delete"
+        operation: "DELETE"
+        using: "false"
+        description: "Only cleanup job can delete (via service role)"
+
+functions:
+  log_integration_event:
+    purpose: "Create immutable log entry"
+    parameters:
+      - name: "p_org_id"
+        type: "UUID"
+      - name: "p_integration_type"
+        type: "VARCHAR"
+      - name: "p_event_type"
+        type: "VARCHAR"
+      - name: "p_direction"
+        type: "VARCHAR"
+      - name: "p_status"
+        type: "VARCHAR"
+      - name: "p_http_status"
+        type: "INTEGER DEFAULT NULL"
+      - name: "p_request_body"
+        type: "JSONB DEFAULT NULL"
+      - name: "p_response_body"
+        type: "JSONB DEFAULT NULL"
+      - name: "p_error_message"
+        type: "TEXT DEFAULT NULL"
+      - name: "p_api_key_id"
+        type: "UUID DEFAULT NULL"
+      - name: "p_webhook_id"
+        type: "UUID DEFAULT NULL"
+      - name: "p_external_system"
+        type: "VARCHAR DEFAULT NULL"
+      - name: "p_external_id"
+        type: "VARCHAR DEFAULT NULL"
+      - name: "p_retry_count"
+        type: "INTEGER DEFAULT 0"
+      - name: "p_duration_ms"
+        type: "INTEGER DEFAULT NULL"
+      - name: "p_metadata"
+        type: "JSONB DEFAULT '{}'"
+    returns: "UUID"
+    logic: "INSERT and RETURN log ID"
+    security: "SECURITY DEFINER"
+
+  cleanup_old_integration_logs:
+    purpose: "Delete logs older than retention period"
+    parameters:
+      - name: "v_retention_days"
+        type: "INTEGER DEFAULT 90"
+    returns: "INTEGER"
+    logic: |
+      DELETE FROM integration_logs
+      WHERE timestamp < now() - (v_retention_days || ' days')::INTERVAL
+      RETURN deleted row count
+    note: "Called by scheduled job (pg_cron)"
+
+migration_file:
+  name: "YYYYMMDDHHMMSS_create_integration_logs.sql"
+  order: 3
+  dependencies: ["integration_api_keys", "integration_webhooks"]
+
+retention_policy:
+  default_days: 90
+  archival: "After 30 days, archive to S3"
+  cleanup_schedule: "Daily at 2 AM (pg_cron)"

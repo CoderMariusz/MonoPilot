@@ -1,0 +1,129 @@
+# Story 04.6c - 1:1 Consumption Enforcement
+# Generated: 2026-01-14
+# Format: Multi-file context (5 files)
+
+story:
+  id: "04.6c"
+  name: "1:1 Consumption Enforcement"
+  slug: "one-to-one-consumption"
+  epic: "04-production"
+  phase: "1"
+  complexity: "M"
+  estimate_days: 2
+  type: "full-stack"
+  state: "ready"
+  priority: "P0"
+
+dependencies:
+  required:
+    - story: "04.6a"
+      name: "Material Consumption Desktop"
+      provides:
+        - "wo_material_consumptions table"
+        - "consumption-service"
+        - "AddConsumptionModal"
+    - story: "04.6b"
+      name: "Material Consumption Scanner"
+      provides:
+        - "scanner flow"
+        - "NumberPad"
+        - "FullConsumptionButton"
+    - story: "03.11a"
+      name: "WO Materials"
+      provides:
+        - "wo_materials.consume_whole_lp flag"
+  soft: []
+  blocked_by:
+    - story: "04.6a"
+      reason: "Adds validation to existing consumption flow"
+    - story: "04.6b"
+      reason: "Enhances scanner with read-only qty for 1:1"
+  blocks:
+    - story: "04.7a"
+      reason: "Output may require 1:1 materials fully consumed"
+
+references:
+  prd:
+    path: "docs/1-BASELINE/product/modules/production.md"
+    sections:
+      - "FR-PROD-008"
+  wireframe_desktop:
+    path: "docs/3-ARCHITECTURE/ux/wireframes/PROD-003-material-consumption.md"
+    sections:
+      - "1:1 consumption states"
+      - "Full LP Required badge"
+  wireframe_scanner:
+    path: "docs/3-ARCHITECTURE/ux/wireframes/PROD-005-scanner-consume-material.md"
+    sections:
+      - "Step 3: Full LP Consumption"
+      - "consume_whole_lp=true states"
+
+functional_requirements:
+  - id: "FR-04.6c-001"
+    name: "Block Partial Consumption"
+    description: "Block partial consumption when consume_whole_lp=true, require full LP quantity"
+
+  - id: "FR-04.6c-002"
+    name: "Scanner Pre-fill and Lock Qty"
+    description: "Pre-fill qty with LP.qty and make read-only on scanner when consume_whole_lp=true"
+
+  - id: "FR-04.6c-003"
+    name: "Full LP Required Badge"
+    description: "Display 'Full LP Required' badge on materials that require full LP consumption"
+
+  - id: "FR-04.6c-004"
+    name: "Desktop Warning and Lock"
+    description: "Show warning and lock qty input when user attempts to edit qty on desktop"
+
+  - id: "FR-04.6c-005"
+    name: "Variance Reporting"
+    description: "Report variance when full LP qty differs from required qty, set is_full_lp flag"
+
+acceptance_criteria:
+  - id: "AC-04.6c-001"
+    given: "consume_whole_lp=true AND LP.qty=100"
+    when: "user enters 50 as consume qty"
+    then: "error 'Full LP consumption required. LP quantity is 100' displays"
+
+  - id: "AC-04.6c-002"
+    given: "consume_whole_lp=true AND LP.qty=100"
+    when: "user enters 100 as consume qty"
+    then: "consumption proceeds successfully with is_full_lp=true"
+
+  - id: "AC-04.6c-003"
+    given: "consume_whole_lp=true on scanner"
+    when: "LP scanned"
+    then: "qty input pre-filled with LP.qty and displayed as read-only with lock icon"
+
+  - id: "AC-04.6c-004"
+    given: "consume_whole_lp=true on scanner"
+    when: "Step 3 (Enter Qty) displayed"
+    then: "number pad is disabled (grayed out, 50% opacity, not interactive)"
+
+  - id: "AC-04.6c-005"
+    given: "consume_whole_lp=true material in materials table"
+    when: "table rendered"
+    then: "'Full LP Required' badge with lock icon displays next to material name"
+
+  - id: "AC-04.6c-006"
+    given: "consume_whole_lp=true on desktop modal"
+    when: "user attempts to edit qty input"
+    then: "warning 'This material requires full LP consumption' displays, qty remains LP.qty"
+
+  - id: "AC-04.6c-007"
+    given: "consume_whole_lp=true AND LP.qty=100 but required=90"
+    when: "consumption completed"
+    then: "consumption proceeds with +11% variance, is_full_lp=true recorded"
+
+  - id: "AC-04.6c-008"
+    given: "API receives consume_qty != LP.qty for consume_whole_lp=true material"
+    when: "POST /consume called"
+    then: "returns 400 with error_code='FULL_LP_REQUIRED', message includes LP.qty"
+
+use_cases:
+  - name: "Allergen-Sensitive Materials"
+    example: "Peanut flour 25kg LP must be fully consumed to prevent cross-contamination"
+  - name: "Traceability Requirements"
+    example: "Organic ingredients require complete LP consumption for certification"
+  - name: "Sealed Packaging"
+    example: "Box of 5000 bags must be consumed entirely, cannot be partially used"

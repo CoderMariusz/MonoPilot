@@ -1,0 +1,198 @@
+story:
+  id: "09.23"
+  name: "Budget Management"
+  epic: "09-finance"
+  phase: "3"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "fullstack"
+
+dependencies:
+  required:
+    - story: "09.22"
+      provides: ["cost_center_budgets", "budget variance"]
+    - story: "09.10"
+      provides: ["cost_centers"]
+    - story: "01.1"
+      provides: ["users", "roles for approval"]
+  optional: []
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/finance.md"
+  prd_sections: ["FR-9.11.4", "FR-9.11.5", "FR-9.11.6"]
+  story: "docs/2-MANAGEMENT/epics/current/09-finance/09.23.budget-management.md"
+  patterns:
+    - "apps/frontend/components/finance/budget/BudgetApprovalWorkflow.tsx"
+
+files_to_create:
+  database:
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_create_budget_approvals.sql"
+      type: "migration"
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_create_budget_revisions.sql"
+      type: "migration"
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_create_budget_forecasts.sql"
+      type: "migration"
+  api:
+    - path: "apps/frontend/app/api/finance/budgets/[id]/submit-for-approval/route.ts"
+      methods: ["POST"]
+    - path: "apps/frontend/app/api/finance/budgets/[id]/approvals/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/finance/budgets/[id]/approve/route.ts"
+      methods: ["POST"]
+    - path: "apps/frontend/app/api/finance/budgets/[id]/reject/route.ts"
+      methods: ["POST"]
+    - path: "apps/frontend/app/api/finance/budgets/[id]/request-revision/route.ts"
+      methods: ["POST"]
+    - path: "apps/frontend/app/api/finance/budgets/[id]/revise/route.ts"
+      methods: ["POST"]
+    - path: "apps/frontend/app/api/finance/budgets/[id]/revision-history/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/finance/budgets/forecast/route.ts"
+      methods: ["POST"]
+    - path: "apps/frontend/app/api/finance/budgets/forecasts/[id]/accept/route.ts"
+      methods: ["POST"]
+    - path: "apps/frontend/app/api/finance/budgets/dashboard-summary/route.ts"
+      methods: ["GET"]
+  services:
+    - path: "apps/frontend/lib/services/budget-management-service.ts"
+  validation:
+    - path: "apps/frontend/lib/validation/budget-management.ts"
+  pages:
+    - path: "apps/frontend/app/(authenticated)/finance/budgets/approvals/page.tsx"
+  components:
+    - path: "apps/frontend/components/finance/budget/BudgetApprovalWorkflow.tsx"
+    - path: "apps/frontend/components/finance/budget/BudgetRevisionModal.tsx"
+    - path: "apps/frontend/components/finance/budget/BudgetForecastWizard.tsx"
+    - path: "apps/frontend/components/finance/budget/BudgetDashboardSummary.tsx"
+
+database:
+  tables:
+    - name: "budget_approvals"
+      columns:
+        - "id"
+        - "org_id"
+        - "budget_id"
+        - "approval_level"
+        - "approver_role"
+        - "required_for_amount_min"
+        - "required_for_amount_max"
+        - "status"
+        - "approved_by"
+        - "approved_at"
+        - "approval_notes"
+        - "rejection_reason"
+      rls: true
+      indexes:
+        - "budget_id"
+        - "org_id, status"
+    - name: "budget_revisions"
+      columns:
+        - "id"
+        - "org_id"
+        - "original_budget_id"
+        - "revised_budget_id"
+        - "revision_number"
+        - "revision_reason"
+        - "revision_notes"
+        - "original_amount"
+        - "revised_amount"
+        - "amount_change"
+        - "percent_change"
+        - "requested_by"
+        - "requested_at"
+        - "approved_at"
+      rls: true
+      indexes:
+        - "original_budget_id"
+        - "revised_budget_id"
+    - name: "budget_forecasts"
+      columns:
+        - "id"
+        - "org_id"
+        - "cost_center_id"
+        - "forecast_period_start"
+        - "forecast_period_end"
+        - "forecasting_method"
+        - "historical_lookback_months"
+        - "growth_rate_percent"
+        - "seasonality_factor"
+        - "historical_avg"
+        - "historical_min"
+        - "historical_max"
+        - "suggested_budget"
+        - "confidence_interval_low"
+        - "confidence_interval_high"
+        - "assumptions"
+        - "forecasted_by"
+        - "forecasted_at"
+        - "accepted"
+        - "budget_id"
+      rls: true
+      indexes:
+        - "cost_center_id"
+
+api_endpoints:
+  - method: "POST"
+    path: "/api/finance/budgets/:id/submit-for-approval"
+    auth: true
+    roles: ["finance_manager"]
+  - method: "POST"
+    path: "/api/finance/budgets/:id/approve"
+    auth: true
+    roles: ["finance_manager", "cfo"]
+  - method: "POST"
+    path: "/api/finance/budgets/forecast"
+    auth: true
+    roles: ["finance_manager", "budget_controller"]
+
+ux:
+  wireframes:
+    - id: "FIN-023"
+      description: "Budget Management Workflow"
+      components:
+        - "Approval workflow status"
+        - "Budget revision form"
+        - "Forecast wizard (3 steps)"
+  patterns:
+    workflow: "Multi-step approval with status indicators"
+    wizard: "Step-by-step forecast configuration"
+    modal: "ShadCN Dialog"
+
+validation_rules:
+  approval_threshold: "Higher tier > lower tier"
+  revision_reason: "Required for all revisions"
+  forecast_lookback: "Minimum 3 historical data points"
+  growth_rate: "Range -50% to +200%"
+
+patterns:
+  rls: "ADR-013"
+  api: "REST with org_id filter"
+  service: "class-based with static methods"
+  validation: "zod schemas"
+
+acceptance_checklist:
+  - "budget_approvals table created with RLS"
+  - "budget_revisions table created"
+  - "budget_forecasts table created"
+  - "Budget approval workflow works (multi-level)"
+  - "Budget revision creation works"
+  - "Revision history tracking works"
+  - "Budget forecasting works (historical avg method)"
+  - "Budget forecasting works (trend-based method)"
+  - "Forecast acceptance creates budget"
+  - "Budget dashboard summary displays"
+  - "Approval notifications sent correctly"
+  - "All tests pass"
+
+output_artifacts:
+  - "Migration: budget_approvals table"
+  - "Migration: budget_revisions table"
+  - "Migration: budget_forecasts table"
+  - "API: 10 budget management endpoints"
+  - "Service: BudgetManagementService"
+  - "Component: BudgetApprovalWorkflow"
+  - "Component: BudgetRevisionModal"
+  - "Component: BudgetForecastWizard"
+  - "Component: BudgetDashboardSummary"
+  - "Page: Budget approvals page"
+  - "Tests: Unit, integration, E2E"

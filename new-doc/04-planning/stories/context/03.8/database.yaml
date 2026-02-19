@@ -1,0 +1,259 @@
+# Story 03.8 - Database Schema
+# Purpose: Tables, RLS policies, triggers, indexes, constraints
+# Agent: BACKEND-DEV (database focus)
+
+migrations:
+  - path: "supabase/migrations/XXX_create_transfer_orders.sql"
+    type: "migration"
+    description: |
+      Creates transfer_orders + transfer_order_lines tables with:
+      - All columns per PRD Section 6.2, 6.3
+      - Constraints (warehouses_different, dates_valid, status_check)
+      - RLS policies per ADR-013
+      - Auto-numbering trigger (TO-YYYY-NNNNN)
+      - Updated_at triggers
+      - Performance indexes
+
+tables:
+  - name: "transfer_orders"
+    description: "Transfer Order headers for inter-warehouse movements"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id) ON DELETE CASCADE" }
+      - { name: "to_number", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "from_warehouse_id", type: "UUID", constraints: "NOT NULL REFERENCES warehouses(id)" }
+      - { name: "to_warehouse_id", type: "UUID", constraints: "NOT NULL REFERENCES warehouses(id)" }
+      - { name: "planned_ship_date", type: "DATE", constraints: "NOT NULL" }
+      - { name: "planned_receive_date", type: "DATE", constraints: "NOT NULL" }
+      - { name: "actual_ship_date", type: "DATE", constraints: "" }
+      - { name: "actual_receive_date", type: "DATE", constraints: "" }
+      - { name: "status", type: "TEXT", constraints: "DEFAULT 'draft' NOT NULL" }
+      - { name: "priority", type: "TEXT", constraints: "DEFAULT 'normal'" }
+      - { name: "notes", type: "TEXT", constraints: "" }
+      - { name: "shipped_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "received_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+      - { name: "created_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "updated_by", type: "UUID", constraints: "REFERENCES users(id)" }
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_transfer_orders_org_id ON transfer_orders(org_id)"
+      - "idx_transfer_orders_org_status ON transfer_orders(org_id, status)"
+      - "idx_transfer_orders_from_warehouse ON transfer_orders(from_warehouse_id)"
+      - "idx_transfer_orders_to_warehouse ON transfer_orders(to_warehouse_id)"
+      - "idx_transfer_orders_ship_date ON transfer_orders(planned_ship_date)"
+      - "idx_transfer_orders_created_at ON transfer_orders(org_id, created_at DESC)"
+    constraints:
+      - name: "transfer_orders_org_number_unique"
+        sql: "UNIQUE(org_id, to_number)"
+      - name: "transfer_orders_warehouses_different"
+        sql: "CHECK (from_warehouse_id != to_warehouse_id)"
+      - name: "transfer_orders_dates_valid"
+        sql: "CHECK (planned_receive_date >= planned_ship_date)"
+      - name: "transfer_orders_status_check"
+        sql: "CHECK (status IN ('draft', 'planned', 'shipped', 'received', 'closed', 'cancelled'))"
+      - name: "transfer_orders_priority_check"
+        sql: "CHECK (priority IN ('low', 'normal', 'high', 'urgent'))"
+
+  - name: "transfer_order_lines"
+    description: "Transfer Order line items"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "to_id", type: "UUID", constraints: "NOT NULL REFERENCES transfer_orders(id) ON DELETE CASCADE" }
+      - { name: "line_number", type: "INTEGER", constraints: "NOT NULL" }
+      - { name: "product_id", type: "UUID", constraints: "NOT NULL REFERENCES products(id)" }
+      - { name: "quantity", type: "DECIMAL(15,4)", constraints: "NOT NULL CHECK (quantity > 0)" }
+      - { name: "uom", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "shipped_qty", type: "DECIMAL(15,4)", constraints: "DEFAULT 0 CHECK (shipped_qty >= 0)" }
+      - { name: "received_qty", type: "DECIMAL(15,4)", constraints: "DEFAULT 0 CHECK (received_qty >= 0)" }
+      - { name: "notes", type: "TEXT", constraints: "" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+    rls: true
+    rls_pattern: "Inherited via to_id JOIN to transfer_orders"
+    indexes:
+      - "idx_transfer_order_lines_to_id ON transfer_order_lines(to_id)"
+      - "idx_transfer_order_lines_product_id ON transfer_order_lines(product_id)"
+    constraints:
+      - name: "transfer_order_lines_to_line_unique"
+        sql: "UNIQUE(to_id, line_number)"
+      - name: "transfer_order_lines_to_product_unique"
+        sql: "UNIQUE(to_id, product_id)"
+        description: "No duplicate products per TO (FR-PLAN-013)"
+      - name: "transfer_order_lines_shipped_qty_limit"
+        sql: "CHECK (shipped_qty <= quantity)"
+      - name: "transfer_order_lines_received_qty_limit"
+        sql: "CHECK (received_qty <= quantity)"
+
+# RLS Policies (ADR-013)
+rls_policies:
+  pattern: "Users Table Lookup"
+  pattern_sql: "(SELECT org_id FROM users WHERE id = auth.uid())"
+
+  policies:
+    # Transfer Orders
+    - table: "transfer_orders"
+      name: "transfer_orders_select"
+      operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+    - table: "transfer_orders"
+      name: "transfer_orders_insert"
+      operation: "INSERT"
+      with_check: |
+        org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        AND (
+          (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid())
+          IN ('owner', 'admin', 'warehouse_manager')
+        )
+
+    - table: "transfer_orders"
+      name: "transfer_orders_update"
+      operation: "UPDATE"
+      using: |
+        org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        AND (
+          (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid())
+          IN ('owner', 'admin', 'warehouse_manager')
+        )
+
+    - table: "transfer_orders"
+      name: "transfer_orders_delete"
+      operation: "DELETE"
+      using: |
+        org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        AND (
+          (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid())
+          IN ('owner', 'admin')
+        )
+
+    # Transfer Order Lines (inherit from parent TO via JOIN)
+    - table: "transfer_order_lines"
+      name: "transfer_order_lines_select"
+      operation: "SELECT"
+      using: |
+        EXISTS (
+          SELECT 1 FROM transfer_orders
+          WHERE id = transfer_order_lines.to_id
+            AND org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        )
+
+    - table: "transfer_order_lines"
+      name: "transfer_order_lines_insert"
+      operation: "INSERT"
+      with_check: |
+        EXISTS (
+          SELECT 1 FROM transfer_orders
+          WHERE id = transfer_order_lines.to_id
+            AND org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        )
+        AND (
+          (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid())
+          IN ('owner', 'admin', 'warehouse_manager')
+        )
+
+    - table: "transfer_order_lines"
+      name: "transfer_order_lines_update"
+      operation: "UPDATE"
+      using: |
+        EXISTS (
+          SELECT 1 FROM transfer_orders
+          WHERE id = transfer_order_lines.to_id
+            AND org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        )
+        AND (
+          (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid())
+          IN ('owner', 'admin', 'warehouse_manager')
+        )
+
+    - table: "transfer_order_lines"
+      name: "transfer_order_lines_delete"
+      operation: "DELETE"
+      using: |
+        EXISTS (
+          SELECT 1 FROM transfer_orders
+          WHERE id = transfer_order_lines.to_id
+            AND org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        )
+        AND (
+          (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid())
+          IN ('owner', 'admin', 'warehouse_manager')
+        )
+
+# Triggers
+triggers:
+  - name: "tr_transfer_orders_auto_number"
+    table: "transfer_orders"
+    timing: "BEFORE INSERT"
+    condition: "WHEN (NEW.to_number IS NULL)"
+    function: "generate_to_number()"
+    description: "Auto-generates TO number in TO-YYYY-NNNNN format"
+    function_sql: |
+      CREATE OR REPLACE FUNCTION generate_to_number()
+      RETURNS TRIGGER AS $$
+      DECLARE
+        next_num INTEGER;
+        year_prefix TEXT;
+      BEGIN
+        year_prefix := TO_CHAR(CURRENT_DATE, 'YYYY');
+
+        SELECT COALESCE(MAX(
+          CAST(SUBSTRING(to_number FROM 'TO-' || year_prefix || '-(.*)') AS INTEGER)
+        ), 0) + 1
+        INTO next_num
+        FROM transfer_orders
+        WHERE org_id = NEW.org_id
+          AND to_number LIKE 'TO-' || year_prefix || '-%';
+
+        NEW.to_number := 'TO-' || year_prefix || '-' || LPAD(next_num::TEXT, 5, '0');
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+
+  - name: "tr_transfer_orders_updated_at"
+    table: "transfer_orders"
+    timing: "BEFORE UPDATE"
+    function: "update_updated_at_column()"
+    description: "Auto-updates updated_at timestamp"
+
+  - name: "tr_transfer_order_lines_updated_at"
+    table: "transfer_order_lines"
+    timing: "BEFORE UPDATE"
+    function: "update_updated_at_column()"
+    description: "Auto-updates updated_at timestamp"
+
+# Status Enum Values
+enums:
+  to_status:
+    values: ["draft", "planned", "shipped", "received", "closed", "cancelled"]
+    transitions:
+      draft: ["planned", "cancelled"]
+      planned: ["shipped", "cancelled"]
+      shipped: ["received"]
+      received: ["closed"]
+      closed: []
+      cancelled: []
+
+  to_priority:
+    values: ["low", "normal", "high", "urgent"]
+    default: "normal"
+
+# Sample Data (for testing)
+sample_data:
+  transfer_orders:
+    - to_number: "TO-2024-00001"
+      from_warehouse: "WH-MAIN"
+      to_warehouse: "WH-BRANCH-A"
+      planned_ship_date: "2024-12-20"
+      planned_receive_date: "2024-12-22"
+      status: "draft"
+      priority: "normal"
+      lines:
+        - product: "RM-FLOUR-001"
+          quantity: 500
+          uom: "kg"
+        - product: "RM-SUGAR-001"
+          quantity: 200
+          uom: "kg"

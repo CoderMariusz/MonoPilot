@@ -1,0 +1,32 @@
+# Story 10.8 - Test Specification
+# Energy Consumption Tracking
+
+acceptance_criteria:
+  - id: "AC-01"
+    given: "operator logs energy reading: 1245 kWh"
+    when: "POST /api/oee/energy/readings"
+    then: "reading saved, kwh_consumed=1245"
+    priority: "P0"
+
+  - id: "AC-02"
+    given: "baseline_kwh_per_unit = 0.6, units_produced = 1000"
+    when: "calculating actual vs baseline"
+    then: "expected = 600 kWh, display variance"
+    priority: "P0"
+
+  - id: "AC-03"
+    given: "rate_per_kwh = $0.10, total_kwh = 1245"
+    when: "calculateCost()"
+    then: "cost = $124.50"
+    priority: "P0"
+
+definition_of_done:
+  - "energy_readings, energy_baselines, energy_costs tables created"
+  - "POST /api/oee/energy/readings logs reading"
+  - "Energy monitoring page displays KPIs and charts"
+  - "Cost calculation accurate"
+  - "Baseline management functional"
+
+coverage:
+  unit: 80
+  integration: 80

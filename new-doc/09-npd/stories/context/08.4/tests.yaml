@@ -1,0 +1,524 @@
+# Test Specifications for Story 08.4
+# Formulations CRUD & Versioning
+
+unit_tests:
+  formulation_service:
+    file: "lib/services/formulation-service.test.ts"
+    coverage_target: 80%
+    test_cases:
+      - name: "listFormulations - returns paginated results"
+        setup:
+          - "Mock database with 30 formulations"
+        test:
+          - "Call listFormulations({ page: 1, limit: 20 })"
+          - "Expect 20 formulations returned"
+          - "Expect total = 30"
+          - "Expect page = 1"
+
+      - name: "listFormulations - filters by status"
+        setup:
+          - "Mock database with formulations: 5 draft, 3 approved, 2 locked"
+        test:
+          - "Call listFormulations({ status: 'approved' })"
+          - "Expect 3 formulations returned"
+          - "Expect all status = 'approved'"
+
+      - name: "listFormulations - filters by effective date"
+        setup:
+          - "Mock formulations with overlapping date ranges"
+        test:
+          - "Call listFormulations({ effective_date: '2024-06-15' })"
+          - "Expect only formulations where 2024-06-15 is between effective_from and effective_to"
+
+      - name: "getFormulation - returns formulation with project"
+        setup:
+          - "Mock formulation with project data"
+        test:
+          - "Call getFormulation(1)"
+          - "Expect formulation object with nested project"
+          - "Expect project.project_number, project_name populated"
+
+      - name: "createFormulation - creates with valid data"
+        setup:
+          - "Mock valid CreateFormulationRequest"
+        test:
+          - "Call createFormulation(validData)"
+          - "Expect database INSERT called"
+          - "Expect formulation returned with id"
+
+      - name: "createFormulation - throws on date overlap"
+        setup:
+          - "Mock existing formulation: 2024-01-01 to 2024-12-31"
+          - "Create request: 2024-06-01 to 2024-12-31 (overlaps)"
+        test:
+          - "Call createFormulation(overlappingData)"
+          - "Expect error 'Date range overlaps...'"
+
+      - name: "updateFormulation - updates formulation"
+        setup:
+          - "Mock existing formulation (status: draft)"
+        test:
+          - "Call updateFormulation(1, { notes: 'Updated' })"
+          - "Expect database UPDATE called"
+          - "Expect notes updated"
+
+      - name: "updateFormulation - throws if locked"
+        setup:
+          - "Mock formulation with status = 'locked'"
+        test:
+          - "Call updateFormulation(1, { notes: 'Try update' })"
+          - "Expect error 'Cannot modify locked formulation'"
+
+      - name: "deleteFormulation - deletes draft formulation"
+        setup:
+          - "Mock formulation (status: draft, no BOM references)"
+        test:
+          - "Call deleteFormulation(1)"
+          - "Expect database DELETE called"
+
+      - name: "deleteFormulation - throws if locked"
+        setup:
+          - "Mock formulation (status: locked)"
+        test:
+          - "Call deleteFormulation(1)"
+          - "Expect error 'Cannot delete locked formulation'"
+
+      - name: "deleteFormulation - throws if used in BOM handoff"
+        setup:
+          - "Mock formulation referenced by boms table (npd_formulation_id = 1)"
+        test:
+          - "Call deleteFormulation(1)"
+          - "Expect error 'Cannot delete formulation used in BOM handoff...'"
+
+      - name: "lockFormulation - locks approved formulation"
+        setup:
+          - "Mock formulation (status: approved)"
+        test:
+          - "Call lockFormulation(1)"
+          - "Expect status updated to 'locked'"
+
+      - name: "lockFormulation - throws if not approved"
+        setup:
+          - "Mock formulation (status: draft)"
+        test:
+          - "Call lockFormulation(1)"
+          - "Expect error 'Formulation must be approved before locking'"
+
+      - name: "getNextVersion - suggests v1.0 for first formulation"
+        setup:
+          - "Mock project with no formulations"
+        test:
+          - "Call getNextVersion(1)"
+          - "Expect 'v1.0'"
+
+      - name: "getNextVersion - suggests v1.1 for minor version"
+        setup:
+          - "Mock project with formulation v1.0"
+        test:
+          - "Call getNextVersion(1)"
+          - "Expect 'v1.1' (auto-suggest minor increment)"
+
+      - name: "checkDateOverlap - returns true for overlap"
+        setup:
+          - "Mock formulation: 2024-01-01 to 2024-12-31"
+        test:
+          - "Call checkDateOverlap(1, '2024-06-01', '2024-12-31')"
+          - "Expect true"
+
+      - name: "checkDateOverlap - returns false for no overlap"
+        setup:
+          - "Mock formulation: 2024-01-01 to 2024-06-30"
+        test:
+          - "Call checkDateOverlap(1, '2024-07-01', '2024-12-31')"
+          - "Expect false"
+
+      - name: "getFormulationTimeline - returns all versions for project"
+        setup:
+          - "Mock project with 3 formulations (v1.0, v1.1, v2.0)"
+        test:
+          - "Call getFormulationTimeline(1)"
+          - "Expect 3 versions returned"
+          - "Expect versions sorted by created_at DESC"
+
+      - name: "getFormulationLineage - returns parent and children"
+        setup:
+          - "Mock formulation v1.1 (parent: v1.0, children: v1.2, v2.0)"
+        test:
+          - "Call getFormulationLineage(2)"
+          - "Expect current = v1.1"
+          - "Expect parent = v1.0"
+          - "Expect children = [v1.2, v2.0]"
+
+integration_tests:
+  api_endpoints:
+    file: "tests/api/npd/formulations.test.ts"
+    coverage_target: 90%
+    test_cases:
+      - name: "GET /api/npd/formulations - returns 200 with formulations"
+        setup:
+          - "Seed database with 10 formulations"
+          - "Authenticate as NPD_LEAD"
+        test:
+          - "GET /api/npd/formulations"
+          - "Expect status 200"
+          - "Expect body.formulations.length = 10"
+
+      - name: "GET /api/npd/formulations - filters by status"
+        setup:
+          - "Seed database with 5 draft, 3 approved formulations"
+          - "Authenticate as R&D"
+        test:
+          - "GET /api/npd/formulations?status=approved"
+          - "Expect status 200"
+          - "Expect body.formulations.length = 3"
+
+      - name: "GET /api/npd/formulations/:id - returns formulation"
+        setup:
+          - "Seed formulation with id=1"
+          - "Authenticate as NPD_LEAD"
+        test:
+          - "GET /api/npd/formulations/1"
+          - "Expect status 200"
+          - "Expect body.id = 1"
+          - "Expect body.project nested"
+
+      - name: "GET /api/npd/formulations/:id - returns 404 if not found"
+        setup:
+          - "Authenticate as NPD_LEAD"
+        test:
+          - "GET /api/npd/formulations/999"
+          - "Expect status 404"
+
+      - name: "POST /api/npd/formulations - creates formulation"
+        setup:
+          - "Authenticate as NPD_LEAD"
+        body:
+          npd_project_id: 1
+          formulation_number: "v1.0"
+          total_qty: 100
+          uom: "kg"
+        test:
+          - "POST /api/npd/formulations"
+          - "Expect status 201"
+          - "Expect body.id exists"
+          - "Expect body.formulation_number = 'v1.0'"
+
+      - name: "POST /api/npd/formulations - returns 400 on validation error"
+        setup:
+          - "Authenticate as NPD_LEAD"
+        body:
+          npd_project_id: 1
+          formulation_number: "invalid"
+          total_qty: -10
+          uom: "kg"
+        test:
+          - "POST /api/npd/formulations"
+          - "Expect status 400"
+          - "Expect error 'VALIDATION_ERROR'"
+
+      - name: "POST /api/npd/formulations - returns 400 on date overlap"
+        setup:
+          - "Seed formulation: 2024-01-01 to 2024-12-31"
+          - "Authenticate as NPD_LEAD"
+        body:
+          npd_project_id: 1
+          formulation_number: "v1.1"
+          effective_from: "2024-06-01"
+          effective_to: "2024-12-31"
+          total_qty: 100
+          uom: "kg"
+        test:
+          - "POST /api/npd/formulations"
+          - "Expect status 400"
+          - "Expect error 'DATE_OVERLAP'"
+
+      - name: "PUT /api/npd/formulations/:id - updates formulation"
+        setup:
+          - "Seed formulation with id=1 (status: draft)"
+          - "Authenticate as NPD_LEAD"
+        body:
+          notes: "Updated notes"
+        test:
+          - "PUT /api/npd/formulations/1"
+          - "Expect status 200"
+          - "Expect body.notes = 'Updated notes'"
+
+      - name: "PUT /api/npd/formulations/:id - returns 400 if locked"
+        setup:
+          - "Seed formulation with id=1 (status: locked)"
+          - "Authenticate as NPD_LEAD"
+        body:
+          notes: "Try update"
+        test:
+          - "PUT /api/npd/formulations/1"
+          - "Expect status 400"
+          - "Expect error 'LOCKED_FORMULATION'"
+
+      - name: "DELETE /api/npd/formulations/:id - deletes formulation"
+        setup:
+          - "Seed formulation with id=1 (status: draft)"
+          - "Authenticate as NPD_LEAD"
+        test:
+          - "DELETE /api/npd/formulations/1"
+          - "Expect status 204"
+          - "Verify formulation deleted from database"
+
+      - name: "DELETE /api/npd/formulations/:id - returns 400 if locked"
+        setup:
+          - "Seed formulation with id=1 (status: locked)"
+          - "Authenticate as NPD_LEAD"
+        test:
+          - "DELETE /api/npd/formulations/1"
+          - "Expect status 400"
+          - "Expect error 'LOCKED_FORMULATION'"
+
+      - name: "POST /api/npd/formulations/:id/lock - locks formulation"
+        setup:
+          - "Seed formulation with id=1 (status: approved)"
+          - "Authenticate as NPD_LEAD"
+        body:
+          confirmation: true
+        test:
+          - "POST /api/npd/formulations/1/lock"
+          - "Expect status 200"
+          - "Expect body.status = 'locked'"
+
+      - name: "POST /api/npd/formulations/:id/lock - returns 400 if not approved"
+        setup:
+          - "Seed formulation with id=1 (status: draft)"
+          - "Authenticate as NPD_LEAD"
+        body:
+          confirmation: true
+        test:
+          - "POST /api/npd/formulations/1/lock"
+          - "Expect status 400"
+          - "Expect error 'INVALID_STATUS'"
+
+      - name: "GET /api/npd/formulations/:id/lineage - returns lineage"
+        setup:
+          - "Seed formulations: v1.0 (id=1), v1.1 (id=2, parent=1), v2.0 (id=3, parent=2)"
+          - "Authenticate as NPD_LEAD"
+        test:
+          - "GET /api/npd/formulations/2/lineage"
+          - "Expect status 200"
+          - "Expect body.current.id = 2"
+          - "Expect body.parent.id = 1"
+          - "Expect body.children[0].id = 3"
+
+      - name: "GET /api/npd/formulations/timeline/:projectId - returns timeline"
+        setup:
+          - "Seed formulations for project 1: v1.0, v1.1, v2.0"
+          - "Authenticate as NPD_LEAD"
+        test:
+          - "GET /api/npd/formulations/timeline/1"
+          - "Expect status 200"
+          - "Expect body.versions.length = 3"
+          - "Expect body.project.id = 1"
+
+      - name: "Permission: R&D cannot delete formulation"
+        setup:
+          - "Seed formulation with id=1 (status: draft)"
+          - "Authenticate as R&D"
+        test:
+          - "DELETE /api/npd/formulations/1"
+          - "Expect status 403"
+
+      - name: "Permission: VIEWER cannot create formulation"
+        setup:
+          - "Authenticate as VIEWER"
+        body:
+          npd_project_id: 1
+          formulation_number: "v1.0"
+          total_qty: 100
+          uom: "kg"
+        test:
+          - "POST /api/npd/formulations"
+          - "Expect status 403"
+
+database_tests:
+  triggers:
+    file: "tests/database/formulations-triggers.test.sql"
+    test_cases:
+      - name: "Trigger: check_formulation_date_overlap - prevents overlap"
+        setup:
+          - "Insert formulation: 2024-01-01 to 2024-12-31"
+        test:
+          - "Attempt insert: 2024-06-01 to 2024-12-31"
+          - "Expect error 'Date range overlaps with existing formulation for this project'"
+
+      - name: "Trigger: check_formulation_date_overlap - allows no overlap"
+        setup:
+          - "Insert formulation: 2024-01-01 to 2024-06-30"
+        test:
+          - "Insert: 2024-07-01 to 2024-12-31"
+          - "Expect success"
+
+      - name: "Trigger: check_formulation_date_overlap - allows NULL dates"
+        setup:
+          - "Insert formulation: effective_from=NULL, effective_to=NULL"
+        test:
+          - "Insert: effective_from=NULL, effective_to=NULL"
+          - "Expect success (no overlap check)"
+
+      - name: "Trigger: auto_calculate_percentage - calculates percentage"
+        setup:
+          - "Insert formulation: total_qty=100 kg"
+        test:
+          - "Insert formulation_item: quantity=50 kg"
+          - "Expect percentage=50.00"
+
+      - name: "Trigger: auto_calculate_percentage - recalculates on update"
+        setup:
+          - "Insert formulation: total_qty=100 kg"
+          - "Insert formulation_item: quantity=50 kg (percentage=50)"
+        test:
+          - "Update formulation: total_qty=200 kg"
+          - "Update formulation_item quantity (triggers recalc)"
+          - "Expect percentage=25.00"
+
+      - name: "Trigger: prevent_locked_formulation_update - blocks update"
+        setup:
+          - "Insert formulation: status='locked'"
+        test:
+          - "Attempt update: notes='Try update'"
+          - "Expect error 'Cannot modify locked formulation'"
+
+      - name: "Trigger: prevent_locked_formulation_delete - blocks delete"
+        setup:
+          - "Insert formulation: status='locked'"
+        test:
+          - "Attempt delete"
+          - "Expect error 'Cannot modify locked formulation'"
+
+e2e_tests:
+  scenarios:
+    file: "tests/e2e/formulations.spec.ts"
+    tool: Playwright
+    test_cases:
+      - name: "E2E: Create formulation flow"
+        steps:
+          - "Login as NPD_LEAD"
+          - "Navigate to /npd/projects/1/formulations"
+          - "Click '[+ Create Formulation]'"
+          - "Fill form: v1.0, 100 kg"
+          - "Click '[Save Formulation]'"
+          - "Expect redirect to formulation detail page"
+          - "Expect formulation v1.0 visible"
+
+      - name: "E2E: Edit formulation flow"
+        steps:
+          - "Login as NPD_LEAD"
+          - "Navigate to formulation detail (id=1)"
+          - "Click '[Edit]'"
+          - "Update notes: 'Updated via E2E'"
+          - "Click '[Save Changes]'"
+          - "Expect redirect to detail page"
+          - "Expect notes updated"
+
+      - name: "E2E: Lock formulation flow"
+        steps:
+          - "Login as NPD_LEAD"
+          - "Navigate to formulation detail (id=1, status=approved)"
+          - "Click '[Lock]'"
+          - "Check 'I understand...'"
+          - "Click '[Confirm]'"
+          - "Expect status badge = 'Locked'"
+          - "Expect '[Edit]' button hidden"
+
+      - name: "E2E: Delete formulation flow"
+        steps:
+          - "Login as NPD_LEAD"
+          - "Navigate to formulations list"
+          - "Click delete on formulation v1.0 (draft)"
+          - "Confirm dialog"
+          - "Expect formulation removed from list"
+
+      - name: "E2E: View timeline"
+        steps:
+          - "Login as NPD_LEAD"
+          - "Navigate to formulations list"
+          - "Click '[Timeline]' on row"
+          - "Expect modal with timeline"
+          - "Expect 3 version bars visible"
+          - "Click version v1.0 bar"
+          - "Expect redirect to v1.0 detail page"
+
+      - name: "E2E: View lineage tree"
+        steps:
+          - "Login as NPD_LEAD"
+          - "Navigate to formulation detail (id=2, has parent v1.0)"
+          - "View lineage section"
+          - "Expect parent v1.0 visible"
+          - "Click parent link"
+          - "Expect redirect to v1.0 detail page"
+
+      - name: "E2E: Permission - R&D cannot delete"
+        steps:
+          - "Login as R&D"
+          - "Navigate to formulations list"
+          - "Expect delete action hidden on rows"
+
+      - name: "E2E: Date overlap error"
+        steps:
+          - "Login as NPD_LEAD"
+          - "Create formulation: 2024-01-01 to 2024-12-31"
+          - "Attempt create: 2024-06-01 to 2024-12-31"
+          - "Expect error toast 'Date range overlaps...'"
+
+performance_tests:
+  scenarios:
+    - name: "List 100 formulations"
+      metric: "Page load time"
+      target: "<500ms (p95)"
+      test:
+        - "Seed 100 formulations"
+        - "GET /api/npd/formulations"
+        - "Measure response time"
+        - "Assert p95 < 500ms"
+
+    - name: "Create formulation"
+      metric: "API response time"
+      target: "<200ms (p95)"
+      test:
+        - "POST /api/npd/formulations (valid data)"
+        - "Measure response time"
+        - "Assert p95 < 200ms"
+
+    - name: "Timeline query"
+      metric: "Query time for 10 versions"
+      target: "<300ms (p95)"
+      test:
+        - "Seed 10 formulation versions"
+        - "GET /api/npd/formulations/timeline/1"
+        - "Measure response time"
+        - "Assert p95 < 300ms"
+
+accessibility_tests:
+  tool: "axe-core + Playwright"
+  test_cases:
+    - name: "Formulation list page - WCAG AA compliance"
+      page: "/npd/projects/1/formulations"
+      assertions:
+        - "No critical violations"
+        - "Keyboard navigation works (Tab, Enter, Escape)"
+        - "Screen reader labels present on buttons"
+
+    - name: "Create formulation form - WCAG AA compliance"
+      page: "/npd/formulations/new"
+      assertions:
+        - "Form labels have for attributes"
+        - "Error messages announced by screen reader"
+        - "Required fields marked with aria-required"
+
+    - name: "Timeline modal - keyboard accessible"
+      page: "/npd/projects/1/formulations (timeline modal open)"
+      assertions:
+        - "Focus trapped in modal"
+        - "Escape key closes modal"
+        - "Timeline bars keyboard navigable"
+
+coverage_targets:
+  unit_tests: 80%
+  integration_tests: 90%
+  e2e_tests: "Critical paths only"
+  overall: 85%

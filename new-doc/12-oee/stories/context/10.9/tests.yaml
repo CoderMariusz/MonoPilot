@@ -1,0 +1,38 @@
+# Story 10.9 - Test Specification
+# Historical Trend Analysis
+
+acceptance_criteria:
+  - id: "AC-01"
+    given: "OEE data exists for last 30 days"
+    when: "GET /api/oee/analytics/trends?granularity=daily&start_date=2025-01-01&end_date=2025-01-30"
+    then: "returns 30 data points with daily OEE averages"
+    priority: "P0"
+
+  - id: "AC-02"
+    given: "requesting weekly trend"
+    when: "granularity=weekly"
+    then: "data aggregated by week"
+    priority: "P0"
+
+  - id: "AC-03"
+    given: "comparing this week vs last week"
+    when: "GET /api/oee/analytics/comparisons"
+    then: "response shows OEE delta and percentage change"
+    priority: "P0"
+
+  - id: "AC-04"
+    given: "trend chart on analytics page"
+    when: "user toggles granularity to Weekly"
+    then: "chart re-renders with weekly aggregated data"
+    priority: "P0"
+
+definition_of_done:
+  - "v_oee_trends_daily and v_oee_trends_weekly views created"
+  - "get_oee_trend() function supports daily/weekly/monthly"
+  - "GET /api/oee/analytics/trends returns trend data < 2s"
+  - "Trend chart displays with granularity selector"
+  - "Period comparison functional"
+
+coverage:
+  unit: 80
+  integration: 80

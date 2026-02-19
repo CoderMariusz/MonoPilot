@@ -1,0 +1,119 @@
+# Story 03.5b - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "03.5b"
+  name: "PO Approval Workflow"
+  slug: "po-approval-workflow"
+  epic: "03-planning"
+  phase: "1"
+  complexity: "M"
+  estimate_days: 4
+  type: "full-stack"
+  state: "ready"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, RLS, indexes
+  - api.yaml         # Endpoints, request/response, errors
+  - frontend.yaml    # Components, hooks, types
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["org_id context", "RLS patterns", "users table"]
+    - story: "03.3"
+      name: "PO CRUD + Lines"
+      provides: ["purchase_orders table", "po_status_history table", "PO service"]
+    - story: "03.5a"
+      name: "PO Approval Setup"
+      provides: ["planning_settings.po_require_approval", "planning_settings.po_approval_threshold", "planning_settings.po_approval_roles"]
+  blocked_by:
+    - story: "03.5a"
+      reason: "Settings must exist before workflow can execute"
+  blocks:
+    - story: "05.X"
+      name: "PO Receiving (Warehouse)"
+      reason: "PO must be approved before receiving can start"
+
+# External Dependencies
+external_dependencies:
+  - name: "SendGrid"
+    type: "Email Service"
+    purpose: "Approval notification emails"
+    required: true
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/planning.md"
+    sections: ["FR-PLAN-009", "FR-PLAN-007"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/planning.md"
+    sections: ["PO Approval", "Status Lifecycle"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/03-planning/03.5b.po-approval-workflow.md"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-008-po-approval-modal.md"
+      id: "PLAN-008"
+      description: "Approve/Reject modal with PO summary"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for po_approval_history"
+  patterns:
+    - path: "docs/2-MANAGEMENT/epics/current/01-settings/context/01.1/database.yaml"
+      relevance: "RLS policy pattern reference"
+    - path: "docs/2-MANAGEMENT/epics/current/01-settings/context/01.1/api.yaml"
+      relevance: "API route pattern reference"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "po_approval_history table with RLS"
+  - type: "api"
+    count: 4
+    description: "submit, approve, reject, approval-history endpoints"
+  - type: "service"
+    count: 2
+    description: "Extend purchase-order-service.ts, create notification-service.ts"
+  - type: "component"
+    count: 4
+    description: "POApprovalModal, POApprovalHistory, POStatusBadge (update), ApprovalStatusBadge"
+  - type: "validation"
+    count: 3
+    description: "approve, reject, submit schemas"
+  - type: "test"
+    count: 4
+    description: "Unit, integration, E2E, notification tests"
+
+# Technical notes
+technical_notes:
+  - "State machine: draft -> pending_approval -> approved/rejected"
+  - "Approval threshold logic reads from planning_settings (03.5a)"
+  - "Rejection reason required (min 10 chars)"
+  - "Notifications queued async - do not block API response"
+  - "User name/role denormalized in approval_history for historical accuracy"
+  - "Use ADR-013 RLS pattern for po_approval_history table"
+
+# Business Rules Summary
+business_rules:
+  - id: "BR-01"
+    rule: "If po_require_approval=false, skip approval flow entirely"
+  - id: "BR-02"
+    rule: "If po_approval_threshold=null, ALL POs require approval"
+  - id: "BR-03"
+    rule: "If total >= threshold, approval required"
+  - id: "BR-04"
+    rule: "Only users with roles in po_approval_roles can approve/reject"
+  - id: "BR-05"
+    rule: "Rejection reason minimum 10 characters"
+  - id: "BR-06"
+    rule: "Approval history is append-only, never updated"
+  - id: "BR-07"
+    rule: "Rejected PO returns to draft status for editing"

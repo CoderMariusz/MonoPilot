@@ -1,0 +1,168 @@
+# Story 06.31 - Test Specifications
+# Purpose: Acceptance criteria, test cases, E2E scenarios
+# Agent: QA-AGENT
+
+unit_tests:
+  service: "capa-service.test.ts"
+  coverage_target: ">80%"
+  test_suites:
+    - suite: "create"
+      tests:
+        - "creates CAPA with correct fields"
+        - "generates CAPA number automatically"
+        - "calculates target_close_date based on priority"
+        - "validates source_type and source_id"
+        - "assigns owner if provided"
+
+    - suite: "createFromNcr"
+      tests:
+        - "creates CAPA from NCR with source linkage"
+        - "inherits title and description from NCR"
+        - "maps NCR severity to CAPA priority"
+        - "defaults capa_type to corrective"
+
+    - suite: "update"
+      tests:
+        - "updates CAPA fields (open/in_progress only)"
+        - "recalculates target_close_date if priority changed"
+        - "blocks update on closed CAPA"
+        - "creates audit log entry"
+
+    - suite: "close"
+      tests:
+        - "closes CAPA with closure notes"
+        - "sets closed_by and closed_at"
+        - "validates all actions complete (via canClose)"
+        - "blocks closure if actions incomplete"
+
+    - suite: "delete"
+      tests:
+        - "deletes open CAPA without action items"
+        - "blocks delete on in_progress or closed CAPA"
+        - "cascades to related records"
+
+    - suite: "generateCapaNumber"
+      tests:
+        - "generates CAPA-YYYY-NNNNN format"
+        - "increments sequence per org per year"
+        - "resets sequence on year change"
+
+    - suite: "calculateTargetDate"
+      tests:
+        - "critical: +7 days"
+        - "high: +30 days"
+        - "medium: +60 days"
+        - "low: +90 days"
+
+integration_tests:
+  api_tests: "api/quality/capa.test.ts"
+  test_suites:
+    - endpoint: "POST /api/quality/capa"
+      tests:
+        - "creates CAPA with valid data"
+        - "returns 400 for missing title"
+        - "returns 400 for invalid source_type"
+        - "enforces org_id from auth"
+
+    - endpoint: "GET /api/quality/capa"
+      tests:
+        - "lists CAPAs with pagination"
+        - "filters by status"
+        - "filters by priority"
+        - "filters by owner_id"
+        - "filters by source_type"
+        - "filters overdue CAPAs"
+        - "searches by title or CAPA number"
+        - "respects RLS for org isolation"
+
+    - endpoint: "GET /api/quality/capa/:id"
+      tests:
+        - "returns CAPA detail with action items"
+        - "returns 404 for invalid ID"
+        - "returns 404 for cross-tenant access"
+
+    - endpoint: "PUT /api/quality/capa/:id"
+      tests:
+        - "updates CAPA fields"
+        - "returns 403 for closed CAPA"
+        - "recalculates target date if priority changed"
+
+    - endpoint: "POST /api/quality/capa/:id/close"
+      tests:
+        - "closes CAPA with closure notes"
+        - "returns 400 if actions incomplete"
+        - "sets closed_by and closed_at"
+
+    - endpoint: "POST /api/quality/ncrs/:id/create-capa"
+      tests:
+        - "creates CAPA from NCR"
+        - "returns 404 for invalid NCR"
+        - "pre-fills title and description"
+
+e2e_tests:
+  scenarios:
+    - name: "Complete CAPA workflow"
+      steps:
+        - "Navigate to CAPA list"
+        - "Click [+ New CAPA]"
+        - "Fill form (title, description, type, priority, owner)"
+        - "Submit and verify CAPA created"
+        - "Verify CAPA appears in list"
+        - "Click CAPA to view detail"
+        - "Click [Start CAPA] -> status = in_progress"
+        - "Add action items (story 06.32)"
+        - "Complete all action items"
+        - "Click [Close CAPA]"
+        - "Fill closure notes"
+        - "Submit and verify status = closed"
+
+    - name: "Create CAPA from NCR"
+      steps:
+        - "Navigate to NCR detail page"
+        - "Click [Create CAPA]"
+        - "Verify form pre-filled with NCR data"
+        - "Edit fields as needed"
+        - "Submit and verify CAPA created"
+        - "Verify NCR shows linked CAPA"
+        - "Click CAPA link to navigate"
+
+    - name: "Filter and search CAPAs"
+      steps:
+        - "Navigate to CAPA list"
+        - "Filter by status = 'open'"
+        - "Verify only open CAPAs shown"
+        - "Filter by priority = 'critical'"
+        - "Verify only critical CAPAs shown"
+        - "Search by CAPA number"
+        - "Verify matching CAPA displayed"
+
+    - name: "Overdue CAPA indicator"
+      steps:
+        - "Create CAPA with target_close_date = yesterday"
+        - "Navigate to CAPA list"
+        - "Verify 'OVERDUE' badge displayed"
+        - "Verify row highlighted in red"
+        - "Click to view detail"
+        - "Verify days overdue calculated"
+
+rls_tests:
+  - test: "Org isolation on CAPA list"
+    scenario: "User A from Org A cannot see CAPAs from Org B"
+  - test: "Cannot view CAPA from different org"
+    scenario: "GET /api/quality/capa/:id returns 404 for cross-tenant access"
+  - test: "CAPA inherits org_id from user"
+    scenario: "Created CAPA automatically has org_id from auth user"
+
+performance_tests:
+  - test: "CAPA list performance"
+    target: "< 500ms for 1000 CAPAs"
+  - test: "CAPA detail performance"
+    target: "< 500ms with 10 action items"
+  - test: "CAPA creation performance"
+    target: "< 300ms"
+
+accessibility_tests:
+  - "Keyboard navigation (Tab, Enter, Escape)"
+  - "Screen reader labels for badges"
+  - "Focus indicators on buttons"
+  - "Color contrast on badges (WCAG AA)"

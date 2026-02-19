@@ -1,0 +1,8 @@
+# Story 06.32 - Frontend Schema
+
+components:
+  - CapaActionList.tsx
+  - CapaActionForm.tsx
+  - CompleteActionModal.tsx
+  - CapaProgressBar.tsx
+  - ActionStatusBadge.tsx

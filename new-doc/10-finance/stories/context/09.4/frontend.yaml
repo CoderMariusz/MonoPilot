@@ -1,0 +1,34 @@
+pages:
+  - path: "/finance/cost-centers"
+    component: "CostCentersListPage"
+    features:
+      - "DataTable with cost centers"
+      - "Create New button"
+      - "Hierarchy tree view"
+
+  - path: "/finance/cost-centers/new"
+    component: "CostCenterFormPage"
+    form_fields:
+      - "Code (unique)"
+      - "Name"
+      - "Type (production, overhead, admin)"
+      - "Production Line (optional)"
+      - "Parent Cost Center (hierarchy)"
+
+  - path: "/finance/work-orders/:id/costs"
+    sections:
+      - name: "Labor Costs"
+        component: "LaborCostsTable"
+        columns: ["Operation", "User", "Hours", "Rate", "Total Cost", "Cost Center"]
+        summary: "Total Labor Cost"
+
+components:
+  - "CostCenterForm.tsx - CRUD form"
+  - "LaborCostsTable.tsx - DataTable with labor breakdown"
+  - "CostCenterHierarchyTree.tsx - Tree view"
+
+ux:
+  wireframes:
+    - id: "FIN-003"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/FIN-003-wo-cost-summary-card.md"
+      relevance: "Work Order cost summary card showing labor costs and cost center allocations"

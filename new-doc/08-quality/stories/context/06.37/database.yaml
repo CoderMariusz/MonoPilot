@@ -1,0 +1,49 @@
+# Story 06.37 - Quality Dashboard Database Context
+# Tables, indexes, materialized views
+
+tables:
+  # No new tables - dashboard reads from existing tables
+  existing_tables:
+    - quality_inspections      # Inspection metrics
+    - ncr_reports             # NCR trends
+    - quality_test_results    # Defect analysis
+    - ccp_monitoring_records  # CCP compliance
+    - capa_records            # CAPA metrics
+    - supplier_quality_ratings # Supplier heatmap
+
+materialized_views:
+  - name: quality_dashboard_kpis
+    description: "Cached KPI summary (refreshed every 5 minutes)"
+    columns:
+      - org_id: UUID
+      - first_pass_yield: NUMERIC
+      - ncr_rate: NUMERIC
+      - inspection_backlog: INTEGER
+      - inspections_completed_30d: INTEGER
+      - refreshed_at: TIMESTAMPTZ
+    indexes:
+      - "UNIQUE idx_dashboard_kpis_org ON (org_id)"
+    refresh_schedule: "Every 5 minutes via pg_cron"
+    optional: true
+    reason: "Performance optimization - materialized view is optional, can calculate KPIs on-demand"
+
+functions:
+  - name: refresh_dashboard_kpis
+    description: "Refresh materialized view for KPIs"
+    returns: void
+    language: plpgsql
+    schedule: "*/5 * * * * (every 5 minutes)"
+    body: |
+      REFRESH MATERIALIZED VIEW CONCURRENTLY quality_dashboard_kpis;
+
+rls_policies:
+  - table: quality_dashboard_kpis
+    policy_name: "dashboard_kpis_org"
+    operation: SELECT
+    condition: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+performance_notes:
+  - "Materialized view reduces KPI query time from 500ms to 50ms"
+  - "Alternative: On-demand calculation with 5-minute cache in Redis"
+  - "Dashboard loads within 2 seconds with materialized view"
+  - "Refresh concurrently to avoid locking during update"

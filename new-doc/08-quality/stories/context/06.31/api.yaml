@@ -1,0 +1,172 @@
+# Story 06.31 - API Schema
+# Purpose: Endpoints, request/response, service methods
+# Agent: BACKEND-DEV (API focus)
+
+service: "capa-service.ts"
+base_path: "/api/quality/capa"
+
+endpoints:
+  - method: "GET"
+    path: "/api/quality/capa"
+    description: "List CAPAs with filters and pagination"
+    auth: true
+    query_params:
+      - { name: "status", type: "string", enum: ["open", "in_progress", "closed", "cancelled"] }
+      - { name: "priority", type: "string", enum: ["low", "medium", "high", "critical"] }
+      - { name: "capa_type", type: "string", enum: ["corrective", "preventive"] }
+      - { name: "owner_id", type: "string", format: "uuid" }
+      - { name: "source_type", type: "string", enum: ["ncr", "audit", "complaint", "management_review", "manual"] }
+      - { name: "overdue", type: "boolean" }
+      - { name: "search", type: "string" }
+      - { name: "sort_by", type: "string", default: "created_date" }
+      - { name: "sort_order", type: "string", default: "desc" }
+      - { name: "page", type: "number", default: 1 }
+      - { name: "limit", type: "number", default: 20 }
+    response_type: "CapaListResponse"
+    response_time_target: "< 500ms"
+
+  - method: "POST"
+    path: "/api/quality/capa"
+    description: "Create new CAPA"
+    auth: true
+    request_type: "CreateCapaRequest"
+    response_type: "CreateCapaResponse"
+    response_time_target: "< 300ms"
+
+  - method: "GET"
+    path: "/api/quality/capa/:id"
+    description: "Get CAPA detail with action items and effectiveness checks"
+    auth: true
+    response_type: "CapaDetailResponse"
+    response_time_target: "< 500ms"
+
+  - method: "PUT"
+    path: "/api/quality/capa/:id"
+    description: "Update CAPA (open/in_progress only)"
+    auth: true
+    request_type: "UpdateCapaRequest"
+    response_type: "CapaRecord"
+    response_time_target: "< 300ms"
+
+  - method: "DELETE"
+    path: "/api/quality/capa/:id"
+    description: "Delete CAPA (open only)"
+    auth: true
+    response_time_target: "< 300ms"
+
+  - method: "POST"
+    path: "/api/quality/capa/:id/close"
+    description: "Close CAPA with closure notes"
+    auth: true
+    request_type: "CloseCapaRequest"
+    response_type: "CloseCapaResponse"
+    response_time_target: "< 500ms"
+
+  - method: "POST"
+    path: "/api/quality/ncrs/:id/create-capa"
+    description: "Create CAPA from NCR"
+    auth: true
+    request_type: "CreateCapaFromNcrRequest"
+    response_type: "CreateCapaResponse"
+    response_time_target: "< 300ms"
+
+service_methods:
+  - name: "list"
+    description: "List CAPAs with filtering and pagination"
+    signature: "async list(params: CapaListParams): Promise<PaginatedResult<CapaRecord>>"
+
+  - name: "getById"
+    description: "Get CAPA by ID with action items and effectiveness checks"
+    signature: "async getById(id: string): Promise<CapaDetailResponse | null>"
+
+  - name: "getByNumber"
+    description: "Get CAPA by number"
+    signature: "async getByNumber(capaNumber: string): Promise<CapaRecord | null>"
+
+  - name: "create"
+    description: "Create new CAPA"
+    signature: "async create(input: CreateCapaInput): Promise<CapaRecord>"
+
+  - name: "createFromNcr"
+    description: "Create CAPA from NCR"
+    signature: "async createFromNcr(ncrId: string, input: CreateCapaFromNcrInput): Promise<CapaRecord>"
+
+  - name: "update"
+    description: "Update CAPA (open/in_progress only)"
+    signature: "async update(id: string, input: UpdateCapaInput): Promise<CapaRecord>"
+
+  - name: "close"
+    description: "Close CAPA"
+    signature: "async close(id: string, input: CloseCapaInput, userId: string): Promise<CapaRecord>"
+
+  - name: "delete"
+    description: "Delete CAPA (open only)"
+    signature: "async delete(id: string): Promise<void>"
+
+  - name: "assignOwner"
+    description: "Assign owner"
+    signature: "async assignOwner(id: string, ownerId: string, assignedBy: string): Promise<CapaRecord>"
+
+  - name: "changeStatus"
+    description: "Change status (open -> in_progress)"
+    signature: "async changeStatus(id: string, status: string): Promise<CapaRecord>"
+
+  - name: "generateCapaNumber"
+    description: "Generate CAPA number"
+    signature: "async generateCapaNumber(orgId: string): Promise<string>"
+
+  - name: "calculateTargetDate"
+    description: "Calculate target close date based on priority"
+    signature: "calculateTargetDate(priority: string, createdDate: Date): Date"
+
+  - name: "canClose"
+    description: "Check if CAPA can be closed (all actions complete, effectiveness passed)"
+    signature: "async canClose(capaId: string): Promise<{ canClose: boolean; missingActions: string[]; pendingChecks: string[] }>"
+
+  - name: "getOverdue"
+    description: "Get overdue CAPAs for org"
+    signature: "async getOverdue(orgId: string): Promise<CapaRecord[]>"
+
+validation_schemas:
+  - name: "createCapaSchema"
+    fields:
+      - { name: "source_type", type: "enum", required: true }
+      - { name: "source_id", type: "uuid", required: false }
+      - { name: "title", type: "string", min: 5, max: 200, required: true }
+      - { name: "description", type: "string", min: 20, max: 5000, required: true }
+      - { name: "capa_type", type: "enum", required: true }
+      - { name: "priority", type: "enum", required: true }
+      - { name: "owner_id", type: "uuid", required: false }
+      - { name: "root_cause", type: "string", max: 2000, required: false }
+      - { name: "root_cause_method", type: "string", max: 100, required: false }
+      - { name: "target_close_date", type: "date", required: false }
+
+  - name: "updateCapaSchema"
+    fields:
+      - { name: "title", type: "string", min: 5, max: 200, required: false }
+      - { name: "description", type: "string", min: 20, max: 5000, required: false }
+      - { name: "priority", type: "enum", required: false }
+      - { name: "owner_id", type: "uuid", required: false }
+      - { name: "root_cause", type: "string", max: 2000, required: false }
+      - { name: "root_cause_method", type: "string", max: 100, required: false }
+      - { name: "target_close_date", type: "date", required: false }
+      - { name: "status", type: "enum", values: ["open", "in_progress", "cancelled"], required: false }
+
+  - name: "closeCapaSchema"
+    fields:
+      - { name: "actual_close_date", type: "date", required: true }
+      - { name: "closure_notes", type: "string", min: 20, max: 2000, required: true }
+
+  - name: "capaListQuerySchema"
+    fields:
+      - { name: "status", type: "enum", required: false }
+      - { name: "priority", type: "enum", required: false }
+      - { name: "capa_type", type: "enum", required: false }
+      - { name: "owner_id", type: "uuid", required: false }
+      - { name: "source_type", type: "enum", required: false }
+      - { name: "overdue", type: "boolean", required: false }
+      - { name: "search", type: "string", min: 1, required: false }
+      - { name: "sort_by", type: "enum", default: "created_date" }
+      - { name: "sort_order", type: "enum", default: "desc" }
+      - { name: "page", type: "number", default: 1 }
+      - { name: "limit", type: "number", default: 20, max: 100 }

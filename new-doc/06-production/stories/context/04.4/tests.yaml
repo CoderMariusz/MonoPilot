@@ -1,0 +1,478 @@
+# Story 04.4 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/yield-service.test.ts"
+    type: "unit"
+    description: "Unit tests for yield calculation and validation logic"
+  - path: "apps/frontend/app/api/production/work-orders/[id]/yield/__tests__/route.test.ts"
+    type: "integration"
+    description: "Integration tests for yield API endpoints"
+  - path: "e2e/production/yield-tracking.spec.ts"
+    type: "e2e"
+    description: "E2E test for manual yield entry workflow"
+
+# Acceptance Criteria (from story file)
+acceptance_criteria:
+  # AC-1: Yield Entry Form Display
+  - id: "AC-01a"
+    given: "operator views WO detail page for WO with status 'In Progress'"
+    when: "page loads"
+    then: "yield entry section displays with current produced_quantity, planned_quantity, and yield percentage"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-01b"
+    given: "WO has planned_quantity = 1000 and produced_quantity = 0"
+    when: "yield section displays"
+    then: "yield shows '0%' with gray indicator (not started)"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-01c"
+    given: "WO has status 'Draft' or 'Released' (not started)"
+    when: "yield section displays"
+    then: "yield entry form is disabled with message 'Start WO to enter yield'"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-01d"
+    given: "WO has status 'Completed' or 'Cancelled'"
+    when: "yield section displays"
+    then: "yield entry form is disabled, showing final yield percentage"
+    test_type: "e2e"
+    priority: "P1"
+
+  # AC-2: Manual Yield Entry
+  - id: "AC-02a"
+    given: "operator enters produced_quantity = 950 in yield form"
+    when: "'Update Yield' button clicked"
+    then: "work_orders.produced_quantity updates to 950 within 500ms"
+    test_type: "integration"
+    priority: "P0"
+    performance: true
+
+  - id: "AC-02b"
+    given: "produced_quantity = 950 and planned_quantity = 1000"
+    when: "yield updates"
+    then: "yield_percent calculates to 95.0% (rounded to 1 decimal place)"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-02c"
+    given: "operator enters negative value (-50)"
+    when: "form validation runs"
+    then: "error 'Produced quantity must be positive' displays inline"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-02d"
+    given: "operator enters non-numeric value ('ABC')"
+    when: "form validation runs"
+    then: "error 'Must be a valid number' displays inline"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-02e"
+    given: "setting allow_overproduction = false and planned_quantity = 1000"
+    when: "operator enters produced_quantity = 1100"
+    then: "error 'Produced quantity cannot exceed planned quantity (1000)' displays"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-02f"
+    given: "setting allow_overproduction = true and planned_quantity = 1000"
+    when: "operator enters produced_quantity = 1100"
+    then: "validation passes and yield_percent = 110.0%"
+    test_type: "integration"
+    priority: "P1"
+
+  # AC-3: Yield Percentage Calculation
+  - id: "AC-03a"
+    given: "planned_quantity = 1000 and produced_quantity = 950"
+    when: "yield calculated"
+    then: "yield_percent = 95.0%"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-03b"
+    given: "planned_quantity = 500 and produced_quantity = 475"
+    when: "yield calculated"
+    then: "yield_percent = 95.0%"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-03c"
+    given: "planned_quantity = 1000 and produced_quantity = 1050 (overproduction allowed)"
+    when: "yield calculated"
+    then: "yield_percent = 105.0%"
+    test_type: "unit"
+    priority: "P1"
+
+  - id: "AC-03d"
+    given: "planned_quantity = 1000 and produced_quantity = 0"
+    when: "yield calculated"
+    then: "yield_percent = 0.0%"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-03e"
+    given: "yield calculation result is 95.456%"
+    when: "displayed"
+    then: "yield rounds to 95.5% (1 decimal place)"
+    test_type: "unit"
+    priority: "P1"
+
+  # AC-4: Yield Visual Indicators
+  - id: "AC-04a"
+    given: "yield_percent = 95%"
+    when: "yield gauge displays"
+    then: "indicator shows green with 'Excellent' label"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-04b"
+    given: "yield_percent = 75%"
+    when: "yield gauge displays"
+    then: "indicator shows yellow with 'Below Target' label"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-04c"
+    given: "yield_percent = 65%"
+    when: "yield gauge displays"
+    then: "indicator shows red with 'Low Yield' label"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-04d"
+    given: "yield_percent = 80% (threshold boundary)"
+    when: "yield gauge displays"
+    then: "indicator shows green"
+    test_type: "unit"
+    priority: "P1"
+
+  - id: "AC-04e"
+    given: "yield_percent = 79.9% (just below threshold)"
+    when: "yield gauge displays"
+    then: "indicator shows yellow"
+    test_type: "unit"
+    priority: "P1"
+
+  - id: "AC-04f"
+    given: "yield_percent = 69.9%"
+    when: "yield gauge displays"
+    then: "indicator shows red"
+    test_type: "unit"
+    priority: "P1"
+
+  # AC-5: Yield History Tracking
+  - id: "AC-05a"
+    given: "operator updates produced_quantity from 0 to 500 at 10:00 AM"
+    when: "update saves"
+    then: "yield_logs table records: wo_id, user_id, old_qty=0, new_qty=500, old_yield=0%, new_yield=50%, timestamp=10:00 AM"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-05b"
+    given: "operator updates produced_quantity from 500 to 950 at 2:00 PM"
+    when: "update saves"
+    then: "new yield_logs entry created with old_qty=500, new_qty=950, timestamps"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-05c"
+    given: "WO has 3 yield updates in history"
+    when: "yield history table displays"
+    then: "all 3 entries show with columns: Timestamp, User, Old Qty, New Qty, Yield Change (%), Notes"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-05d"
+    given: "yield history table displayed"
+    when: "entries rendered"
+    then: "entries sort by timestamp DESC (newest first)"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-05e"
+    given: "yield update includes optional notes 'Adjusted after recount'"
+    when: "saved"
+    then: "notes display in history table for that entry"
+    test_type: "integration"
+    priority: "P1"
+
+  # AC-6: Low Yield Warnings
+  - id: "AC-06a"
+    given: "yield_percent = 75% (< 80% threshold)"
+    when: "WO detail page displays"
+    then: "warning banner shows 'Low Yield Alert: 75% (Target: >=80%)' in yellow"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-06b"
+    given: "yield_percent = 65% (< 70% threshold)"
+    when: "WO detail page displays"
+    then: "warning banner shows 'Critical Low Yield: 65% (Target: >=80%)' in red"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-06c"
+    given: "yield_percent = 85% (>= 80% threshold)"
+    when: "WO detail page displays"
+    then: "no low yield warning displays"
+    test_type: "e2e"
+    priority: "P0"
+
+  # AC-7: Yield Display on WO List
+  - id: "AC-07a"
+    given: "operator views WO list/dashboard"
+    when: "table renders"
+    then: "'Yield %' column displays for each WO with color-coded badges (green/yellow/red)"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-07b"
+    given: "WO has produced_quantity = 0"
+    when: "yield column displays"
+    then: "shows '-' or 'N/A' (not '0%')"
+    test_type: "unit"
+    priority: "P1"
+
+  - id: "AC-07c"
+    given: "WO list filtered by yield < 80%"
+    when: "filter applied"
+    then: "only WOs with low yield display"
+    test_type: "e2e"
+    priority: "P2"
+
+# Unit Test Cases
+unit_tests:
+  yield_calculation:
+    - name: "calculateYieldPercentage returns correct percentage"
+      cases:
+        - { produced: 950, planned: 1000, expected: 95.0 }
+        - { produced: 475, planned: 500, expected: 95.0 }
+        - { produced: 1050, planned: 1000, expected: 105.0 }
+        - { produced: 0, planned: 1000, expected: 0.0 }
+        - { produced: 1000, planned: 1000, expected: 100.0 }
+
+    - name: "calculateYieldPercentage handles zero planned quantity"
+      setup: "plannedQuantity = 0"
+      expected: "Returns 0"
+
+    - name: "calculateYieldPercentage rounds to 1 decimal"
+      cases:
+        - { produced: 954.56, planned: 1000, expected: 95.5 }
+        - { produced: 954.44, planned: 1000, expected: 95.4 }
+
+  yield_status:
+    - name: "getYieldIndicatorStatus returns 'excellent' for >= 80%"
+      cases:
+        - { yield: 80, expected: "excellent" }
+        - { yield: 95, expected: "excellent" }
+        - { yield: 100, expected: "excellent" }
+        - { yield: 110, expected: "excellent" }
+
+    - name: "getYieldIndicatorStatus returns 'below_target' for 70-79%"
+      cases:
+        - { yield: 70, expected: "below_target" }
+        - { yield: 75, expected: "below_target" }
+        - { yield: 79.9, expected: "below_target" }
+
+    - name: "getYieldIndicatorStatus returns 'low_yield' for < 70%"
+      cases:
+        - { yield: 69.9, expected: "low_yield" }
+        - { yield: 50, expected: "low_yield" }
+        - { yield: 10, expected: "low_yield" }
+
+    - name: "getYieldIndicatorStatus returns 'not_started' for 0%"
+      cases:
+        - { yield: 0, expected: "not_started" }
+
+  yield_color:
+    - name: "getYieldIndicatorColor returns correct color"
+      cases:
+        - { yield: 85, expected: "green" }
+        - { yield: 75, expected: "yellow" }
+        - { yield: 65, expected: "red" }
+        - { yield: 0, expected: "gray" }
+
+  validation:
+    - name: "updateYieldSchema validates positive numbers"
+      cases:
+        - { input: { produced_quantity: 100 }, valid: true }
+        - { input: { produced_quantity: 0 }, valid: true }
+        - { input: { produced_quantity: -50 }, valid: false, error: "Produced quantity must be positive" }
+
+    - name: "updateYieldSchema validates notes length"
+      cases:
+        - { input: { produced_quantity: 100, notes: "Short note" }, valid: true }
+        - { input: { produced_quantity: 100, notes: "A".repeat(1001) }, valid: false, error: "Notes cannot exceed 1000 characters" }
+
+# Integration Test Cases
+integration_tests:
+  api_yield_update:
+    - name: "PATCH /yield updates work order and creates log"
+      setup: |
+        - Create org with production_settings (allow_overproduction: false)
+        - Create work order with status 'in_progress', planned_quantity: 1000, produced_quantity: 0
+      action: "PATCH /api/production/work-orders/{id}/yield with { produced_quantity: 950, notes: 'Test update' }"
+      expected:
+        - "work_orders.produced_quantity = 950"
+        - "work_orders.yield_percent = 95.0"
+        - "yield_logs entry created with old_qty=0, new_qty=950"
+        - "Response status 200"
+        - "Response time < 500ms"
+
+    - name: "PATCH /yield rejects overproduction when not allowed"
+      setup: |
+        - Create org with production_settings (allow_overproduction: false)
+        - Create work order with planned_quantity: 1000
+      action: "PATCH with { produced_quantity: 1100 }"
+      expected: "Status 400 with error 'Produced quantity cannot exceed planned quantity'"
+
+    - name: "PATCH /yield allows overproduction when setting enabled"
+      setup: |
+        - Create org with production_settings (allow_overproduction: true)
+        - Create work order with planned_quantity: 1000
+      action: "PATCH with { produced_quantity: 1100 }"
+      expected:
+        - "Status 200"
+        - "yield_percent = 110.0"
+
+    - name: "PATCH /yield rejects non-in-progress WO"
+      setup: "Create work order with status 'released'"
+      action: "PATCH with { produced_quantity: 500 }"
+      expected: "Status 400 with error about WO status"
+
+    - name: "PATCH /yield returns 404 for non-existent WO"
+      action: "PATCH /api/production/work-orders/{invalid-uuid}/yield"
+      expected: "Status 404"
+
+  api_yield_history:
+    - name: "GET /yield/history returns logs sorted DESC"
+      setup: |
+        - Create work order
+        - Create 3 yield_logs entries with different timestamps
+      action: "GET /api/production/work-orders/{id}/yield/history"
+      expected:
+        - "Returns 3 logs"
+        - "Sorted by timestamp DESC (newest first)"
+        - "Includes user_name joined from users table"
+
+    - name: "GET /yield/history respects pagination"
+      setup: "Create 15 yield_logs entries"
+      action: "GET /yield/history?limit=10&offset=0"
+      expected:
+        - "Returns 10 logs"
+        - "has_more = true"
+        - "total = 15"
+
+  rls_isolation:
+    - name: "User can only update yield for own org's WO"
+      setup: |
+        - Create Org A with User A and WO A
+        - Create Org B with User B and WO B
+      action: "User A attempts to PATCH yield for WO B"
+      expected: "Status 404 (RLS blocks access)"
+
+    - name: "User can only view yield history for own org's WO"
+      setup: |
+        - Create Org A with User A and WO A with yield_logs
+        - Create Org B with User B
+      action: "User B attempts to GET yield/history for WO A"
+      expected: "Status 404 (RLS blocks access)"
+
+# E2E Test Cases
+e2e_tests:
+  - name: "Manual yield entry workflow"
+    steps:
+      - "Navigate to production module"
+      - "Start a released work order"
+      - "Navigate to WO detail page"
+      - "Enter produced quantity 500 in yield form"
+      - "Add note 'First batch complete'"
+      - "Click Update Yield"
+      - "Verify yield gauge shows 50% (yellow)"
+      - "Verify history table shows entry"
+      - "Enter produced quantity 950"
+      - "Click Update Yield"
+      - "Verify yield gauge shows 95% (green)"
+      - "Verify history table shows 2 entries"
+    expected:
+      - "All updates complete within 500ms"
+      - "Visual indicators update correctly"
+      - "History shows both entries with correct data"
+
+  - name: "Low yield warning display"
+    steps:
+      - "Create WO with planned_quantity 1000"
+      - "Start WO"
+      - "Enter produced_quantity 750"
+      - "Verify yellow warning banner displays"
+      - "Enter produced_quantity 650"
+      - "Verify red critical warning banner displays"
+      - "Enter produced_quantity 850"
+      - "Verify no warning banner displays"
+
+# Definition of Done
+definition_of_done:
+  - "yield_logs table created with RLS policies"
+  - "PATCH /api/production/work-orders/:id/yield endpoint implemented"
+  - "GET /api/production/work-orders/:id/yield/history endpoint implemented"
+  - "yield-service.ts with calculation and validation logic"
+  - "Zod validation schemas for yield updates"
+  - "YieldSection component integrated on WO detail page"
+  - "Yield gauge with color-coded indicators"
+  - "Yield history table with user audit trail"
+  - "Low yield warning banner on WO detail page"
+  - "Yield column added to WO list/dashboard table"
+  - "Overproduction validation based on production_settings"
+  - "Unit tests for yield calculation (>80% coverage)"
+  - "Integration tests for yield update API"
+  - "E2E test: Operator enters yield, sees updated percentage and history"
+  - "Performance: Yield updates complete within 500ms"
+  - "Error handling: Network errors, validation errors display user-friendly messages"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    reason: "Business logic coverage for yield calculations"
+    files:
+      - "lib/services/yield-service.ts: 90%"
+      - "lib/validation/yield-validation.ts: 90%"
+  integration:
+    target: 80
+    reason: "API endpoint coverage"
+    files:
+      - "app/api/production/work-orders/[id]/yield/route.ts: 85%"
+      - "app/api/production/work-orders/[id]/yield/history/route.ts: 85%"
+  e2e:
+    target: 1
+    reason: "Critical workflow coverage"
+    scenarios:
+      - "Manual yield entry and display"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "Yield calculation precision issues with decimal values"
+    mitigation: "Use DECIMAL(15,4) in DB, round to 1 decimal in display"
+    severity: "medium"
+    test_coverage: "unit_tests.yield_calculation"
+
+  - id: "RISK-02"
+    description: "Performance degradation with many yield_logs entries"
+    mitigation: "Index on wo_id and created_at, pagination on history endpoint"
+    severity: "low"
+    test_coverage: "integration_tests.api_yield_history"
+
+  - id: "RISK-03"
+    description: "Race condition if multiple users update yield simultaneously"
+    mitigation: "Optimistic locking not required for Phase 0; latest update wins"
+    severity: "low"
+    test_coverage: "Not tested in Phase 0"

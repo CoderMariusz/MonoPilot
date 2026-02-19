@@ -1,0 +1,266 @@
+# Story 11.1 - Tests Context
+# Acceptance criteria mapping, test specifications, coverage requirements
+
+unit_tests:
+  service:
+    file: "lib/services/integration-dashboard-service.test.ts"
+    coverage_target: 85%
+    tests:
+      - describe: "getDashboard"
+        tests:
+          - "returns dashboard data with health status"
+          - "returns recent activity (last 20 events)"
+          - "returns error summary counts"
+          - "calculates success rate correctly"
+          - "enforces RLS (org_id filter)"
+          - "handles refresh=true parameter"
+          - "throws error if user not admin"
+
+      - describe: "getHealthStatus"
+        tests:
+          - "returns overall_status = healthy when all connected"
+          - "returns overall_status = degraded when one error"
+          - "returns overall_status = down when all error"
+          - "returns integration-specific status"
+          - "includes metadata (active_count for API keys)"
+
+      - describe: "refreshHealth"
+        tests:
+          - "calculates health from integration_logs"
+          - "upserts integration_health record"
+          - "handles not_configured state"
+          - "handles error state (last_error > last_sync)"
+          - "handles connected state"
+
+      - describe: "getRecentActivity"
+        tests:
+          - "returns last 20 events sorted by timestamp DESC"
+          - "filters by org_id"
+          - "includes all required fields"
+          - "returns empty array if no events"
+
+      - describe: "getErrorSummary"
+        tests:
+          - "counts failed events in last 24h"
+          - "counts pending retries"
+          - "counts dead letter queue items"
+          - "returns 0s when no errors"
+
+  database:
+    file: "lib/supabase/__tests__/integration-health.test.ts"
+    tests:
+      - describe: "refresh_integration_health function"
+        tests:
+          - "calculates success_count from logs"
+          - "calculates error_count from logs"
+          - "sets status=connected when success_count > 0"
+          - "sets status=error when last_error > last_sync"
+          - "sets status=not_configured when no events"
+          - "upserts (updates existing record)"
+          - "handles concurrent calls (no race condition)"
+
+integration_tests:
+  api:
+    file: "app/api/integrations/dashboard/route.test.ts"
+    tests:
+      - describe: "GET /api/integrations/dashboard"
+        tests:
+          - "returns 200 OK with dashboard data"
+          - "returns 403 for non-admin user"
+          - "enforces RLS (org isolation)"
+          - "handles refresh=true parameter"
+          - "returns 500 on database error"
+          - "response time < 1s"
+
+      - describe: "GET /api/integrations/health"
+        tests:
+          - "returns 200 OK with health check data"
+          - "calculates overall_status correctly"
+          - "returns 403 for non-admin user"
+          - "response time < 500ms"
+
+  rls:
+    file: "__tests__/rls/integration-health.test.ts"
+    tests:
+      - "User A cannot see User B's integration_health"
+      - "User A can insert own org's health record"
+      - "User A can update own org's health record"
+      - "User A cannot update other org's health record"
+      - "Refresh function respects org_id"
+
+e2e_tests:
+  file: "e2e/integrations/dashboard.spec.ts"
+  framework: "Playwright"
+  tests:
+    - describe: "Dashboard Load"
+      tests:
+        - "Navigate to /integrations/dashboard"
+        - "See 4 health status cards"
+        - "See activity feed with events"
+        - "See error summary panel"
+        - "Page loads within 2s"
+
+    - describe: "Health Status Cards"
+      tests:
+        - "Comarch card shows 'Not Configured' initially"
+        - "API Keys card shows active count"
+        - "Click card navigates to settings page"
+        - "Status badge color matches status"
+
+    - describe: "Activity Feed"
+      tests:
+        - "Shows last 20 events"
+        - "Events sorted newest first"
+        - "Click event expands detail"
+        - "Error event shows error message"
+        - "Empty state when no events"
+
+    - describe: "Auto-Refresh"
+      tests:
+        - "Dashboard auto-refreshes after 30s"
+        - "New event appears in feed"
+        - "Toast notification shows '1 new event'"
+        - "Auto-refresh pauses when tab inactive"
+
+    - describe: "Error Summary"
+      tests:
+        - "Shows failed count"
+        - "Click failed count navigates to logs"
+        - "Shows 'All integrations healthy' when no errors"
+
+    - describe: "Navigation"
+      tests:
+        - "Sidebar shows all integration sections"
+        - "Dashboard menu item highlighted"
+        - "Click 'API Keys' navigates to /integrations/api-keys"
+
+    - describe: "Permissions"
+      tests:
+        - "Admin can access dashboard"
+        - "IT Manager can access dashboard"
+        - "Regular user redirected with 403"
+
+performance_tests:
+  file: "lib/services/__tests__/integration-dashboard-perf.test.ts"
+  tests:
+    - name: "Dashboard load with 1000 logs"
+      setup: "Insert 1000 integration_logs"
+      assertion: "getDashboard() < 1s"
+
+    - name: "Health check with all integrations"
+      setup: "4 integration_health records"
+      assertion: "getHealthStatus() < 500ms"
+
+    - name: "Activity feed query"
+      setup: "500 events in last 24h"
+      assertion: "getRecentActivity(20) < 300ms"
+
+acceptance_criteria_mapping:
+  AC-1:
+    tests:
+      - "e2e/integrations/dashboard.spec.ts: Navigate to /integrations/dashboard"
+      - "app/api/integrations/dashboard/route.test.ts: returns 403 for non-admin"
+
+  AC-2:
+    tests:
+      - "e2e/integrations/dashboard.spec.ts: Comarch card shows 'Not Configured'"
+      - "e2e/integrations/dashboard.spec.ts: API Keys card shows active count"
+      - "lib/services/integration-dashboard-service.test.ts: getHealthStatus"
+
+  AC-3:
+    tests:
+      - "e2e/integrations/dashboard.spec.ts: Shows last 20 events"
+      - "lib/services/integration-dashboard-service.test.ts: getRecentActivity"
+
+  AC-4:
+    tests:
+      - "e2e/integrations/dashboard.spec.ts: Shows failed count"
+      - "lib/services/integration-dashboard-service.test.ts: getErrorSummary"
+
+  AC-5:
+    tests:
+      - "e2e/integrations/dashboard.spec.ts: Sidebar shows all sections"
+
+  AC-6:
+    tests:
+      - "app/api/integrations/dashboard/route.test.ts: returns 200 OK"
+      - "__tests__/rls/integration-health.test.ts: User A cannot see User B's data"
+
+  AC-7:
+    tests:
+      - "app/api/integrations/health/route.test.ts: returns health check data"
+
+  AC-8:
+    tests:
+      - "e2e/integrations/dashboard.spec.ts: Dashboard auto-refreshes after 30s"
+
+  AC-9:
+    tests:
+      - "e2e/integrations/dashboard.spec.ts: Admin can access"
+      - "e2e/integrations/dashboard.spec.ts: Regular user redirected"
+
+  AC-10:
+    tests:
+      - "e2e/integrations/dashboard.spec.ts: Mobile responsive (manual test)"
+
+  AC-11:
+    tests:
+      - "lib/services/__tests__/integration-dashboard-perf.test.ts: Dashboard load < 1s"
+
+  AC-12:
+    tests:
+      - "lib/services/integration-dashboard-service.test.ts: handles errors gracefully"
+
+test_data:
+  organizations:
+    - id: "org-a-uuid"
+      name: "Org A"
+    - id: "org-b-uuid"
+      name: "Org B"
+
+  users:
+    - id: "admin-a-uuid"
+      org_id: "org-a-uuid"
+      role: "ADMIN"
+    - id: "user-a-uuid"
+      org_id: "org-a-uuid"
+      role: "USER"
+    - id: "admin-b-uuid"
+      org_id: "org-b-uuid"
+      role: "ADMIN"
+
+  integration_health:
+    - org_id: "org-a-uuid"
+      integration_type: "comarch"
+      status: "connected"
+      success_count_24h: 45
+      error_count_24h: 2
+      last_sync_at: "2026-01-15T14:30:00Z"
+
+    - org_id: "org-a-uuid"
+      integration_type: "api_keys"
+      status: "connected"
+      success_count_24h: 1247
+      error_count_24h: 5
+      metadata: {"active_keys": 3}
+
+  integration_logs:
+    - org_id: "org-a-uuid"
+      integration_type: "webhook"
+      event_type: "order.created"
+      status: "success"
+      timestamp: "2026-01-15T14:25:00Z"
+
+    - org_id: "org-a-uuid"
+      integration_type: "comarch"
+      event_type: "invoice.push"
+      status: "error"
+      error_message: "Connection timeout"
+      timestamp: "2026-01-15T14:20:00Z"
+
+coverage_requirements:
+  overall: ">80%"
+  service_layer: ">85%"
+  api_routes: ">80%"
+  database_functions: ">90%"
+  critical_paths: "100%"

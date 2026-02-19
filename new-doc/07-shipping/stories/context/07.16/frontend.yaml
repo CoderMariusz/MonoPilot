@@ -1,0 +1,483 @@
+# Story 07.16 - Frontend Components, Pages & Services
+# Purpose: UI components, pages, business logic, type definitions
+# Agent: FRONTEND-DEV (UI/UX focus)
+
+pages:
+  rma_list:
+    path: "apps/frontend/app/(authenticated)/shipping/rma/page.tsx"
+    description: "RMA list with filters, search, and bulk actions"
+    layout: "ShadCN DataTable + Filters sidebar"
+    features:
+      - "Display RMA list with pagination"
+      - "Filter by status, customer, reason code, date range"
+      - "Search by RMA number or customer name"
+      - "Sort by RMA number, created date, customer, status"
+      - "Bulk actions: (future) mark approved, export"
+      - "Create RMA button (modal)"
+      - "Row actions: View detail, Edit (pending), Delete (pending)"
+
+  rma_detail:
+    path: "apps/frontend/app/(authenticated)/shipping/rma/[id]/page.tsx"
+    description: "RMA detail view with full information and actions"
+    layout: "Header + tabs/sections"
+    features:
+      - "Display RMA header (number, customer, SO link if present)"
+      - "Status badge with color"
+      - "Reason code & disposition badges"
+      - "Created by / Created date info"
+      - "Approval info (if approved): approved by, timestamp"
+      - "RMA lines table (product, qty_expected, qty_received, lot, actions)"
+      - "Notes section"
+      - "Action buttons (Edit, Delete, Approve, Close - conditional)"
+      - "Audit trail section (shows all status changes)"
+
+components:
+  data_display:
+    RMADataTable:
+      path: "apps/frontend/components/shipping/rma/RMADataTable.tsx"
+      props:
+        - "rmas: RMA[]"
+        - "isLoading: boolean"
+        - "onEdit: (id) => void"
+        - "onDelete: (id) => void"
+        - "onViewDetail: (id) => void"
+      features:
+        - "ShadCN DataTable with sorting, pagination"
+        - "Columns: RMA Number, Customer, Status, Reason, Lines Count, Created Date, Actions"
+        - "Row selection (future bulk actions)"
+        - "Status badge renderer"
+        - "Reason code badge renderer"
+
+    RMAStatusBadge:
+      path: "apps/frontend/components/shipping/rma/RMAStatusBadge.tsx"
+      props:
+        - "status: RMAStatus"
+        - "size: 'sm' | 'md' | 'lg'"
+      colors:
+        pending: "bg-gray-200 text-gray-800"
+        approved: "bg-blue-200 text-blue-800"
+        receiving: "bg-purple-200 text-purple-800"
+        received: "bg-yellow-200 text-yellow-800"
+        processed: "bg-orange-200 text-orange-800"
+        closed: "bg-green-200 text-green-800"
+
+    RMAReasonBadge:
+      path: "apps/frontend/components/shipping/rma/RMAReasonBadge.tsx"
+      props:
+        - "reasonCode: ReasonCode"
+        - "size: 'sm' | 'md'"
+      colors:
+        damaged: "bg-red-100 text-red-800"
+        expired: "bg-orange-100 text-orange-800"
+        wrong_product: "bg-yellow-100 text-yellow-800"
+        quality_issue: "bg-purple-100 text-purple-800"
+        customer_change: "bg-blue-100 text-blue-800"
+        other: "bg-gray-100 text-gray-800"
+
+    RMADispositionBadge:
+      path: "apps/frontend/components/shipping/rma/RMADispositionBadge.tsx"
+      props:
+        - "disposition: Disposition | null"
+        - "size: 'sm' | 'md'"
+      colors:
+        restock: "bg-green-100 text-green-800"
+        scrap: "bg-red-100 text-red-800"
+        quality_hold: "bg-orange-100 text-orange-800"
+        rework: "bg-blue-100 text-blue-800"
+
+    RMALinesTable:
+      path: "apps/frontend/components/shipping/rma/RMALinesTable.tsx"
+      props:
+        - "lines: RMALine[]"
+        - "products: Map<UUID, Product>"
+        - "isEditable: boolean"
+        - "onEditLine: (lineId) => void"
+        - "onDeleteLine: (lineId) => void"
+      features:
+        - "Columns: Product, Qty Expected, Qty Received, Lot Number, Reason Notes, Disposition, Actions"
+        - "Edit/Delete buttons (disabled if not pending)"
+        - "Expandable reason notes"
+
+    RMADetailView:
+      path: "apps/frontend/components/shipping/rma/RMADetailView.tsx"
+      props:
+        - "rma: RMADetail"
+        - "permissions: RMAPermissions"
+        - "onApprove: () => void"
+        - "onClose: () => void"
+        - "onEdit: () => void"
+        - "onDelete: () => void"
+      features:
+        - "Header with RMA number, customer, SO link"
+        - "Status, Reason, Disposition badges"
+        - "Created by / Created date"
+        - "Approval section (if approved)"
+        - "Lines table with products"
+        - "Notes display"
+        - "Action buttons (conditional)"
+
+  forms:
+    CreateRMAForm:
+      path: "apps/frontend/components/shipping/rma/CreateRMAForm.tsx"
+      type: "Modal/Dialog"
+      props:
+        - "customers: Customer[]"
+        - "salesOrders: SalesOrder[]"
+        - "onSubmit: (data) => void"
+        - "onCancel: () => void"
+      fields:
+        - "Customer (required, autocomplete or dropdown)"
+        - "Sales Order (optional, autocomplete)"
+        - "Reason Code (required, dropdown)"
+        - "Disposition (optional, dropdown - auto-suggest based on reason)"
+        - "Notes (optional, textarea, max 2000 chars)"
+        - "Lines section (add lines dynamically)"
+      features:
+        - "Dynamic line addition"
+        - "Zod validation"
+        - "Disposition auto-suggestion based on reason code"
+        - "Submit button disabled until valid"
+        - "Loading spinner during submission"
+
+    RMALineForm:
+      path: "apps/frontend/components/shipping/rma/RMALineForm.tsx"
+      type: "Modal/Dialog"
+      props:
+        - "products: Product[]"
+        - "initialData?: RMALine"
+        - "onSubmit: (data) => void"
+        - "onCancel: () => void"
+      fields:
+        - "Product (required, autocomplete)"
+        - "Quantity Expected (required, decimal input)"
+        - "Lot Number (optional, text)"
+        - "Reason Notes (optional, textarea, max 500 chars)"
+        - "Disposition (optional, dropdown)"
+      features:
+        - "Zod validation"
+        - "Quantity validation (> 0)"
+        - "Product search"
+
+    EditRMAForm:
+      path: "apps/frontend/components/shipping/rma/EditRMAForm.tsx"
+      type: "Modal/Dialog"
+      props:
+        - "rma: RMA"
+        - "onSubmit: (data) => void"
+        - "onCancel: () => void"
+      editable_fields:
+        - "reason_code"
+        - "disposition"
+        - "notes"
+      features:
+        - "Read-only: RMA number, customer, SO link"
+        - "Zod validation"
+        - "Disabled if RMA not pending"
+
+  dialogs:
+    ApproveRMADialog:
+      path: "apps/frontend/components/shipping/rma/ApproveRMADialog.tsx"
+      type: "AlertDialog"
+      props:
+        - "rma: RMA"
+        - "onConfirm: () => void"
+        - "onCancel: () => void"
+      content:
+        - "Confirmation: 'Are you sure you want to approve this RMA?'"
+        - "RMA details (number, customer, line count)"
+        - "Warning: 'This will enable the receiving workflow'"
+        - "Buttons: Approve, Cancel"
+
+    CloseRMADialog:
+      path: "apps/frontend/components/shipping/rma/CloseRMADialog.tsx"
+      type: "AlertDialog"
+      props:
+        - "rma: RMA"
+        - "onConfirm: () => void"
+        - "onCancel: () => void"
+      content:
+        - "Confirmation: 'Are you sure you want to close this RMA?'"
+        - "RMA details"
+        - "Buttons: Close RMA, Cancel"
+
+    DeleteRMADialog:
+      path: "apps/frontend/components/shipping/rma/DeleteRMADialog.tsx"
+      type: "AlertDialog"
+      props:
+        - "rma: RMA"
+        - "onConfirm: () => void"
+        - "onCancel: () => void"
+      content:
+        - "Warning: 'Delete this RMA? This action cannot be undone.'"
+        - "RMA number, customer"
+        - "Buttons: Delete, Cancel"
+
+  filters:
+    RMAFilters:
+      path: "apps/frontend/components/shipping/rma/RMAFilters.tsx"
+      props:
+        - "onFilterChange: (filters) => void"
+        - "customers: Customer[]"
+      filters:
+        - "Status (select: pending, approved, receiving, received, processed, closed)"
+        - "Customer (select/autocomplete)"
+        - "Reason Code (multi-select)"
+        - "Date Range (from, to)"
+      features:
+        - "Apply/Reset buttons"
+        - "Saved filter presets (future)"
+
+# Services & Business Logic
+services:
+  rma_service:
+    path: "apps/frontend/lib/services/rma-service.ts"
+    methods:
+      listRMAs:
+        signature: "(filters: RMAListFilters) => Promise<{ rmas: RMA[]; pagination: Pagination; stats: RMAStats }>"
+        description: "Fetch RMA list with filters"
+
+      getRMA:
+        signature: "(id: UUID) => Promise<RMADetail>"
+        description: "Fetch single RMA with full details"
+
+      createRMA:
+        signature: "(data: CreateRMAInput) => Promise<RMA>"
+        description: "Create new RMA"
+        logic:
+          - "Validate customer exists"
+          - "POST /api/shipping/rma"
+          - "Return created RMA with generated number"
+
+      updateRMA:
+        signature: "(id: UUID, data: UpdateRMAInput) => Promise<RMA>"
+        description: "Update RMA (pending only)"
+
+      deleteRMA:
+        signature: "(id: UUID) => Promise<void>"
+        description: "Delete RMA (pending only)"
+
+      addRMALine:
+        signature: "(rmaId: UUID, data: RMALineInput) => Promise<RMALine>"
+        description: "Add line to RMA"
+
+      updateRMALine:
+        signature: "(rmaId: UUID, lineId: UUID, data: UpdateRMALineInput) => Promise<RMALine>"
+        description: "Update RMA line (pending RMA only)"
+
+      deleteRMALine:
+        signature: "(rmaId: UUID, lineId: UUID) => Promise<void>"
+        description: "Delete RMA line (pending RMA only)"
+
+      approveRMA:
+        signature: "(id: UUID) => Promise<RMA>"
+        description: "Approve RMA (pending → approved)"
+        logic:
+          - "Check role: MANAGER+"
+          - "Check status: pending"
+          - "Check lines: at least 1"
+          - "POST /api/shipping/rma/:id/approve"
+          - "Return updated RMA"
+
+      closeRMA:
+        signature: "(id: UUID) => Promise<RMA>"
+        description: "Close RMA (final status)"
+
+      suggestDisposition:
+        signature: "(reasonCode: ReasonCode) => Disposition | null"
+        description: "Suggest disposition based on reason code"
+        logic:
+          - "damaged → scrap"
+          - "expired → scrap"
+          - "wrong_product → restock"
+          - "quality_issue → quality_hold"
+          - "customer_change → restock"
+          - "other → null"
+
+# Type Definitions
+types:
+  RMA:
+    path: "apps/frontend/lib/types/rma.ts"
+    properties:
+      id: "UUID"
+      org_id: "UUID"
+      rma_number: "string (RMA-YYYY-NNNNN)"
+      customer_id: "UUID"
+      customer_name: "string"
+      sales_order_id: "UUID | null"
+      reason_code: "ReasonCode enum"
+      disposition: "Disposition enum | null"
+      status: "RMAStatus enum"
+      notes: "string | null"
+      total_value: "number | null"
+      approved_at: "Date | null"
+      approved_by_id: "UUID | null"
+      approved_by_name: "string | null"
+      created_at: "Date"
+      created_by_id: "UUID"
+      created_by_name: "string"
+      updated_at: "Date"
+
+  RMADetail:
+    extends: "RMA"
+    additional_properties:
+      lines: "RMALineWithProduct[]"
+      permissions: "RMAPermissions"
+
+  RMALine:
+    properties:
+      id: "UUID"
+      rma_request_id: "UUID"
+      product_id: "UUID"
+      quantity_expected: "number"
+      quantity_received: "number"
+      lot_number: "string | null"
+      reason_notes: "string | null"
+      disposition: "Disposition | null"
+      created_at: "Date"
+
+  RMALineWithProduct:
+    extends: "RMALine"
+    additional_properties:
+      product_name: "string"
+      product_sku: "string"
+
+  RMAListItem:
+    properties:
+      id: "UUID"
+      rma_number: "string"
+      customer_id: "UUID"
+      customer_name: "string"
+      status: "RMAStatus"
+      reason_code: "ReasonCode"
+      line_count: "number"
+      total_value: "number | null"
+      created_at: "Date"
+
+  RMAStatus:
+    enum:
+      - "pending (draft, can edit/delete)"
+      - "approved (locked, ready for receiving)"
+      - "receiving (items being received)"
+      - "received (all items received)"
+      - "processed (disposition executed)"
+      - "closed (final)"
+
+  ReasonCode:
+    enum:
+      - "damaged"
+      - "expired"
+      - "wrong_product"
+      - "quality_issue"
+      - "customer_change"
+      - "other"
+
+  Disposition:
+    enum:
+      - "restock"
+      - "scrap"
+      - "quality_hold"
+      - "rework"
+
+  RMAPermissions:
+    properties:
+      can_edit: "boolean (pending only)"
+      can_delete: "boolean (pending only)"
+      can_approve: "boolean (MANAGER+, pending only)"
+      can_close: "boolean (MANAGER+)"
+      can_add_lines: "boolean (pending only)"
+
+  CreateRMAInput:
+    properties:
+      customer_id: "UUID (required)"
+      sales_order_id: "UUID | null (optional)"
+      reason_code: "ReasonCode (required)"
+      disposition: "Disposition | null (optional)"
+      notes: "string (optional, max 2000)"
+      lines: "RMALineInput[] (required, min 1)"
+
+  RMALineInput:
+    properties:
+      product_id: "UUID (required)"
+      quantity_expected: "number (required, > 0)"
+      lot_number: "string | null (optional)"
+      reason_notes: "string | null (optional, max 500)"
+      disposition: "Disposition | null (optional)"
+
+# Zod Schemas
+validation:
+  path: "apps/frontend/lib/validation/rma-schema.ts"
+  schemas:
+    rmaReasonCodeEnum:
+      - "damaged | expired | wrong_product | quality_issue | customer_change | other"
+
+    rmaDispositionEnum:
+      - "restock | scrap | quality_hold | rework"
+
+    rmaStatusEnum:
+      - "pending | approved | receiving | received | processed | closed"
+
+    createRMASchema:
+      - "customer_id: string().uuid()"
+      - "sales_order_id: string().uuid().optional().nullable()"
+      - "reason_code: rmaReasonCodeEnum"
+      - "disposition: rmaDispositionEnum.optional().nullable()"
+      - "notes: string().max(2000).optional().nullable()"
+      - "lines: z.array(rmaLineSchema).min(1)"
+
+    rmaLineSchema:
+      - "product_id: string().uuid()"
+      - "quantity_expected: number().positive()"
+      - "lot_number: string().max(100).optional().nullable()"
+      - "reason_notes: string().max(500).optional().nullable()"
+      - "disposition: rmaDispositionEnum.optional().nullable()"
+
+# UI States
+states:
+  list_page:
+    - "loading: skeleton table with progress bar"
+    - "empty: 'No RMAs. Create one to get started.'"
+    - "error: 'Failed to load RMAs. [Retry]'"
+    - "success: DataTable with RMAs"
+    - "no_results: 'No RMAs match your filters.'"
+
+  detail_page:
+    - "loading: skeleton content with progress bar"
+    - "not_found: '404 RMA not found'"
+    - "success: Full RMA detail with actions"
+
+  form_submission:
+    - "idle: Submit button enabled"
+    - "loading: Button shows spinner, form disabled"
+    - "success: Toast notification, redirect to list"
+    - "error: Toast error message, form remains open"
+
+# Responsive Design
+responsive:
+  mobile:
+    - "List: Stack DataTable columns, prioritize RMA number & customer"
+    - "Detail: Full-width sections, buttons stacked vertically"
+    - "Forms: Full-screen modal or bottom sheet"
+
+  tablet:
+    - "List: Multi-column DataTable with horizontal scroll"
+    - "Detail: Two-column layout (info + lines)"
+    - "Forms: Centered modal"
+
+  desktop:
+    - "List: Full DataTable with all columns visible"
+    - "Detail: Standard layout with sidebar or tabs"
+    - "Forms: Modal dialog"
+
+# Loading & Performance
+performance:
+  list_load_time: "< 500ms"
+  detail_load_time: "< 300ms"
+  form_submission: "< 1s"
+  approval_action: "< 500ms"
+
+  optimization:
+    - "Lazy load customer/product lookups"
+    - "Cache product list in context"
+    - "Debounce search input"
+    - "Paginate list (20 items per page)"
+    - "Virtual scrolling for large tables (future)"

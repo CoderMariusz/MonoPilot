@@ -1,0 +1,108 @@
+# Epic 11 - Integrations Module Implementation Roadmap
+# Last Updated: 2026-01-15
+
+epic:
+  id: "11"
+  name: "Integrations & External Connectivity"
+  module: "integrations"
+  type: "premium_addon"
+  status: "planning"
+  completion_pct: 0
+  priority: "P2"
+  pricing: "+$50/user/month"
+
+summary:
+  total_stories: 18
+  completed_stories: 0
+  remaining_stories: 18
+  phases: 3
+  estimated_days_total: 54-72
+  target_completion: "2026-08-31"
+  fr_count: 30
+
+phases:
+  - phase_id: "1"
+    name: "MVP Core"
+    timeline: "Weeks 1-5"
+    stories: 6
+    estimated_days: 18-24
+    stories_list: ["11.1", "11.2", "11.3", "11.4", "11.5", "11.6"]
+    deliverables:
+      - "API keys management with scopes and rate limiting"
+      - "Webhook events (outbound)"
+      - "Integration logs with audit trail"
+      - "Data export (CSV/JSON)"
+      - "Supplier portal (PO view, delivery confirmation)"
+      - "Comarch Optima invoice push"
+
+  - phase_id: "2"
+    name: "Advanced Integrations"
+    timeline: "Weeks 6-10"
+    stories: 8
+    estimated_days: 24-32
+    stories_list: ["11.7", "11.8", "11.9", "11.10", "11.11", "11.12", "11.13", "11.14"]
+    deliverables:
+      - "Customer portal (order tracking, shipment status)"
+      - "EDI Basic (ORDERS, INVOIC, DESADV)"
+      - "Import templates (products, BOMs)"
+      - "Retry logic UI and dead letter queue"
+      - "Comarch advanced (CoA sync, VAT reports)"
+      - "XML export"
+
+  - phase_id: "3"
+    name: "Enterprise Features"
+    timeline: "Weeks 11-13"
+    stories: 4
+    estimated_days: 12-16
+    stories_list: ["11.15", "11.16", "11.17", "11.18"]
+    deliverables:
+      - "EDI advanced (ORDRSP, RECADV)"
+      - "Comarch payment reconciliation"
+      - "Custom integration builder (low-code)"
+      - "API marketplace and bi-directional webhooks"
+
+stories:
+  # Phase 1
+  - {id: "11.1", name: "Integrations Settings & Dashboard", phase: "1", type: "fullstack", complexity: "M", estimate_days: "3-4", fr_ids: ["FR-INT-001"], status: "to_create"}
+  - {id: "11.2", name: "API Keys Management & Scopes", phase: "1", type: "fullstack", complexity: "L", estimate_days: "4-5", fr_ids: ["FR-INT-002", "FR-INT-003", "FR-INT-004"], status: "to_create"}
+  - {id: "11.3", name: "Integration Logs & Audit Trail", phase: "1", type: "backend", complexity: "M", estimate_days: "3-4", fr_ids: ["FR-INT-005"], status: "to_create"}
+  - {id: "11.4", name: "Webhook Configuration & Events", phase: "1", type: "fullstack", complexity: "L", estimate_days: "4-5", fr_ids: ["FR-INT-006", "FR-INT-007"], status: "to_create"}
+  - {id: "11.5", name: "Data Export (CSV/JSON)", phase: "1", type: "backend", complexity: "M", estimate_days: "2-3", fr_ids: ["FR-INT-008"], status: "to_create"}
+  - {id: "11.6", name: "Supplier Portal & Comarch Basic", phase: "1", type: "fullstack", complexity: "M", estimate_days: "3-4", fr_ids: ["FR-INT-009", "FR-INT-010", "FR-INT-011", "FR-INT-012"], status: "to_create"}
+
+  # Phase 2
+  - {id: "11.7", name: "Customer Portal", phase: "2", type: "fullstack", complexity: "M", estimate_days: "3-4", fr_ids: ["FR-INT-013", "FR-INT-014"], status: "to_create"}
+  - {id: "11.8", name: "EDI ORDERS Inbound", phase: "2", type: "backend", complexity: "L", estimate_days: "4-5", fr_ids: ["FR-INT-015"], status: "to_create"}
+  - {id: "11.9", name: "EDI INVOIC Outbound", phase: "2", type: "backend", complexity: "M", estimate_days: "3-4", fr_ids: ["FR-INT-016"], status: "to_create"}
+  - {id: "11.10", name: "EDI DESADV Outbound", phase: "2", type: "backend", complexity: "M", estimate_days: "3-4", fr_ids: ["FR-INT-017"], status: "to_create"}
+  - {id: "11.11", name: "Import Templates (Products/BOMs)", phase: "2", type: "fullstack", complexity: "M", estimate_days: "3-4", fr_ids: ["FR-INT-018", "FR-INT-019"], status: "to_create"}
+  - {id: "11.12", name: "Retry Logic & Dead Letter Queue", phase: "2", type: "backend", complexity: "M", estimate_days: "3-4", fr_ids: ["FR-INT-020", "FR-INT-021"], status: "to_create"}
+  - {id: "11.13", name: "Comarch Advanced (CoA/VAT)", phase: "2", type: "backend", complexity: "M", estimate_days: "3-4", fr_ids: ["FR-INT-022", "FR-INT-023"], status: "to_create"}
+  - {id: "11.14", name: "XML Export", phase: "2", type: "backend", complexity: "S", estimate_days: "1-2", fr_ids: ["FR-INT-024"], status: "to_create"}
+
+  # Phase 3
+  - {id: "11.15", name: "EDI Advanced (ORDRSP/RECADV)", phase: "3", type: "backend", complexity: "M", estimate_days: "3-4", fr_ids: ["FR-INT-025", "FR-INT-026"], status: "to_create"}
+  - {id: "11.16", name: "Comarch Payment Reconciliation", phase: "3", type: "backend", complexity: "M", estimate_days: "3-4", fr_ids: ["FR-INT-027"], status: "to_create"}
+  - {id: "11.17", name: "Custom Integration Builder", phase: "3", type: "fullstack", complexity: "L", estimate_days: "4-5", fr_ids: ["FR-INT-028"], status: "to_create"}
+  - {id: "11.18", name: "API Marketplace & Bi-directional Webhooks", phase: "3", type: "fullstack", complexity: "M", estimate_days: "3-4", fr_ids: ["FR-INT-029", "FR-INT-030"], status: "to_create"}
+
+dependencies:
+  cross_epic:
+    - {epic: "01", stories: ["01.1"], provides: "organizations, users, roles", status: "ready"}
+    - {epic: "02", stories: ["02.1", "02.4"], provides: "products, BOMs", status: "ready"}
+    - {epic: "03", stories: ["03.1", "03.3", "03.10"], provides: "suppliers, POs, WOs", status: "ready"}
+    - {epic: "05", stories: ["05.1"], provides: "license plates", status: "ready"}
+    - {epic: "07", stories: ["07.2", "07.11"], provides: "sales orders, shipments", status: "ready"}
+
+  within_epic:
+    - {story: "11.1", blocks: ["11.2", "11.3", "11.4"]}
+    - {story: "11.2", blocks: ["11.5", "11.6", "11.7"]}
+    - {story: "11.3", blocks: ["11.12"]}
+    - {story: "11.4", blocks: ["11.18"]}
+    - {story: "11.6", blocks: ["11.13", "11.16"]}
+    - {story: "11.8", blocks: ["11.15"]}
+
+metadata:
+  created: "2026-01-15"
+  version: "1.0"
+  author: "ORCHESTRATOR"

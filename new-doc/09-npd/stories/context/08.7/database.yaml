@@ -1,0 +1,372 @@
+# Story 08.7 - Database Context
+# Generated: 2026-01-15
+# Purpose: Database schema, migrations, functions, triggers for formulation costing
+
+# Tables
+tables:
+  - name: "npd_costing"
+    operation: "create"
+    description: "Stores target, estimated, and actual costs for formulations with Finance approval workflow"
+    columns:
+      - { name: "id", type: "SERIAL PRIMARY KEY", description: "Auto-increment ID" }
+      - { name: "org_id", type: "UUID NOT NULL", description: "Organization ID (RLS isolation)" }
+      - { name: "npd_project_id", type: "INTEGER NOT NULL", description: "Parent NPD project" }
+      - { name: "formulation_id", type: "INTEGER", description: "Related formulation (nullable for project-level costing)" }
+      - { name: "target_cost", type: "DECIMAL(15,4)", description: "Target cost (manual entry at G2)" }
+      - { name: "estimated_cost", type: "DECIMAL(15,4)", description: "Estimated cost (calculated from formulation items)" }
+      - { name: "actual_cost", type: "DECIMAL(15,4)", description: "Actual cost (from pilot WO)" }
+      - { name: "variance_pct", type: "DECIMAL(5,2)", description: "Cost variance percentage ((actual - target) / target * 100)" }
+      - { name: "status", type: "VARCHAR(20) NOT NULL DEFAULT 'draft'", description: "draft, submitted, approved, rejected" }
+      - { name: "approved_by", type: "UUID", description: "Finance user who approved" }
+      - { name: "approved_at", type: "TIMESTAMPTZ", description: "Approval timestamp" }
+      - { name: "notes", type: "TEXT", description: "Costing notes / rejection reason" }
+      - { name: "created_at", type: "TIMESTAMPTZ DEFAULT NOW()", description: "Record creation timestamp" }
+      - { name: "updated_at", type: "TIMESTAMPTZ DEFAULT NOW()", description: "Last update timestamp" }
+      - { name: "created_by", type: "UUID", description: "User who created record" }
+      - { name: "updated_by", type: "UUID", description: "User who last updated record" }
+    foreign_keys:
+      - { column: "org_id", references: "organizations(id)", on_delete: "CASCADE" }
+      - { column: "npd_project_id", references: "npd_projects(id)", on_delete: "CASCADE" }
+      - { column: "formulation_id", references: "npd_formulations(id)", on_delete: "SET NULL" }
+      - { column: "approved_by", references: "users(id)", on_delete: "SET NULL" }
+      - { column: "created_by", references: "users(id)", on_delete: "SET NULL" }
+      - { column: "updated_by", references: "users(id)", on_delete: "SET NULL" }
+    constraints:
+      - { type: "CHECK", expression: "status IN ('draft', 'submitted', 'approved', 'rejected')", description: "Valid status values" }
+      - { type: "CHECK", expression: "target_cost IS NULL OR target_cost > 0", description: "Target cost must be positive if set" }
+    indexes:
+      - { name: "idx_npd_costing_formulation", columns: ["formulation_id"], type: "btree" }
+      - { name: "idx_npd_costing_project", columns: ["npd_project_id"], type: "btree" }
+      - { name: "idx_npd_costing_status", columns: ["org_id", "status"], type: "btree" }
+      - { name: "idx_npd_costing_org", columns: ["org_id"], type: "btree" }
+    rls_enabled: true
+    rls_policies:
+      - name: "npd_costing_org_isolation"
+        type: "ALL"
+        using: "org_id = current_setting('app.current_org_id')::UUID"
+        description: "Tenant isolation via org_id"
+      - name: "npd_costing_select"
+        type: "SELECT"
+        using: "org_id = current_setting('app.current_org_id')::UUID"
+        description: "Allow select for same org"
+      - name: "npd_costing_insert"
+        type: "INSERT"
+        with_check: "org_id = current_setting('app.current_org_id')::UUID"
+        description: "Allow insert for same org"
+      - name: "npd_costing_update"
+        type: "UPDATE"
+        using: "org_id = current_setting('app.current_org_id')::UUID"
+        description: "Allow update for same org"
+      - name: "npd_costing_delete"
+        type: "DELETE"
+        using: "org_id = current_setting('app.current_org_id')::UUID"
+        description: "Allow delete for same org"
+
+  - name: "npd_formulation_items"
+    operation: "reference"
+    description: "EXISTING - Referenced for cost calculation (quantity * product.cost_per_unit)"
+    columns_referenced:
+      - { name: "formulation_id", usage: "JOIN key for cost calculation" }
+      - { name: "product_id", usage: "JOIN to products for cost_per_unit" }
+      - { name: "quantity", usage: "Multiplied by cost_per_unit" }
+
+  - name: "products"
+    operation: "reference"
+    description: "EXISTING - Referenced for ingredient unit costs"
+    columns_referenced:
+      - { name: "cost_per_unit", usage: "Ingredient cost for formulation costing" }
+      - { name: "id", usage: "JOIN key from npd_formulation_items" }
+
+  - name: "work_order_costs"
+    operation: "reference"
+    description: "EXISTING - Referenced for actual cost from pilot WO"
+    columns_referenced:
+      - { name: "work_order_id", usage: "Filter by pilot WO" }
+      - { name: "material_cost", usage: "Sum for actual cost" }
+
+  - name: "npd_settings"
+    operation: "reference"
+    description: "EXISTING - Referenced for variance thresholds"
+    columns_referenced:
+      - { name: "cost_variance_warning_pct", usage: "Warning threshold (default 20%)" }
+      - { name: "cost_variance_blocker_pct", usage: "Blocker threshold (default 50%)" }
+      - { name: "require_costing_approval", usage: "Handoff validation flag (default true)" }
+
+# Database Functions
+functions:
+  - name: "calculate_formulation_cost"
+    description: "Calculate estimated cost by summing formulation item costs (quantity * product.cost_per_unit)"
+    parameters:
+      - { name: "p_formulation_id", type: "INTEGER", description: "Formulation ID to calculate cost for" }
+    returns: "DECIMAL(15,4)"
+    language: "plpgsql"
+    logic: |
+      SELECT COALESCE(SUM(fi.quantity * p.cost_per_unit), 0)
+      FROM npd_formulation_items fi
+      JOIN products p ON fi.product_id = p.id
+      WHERE fi.formulation_id = p_formulation_id
+    usage: "Called by auto-update trigger and manual recalculation endpoint"
+    example_call: "SELECT calculate_formulation_cost(123)"
+
+  - name: "auto_update_formulation_cost"
+    description: "Trigger function to auto-update estimated_cost when formulation items change"
+    returns: "TRIGGER"
+    language: "plpgsql"
+    logic: |
+      UPDATE npd_costing
+      SET
+        estimated_cost = calculate_formulation_cost(COALESCE(NEW.formulation_id, OLD.formulation_id)),
+        updated_at = NOW()
+      WHERE formulation_id = COALESCE(NEW.formulation_id, OLD.formulation_id);
+      RETURN COALESCE(NEW, OLD);
+    trigger_on: "npd_formulation_items"
+    trigger_events: ["INSERT", "UPDATE", "DELETE"]
+    trigger_timing: "AFTER"
+    trigger_level: "ROW"
+
+  - name: "auto_calculate_cost_variance"
+    description: "Trigger function to auto-calculate variance_pct when target_cost or actual_cost changes"
+    returns: "TRIGGER"
+    language: "plpgsql"
+    logic: |
+      IF NEW.target_cost IS NOT NULL AND NEW.actual_cost IS NOT NULL AND NEW.target_cost > 0 THEN
+        NEW.variance_pct := ((NEW.actual_cost - NEW.target_cost) / NEW.target_cost) * 100;
+      ELSE
+        NEW.variance_pct := NULL;
+      END IF;
+      RETURN NEW;
+    trigger_on: "npd_costing"
+    trigger_events: ["INSERT", "UPDATE"]
+    trigger_timing: "BEFORE"
+    trigger_level: "ROW"
+
+# Triggers
+triggers:
+  - name: "trg_auto_update_formulation_cost"
+    table: "npd_formulation_items"
+    events: ["INSERT", "UPDATE", "DELETE"]
+    timing: "AFTER"
+    level: "ROW"
+    function: "auto_update_formulation_cost()"
+    description: "Auto-update npd_costing.estimated_cost when formulation items change"
+
+  - name: "trg_auto_calculate_cost_variance"
+    table: "npd_costing"
+    events: ["INSERT", "UPDATE"]
+    timing: "BEFORE"
+    level: "ROW"
+    function: "auto_calculate_cost_variance()"
+    description: "Auto-calculate variance_pct when target_cost or actual_cost changes"
+
+# Migrations
+migrations:
+  - file: "0XXX_create_npd_costing_table.sql"
+    description: "Create npd_costing table with all columns and constraints"
+    order: 1
+    sql_snippet: |
+      CREATE TABLE npd_costing (
+        id SERIAL PRIMARY KEY,
+        org_id UUID NOT NULL REFERENCES organizations(id),
+        npd_project_id INTEGER NOT NULL REFERENCES npd_projects(id),
+        formulation_id INTEGER REFERENCES npd_formulations(id),
+        target_cost DECIMAL(15,4),
+        estimated_cost DECIMAL(15,4),
+        actual_cost DECIMAL(15,4),
+        variance_pct DECIMAL(5,2),
+        status VARCHAR(20) NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'submitted', 'approved', 'rejected')),
+        approved_by UUID REFERENCES users(id),
+        approved_at TIMESTAMPTZ,
+        notes TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        created_by UUID REFERENCES users(id),
+        updated_by UUID REFERENCES users(id),
+        CHECK (target_cost IS NULL OR target_cost > 0)
+      );
+
+  - file: "0XXX_create_npd_costing_indexes.sql"
+    description: "Create indexes for npd_costing table"
+    order: 2
+    sql_snippet: |
+      CREATE INDEX idx_npd_costing_formulation ON npd_costing(formulation_id);
+      CREATE INDEX idx_npd_costing_project ON npd_costing(npd_project_id);
+      CREATE INDEX idx_npd_costing_status ON npd_costing(org_id, status);
+      CREATE INDEX idx_npd_costing_org ON npd_costing(org_id);
+
+  - file: "0XXX_create_calculate_formulation_cost_function.sql"
+    description: "Create calculate_formulation_cost() function"
+    order: 3
+    sql_snippet: |
+      CREATE OR REPLACE FUNCTION calculate_formulation_cost(p_formulation_id INTEGER)
+      RETURNS DECIMAL(15,4) AS $$
+      DECLARE
+        v_total_cost DECIMAL(15,4);
+      BEGIN
+        SELECT COALESCE(SUM(fi.quantity * p.cost_per_unit), 0)
+        INTO v_total_cost
+        FROM npd_formulation_items fi
+        JOIN products p ON fi.product_id = p.id
+        WHERE fi.formulation_id = p_formulation_id;
+
+        RETURN v_total_cost;
+      END;
+      $$ LANGUAGE plpgsql;
+
+  - file: "0XXX_create_auto_update_formulation_cost_trigger.sql"
+    description: "Create auto-update trigger for estimated_cost"
+    order: 4
+    sql_snippet: |
+      CREATE OR REPLACE FUNCTION auto_update_formulation_cost()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        UPDATE npd_costing
+        SET
+          estimated_cost = calculate_formulation_cost(COALESCE(NEW.formulation_id, OLD.formulation_id)),
+          updated_at = NOW()
+        WHERE formulation_id = COALESCE(NEW.formulation_id, OLD.formulation_id);
+
+        RETURN COALESCE(NEW, OLD);
+      END;
+      $$ LANGUAGE plpgsql;
+
+      CREATE TRIGGER trg_auto_update_formulation_cost
+      AFTER INSERT OR UPDATE OR DELETE ON npd_formulation_items
+      FOR EACH ROW EXECUTE FUNCTION auto_update_formulation_cost();
+
+  - file: "0XXX_create_auto_calculate_cost_variance_trigger.sql"
+    description: "Create auto-calculate trigger for variance_pct"
+    order: 5
+    sql_snippet: |
+      CREATE OR REPLACE FUNCTION auto_calculate_cost_variance()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        IF NEW.target_cost IS NOT NULL AND NEW.actual_cost IS NOT NULL AND NEW.target_cost > 0 THEN
+          NEW.variance_pct := ((NEW.actual_cost - NEW.target_cost) / NEW.target_cost) * 100;
+        ELSE
+          NEW.variance_pct := NULL;
+        END IF;
+
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+
+      CREATE TRIGGER trg_auto_calculate_cost_variance
+      BEFORE INSERT OR UPDATE ON npd_costing
+      FOR EACH ROW EXECUTE FUNCTION auto_calculate_cost_variance();
+
+  - file: "0XXX_enable_rls_npd_costing.sql"
+    description: "Enable RLS and create policies for npd_costing"
+    order: 6
+    sql_snippet: |
+      ALTER TABLE npd_costing ENABLE ROW LEVEL SECURITY;
+
+      CREATE POLICY npd_costing_org_isolation ON npd_costing
+        USING (org_id = current_setting('app.current_org_id')::UUID);
+
+      CREATE POLICY npd_costing_select ON npd_costing FOR SELECT
+        USING (org_id = current_setting('app.current_org_id')::UUID);
+
+      CREATE POLICY npd_costing_insert ON npd_costing FOR INSERT
+        WITH CHECK (org_id = current_setting('app.current_org_id')::UUID);
+
+      CREATE POLICY npd_costing_update ON npd_costing FOR UPDATE
+        USING (org_id = current_setting('app.current_org_id')::UUID);
+
+      CREATE POLICY npd_costing_delete ON npd_costing FOR DELETE
+        USING (org_id = current_setting('app.current_org_id')::UUID);
+
+# Queries
+example_queries:
+  - description: "Get formulation costing with breakdown"
+    sql: |
+      SELECT
+        c.id,
+        c.target_cost,
+        c.estimated_cost,
+        c.actual_cost,
+        c.variance_pct,
+        c.status,
+        c.approved_by,
+        c.approved_at,
+        f.formulation_number,
+        p.project_number,
+        p.project_name
+      FROM npd_costing c
+      JOIN npd_formulations f ON c.formulation_id = f.id
+      JOIN npd_projects p ON c.npd_project_id = p.id
+      WHERE c.formulation_id = $1
+        AND c.org_id = current_setting('app.current_org_id')::UUID;
+
+  - description: "Get formulation cost breakdown (per ingredient)"
+    sql: |
+      SELECT
+        fi.product_id,
+        pr.code AS product_code,
+        pr.name AS product_name,
+        fi.quantity,
+        fi.uom,
+        pr.cost_per_unit AS unit_cost,
+        (fi.quantity * pr.cost_per_unit) AS total_cost,
+        ((fi.quantity * pr.cost_per_unit) / NULLIF(calculate_formulation_cost(fi.formulation_id), 0)) * 100 AS percentage
+      FROM npd_formulation_items fi
+      JOIN products pr ON fi.product_id = pr.id
+      WHERE fi.formulation_id = $1
+      ORDER BY total_cost DESC;
+
+  - description: "Get cost history for all formulation versions in a project"
+    sql: |
+      SELECT
+        f.formulation_number,
+        c.target_cost,
+        c.estimated_cost,
+        c.actual_cost,
+        c.variance_pct,
+        c.status,
+        c.created_at,
+        c.approved_at
+      FROM npd_costing c
+      JOIN npd_formulations f ON c.formulation_id = f.id
+      WHERE c.npd_project_id = $1
+        AND c.org_id = current_setting('app.current_org_id')::UUID
+      ORDER BY f.created_at DESC;
+
+  - description: "Check if costing approved for handoff validation"
+    sql: |
+      SELECT
+        c.status = 'approved' AS is_approved,
+        c.variance_pct,
+        s.cost_variance_blocker_pct
+      FROM npd_costing c
+      JOIN npd_settings s ON c.org_id = s.org_id
+      WHERE c.formulation_id = $1
+        AND c.org_id = current_setting('app.current_org_id')::UUID;
+
+  - description: "Get variance alert type (none/warning/blocker)"
+    sql: |
+      SELECT
+        c.variance_pct,
+        s.cost_variance_warning_pct,
+        s.cost_variance_blocker_pct,
+        CASE
+          WHEN c.variance_pct IS NULL THEN 'none'
+          WHEN ABS(c.variance_pct) > s.cost_variance_blocker_pct THEN 'blocker'
+          WHEN ABS(c.variance_pct) > s.cost_variance_warning_pct THEN 'warning'
+          ELSE 'none'
+        END AS alert_type
+      FROM npd_costing c
+      JOIN npd_settings s ON c.org_id = s.org_id
+      WHERE c.formulation_id = $1
+        AND c.org_id = current_setting('app.current_org_id')::UUID;
+
+# Performance Considerations
+performance:
+  - consideration: "Index on formulation_id for fast lookup"
+    solution: "idx_npd_costing_formulation btree index"
+  - consideration: "Index on org_id + status for dashboard filtering"
+    solution: "idx_npd_costing_status composite index"
+  - consideration: "Cost calculation with up to 50 items"
+    solution: "calculate_formulation_cost() uses single SUM query with JOIN"
+  - consideration: "Auto-update trigger on every formulation_items change"
+    solution: "Trigger updates only affected formulation (WHERE formulation_id = ...)"
+  - consideration: "Cost breakdown query joins products table"
+    solution: "products.cost_per_unit indexed via primary key"

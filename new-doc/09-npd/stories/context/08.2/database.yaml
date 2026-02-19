@@ -1,0 +1,251 @@
+# Story 08.2 - Database Schema
+# NPD Projects Tables
+
+tables:
+  - name: npd_projects
+    purpose: "Core NPD project entity with Stage-Gate workflow"
+    columns:
+      - name: id
+        type: UUID
+        constraints: PRIMARY KEY DEFAULT gen_random_uuid()
+      - name: org_id
+        type: UUID
+        constraints: NOT NULL REFERENCES organizations(id)
+      - name: project_number
+        type: TEXT
+        constraints: NOT NULL
+        description: "Auto-generated: NPD-YYYY-NNNNN"
+      - name: project_name
+        type: TEXT
+        constraints: NOT NULL
+        description: "User-provided project name"
+      - name: description
+        type: TEXT
+        constraints: NULL
+      - name: portfolio_category
+        type: TEXT
+        constraints: NULL
+        description: "e.g., 'Vegan Line', 'Premium Burgers'"
+      - name: current_gate
+        type: TEXT
+        constraints: "NOT NULL DEFAULT 'G0' CHECK IN ('G0', 'G1', 'G2', 'G3', 'G4', 'Launched')"
+        description: "Current Stage-Gate position"
+      - name: status
+        type: TEXT
+        constraints: "NOT NULL DEFAULT 'idea' CHECK IN ('idea', 'feasibility', 'business_case', 'development', 'testing', 'launched', 'cancelled')"
+      - name: priority
+        type: TEXT
+        constraints: "DEFAULT 'medium' CHECK IN ('low', 'medium', 'high')"
+      - name: owner_id
+        type: UUID
+        constraints: REFERENCES users(id)
+        description: "NPD Lead or project owner"
+      - name: target_launch_date
+        type: DATE
+        constraints: NULL
+      - name: actual_launch_date
+        type: DATE
+        constraints: NULL
+      - name: created_at
+        type: TIMESTAMPTZ
+        constraints: NOT NULL DEFAULT now()
+      - name: created_by
+        type: UUID
+        constraints: REFERENCES users(id)
+      - name: updated_at
+        type: TIMESTAMPTZ
+        constraints: NOT NULL DEFAULT now()
+      - name: updated_by
+        type: UUID
+        constraints: REFERENCES users(id)
+    constraints:
+      - type: UNIQUE
+        columns: [org_id, project_number]
+        name: uq_project_number
+    rls: true
+    indexes:
+      - name: idx_npd_projects_org_status
+        columns: [org_id, status]
+        purpose: "Filter by org and status"
+      - name: idx_npd_projects_org_gate
+        columns: [org_id, current_gate]
+        purpose: "Kanban view grouping"
+      - name: idx_npd_projects_gate_status
+        columns: [org_id, current_gate, status]
+        purpose: "Kanban + status filter"
+      - name: idx_npd_projects_owner
+        columns: [owner_id]
+        where: "owner_id IS NOT NULL"
+        purpose: "Filter by owner"
+      - name: idx_npd_projects_category
+        columns: [org_id, portfolio_category]
+        where: "portfolio_category IS NOT NULL"
+        purpose: "Filter by category"
+      - name: idx_npd_projects_priority
+        columns: [org_id, priority]
+        purpose: "Filter by priority"
+      - name: idx_npd_projects_target_date
+        columns: [org_id, target_launch_date]
+        where: "target_launch_date IS NOT NULL"
+        purpose: "Sort by target date"
+      - name: idx_npd_projects_created
+        columns: [org_id, created_at]
+        purpose: "Default sort order"
+
+  - name: npd_project_number_sequences
+    purpose: "Auto-increment sequences for project numbers per org per year"
+    columns:
+      - name: id
+        type: UUID
+        constraints: PRIMARY KEY DEFAULT gen_random_uuid()
+      - name: org_id
+        type: UUID
+        constraints: NOT NULL REFERENCES organizations(id) ON DELETE CASCADE
+      - name: year
+        type: INTEGER
+        constraints: NOT NULL
+      - name: current_value
+        type: BIGINT
+        constraints: NOT NULL DEFAULT 0
+      - name: updated_at
+        type: TIMESTAMPTZ
+        constraints: NOT NULL DEFAULT now()
+    constraints:
+      - type: UNIQUE
+        columns: [org_id, year]
+        name: uq_seq_org_year
+    rls: true
+
+functions:
+  - name: generate_npd_project_number
+    purpose: "Generate unique project number in NPD-YYYY-NNNNN format"
+    parameters:
+      - name: p_org_id
+        type: UUID
+    returns: TEXT
+    language: plpgsql
+    logic: |
+      1. Extract current year
+      2. Upsert npd_project_number_sequences (org_id, year)
+      3. Increment current_value
+      4. Format as 'NPD-' || year || '-' || LPAD(current_value, 5, '0')
+      5. Return project_number
+    example: "NPD-2025-00001"
+
+triggers:
+  - name: update_npd_projects_updated_at
+    table: npd_projects
+    timing: BEFORE UPDATE
+    for_each: ROW
+    function: update_updated_at_column()
+    purpose: "Auto-update updated_at timestamp"
+
+rls_policies:
+  - table: npd_projects
+    name: npd_projects_select
+    operation: SELECT
+    using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+  - table: npd_projects
+    name: npd_projects_insert
+    operation: INSERT
+    with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+  - table: npd_projects
+    name: npd_projects_update
+    operation: UPDATE
+    using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+  - table: npd_projects
+    name: npd_projects_delete
+    operation: DELETE
+    using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid()) AND status IN ('cancelled', 'idea')"
+    note: "Only allow delete of cancelled or idea projects"
+
+  - table: npd_project_number_sequences
+    name: npd_seq_org
+    operation: ALL
+    using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+gate_workflow:
+  gates:
+    - code: G0
+      name: Idea
+      default_status: idea
+      next_gate: G1
+    - code: G1
+      name: Feasibility
+      default_status: feasibility
+      next_gate: G2
+    - code: G2
+      name: Business Case
+      default_status: business_case
+      next_gate: G3
+    - code: G3
+      name: Development
+      default_status: development
+      next_gate: G4
+    - code: G4
+      name: Testing
+      default_status: testing
+      next_gate: Launched
+    - code: Launched
+      name: Launched
+      default_status: launched
+      next_gate: null
+
+  transitions:
+    - from: G0
+      to: G1
+      validation: "MVP: none (skip checklist validation)"
+    - from: G1
+      to: G2
+      validation: "MVP: none"
+    - from: G2
+      to: G3
+      validation: "MVP: none"
+    - from: G3
+      to: G4
+      validation: "MVP: none"
+    - from: G4
+      to: Launched
+      validation: "MVP: none (story 08.7 adds handoff validation)"
+
+  rollback:
+    allowed: true
+    warning: "Moving backwards is unusual - confirm action"
+
+queries:
+  kanban_data:
+    description: "Get projects grouped by gate for Kanban view"
+    sql: |
+      SELECT
+        p.*,
+        u.name as owner_name
+      FROM npd_projects p
+      LEFT JOIN users u ON p.owner_id = u.id
+      WHERE p.org_id = $1
+        AND p.status != 'cancelled'
+      ORDER BY
+        CASE p.priority
+          WHEN 'high' THEN 1
+          WHEN 'medium' THEN 2
+          WHEN 'low' THEN 3
+        END,
+        p.created_at DESC
+
+  project_detail:
+    description: "Get project with related counts"
+    sql: |
+      SELECT
+        p.*,
+        u.name as owner_name,
+        (SELECT COUNT(*) FROM npd_formulations WHERE npd_project_id = p.id) as formulation_count,
+        (SELECT COUNT(*) FROM npd_gate_checklists WHERE npd_project_id = p.id AND is_completed = true) as completed_checklist_count,
+        (SELECT COUNT(*) FROM npd_gate_checklists WHERE npd_project_id = p.id) as total_checklist_count
+      FROM npd_projects p
+      LEFT JOIN users u ON p.owner_id = u.id
+      WHERE p.id = $1
+        AND p.org_id = $2
+
+migration_file: "supabase/migrations/YYYYMMDDHHMMSS_create_npd_projects.sql"

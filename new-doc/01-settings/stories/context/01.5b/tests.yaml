@@ -1,0 +1,358 @@
+# Story 01.5b - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/__tests__/components/settings/users/WarehouseAccessSection.test.tsx"
+    type: "unit"
+    description: "Unit tests for WarehouseAccessSection component"
+  - path: "apps/frontend/__tests__/services/user-warehouse-service.test.ts"
+    type: "unit"
+    description: "Unit tests for user warehouse service"
+  - path: "apps/frontend/__tests__/api/settings/users/warehouse-access.test.ts"
+    type: "integration"
+    description: "Integration tests for warehouse access API"
+  - path: "supabase/tests/rls-warehouse-access.test.sql"
+    type: "integration"
+    description: "RLS tests for warehouse access enforcement"
+
+# Acceptance Criteria (from story)
+acceptance_criteria:
+  - id: "AC-1"
+    title: "Warehouse Access Multi-Select"
+    given: "admin opens user create/edit modal"
+    when: "modal loads"
+    then: "warehouse access section displays with 'All Warehouses' checkbox and multi-select dropdown"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-1.1"
+    title: "All Warehouses Checkbox Checked"
+    given: "'All Warehouses' checkbox is checked"
+    when: "user views dropdown"
+    then: "dropdown is disabled (all warehouses implied)"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-1.2"
+    title: "All Warehouses Checkbox Unchecked"
+    given: "'All Warehouses' checkbox is unchecked"
+    when: "user views dropdown"
+    then: "dropdown is enabled, showing all available warehouses"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-1.3"
+    title: "Specific Warehouse Selection"
+    given: "user unchecks 'All Warehouses' and selects WH-001, WH-002"
+    when: "save clicked"
+    then: "user's warehouse_access_ids = ['WH-001-UUID', 'WH-002-UUID']"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-2"
+    title: "RLS Enforcement - User Access"
+    given: "user has access to WH-001 only"
+    when: "viewing inventory module"
+    then: "only WH-001 inventory displays"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-2.1"
+    title: "RLS Enforcement - No Access"
+    given: "user has no warehouse access assigned"
+    when: "accessing warehouse-dependent modules"
+    then: "error message 'No warehouse access configured' displays"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-2.2"
+    title: "RLS Enforcement - Admin Bypass"
+    given: "super_admin or admin role"
+    when: "accessing any module"
+    then: "all warehouses are accessible (bypass restriction)"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-2.3"
+    title: "RLS Enforcement - Immediate Effect"
+    given: "user warehouse access is changed"
+    when: "user refreshes page"
+    then: "new access permissions apply immediately"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-3"
+    title: "Warehouse Dropdown Filtering"
+    given: "admin assigns warehouse access in user profile"
+    when: "user logs in"
+    then: "only assigned warehouses appear in warehouse dropdown filters"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-4"
+    title: "Default Behavior - New User"
+    given: "new user is created"
+    when: "warehouse_access_ids is NULL"
+    then: "for admin/super_admin: interpret as 'all warehouses', for other roles: interpret as 'no warehouses'"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-4.1"
+    title: "Default Behavior - Edit Modal"
+    given: "existing user has warehouse_access_ids = NULL"
+    when: "admin opens edit modal"
+    then: "'All Warehouses' checkbox is checked for admin/super_admin roles, unchecked for other roles (warning shown)"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-5"
+    title: "API Endpoints - GET"
+    given: "GET /api/v1/settings/users/:id/warehouse-access called"
+    when: "user has specific warehouses assigned"
+    then: "response includes warehouse_ids array and all_warehouses = false"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-5.1"
+    title: "API Endpoints - PUT"
+    given: "PUT /api/v1/settings/users/:id/warehouse-access called"
+    when: "body = { warehouse_ids: ['id1', 'id2'], all_warehouses: false }"
+    then: "user's warehouse_access_ids updated"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-5.2"
+    title: "API Endpoints - All Warehouses"
+    given: "PUT with { all_warehouses: true }"
+    when: "request processed"
+    then: "user's warehouse_access_ids set to NULL (all access)"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-6"
+    title: "Audit Trail"
+    given: "admin changes user's warehouse access"
+    when: "change is saved"
+    then: "audit log entry created with who, what, when"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-7"
+    title: "Cascading Delete"
+    given: "warehouse WH-001 is deleted"
+    when: "user had access to WH-001"
+    then: "WH-001 is removed from user's warehouse_access_ids automatically"
+    test_type: "integration"
+    priority: "P1"
+
+# Unit Test Cases
+unit_tests:
+  WarehouseAccessSection:
+    - name: "renders checkbox and multi-select"
+      setup: "Mount component with empty props"
+      expected: "'All Warehouses' checkbox and multi-select rendered"
+
+    - name: "checkbox checked disables multi-select"
+      setup: "allWarehousesChecked = true"
+      expected: "Multi-select is disabled"
+
+    - name: "checkbox unchecked enables multi-select"
+      setup: "allWarehousesChecked = false"
+      expected: "Multi-select is enabled"
+
+    - name: "onChange callback fires on checkbox toggle"
+      setup: "Mock onChange, toggle checkbox"
+      expected: "onChange called with ([], true) or ([], false)"
+
+    - name: "onChange callback fires on multi-select change"
+      setup: "Select warehouses, mock onChange"
+      expected: "onChange called with selected IDs"
+
+    - name: "validation error shown when no warehouses selected"
+      setup: "allWarehouses = false, warehouse_ids = []"
+      expected: "Error message displayed"
+
+  UserWarehouseService:
+    - name: "getWarehouseAccess returns all warehouses for admin with NULL"
+      setup: "User role = ADMIN, warehouse_access_ids = NULL"
+      expected: "all_warehouses = true, warehouses = [all]"
+
+    - name: "getWarehouseAccess returns no warehouses for operator with NULL"
+      setup: "User role = OPERATOR, warehouse_access_ids = NULL"
+      expected: "all_warehouses = false, warehouses = []"
+
+    - name: "getWarehouseAccess returns specific warehouses"
+      setup: "warehouse_access_ids = [id1, id2]"
+      expected: "all_warehouses = false, warehouses = [wh1, wh2]"
+
+    - name: "updateWarehouseAccess sets NULL for all warehouses"
+      setup: "Call with all_warehouses = true"
+      expected: "users.warehouse_access_ids = NULL"
+
+    - name: "updateWarehouseAccess sets array for specific warehouses"
+      setup: "Call with all_warehouses = false, warehouse_ids = [id1]"
+      expected: "users.warehouse_access_ids = [id1]"
+
+    - name: "logAccessChange creates audit log entry"
+      setup: "Change access from WH-001 to WH-002"
+      expected: "Audit log record inserted"
+
+# Integration Test Cases
+integration_tests:
+  api_endpoints:
+    - name: "GET /users/:id/warehouse-access returns access for user"
+      setup: "Create user with specific warehouse access"
+      action: "GET /api/v1/settings/users/:id/warehouse-access"
+      expected: "200 response with warehouse_ids array"
+
+    - name: "GET /users/:id/warehouse-access returns 404 for non-existent user"
+      setup: "Use invalid user ID"
+      action: "GET /api/v1/settings/users/:id/warehouse-access"
+      expected: "404 response"
+
+    - name: "GET /users/:id/warehouse-access returns 403 for non-admin"
+      setup: "Authenticated as VIEWER"
+      action: "GET /api/v1/settings/users/:id/warehouse-access"
+      expected: "403 response"
+
+    - name: "PUT /users/:id/warehouse-access updates access"
+      setup: "Create user, prepare update payload"
+      action: "PUT /api/v1/settings/users/:id/warehouse-access"
+      expected: "200 response, warehouse_access_ids updated"
+
+    - name: "PUT /users/:id/warehouse-access validates at least one warehouse"
+      setup: "Send all_warehouses = false, warehouse_ids = []"
+      action: "PUT /api/v1/settings/users/:id/warehouse-access"
+      expected: "400 response with validation error"
+
+    - name: "PUT /users/:id/warehouse-access validates warehouse IDs exist"
+      setup: "Send invalid warehouse UUID"
+      action: "PUT /api/v1/settings/users/:id/warehouse-access"
+      expected: "400 response 'Warehouse not found'"
+
+  rls_enforcement:
+    - name: "User with WH-001 access can only see WH-001 inventory"
+      setup: |
+        - Create Org A with WH-001, WH-002
+        - Create User A with access to WH-001 only
+        - Insert inventory in WH-001 and WH-002
+      action: "User A queries inventory_items"
+      expected: "Only WH-001 inventory returned"
+
+    - name: "Admin with NULL access sees all warehouses"
+      setup: |
+        - Create Admin user with warehouse_access_ids = NULL
+        - Insert inventory in multiple warehouses
+      action: "Admin queries inventory_items"
+      expected: "All warehouse inventory returned"
+
+    - name: "User with no warehouse access sees no inventory"
+      setup: |
+        - Create User B with warehouse_access_ids = []
+        - Insert inventory in WH-001
+      action: "User B queries inventory_items"
+      expected: "No inventory returned"
+
+    - name: "Warehouse access change takes effect immediately"
+      setup: |
+        - Create User C with access to WH-001
+        - Insert inventory in WH-001, WH-002
+      action: |
+        1. User C queries inventory (sees WH-001)
+        2. Admin updates User C access to WH-002
+        3. User C queries inventory again
+      expected: "Second query returns WH-002 inventory only"
+
+  cascading_deletes:
+    - name: "Deleting warehouse removes it from user access"
+      setup: |
+        - Create User D with warehouse_access_ids = [WH-001, WH-002]
+        - Delete WH-001
+      action: "Query users table"
+      expected: "User D's warehouse_access_ids = [WH-002]"
+
+# E2E Test Cases
+e2e_tests:
+  - name: "Create user and assign specific warehouse access"
+    steps:
+      - "Admin navigates to /settings/users"
+      - "Click 'Add User'"
+      - "Fill in email, name, role"
+      - "Uncheck 'All Warehouses'"
+      - "Select WH-001 from multi-select"
+      - "Click 'Create'"
+    expected: "User created, warehouse access saved, appears in user list"
+
+  - name: "Edit user and change warehouse access"
+    steps:
+      - "Admin opens existing user with WH-001 access"
+      - "Uncheck WH-001, select WH-002"
+      - "Click 'Save'"
+    expected: "Warehouse access updated, changes visible immediately"
+
+  - name: "Admin user defaults to all warehouses"
+    steps:
+      - "Create new user with ADMIN role"
+      - "Open user modal"
+    expected: "'All Warehouses' checkbox is checked by default"
+
+  - name: "Operator user defaults to no warehouses"
+    steps:
+      - "Create new user with OPERATOR role"
+      - "Open user modal"
+    expected: "'All Warehouses' checkbox is unchecked, warning shown"
+
+# Definition of Done
+definition_of_done:
+  - "Warehouse access multi-select component works correctly"
+  - "'All Warehouses' checkbox toggles multi-select disabled state"
+  - "API endpoints return correct data for GET and PUT"
+  - "RLS policies enforce warehouse access on inventory queries"
+  - "Admin/Super Admin bypass works (NULL = all access)"
+  - "Audit log (if implemented) captures access changes"
+  - "Cascading delete removes warehouse from user access arrays"
+  - "Unit test coverage >= 80%"
+  - "Integration test coverage >= 80%"
+  - "All acceptance criteria pass"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    reason: "Frontend components and service logic"
+  integration:
+    target: 80
+    reason: "API endpoints and RLS enforcement"
+  files:
+    - "components/settings/users/WarehouseAccessSection.tsx: 80%"
+    - "lib/services/user-warehouse-service.ts: 90%"
+    - "api/v1/settings/users/[id]/warehouse-access/route.ts: 90%"
+    - "RLS policies: 100% of scenarios tested"
+
+# Security Test Cases
+security_tests:
+  - id: "SEC-1"
+    description: "Non-admin cannot access warehouse access API"
+    test: "Authenticated as VIEWER, call GET/PUT warehouse-access endpoints"
+    expected: "403 Forbidden"
+
+  - id: "SEC-2"
+    description: "User cannot see inventory from unauthorized warehouses"
+    test: "User with WH-001 access queries inventory in WH-002"
+    expected: "No results (RLS blocks)"
+
+  - id: "SEC-3"
+    description: "Cross-tenant warehouse access blocked"
+    test: "User from Org A tries to assign Org B warehouse"
+    expected: "404 or 400 error (warehouse not found)"
+
+  - id: "SEC-4"
+    description: "Admin cannot assign non-existent warehouse"
+    test: "PUT with invalid warehouse UUID"
+    expected: "400 error 'Warehouse not found'"

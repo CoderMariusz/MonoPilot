@@ -1,0 +1,46 @@
+# Story 10.20 - Frontend Specification
+# Purpose: Export UI and documentation
+# Agent: FRONTEND-DEV
+
+components:
+  - path: "apps/frontend/components/oee/export/ExportDialog.tsx"
+    description: "Export configuration dialog"
+    form_fields:
+      - { name: "table", type: "select", options: ["OEE Snapshots", "Downtime Events", "Shift Reports", "Data Mart"] }
+      - { name: "format", type: "select", options: ["CSV", "JSON", "Excel (XLSX)"] }
+      - { name: "date_from", type: "date" }
+      - { name: "date_to", type: "date" }
+      - { name: "filters", type: "multi-select", options: ["machine", "line", "shift"] }
+    features:
+      - "Row count preview"
+      - "Download button"
+      - "Progress indicator"
+
+  - path: "apps/frontend/components/oee/export/BIConnectorGuide.tsx"
+    description: "Instructions for connecting BI tools"
+    guides:
+      - title: "Power BI"
+        steps: ["Open Power BI", "Select Web data source", "Enter API URL", "Configure authentication"]
+      - title: "Tableau"
+        steps: ["Open Tableau", "Select Web Data Connector", "Enter WDC URL"]
+
+pages:
+  - path: "apps/frontend/app/(authenticated)/oee/export/page.tsx"
+    route: "/oee/export"
+    title: "Export Data"
+    sections:
+      - "Export Dialog"
+      - "BI Connector Guides"
+      - "API Documentation Link"
+
+hooks:
+  - path: "apps/frontend/lib/hooks/use-export.ts"
+    exports:
+      - "useExport"
+      - "useExportPreview"
+
+ux:
+  states:
+    - loading: "Progress bar during export"
+    - success: "Download initiated notification"
+    - error: "Error message with retry"

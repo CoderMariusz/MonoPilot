@@ -1,0 +1,70 @@
+# Story 03.13 - Frontend Specification
+# Purpose: Components, hooks, UI patterns
+# Status: COMPLETE
+
+components:
+  - path: "apps/frontend/components/planning/work-orders/availability/WOAvailabilityPanel.tsx"
+    status: "complete"
+    props: ["woId: string"]
+    states: ["loading", "empty", "error", "success", "disabled"]
+  - path: "apps/frontend/components/planning/work-orders/availability/AvailabilityMaterialRow.tsx"
+    status: "complete"
+    props: ["material: MaterialAvailability"]
+  - path: "apps/frontend/components/planning/work-orders/availability/AvailabilityTrafficLight.tsx"
+    status: "complete"
+    props: ["status: AvailabilityStatus", "size: 'sm' | 'md' | 'lg'"]
+  - path: "apps/frontend/components/planning/work-orders/availability/AvailabilitySummaryCard.tsx"
+    status: "complete"
+    props: ["summary: AvailabilitySummary", "overallStatus: AvailabilityStatus"]
+  - path: "apps/frontend/components/planning/work-orders/availability/AvailabilityWarningModal.tsx"
+    status: "complete"
+    props: ["open: boolean", "materials: MaterialAvailability[]", "onClose", "onProceed"]
+
+hooks:
+  - path: "apps/frontend/lib/hooks/use-wo-availability.ts"
+    status: "complete"
+    exports: ["useWOAvailability(woId, enabled)"]
+  - path: "apps/frontend/lib/hooks/use-check-availability.ts"
+    status: "complete"
+    exports: ["useCheckAvailability()"]
+
+types:
+  path: "apps/frontend/lib/types/wo-availability.ts"
+  exports:
+    - "AvailabilityStatus: 'sufficient' | 'low_stock' | 'shortage' | 'no_stock'"
+    - "MaterialAvailability"
+    - "AvailabilitySummary"
+    - "WOAvailabilityResponse"
+
+wireframe:
+  id: "PLAN-027"
+  path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-027-wo-availability-panel.md"
+
+traffic_light_colors:
+  sufficient: "#22c55e (green-500)"
+  low_stock: "#eab308 (yellow-500)"
+  shortage: "#ef4444 (red-500)"
+  no_stock: "#ef4444 (red-500) outline"
+
+states:
+  loading: "Skeleton placeholders"
+  empty: "No materials to check"
+  error: "Failed to check + Retry button"
+  success: "Full panel with data"
+  disabled: "Info message + link to settings"
+
+breakpoints:
+  desktop: ">1024px - Full table"
+  tablet: "768-1024px - Condensed table"
+  mobile: "<768px - Card layout"
+
+accessibility:
+  touch_targets: "48dp minimum"
+  contrast: "4.5:1 minimum"
+  aria_roles: ["region", "alertdialog", "img"]
+  keyboard: ["Tab", "Enter", "Escape"]
+
+performance:
+  initial_load: "<500ms"
+  cached_response: "<100ms"
+  auto_refresh: "30 seconds"

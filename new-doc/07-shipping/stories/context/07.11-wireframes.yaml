@@ -1,0 +1,439 @@
+wireframes_summary:
+  story_id: "07.11"
+  story_name: "Packing & Shipment Creation"
+  total_wireframes: 2
+  total_screens: 14
+
+wireframe_1:
+  id: "SHIP-017"
+  name: "Packing Station Interface (Desktop)"
+  location: "docs/3-ARCHITECTURE/ux/wireframes/SHIP-017-packing-station.md"
+  route: "/shipping/packing/:shipmentId"
+  purpose: |
+    Desktop-focused packing workbench for warehouse packers.
+    Shows picked items, active carton builder, SSCC label preview, packing history.
+    Supports scanning or manual LP entry, weight/dimension capture, carton closure.
+  complexity: "High"
+  screens_count: 10
+
+  primary_states:
+    success:
+      name: "Packing Station Active"
+      wireframe_lines: "15-102"
+      layout_description: |
+        Header: Station ID, operator, active time, shipment#, customer, total items, progress%
+        Main: 2-column grid
+          Left: Picked items table with [Check], Line#, Product, LP#, Qty columns
+          Right: Active carton panel with ID, status, weight, dimensions, contents, label preview
+        Footer: Packing history, shipment actions (Create Carton, Complete, Print Labels, BOL)
+      key_elements:
+        - "PACKING STATION HEADER (station, operator, shipment, progress)"
+        - "PICKED ITEMS TABLE (line number, product, LP, qty, allergen badge)"
+        - "ACTIVE CARTON PANEL (carton ID, weight, dimensions, contents list)"
+        - "CARTON LABEL PREVIEW (SSCC barcode, ship-to, ship-from, order, warnings)"
+        - "SCAN/MANUAL ENTRY INPUT (with haptic feedback)"
+        - "PACKING HISTORY (closed cartons with status and timestamps)"
+      relevant_components:
+        - "PackingWorkbench (main container)"
+        - "PickedItemsTable (left column)"
+        - "ActiveCartonPanel (right column with tabs)"
+        - "CartonLabelPreview (inside carton panel)"
+      validation_points:
+        - "Carton weight exceeds 25kg capacity"
+        - "License plate format LP-YYYY-NNNN"
+        - "Quantity available in LP"
+        - "Allergen restrictions"
+
+    pack_confirmation_modal:
+      name: "Confirm Pack Modal"
+      wireframe_lines: "104-167"
+      layout_description: |
+        Modal overlaying packing station for confirming pack of individual item.
+        Sections: LP scan, Quantity confirmation, Carton info, Allergen check
+      key_elements:
+        - "SCAN PICKED LICENSE PLATE (input with matched status)"
+        - "Lot and manufacturing info display"
+        - "QUANTITY TO PACK (with quantity adjustment ±)"
+        - "[Partial Pack] checkbox for incomplete quantities"
+        - "CARTON INFORMATION (current carton, weight, capacity)"
+        - "[Create New Carton] option if item doesn't fit"
+        - "ALLERGEN CHECK (product allergens vs customer restrictions)"
+        - "ACTION BUTTONS [Check Confirm & Pack] [Skip Item] [Cancel]"
+      relevant_components:
+        - "AllergenWarningDialog (nested if allergen conflict)"
+        - "LPSelector (for manual entry fallback)"
+        - "QuantityInput (number spinner)"
+      validation_points:
+        - "LP must exist in inventory"
+        - "LP must have on-hand qty >= quantity to pack"
+        - "Carton capacity check (weight)"
+        - "Allergen restriction check"
+
+    close_carton_modal:
+      name: "Close Carton Modal"
+      wireframe_lines: "169-258"
+      layout_description: |
+        Modal for finalizing and closing carton before creating new one.
+        Captures weight, dimensions, generates SSCC label.
+      key_elements:
+        - "CARTON SUMMARY (carton ID, created time, items count, contents list)"
+        - "CARTON DIMENSIONS & WEIGHT (L, W, H inputs in cm, weight in kg)"
+        - "[Check Capacity] button"
+        - "[Use Scale] button for weight device integration"
+        - "SSCC LABEL GENERATION (auto-generates SSCC-18)"
+        - "SSCC PREVIEW (barcode graphic, ship-to/from addresses, warnings)"
+        - "[Regenerate Label] [Preview on Page] [Print Label] [Download PDF]"
+        - "STAGING & NEXT STEPS (location assignment, dock door, estimated ship time)"
+        - "ACTION BUTTONS [Check Close Carton & Create New] [Close & Continue] [Cancel]"
+      relevant_components:
+        - "DimensionInputs (L, W, H validators)"
+        - "WeightInput (kg validator, scale integration)"
+        - "SSCCLabelPreview (barcode render)"
+      validation_points:
+        - "Weight > 0 and <= carton capacity"
+        - "Dimensions 10-200 cm each if provided"
+        - "SSCC generation (GS1-18 format with check digit)"
+        - "All required fields before close"
+
+    complete_packing_modal:
+      name: "Complete Packing Modal"
+      wireframe_lines: "260-349"
+      layout_description: |
+        Final confirmation modal for shipment completion.
+        Summarizes cartons, quality checks, document generation.
+      key_elements:
+        - "SHIPMENT SUMMARY (shipment ID, customer, SOs, total items, packing duration)"
+        - "CARTONS PACKED TABLE ([Check] carton ID, weight, items, SSCC, status)"
+        - "DOCUMENTS TO PRINT (checkboxes for SSCC Labels, Packing Slip, BOL)"
+        - "QUALITY CHECKS (list of validation checkpoints, mostly auto, some manual)"
+        - "SHIPMENT STATUS (current→packed, next status, dock assignment, carrier, delivery est)"
+        - "ACTION BUTTONS [Check Complete & Print Labels] [Print BOL Only] [Save & Continue Later] [Cancel]"
+      relevant_components:
+        - "CartonSummaryTable (readonly)"
+        - "DocumentChecklist (print options)"
+        - "QualityChecksList (validation results)"
+      validation_points:
+        - "All picked items packed into cartons"
+        - "All cartons have weight and dimensions"
+        - "All cartons have SSCC generated"
+        - "No allergen violations"
+
+    loading_state:
+      name: "Loading State"
+      wireframe_lines: "351-375"
+      layout_description: |
+        Initial page load with skeleton loaders and progress indicators.
+      key_elements:
+        - "[Spinner] Fetching shipment details..."
+        - "[Progress bar] ████████░░ 40%"
+        - "[Spinner] Loading picked items..."
+        - "Estimated time: 3-5 seconds"
+
+    empty_state:
+      name: "Empty State"
+      wireframe_lines: "377-404"
+      layout_description: |
+        No shipments ready for packing.
+      key_elements:
+        - "[Empty Carton Icon]"
+        - "No Shipments Ready for Packing"
+        - "[Arrow] View Pending Shipments"
+        - "[Arrow] Create New Sales Order"
+        - "[Arrow] View Packing History"
+        - "Recent Completed Shipments list"
+
+    error_weight_exceeded:
+      name: "Carton Weight Exceeded Error"
+      wireframe_lines: "406-431"
+      layout_description: |
+        Error when adding item that exceeds carton capacity.
+      key_elements:
+        - "[Error Icon]"
+        - "Carton Weight Exceeds Capacity"
+        - "Current carton weight, item weight, total, limit"
+        - "[Check] Create New Carton (recommended)"
+        - "[Arrow] Remove Item from Current Carton"
+        - "[Arrow] Use Different Carton Size"
+
+    error_lp_not_found:
+      name: "LP Not Found Error"
+      wireframe_lines: "433-466"
+      layout_description: |
+        Error when scanned LP doesn't exist or has been consumed.
+      key_elements:
+        - "[Search] Scan LP or enter manually:"
+        - "[LP-9999-9999] [Error: Not Found]"
+        - "License Plate not found in warehouse inventory"
+        - "Possible causes (list)"
+        - "RECOVERY OPTIONS"
+        - "[Retry Scan] [Manual Entry] [View Alternatives] [Contact Supervisor]"
+
+    error_sscc_failed:
+      name: "SSCC Generation Failed"
+      wireframe_lines: "468-496"
+      layout_description: |
+        Error when SSCC barcode generation fails.
+      key_elements:
+        - "ERROR: SSCC Generation Failed"
+        - "Error details (sequence exhausted, check digit error)"
+        - "RECOVERY OPTIONS"
+        - "[Retry] [Assign Manual] [Contact Support] [Save Draft]"
+
+    error_shipment_cancelled:
+      name: "Shipment Cancelled Error"
+      wireframe_lines: "498-525"
+      layout_description: |
+        Error when shipment has been cancelled by admin or customer.
+      key_elements:
+        - "[Error/Cancelled Icon]"
+        - "Shipment Cancelled"
+        - "Shipment ID, cancellation reason, cancelled by, timestamp"
+        - "Packed cartons will be returned to warehouse"
+        - "[View Cancellation Details] [Return to Active Shipments]"
+
+wireframe_2:
+  id: "SHIP-020"
+  name: "Packing Slip Generation & Printing"
+  location: "docs/3-ARCHITECTURE/ux/wireframes/SHIP-020-packing-slip.md"
+  route: "/shipping/shipments/:id/packing-slip"
+  purpose: |
+    Packing slip PDF generation, preview, printing, and email delivery.
+    Shows document layout with line items, carton summary, special instructions.
+    Supports three distribution workflows: print, email, download.
+  complexity: "Medium"
+  screens_count: 8
+
+  primary_states:
+    success_pdf_preview:
+      name: "Packing Slip Preview (Desktop)"
+      wireframe_lines: "12-93"
+      layout_description: |
+        Full PDF preview of packing slip in 8.5x11 inch letter format.
+        Header: Company logo, "PACKING SLIP" title, SO#, shipment#, date, tracking
+        Content: Ship-to/from addresses, line items table, carton summary, special instructions, footer signature lines
+      pdf_specs:
+        dimensions: "8.5\" x 11\""
+        margins: "0.5\" all sides"
+        font: "Arial/Helvetica"
+        barcode_format: "GS1-128 (SSCC)"
+        pages: "1 page single document"
+        color_mode: "RGB full color"
+      key_elements:
+        - "PACKING SLIP HEADER (company logo, title, metadata)"
+        - "SHIP TO / SHIP FROM ADDRESSES (2-column layout)"
+        - "LINE ITEMS TABLE (6 columns: line#, product, qty ordered, qty shipped, backorder, price)"
+        - "CARTON SUMMARY TABLE (box#, SSCC barcode, weight, dimensions, QR code)"
+        - "SPECIAL INSTRUCTIONS (customer notes, temperature zone, allergen warnings)"
+        - "FOOTER (signature lines, return policy, contact info)"
+      relevant_components:
+        - "PackingSlipPreview (PDF viewer wrapper)"
+        - "PdfRenderer (pdf.js based)"
+      buttons:
+        - "[Print] (window.print())"
+        - "[Email] (opens email modal)"
+        - "[Download] (PDF download)"
+
+    email_modal:
+      name: "Email Packing Slip Modal"
+      wireframe_lines: "95-137"
+      layout_description: |
+        Modal form for emailing packing slip to customer.
+      key_elements:
+        - "[Dropdown] To: [Customer Contact Email v] (suggests primary, account owner, custom)"
+        - "[Add Custom Contacts +] CC field"
+        - "[Text input] Subject: Packing Slip - SO-..."
+        - "[Rich text editor] Message: (default template provided)"
+        - "[ ] Include PDF attachment (checked)"
+        - "[ ] Include tracking link (checked)"
+        - "[Cancel] [Send Email]"
+      relevant_components:
+        - "EmailModal (dialog)"
+        - "RecipientDropdown (with search)"
+        - "MessageEditor (basic rich text)"
+      validation_points:
+        - "At least 1 recipient required"
+        - "Valid email format"
+        - "Subject 5-200 characters"
+        - "Message max 5000 characters"
+
+    tablet_layout:
+      name: "Tablet Layout (768-1024px)"
+      wireframe_lines: "139-176"
+      layout_description: |
+        Responsive layout scaled for tablet screens.
+        PDF fits width, buttons below header, condensed table format.
+
+    mobile_layout:
+      name: "Mobile Layout (<768px)"
+      wireframe_lines: "178-238"
+      layout_description: |
+        Full-screen mobile layout with vertical button stack.
+        PDF scrolls full viewport, action buttons in sticky footer.
+
+    loading_state:
+      name: "Loading State"
+      wireframe_lines: "240-261"
+      layout_description: |
+        PDF generation in progress with progress bar.
+      key_elements:
+        - "[Spinner] Generating packing slip PDF..."
+        - "[Progress] ========== 65% =========="
+        - "Fetching shipment details... Please wait"
+
+    empty_state:
+      name: "Empty State - No Packing Slip"
+      wireframe_lines: "263-289"
+      layout_description: |
+        No packing slip available (incomplete shipment).
+      key_elements:
+        - "[Package Icon]"
+        - "No Packing Slip Available"
+        - "This shipment does not have a packing slip"
+        - "Complete packing first to generate a packing slip"
+        - "[Back to Shipment] [Create Packing Slip] [View Other Options]"
+
+    error_pdf_generation:
+      name: "Error - PDF Generation Failed"
+      wireframe_lines: "291-317"
+      layout_description: |
+        PDF generation timeout or failure.
+      key_elements:
+        - "[Error Icon]"
+        - "Failed to Generate Packing Slip"
+        - "Error: PDF_GENERATION_TIMEOUT (Code 5001)"
+        - "The PDF generation service took too long to respond"
+        - "[Retry] [Contact Support] [Back to Shipment]"
+
+    error_missing_data:
+      name: "Error - Incomplete Shipment"
+      wireframe_lines: "346-374"
+      layout_description: |
+        Required fields missing for packing slip generation.
+      key_elements:
+        - "[Warning Icon]"
+        - "Incomplete Shipment"
+        - "Cannot generate packing slip. Missing information:"
+        - "- Box weights not captured"
+        - "- SSCC barcodes not generated"
+        - "- Customer address not confirmed"
+        - "[Complete Packing] [Contact Support] [Back to Shipment]"
+
+    error_email_failed:
+      name: "Error - Email Send Failed"
+      wireframe_lines: "319-344"
+      layout_description: |
+        SMTP or email service failure.
+      key_elements:
+        - "ERROR: Failed to Send Email"
+        - "SMTP_CONNECTION_FAILED"
+        - "Unable to connect to mail server"
+        - "[Retry] [Try Different Email] [Cancel]"
+
+data_fields_in_pdf:
+  header_section:
+    - "Company logo (from organization settings)"
+    - "Title: 'PACKING SLIP'"
+    - "Sales Order number"
+    - "Shipment number"
+    - "Shipment date"
+    - "Tracking number"
+
+  shipping_section:
+    - "Ship To: customer name, address, phone"
+    - "Ship From: org name, warehouse address, phone"
+
+  line_items:
+    - "Line number (sequential)"
+    - "Product name and description"
+    - "Quantity ordered (from SO)"
+    - "Quantity shipped (sum of shipment_box_contents)"
+    - "Backorder quantity (ordered - shipped)"
+    - "Unit price (from SO line)"
+    - "Lot number (from license_plate)"
+    - "Best before date (from license_plate)"
+
+  carton_summary:
+    - "Box number (X of Y format)"
+    - "SSCC barcode (GS1-128 graphic)"
+    - "Weight (kg)"
+    - "Dimensions (L x W x H in cm)"
+    - "Total weight (sum of all boxes)"
+    - "Total box count"
+
+  special_instructions:
+    - "Customer notes (from SO)"
+    - "Temperature zone (from warehouse)"
+    - "Handling instructions (generated from allergens)"
+    - "Allergen warnings (from products)"
+    - "Return policy (from organization)"
+
+  footer:
+    - "Shipped by: __________ Date: __________"
+    - "Received by: __________ Date: __________"
+    - "Return policy text"
+    - "Contact info (email, phone)"
+
+api_endpoints_for_packing_slip:
+  - method: "GET"
+    path: "/api/shipping/packing-slips/:shipmentId"
+    description: "Fetch packing slip data for preview"
+
+  - method: "GET"
+    path: "/api/shipping/packing-slips/:shipmentId/pdf"
+    description: "Download PDF file"
+
+  - method: "POST"
+    path: "/api/shipping/packing-slips/:shipmentId/generate"
+    description: "Regenerate PDF if needed"
+
+  - method: "POST"
+    path: "/api/shipping/packing-slips/:shipmentId/email"
+    description: "Send via email"
+
+  - method: "POST"
+    path: "/api/shipping/packing-slips/:shipmentId/print"
+    description: "Queue for printing (legacy, now uses browser print)"
+
+design_patterns:
+  pdf_preview: "pdf.js library for secure PDF rendering"
+  email_workflow: "Modal form with validation before sending"
+  print_workflow: "Browser native print dialog (Ctrl+P)"
+  responsive_design: "Desktop (100%), Tablet (fit-width), Mobile (full-screen)"
+  action_buttons: "Print (window.print), Email (modal), Download (link), Back (navigation)"
+
+accessibility_requirements:
+  touch_targets:
+    - "Print button: 48x48dp"
+    - "Email button: 48x48dp"
+    - "Download button: 48x48dp (mobile)"
+    - "Back link: 48x48dp"
+
+  contrast_ratios:
+    - "Button text: WCAG AAA (8.59:1)"
+    - "Error message: WCAG AA (5.90:1)"
+    - "Table text: WCAG AAA (16.65:1)"
+
+  screen_reader:
+    - "Semantic HTML with proper heading hierarchy"
+    - "ARIA labels for all buttons"
+    - "Live regions for status updates"
+    - "Keyboard navigation: Tab, Enter, Escape"
+
+keyboard_navigation:
+  - "Tab: Navigate between buttons"
+  - "Enter: Activate button, submit form"
+  - "Escape: Close modal/dialog"
+  - "Ctrl+P / Cmd+P: Open print dialog"
+
+performance_targets:
+  page_load: "<1s (including PDF fetch from cache)"
+  pdf_generation: "<5s (timeout 30s)"
+  email_send: "<2s"
+  print_dialog: "<1s"
+  cache_hit: "<500ms"
+
+version_history:
+  - version: "1.0"
+    date: "2025-12-18"
+    description: "Wireframe reference mapping for Story 07.11"
+    author: "TECH-WRITER"

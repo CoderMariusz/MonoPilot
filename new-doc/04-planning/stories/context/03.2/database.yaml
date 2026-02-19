@@ -1,0 +1,270 @@
+# Story 03.2 - Database Schema
+# Purpose: Tables, RLS policies, indexes, constraints
+# Agent: BACKEND-DEV (database focus)
+
+migrations:
+  - path: "supabase/migrations/YYYYMMDDHHMMSS_create_supplier_products_table.sql"
+    type: "migration"
+    description: "Junction table for supplier-product assignments with RLS"
+
+tables:
+  - name: "supplier_products"
+    description: "Links suppliers to products they can provide, with optional overrides"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "supplier_id", type: "UUID", constraints: "NOT NULL REFERENCES suppliers(id) ON DELETE CASCADE" }
+      - { name: "product_id", type: "UUID", constraints: "NOT NULL REFERENCES products(id) ON DELETE CASCADE" }
+      - { name: "is_default", type: "BOOLEAN", constraints: "DEFAULT false" }
+      - { name: "supplier_product_code", type: "TEXT", constraints: "" }
+      - { name: "unit_price", type: "DECIMAL(15,4)", constraints: "" }
+      - { name: "currency", type: "TEXT", constraints: "" }
+      - { name: "lead_time_days", type: "INTEGER", constraints: "" }
+      - { name: "moq", type: "DECIMAL(15,4)", constraints: "" }
+      - { name: "order_multiple", type: "DECIMAL(15,4)", constraints: "" }
+      - { name: "last_purchase_date", type: "DATE", constraints: "" }
+      - { name: "last_purchase_price", type: "DECIMAL(15,4)", constraints: "" }
+      - { name: "notes", type: "TEXT", constraints: "" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+    rls: true
+    rls_pattern: "supplier_id IN (SELECT id FROM suppliers WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid()))"
+    indexes:
+      - name: "idx_supplier_products_supplier"
+        columns: ["supplier_id"]
+        description: "Fast lookup by supplier"
+      - name: "idx_supplier_products_product"
+        columns: ["product_id"]
+        description: "Fast lookup by product"
+      - name: "idx_supplier_products_default"
+        columns: ["product_id", "is_default"]
+        partial: "WHERE is_default = true"
+        description: "Fast lookup for default supplier per product"
+    constraints:
+      - type: "UNIQUE"
+        columns: ["supplier_id", "product_id"]
+        description: "Prevent duplicate supplier-product pairs"
+
+# RLS Policies (ADR-013)
+rls_policies:
+  pattern: "Supplier FK Lookup"
+  pattern_sql: "supplier_id IN (SELECT id FROM suppliers WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid()))"
+  rationale:
+    - "supplier_products has no direct org_id column"
+    - "RLS enforced via supplier FK relationship"
+    - "Supplier already has RLS, this ensures consistency"
+    - "Performance: ~1ms overhead with proper indexes"
+
+  policies:
+    - table: "supplier_products"
+      name: "supplier_products_org_isolation"
+      operation: "SELECT"
+      using: |
+        supplier_id IN (
+          SELECT id FROM suppliers
+          WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        )
+      description: "Users can only read supplier-products for their org's suppliers"
+
+    - table: "supplier_products"
+      name: "supplier_products_insert"
+      operation: "INSERT"
+      with_check: |
+        supplier_id IN (
+          SELECT id FROM suppliers
+          WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        )
+      description: "Users can only create assignments for their org's suppliers"
+
+    - table: "supplier_products"
+      name: "supplier_products_update"
+      operation: "UPDATE"
+      using: |
+        supplier_id IN (
+          SELECT id FROM suppliers
+          WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        )
+      description: "Users can only update assignments for their org's suppliers"
+
+    - table: "supplier_products"
+      name: "supplier_products_delete"
+      operation: "DELETE"
+      using: |
+        supplier_id IN (
+          SELECT id FROM suppliers
+          WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        )
+      description: "Users can only delete assignments for their org's suppliers"
+
+# Column Details
+column_details:
+  supplier_id:
+    type: "UUID"
+    required: true
+    description: "FK to suppliers table"
+    cascade: "ON DELETE CASCADE"
+    validation: "Must exist in suppliers table for user's org"
+
+  product_id:
+    type: "UUID"
+    required: true
+    description: "FK to products table"
+    cascade: "ON DELETE CASCADE"
+    validation: "Must exist in products table for user's org"
+
+  is_default:
+    type: "BOOLEAN"
+    required: false
+    default: false
+    description: "Is this the default supplier for this product?"
+    business_rule: "Only ONE can be true per product_id"
+
+  supplier_product_code:
+    type: "TEXT"
+    required: false
+    max_length: 50
+    description: "Supplier's SKU/product code for this product"
+    use_case: "Appears on PO export for supplier reference"
+
+  unit_price:
+    type: "DECIMAL(15,4)"
+    required: false
+    description: "Negotiated price per unit"
+    validation: "Must be positive if provided"
+    use_case: "Pre-fills PO line price"
+
+  currency:
+    type: "TEXT"
+    required: false
+    enum: ["PLN", "EUR", "USD", "GBP"]
+    description: "Currency for unit_price"
+    fallback: "If NULL, use suppliers.currency"
+
+  lead_time_days:
+    type: "INTEGER"
+    required: false
+    description: "Override for product.supplier_lead_time_days"
+    validation: "Must be non-negative if provided"
+    use_case: "Calculate expected delivery date on PO"
+
+  moq:
+    type: "DECIMAL(15,4)"
+    required: false
+    description: "Minimum order quantity for this supplier"
+    validation: "Must be positive if provided"
+    use_case: "Validate PO line quantity >= MOQ"
+
+  order_multiple:
+    type: "DECIMAL(15,4)"
+    required: false
+    description: "Must order in multiples of this quantity"
+    validation: "Must be positive if provided"
+    use_case: "Warn if PO qty not divisible by order_multiple"
+
+  last_purchase_date:
+    type: "DATE"
+    required: false
+    description: "Auto-updated when PO confirmed"
+    auto_update: "On PO confirmation (Story 03.3)"
+
+  last_purchase_price:
+    type: "DECIMAL(15,4)"
+    required: false
+    description: "Price from last confirmed PO"
+    auto_update: "On PO confirmation (Story 03.3)"
+
+  notes:
+    type: "TEXT"
+    required: false
+    max_length: 1000
+    description: "Internal notes for this supplier-product pair"
+
+# Migration SQL
+migration_sql: |
+  -- Migration: Create supplier_products table
+  -- Story: 03.2 - Supplier-Product Assignment
+  -- PRD: FR-PLAN-002, FR-PLAN-003
+
+  -- Create table
+  CREATE TABLE IF NOT EXISTS supplier_products (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    supplier_id UUID NOT NULL REFERENCES suppliers(id) ON DELETE CASCADE,
+    product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    is_default BOOLEAN DEFAULT false,
+    supplier_product_code TEXT,
+    unit_price DECIMAL(15,4),
+    currency TEXT,
+    lead_time_days INTEGER,
+    moq DECIMAL(15,4),
+    order_multiple DECIMAL(15,4),
+    last_purchase_date DATE,
+    last_purchase_price DECIMAL(15,4),
+    notes TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+
+    CONSTRAINT supplier_products_unique UNIQUE(supplier_id, product_id),
+    CONSTRAINT supplier_products_price_positive CHECK (unit_price IS NULL OR unit_price > 0),
+    CONSTRAINT supplier_products_moq_positive CHECK (moq IS NULL OR moq > 0),
+    CONSTRAINT supplier_products_order_multiple_positive CHECK (order_multiple IS NULL OR order_multiple > 0),
+    CONSTRAINT supplier_products_lead_time_non_negative CHECK (lead_time_days IS NULL OR lead_time_days >= 0),
+    CONSTRAINT supplier_products_currency_valid CHECK (currency IS NULL OR currency IN ('PLN', 'EUR', 'USD', 'GBP'))
+  );
+
+  -- Create indexes
+  CREATE INDEX idx_supplier_products_supplier ON supplier_products(supplier_id);
+  CREATE INDEX idx_supplier_products_product ON supplier_products(product_id);
+  CREATE INDEX idx_supplier_products_default ON supplier_products(product_id, is_default) WHERE is_default = true;
+
+  -- Enable RLS
+  ALTER TABLE supplier_products ENABLE ROW LEVEL SECURITY;
+
+  -- Create RLS policies
+  CREATE POLICY "supplier_products_org_isolation" ON supplier_products
+    FOR SELECT USING (
+      supplier_id IN (
+        SELECT id FROM suppliers
+        WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+      )
+    );
+
+  CREATE POLICY "supplier_products_insert" ON supplier_products
+    FOR INSERT WITH CHECK (
+      supplier_id IN (
+        SELECT id FROM suppliers
+        WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+      )
+    );
+
+  CREATE POLICY "supplier_products_update" ON supplier_products
+    FOR UPDATE USING (
+      supplier_id IN (
+        SELECT id FROM suppliers
+        WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+      )
+    );
+
+  CREATE POLICY "supplier_products_delete" ON supplier_products
+    FOR DELETE USING (
+      supplier_id IN (
+        SELECT id FROM suppliers
+        WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+      )
+    );
+
+  -- Grant permissions
+  GRANT ALL ON supplier_products TO authenticated;
+
+  -- Create updated_at trigger
+  CREATE TRIGGER supplier_products_updated_at
+    BEFORE UPDATE ON supplier_products
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+# Related Tables (for context)
+related_tables:
+  - name: "suppliers"
+    relationship: "supplier_products.supplier_id -> suppliers.id"
+    cascade: "ON DELETE CASCADE"
+  - name: "products"
+    relationship: "supplier_products.product_id -> products.id"
+    cascade: "ON DELETE CASCADE"

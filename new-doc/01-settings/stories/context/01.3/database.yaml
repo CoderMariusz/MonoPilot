@@ -1,0 +1,106 @@
+# Story 01.3 - Database Schema
+# Purpose: Onboarding columns on organizations table
+# Agent: BACKEND-DEV (database focus)
+
+migrations:
+  - path: "supabase/migrations/YYYYMMDDHHMMSS_add_onboarding_fields.sql"
+    type: "migration"
+    description: "Add onboarding columns to organizations table"
+    sql: |
+      -- Add onboarding tracking columns to organizations table
+      ALTER TABLE organizations
+      ADD COLUMN IF NOT EXISTS onboarding_step INTEGER DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS onboarding_started_at TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS onboarding_completed_at TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS onboarding_skipped BOOLEAN DEFAULT false;
+
+      -- Add comment for documentation
+      COMMENT ON COLUMN organizations.onboarding_step IS 'Current wizard step (0=not started, 1-6=in progress, 7=completed)';
+      COMMENT ON COLUMN organizations.onboarding_started_at IS 'Timestamp when wizard was first shown';
+      COMMENT ON COLUMN organizations.onboarding_completed_at IS 'Timestamp when wizard was completed or skipped';
+      COMMENT ON COLUMN organizations.onboarding_skipped IS 'True if user skipped wizard';
+
+# Note: If columns already exist from 01.1, this migration is a no-op
+# Using IF NOT EXISTS for idempotency
+
+# Table modifications (no new tables)
+tables_modified:
+  - name: "organizations"
+    columns_added:
+      - name: "onboarding_step"
+        type: "INTEGER"
+        default: 0
+        description: "Current wizard step (0=not started, 1-6=in progress, 7=completed)"
+      - name: "onboarding_started_at"
+        type: "TIMESTAMPTZ"
+        nullable: true
+        description: "Timestamp when wizard was first shown"
+      - name: "onboarding_completed_at"
+        type: "TIMESTAMPTZ"
+        nullable: true
+        description: "Timestamp when wizard was completed or skipped"
+      - name: "onboarding_skipped"
+        type: "BOOLEAN"
+        default: false
+        description: "True if user skipped wizard"
+    rls: true  # Uses existing RLS from 01.1
+
+# Demo data created on skip
+demo_data_on_skip:
+  warehouse:
+    code: "DEMO-WH"
+    name: "Main Warehouse"
+    type: "general"
+    is_default: true
+  location:
+    code: "DEFAULT"
+    name: "Default Location"
+    type: "zone"
+    parent: "DEMO-WH warehouse_id"
+  product:
+    code: "SAMPLE-001"
+    name: "Sample Product"
+    uom: "EA"
+    status: "active"
+  module_toggles:
+    technical: true
+    planning: false
+    production: false
+    warehouse: false
+    quality: false
+    shipping: false
+
+# State machine
+state_machine:
+  states:
+    - NOT_STARTED    # onboarding_step = 0, onboarding_completed_at = null
+    - IN_PROGRESS    # onboarding_step = 1-6
+    - COMPLETED      # onboarding_step = 7, onboarding_completed_at != null, onboarding_skipped = false
+    - SKIPPED        # onboarding_completed_at != null, onboarding_skipped = true
+
+  transitions:
+    - from: "NOT_STARTED"
+      to: "IN_PROGRESS"
+      trigger: "start_wizard"
+      action: "SET onboarding_step = 1, onboarding_started_at = NOW()"
+
+    - from: "IN_PROGRESS"
+      to: "IN_PROGRESS"
+      trigger: "next_step"
+      action: "SET onboarding_step = onboarding_step + 1"
+
+    - from: "IN_PROGRESS"
+      to: "COMPLETED"
+      trigger: "complete_wizard"
+      condition: "onboarding_step = 6"
+      action: "SET onboarding_step = 7, onboarding_completed_at = NOW()"
+
+    - from: "IN_PROGRESS"
+      to: "SKIPPED"
+      trigger: "skip_wizard"
+      action: "SET onboarding_skipped = true, onboarding_completed_at = NOW()"
+
+    - from: "NOT_STARTED"
+      to: "SKIPPED"
+      trigger: "skip_wizard"
+      action: "SET onboarding_skipped = true, onboarding_completed_at = NOW()"

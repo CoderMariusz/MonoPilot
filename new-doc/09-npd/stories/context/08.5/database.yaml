@@ -1,0 +1,180 @@
+database:
+  migration_file: "supabase/migrations/XXX_create_aggregate_formulation_allergens_function.sql"
+
+  function:
+    name: "aggregate_formulation_allergens"
+    description: "Aggregate allergens from all formulation items with deduplication"
+
+    signature:
+      parameters:
+        - name: "p_formulation_id"
+          type: "UUID"
+          description: "Formulation ID to aggregate allergens for"
+
+      returns:
+        type: "TABLE"
+        columns:
+          - name: "allergen_id"
+            type: "UUID"
+            description: "Allergen unique identifier"
+          - name: "code"
+            type: "VARCHAR(10)"
+            description: "Allergen code (A01-A14)"
+          - name: "name_en"
+            type: "VARCHAR(100)"
+            description: "English name"
+          - name: "name_pl"
+            type: "VARCHAR(100)"
+            description: "Polish name"
+          - name: "name_de"
+            type: "VARCHAR(100)"
+            description: "German name (nullable)"
+          - name: "name_fr"
+            type: "VARCHAR(100)"
+            description: "French name (nullable)"
+          - name: "icon_url"
+            type: "TEXT"
+            description: "Icon URL (nullable)"
+
+    implementation:
+      language: "plpgsql"
+      stability: "STABLE"
+      security: "DEFINER"
+
+      logic: |
+        1. JOIN npd_formulation_items on formulation_id
+        2. JOIN product_allergens on product_id
+        3. JOIN allergens on allergen_id
+        4. Filter: fi.is_active = true AND a.is_active = true
+        5. SELECT DISTINCT allergen columns
+        6. ORDER BY a.code ASC
+
+      joins:
+        - table: "npd_formulation_items"
+          alias: "fi"
+          condition: "fi.formulation_id = p_formulation_id"
+
+        - table: "product_allergens"
+          alias: "pa"
+          join_type: "INNER JOIN"
+          condition: "fi.product_id = pa.product_id"
+
+        - table: "allergens"
+          alias: "a"
+          join_type: "INNER JOIN"
+          condition: "pa.allergen_id = a.id"
+
+      filters:
+        - "fi.is_active = true"
+        - "a.is_active = true"
+
+      distinct: true
+
+      order_by: "a.code ASC"
+
+    performance:
+      indexes_used:
+        - "idx_product_allergens_product (on product_allergens.product_id)"
+        - "idx_allergens_code (on allergens.code)"
+
+      query_plan_notes:
+        - "Hash join on product_id should be efficient"
+        - "DISTINCT on allergen_id deduplicates"
+        - "Sort on code is cheap (max 14 rows)"
+
+      benchmark:
+        condition: "Formulation with 20 items, 5 duplicate allergens"
+        target: "< 200ms"
+
+  tables_referenced:
+    - name: "npd_formulation_items"
+      schema: "public"
+      from_story: "08.4"
+      columns_used:
+        - "formulation_id (WHERE clause)"
+        - "product_id (JOIN key)"
+        - "is_active (filter)"
+
+      indexes:
+        - name: "idx_npd_formulation_items_formulation"
+          columns: ["formulation_id"]
+          type: "btree"
+
+    - name: "product_allergens"
+      schema: "public"
+      from_story: "01.12"
+      columns_used:
+        - "product_id (JOIN key)"
+        - "allergen_id (JOIN key)"
+
+      indexes:
+        - name: "idx_product_allergens_product"
+          columns: ["product_id"]
+          type: "btree"
+
+    - name: "allergens"
+      schema: "public"
+      from_story: "01.12"
+      columns_used:
+        - "id (JOIN key)"
+        - "code (ORDER BY)"
+        - "name_en, name_pl, name_de, name_fr (SELECT)"
+        - "icon_url (SELECT)"
+        - "is_active (filter)"
+
+      indexes:
+        - name: "idx_allergens_code"
+          columns: ["code"]
+          type: "btree"
+
+  rls_enforcement:
+    mechanism: "Via formulation_id lookup"
+    notes: |
+      Function itself does NOT enforce RLS directly.
+      RLS is enforced by API route when querying formulation:
+      1. API route validates user has access to formulation_id
+      2. Formulation RLS policy checks org_id match
+      3. If formulation access denied → 403 Forbidden
+      4. If formulation access granted → function executes
+
+  migration_dependencies:
+    required:
+      - "018_create_allergens_table.sql (Epic 01)"
+      - "032_create_product_allergens_table.sql (Epic 01)"
+      - "XXX_create_npd_formulation_items_table.sql (Story 08.4)"
+
+  test_queries:
+    - name: "Test deduplication"
+      sql: |
+        -- Create formulation with 2 items both containing A07-Milk
+        SELECT * FROM aggregate_formulation_allergens('formulation-uuid');
+        -- Expected: A07 appears only once
+
+    - name: "Test sorting"
+      sql: |
+        -- Formulation with A07, A01, A03
+        SELECT code FROM aggregate_formulation_allergens('formulation-uuid');
+        -- Expected order: A01, A03, A07
+
+    - name: "Test empty formulation"
+      sql: |
+        -- Formulation with 0 items
+        SELECT * FROM aggregate_formulation_allergens('empty-formulation-uuid');
+        -- Expected: 0 rows
+
+    - name: "Test inactive allergen filter"
+      sql: |
+        -- Set allergen A01 to is_active = false
+        -- Formulation contains A01
+        SELECT * FROM aggregate_formulation_allergens('formulation-uuid');
+        -- Expected: A01 NOT in results
+
+    - name: "Test inactive item filter"
+      sql: |
+        -- Set formulation_item to is_active = false
+        SELECT * FROM aggregate_formulation_allergens('formulation-uuid');
+        -- Expected: Allergens from inactive item NOT in results
+
+rollback:
+  drop_function: |
+    DROP FUNCTION IF EXISTS aggregate_formulation_allergens(UUID);

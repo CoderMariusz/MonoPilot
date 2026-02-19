@@ -1,0 +1,311 @@
+# Story 05.4 - Frontend Specification
+# Purpose: Components, types, modals for LP Status Management
+# Agent: FRONTEND-DEV
+
+# UX References
+ux:
+  wireframes:
+    - id: "WH-003"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/WH-003-license-plate-detail.md"
+      components:
+        - "StatusBadge"
+        - "QAStatusBadge"
+        - "Audit Tab"
+        - "Quick Actions (Change QA Status, Block LP)"
+    - id: "WH-009"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/WH-009-qa-status-change-modal.md"
+      components:
+        - "ChangeQAStatusModal"
+        - "Status Effects Preview"
+        - "Quarantine Location Dropdown"
+  patterns:
+    badges: "ShadCN Badge component with color variants"
+    modal: "ShadCN Dialog component"
+    table: "ShadCN DataTable for audit trail"
+    form: "ShadCN Form with radio buttons"
+  states:
+    - "loading"
+    - "empty"
+    - "error"
+    - "success"
+
+# Components
+components:
+  - path: "apps/frontend/app/(authenticated)/warehouse/license-plates/[id]/components/StatusBadge.tsx"
+    description: "LP Status badge with color coding"
+    props:
+      - { name: "status", type: "LPStatus", required: true }
+      - { name: "size", type: "'sm' | 'md' | 'lg'", required: false, default: "'md'" }
+    colors:
+      available: { bg: "#D1FAE5", text: "#065F46", border: "#6EE7B7", icon: "CheckCircle" }
+      reserved: { bg: "#DBEAFE", text: "#1E40AF", border: "#93C5FD", icon: "Lock" }
+      consumed: { bg: "#E5E7EB", text: "#1F2937", border: "#9CA3AF", icon: "Archive" }
+      blocked: { bg: "#FEE2E2", text: "#991B1B", border: "#FCA5A5", icon: "Ban" }
+
+  - path: "apps/frontend/app/(authenticated)/warehouse/license-plates/[id]/components/QAStatusBadge.tsx"
+    description: "QA Status badge with color coding"
+    props:
+      - { name: "qaStatus", type: "QAStatus", required: true }
+      - { name: "size", type: "'sm' | 'md' | 'lg'", required: false, default: "'md'" }
+    colors:
+      pending: { bg: "#FEF3C7", text: "#92400E", border: "#FCD34D", icon: "Clock" }
+      passed: { bg: "#D1FAE5", text: "#065F46", border: "#6EE7B7", icon: "CheckCircle" }
+      failed: { bg: "#FEE2E2", text: "#991B1B", border: "#FCA5A5", icon: "XCircle" }
+      quarantine: { bg: "#FED7AA", text: "#9A3412", border: "#FDBA74", icon: "AlertTriangle" }
+
+  - path: "apps/frontend/app/(authenticated)/warehouse/license-plates/[id]/components/ChangeQAStatusModal.tsx"
+    description: "Modal for changing QA status (Manager/QA role only)"
+    props:
+      - { name: "lpId", type: "string", required: true }
+      - { name: "currentQAStatus", type: "QAStatus", required: true }
+      - { name: "currentStatus", type: "LPStatus", required: true }
+      - { name: "lpNumber", type: "string", required: true }
+      - { name: "onSuccess", type: "() => void", required: true }
+      - { name: "onClose", type: "() => void", required: true }
+    features:
+      - "Radio button selection for QA status"
+      - "Reason textarea (required for failed/quarantine)"
+      - "Quarantine location dropdown (required for quarantine)"
+      - "Status effects preview panel"
+      - "Loading state during submit"
+      - "Success confirmation with next actions"
+
+  - path: "apps/frontend/app/(authenticated)/warehouse/license-plates/[id]/components/BlockLPModal.tsx"
+    description: "Modal for blocking/unblocking LP (Manager role only)"
+    props:
+      - { name: "lpId", type: "string", required: true }
+      - { name: "lpNumber", type: "string", required: true }
+      - { name: "currentStatus", type: "LPStatus", required: true }
+      - { name: "mode", type: "'block' | 'unblock'", required: true }
+      - { name: "onSuccess", type: "() => void", required: true }
+      - { name: "onClose", type: "() => void", required: true }
+    features:
+      - "Reason textarea (required, min 5 chars)"
+      - "Warning message about consumption blocking"
+      - "Loading state during submit"
+      - "Success toast notification"
+
+  - path: "apps/frontend/app/(authenticated)/warehouse/license-plates/[id]/components/StatusAuditTrail.tsx"
+    description: "Table showing status change history"
+    props:
+      - { name: "lpId", type: "string", required: true }
+      - { name: "fieldFilter", type: "'status' | 'qa_status' | null", required: false }
+    columns:
+      - { header: "Field", accessor: "field_name", width: "120px" }
+      - { header: "Old Value", accessor: "old_value", width: "120px" }
+      - { header: "New Value", accessor: "new_value", width: "120px" }
+      - { header: "Reason", accessor: "reason", width: "200px" }
+      - { header: "Changed By", accessor: "changed_by_name", width: "150px" }
+      - { header: "Changed At", accessor: "changed_at", width: "180px" }
+    features:
+      - "Sorted by changed_at DESC (newest first)"
+      - "Pagination (50 per page)"
+      - "Field filter dropdown"
+      - "Empty state for no history"
+      - "Badge coloring for status values"
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/lp-status.ts"
+    exports:
+      - "LPStatus"
+      - "QAStatus"
+      - "StatusValidationResult"
+      - "StatusAuditEntry"
+      - "QAStatusUpdateResponse"
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-lp-status.ts"
+    description: "React Query hooks for LP status operations"
+    exports:
+      - name: "useUpdateLPStatus"
+        type: "useMutation"
+        description: "Mutation hook for updating LP status"
+      - name: "useUpdateQAStatus"
+        type: "useMutation"
+        description: "Mutation hook for updating QA status"
+      - name: "useBlockLP"
+        type: "useMutation"
+        description: "Mutation hook for blocking LP"
+      - name: "useUnblockLP"
+        type: "useMutation"
+        description: "Mutation hook for unblocking LP"
+      - name: "useStatusAuditTrail"
+        type: "useQuery"
+        description: "Query hook for fetching status audit trail"
+      - name: "useValidateConsumption"
+        type: "useQuery"
+        description: "Query hook for validating LP consumption eligibility"
+
+# Permission Checks
+permissions:
+  qa_status_change:
+    roles: ["warehouse_manager", "quality_manager", "quality_inspector", "admin", "owner"]
+    check: "hasPermission(context, 'quality', 'U') || hasPermission(context, 'warehouse', 'U')"
+  block_unblock:
+    roles: ["warehouse_manager", "quality_manager", "admin", "owner"]
+    check: "hasPermission(context, 'warehouse', 'U')"
+  view_audit:
+    roles: ["*"]
+    check: "hasPermission(context, 'warehouse', 'R')"
+
+# UI States
+states:
+  change_qa_status_modal:
+    - name: "loading_lp_details"
+      description: "Fetching LP data and quarantine locations"
+      elements: "Skeleton loader for LP info section"
+    - name: "success_form"
+      description: "Form ready for input"
+      elements: "Radio buttons, reason field, effects preview"
+    - name: "success_form_quarantine"
+      description: "Quarantine status selected"
+      elements: "Form + quarantine location dropdown"
+    - name: "loading_updating"
+      description: "Submitting status change"
+      elements: "Progress indicator with steps"
+    - name: "validation_errors"
+      description: "Form validation errors"
+      elements: "Error messages inline + summary banner"
+    - name: "success_updated"
+      description: "Status changed successfully"
+      elements: "Success message with next actions"
+
+  status_badge:
+    - name: "available"
+      color: "green"
+      icon: "CheckCircle"
+    - name: "reserved"
+      color: "blue"
+      icon: "Lock"
+    - name: "consumed"
+      color: "gray"
+      icon: "Archive"
+    - name: "blocked"
+      color: "red"
+      icon: "Ban"
+
+  qa_status_badge:
+    - name: "pending"
+      color: "yellow"
+      icon: "Clock"
+    - name: "passed"
+      color: "green"
+      icon: "CheckCircle"
+    - name: "failed"
+      color: "red"
+      icon: "XCircle"
+    - name: "quarantine"
+      color: "orange"
+      icon: "AlertTriangle"
+
+# Component Patterns
+patterns:
+  status_badge: |
+    // apps/frontend/app/(authenticated)/warehouse/license-plates/[id]/components/StatusBadge.tsx
+    import { Badge } from '@/components/ui/badge';
+    import { CheckCircle, Lock, Archive, Ban } from 'lucide-react';
+    import { LPStatus } from '@/lib/types/lp-status';
+
+    const STATUS_CONFIG: Record<LPStatus, { bg: string; text: string; icon: React.ElementType; label: string }> = {
+      available: { bg: 'bg-green-100', text: 'text-green-800', icon: CheckCircle, label: 'Available' },
+      reserved: { bg: 'bg-blue-100', text: 'text-blue-800', icon: Lock, label: 'Reserved' },
+      consumed: { bg: 'bg-gray-100', text: 'text-gray-800', icon: Archive, label: 'Consumed' },
+      blocked: { bg: 'bg-red-100', text: 'text-red-800', icon: Ban, label: 'Blocked' },
+    };
+
+    export function StatusBadge({ status, size = 'md' }: { status: LPStatus; size?: 'sm' | 'md' | 'lg' }) {
+      const config = STATUS_CONFIG[status];
+      const Icon = config.icon;
+      const sizeClasses = size === 'sm' ? 'text-xs px-2 py-0.5' : size === 'lg' ? 'text-base px-4 py-1.5' : 'text-sm px-3 py-1';
+
+      return (
+        <Badge className={`${config.bg} ${config.text} ${sizeClasses} inline-flex items-center gap-1`}>
+          <Icon className="h-3 w-3" />
+          {config.label}
+        </Badge>
+      );
+    }
+
+  change_qa_status_form: |
+    // Simplified form structure
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Change QA Status</DialogTitle>
+        </DialogHeader>
+
+        {/* LP Info Section */}
+        <LPInfoCard lp={lpData} />
+
+        {/* QA Status Radio Group */}
+        <RadioGroup value={selectedQAStatus} onValueChange={setSelectedQAStatus}>
+          {QA_STATUS_OPTIONS.map(option => (
+            <RadioGroupItem key={option.value} value={option.value}>
+              <option.icon className="h-4 w-4" />
+              <span>{option.label}</span>
+              <span className="text-muted-foreground">{option.description}</span>
+            </RadioGroupItem>
+          ))}
+        </RadioGroup>
+
+        {/* Reason Field (conditional) */}
+        {requiresReason && (
+          <Textarea
+            placeholder="Enter reason for status change..."
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            minLength={10}
+            maxLength={500}
+          />
+        )}
+
+        {/* Quarantine Location (conditional) */}
+        {selectedQAStatus === 'quarantine' && (
+          <Select value={quarantineLocationId} onValueChange={setQuarantineLocationId}>
+            {quarantineLocations.map(loc => (
+              <SelectItem key={loc.id} value={loc.id}>
+                {loc.code} - {loc.name}
+              </SelectItem>
+            ))}
+          </Select>
+        )}
+
+        {/* Status Effects Preview */}
+        <StatusEffectsPreview
+          currentStatus={lpData.status}
+          currentQAStatus={lpData.qa_status}
+          newQAStatus={selectedQAStatus}
+        />
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={handleSubmit} disabled={isSubmitting}>
+            {isSubmitting ? 'Updating...' : 'Update Status'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+# Accessibility
+accessibility:
+  touch_targets: "48dp minimum for all buttons and radio options"
+  contrast: "4.5:1 minimum for all text"
+  wcag_level: "AA"
+  keyboard_navigation:
+    - "Tab: Navigate between radio buttons, fields, buttons"
+    - "Arrow keys: Navigate within radio group"
+    - "Enter: Submit form, activate buttons"
+    - "Escape: Close modal"
+  screen_reader:
+    - "Modal announces title and LP number on open"
+    - "Radio selection announces status change effects"
+    - "Error messages announced immediately"
+    - "Success confirmation announced with summary"
+
+# Responsive Breakpoints
+responsive:
+  mobile: "<768px - Radio buttons as full-width cards, stacked buttons"
+  tablet: "768-1024px - Single column layout, inline form"
+  desktop: ">1024px - Full layout with side-by-side effects preview"

@@ -1,0 +1,86 @@
+story_id: "04.5"
+name: "Production Settings"
+epic: "04-production"
+status: in_progress
+started_at: "2026-01-06T10:00:00Z"
+
+phases:
+  P1:
+    status: skipped
+    reason: "Standard settings form - no custom UX needed"
+    timestamp: "2026-01-06T10:00:00Z"
+  P2:
+    status: complete
+    agent: test-writer
+    model: Claude-Opus-4.5
+    timestamp: "2026-01-06T15:03:00Z"
+    metrics:
+      files: 4
+      tests: 138
+      status: red
+  P3:
+    status: pending
+  P4:
+    status: pending
+  P5:
+    status: pending
+  P6:
+    status: pending
+  P7:
+    status: pending
+
+context:
+  story_path: "docs/2-MANAGEMENT/epics/current/04-production/04.5.production-settings.md"
+  type: "backend + frontend"
+  complexity: "S"
+  estimate_days: 2
+
+deliverables:
+  database:
+    - path: "supabase/migrations/XXX_create_production_settings.sql"
+      status: pending
+  api:
+    - path: "apps/frontend/app/api/production/settings/route.ts"
+      methods: ["GET", "PUT"]
+      status: pending
+  services:
+    - path: "apps/frontend/lib/services/production-settings-service.ts"
+      status: pending
+  validation:
+    - path: "apps/frontend/lib/validation/production-settings.ts"
+      status: pending
+  pages:
+    - path: "apps/frontend/app/(authenticated)/settings/production/page.tsx"
+      status: pending
+  components:
+    - path: "apps/frontend/app/(authenticated)/settings/production/components/ProductionSettingsForm.tsx"
+      status: pending
+    - path: "apps/frontend/app/(authenticated)/settings/production/components/SettingToggle.tsx"
+      status: pending
+    - path: "apps/frontend/app/(authenticated)/settings/production/components/SettingNumberInput.tsx"
+      status: pending
+    - path: "apps/frontend/app/(authenticated)/settings/production/components/SettingsSection.tsx"
+      status: pending
+  tests:
+    - path: "apps/frontend/lib/validation/__tests__/production-settings.test.ts"
+      type: unit
+      tests: 45
+      status: red
+    - path: "apps/frontend/lib/services/__tests__/production-settings-service.test.ts"
+      type: unit
+      tests: 26
+      status: red
+    - path: "apps/frontend/__tests__/api/production/settings.test.ts"
+      type: integration
+      tests: 22
+      status: red
+    - path: "apps/frontend/components/production/__tests__/ProductionSettingsForm.test.tsx"
+      type: component
+      tests: 45
+      status: red
+P5: ✓ code-reviewer 15:16 issues:5 decision:request_changes
+P5: x code-reviewer 16:06 issues:1-major decision:request_changes
+P6: ✓ qa-agent 16:08 ac:7/7 tests:26/26 bugs:0 decision:pass
+P7: ✓ tech-writer 18:28 docs:verified jsdoc:verified
+---
+STORY 04.5 COMPLETE

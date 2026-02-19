@@ -1,0 +1,180 @@
+# Story 01.1 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  - method: "GET"
+    path: "/api/settings/context"
+    description: "Returns org_id, user_id, role, permissions for authenticated user"
+    file: "apps/frontend/app/api/settings/context/route.ts"
+    auth: "required"
+    roles: ["*"]  # All authenticated users
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+
+    response:
+      status: 200
+      type: "OrgContext"
+      schema:
+        org_id: "UUID"
+        user_id: "UUID"
+        role_code: "string"
+        role_name: "string"
+        permissions: "Record<string, string>"
+        organization:
+          name: "string"
+          timezone: "string"
+          locale: "string"
+          currency: "string"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token provided"
+      - status: 404
+        code: "USER_NOT_FOUND"
+        message: "User not found"
+        when: "JWT valid but user record not in users table"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/org-context-service.ts"
+    description: "Shared auth/org context helper"
+    exports:
+      - name: "getOrgContext"
+        type: "async function"
+        params: []
+        returns: "Promise<OrgContext | null>"
+        description: "Resolves current user's org context from session"
+      - name: "OrgContext"
+        type: "interface"
+        fields:
+          - "org_id: string"
+          - "user_id: string"
+          - "role_code: string"
+          - "role_name: string"
+          - "permissions: Record<string, string>"
+          - "organization: Organization"
+
+  - path: "apps/frontend/lib/services/permission-service.ts"
+    description: "Role-based permission checks"
+    exports:
+      - name: "hasPermission"
+        type: "function"
+        params:
+          - "context: OrgContext"
+          - "module: string"
+          - "action: 'C' | 'R' | 'U' | 'D'"
+        returns: "boolean"
+        description: "Check if user has permission for module action"
+      - name: "hasRole"
+        type: "function"
+        params:
+          - "context: OrgContext"
+          - "roles: string[]"
+        returns: "boolean"
+        description: "Check if user has any of the specified roles"
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/organization.ts"
+    description: "Organization TypeScript interfaces"
+    exports:
+      - "Organization"
+      - "OrgContext"
+
+  - path: "apps/frontend/lib/types/user.ts"
+    description: "User TypeScript interfaces"
+    exports:
+      - "User"
+      - "Role"
+
+  - path: "apps/frontend/lib/types/module.ts"
+    description: "Module TypeScript interfaces"
+    exports:
+      - "Module"
+      - "OrganizationModule"
+
+# Implementation patterns
+patterns:
+  api_route: |
+    // apps/frontend/app/api/settings/context/route.ts
+    import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+    import { cookies } from 'next/headers';
+    import { NextResponse } from 'next/server';
+
+    export async function GET() {
+      const supabase = createRouteHandlerClient({ cookies });
+
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select(`
+          id,
+          org_id,
+          role:roles(id, code, name, permissions),
+          organization:organizations(id, name, timezone, locale, currency)
+        `)
+        .eq('id', user.id)
+        .single();
+
+      if (userError || !userData) {
+        return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      }
+
+      return NextResponse.json({
+        org_id: userData.org_id,
+        user_id: userData.id,
+        role_code: userData.role.code,
+        role_name: userData.role.name,
+        permissions: userData.role.permissions,
+        organization: userData.organization,
+      });
+    }
+
+  service_pattern: |
+    // apps/frontend/lib/services/org-context-service.ts
+    import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+
+    export interface OrgContext {
+      org_id: string;
+      user_id: string;
+      role_code: string;
+      role_name: string;
+      permissions: Record<string, string>;
+      organization: {
+        name: string;
+        timezone: string;
+        locale: string;
+        currency: string;
+      };
+    }
+
+    export async function getOrgContext(): Promise<OrgContext | null> {
+      const response = await fetch('/api/settings/context');
+      if (!response.ok) return null;
+      return response.json();
+    }
+
+  permission_check: |
+    // apps/frontend/lib/services/permission-service.ts
+    export function hasPermission(
+      context: OrgContext,
+      module: string,
+      action: 'C' | 'R' | 'U' | 'D'
+    ): boolean {
+      const modulePerms = context.permissions[module];
+      if (!modulePerms || modulePerms === '-') return false;
+      return modulePerms.includes(action);
+    }
+
+    export function hasRole(context: OrgContext, roles: string[]): boolean {
+      return roles.includes(context.role_code);
+    }

@@ -1,0 +1,43 @@
+# Story 10.15 - Database Schema
+# Purpose: Production rate views and aggregations
+# Agent: BACKEND-DEV
+
+# Uses existing tables, creates aggregation views
+views:
+  - name: "production_rate_hourly"
+    description: "Hourly production rate by machine"
+    sql: |
+      CREATE OR REPLACE VIEW production_rate_hourly AS
+      SELECT
+          s.org_id,
+          s.machine_id,
+          m.name as machine_name,
+          DATE_TRUNC('hour', s.snapshot_time) as hour_start,
+          SUM(s.total_pieces) as total_units,
+          SUM(s.actual_production_time) / 60.0 as hours_worked,
+          CASE WHEN SUM(s.actual_production_time) > 0
+            THEN SUM(s.total_pieces) / (SUM(s.actual_production_time) / 60.0)
+            ELSE 0
+          END as rate_per_hour
+      FROM oee_snapshots s
+      JOIN machines m ON s.machine_id = m.id
+      GROUP BY s.org_id, s.machine_id, m.name, DATE_TRUNC('hour', s.snapshot_time);
+
+existing_tables:
+  - name: "oee_snapshots"
+    columns_used:
+      - "total_pieces"
+      - "actual_production_time"
+      - "snapshot_time"
+      - "machine_id"
+  - name: "boms"
+    columns_used:
+      - "target_rate"
+    purpose: "Target rate for comparison"
+
+migrations: []
+
+indexes:
+  - table: "oee_snapshots"
+    name: "idx_snapshots_rate"
+    columns: ["org_id", "machine_id", "snapshot_time", "total_pieces"]

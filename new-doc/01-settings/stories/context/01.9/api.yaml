@@ -1,0 +1,296 @@
+# Story 01.9 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+base_path: "/api/settings/warehouses/:warehouseId/locations"
+
+endpoints:
+  - method: "GET"
+    path: "/api/settings/warehouses/:warehouseId/locations"
+    description: "List locations (tree or flat view)"
+    file: "apps/frontend/app/api/settings/warehouses/[warehouseId]/locations/route.ts"
+    auth: "required"
+    roles: ["*"]  # All authenticated users
+
+    query_params:
+      view:
+        type: "enum"
+        values: ["tree", "flat"]
+        default: "tree"
+        description: "Tree returns nested structure, flat returns array"
+      level:
+        type: "enum"
+        values: ["zone", "aisle", "rack", "bin"]
+        optional: true
+        description: "Filter by level"
+      type:
+        type: "enum"
+        values: ["bulk", "pallet", "shelf", "floor", "staging"]
+        optional: true
+        description: "Filter by location_type"
+      parent_id:
+        type: "uuid | null"
+        optional: true
+        description: "Filter children of specific parent (null for root)"
+      search:
+        type: "string"
+        optional: true
+        description: "Search by code or name"
+      include_capacity:
+        type: "boolean"
+        default: false
+        description: "Include current capacity stats"
+
+    response:
+      status: 200
+      type: "LocationTreeResponse"
+      schema:
+        locations: "LocationNode[]"
+        total_count: "number"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 404
+        code: "WAREHOUSE_NOT_FOUND"
+        message: "Warehouse not found"
+
+  - method: "POST"
+    path: "/api/settings/warehouses/:warehouseId/locations"
+    description: "Create new location"
+    file: "apps/frontend/app/api/settings/warehouses/[warehouseId]/locations/route.ts"
+    auth: "required"
+    roles: ["SUPER_ADMIN", "ADMIN", "WAREHOUSE_MANAGER"]
+
+    request:
+      type: "CreateLocationInput"
+      fields:
+        code: "string (required, uppercase)"
+        name: "string (required)"
+        description: "string (optional)"
+        parent_id: "uuid | null (optional)"
+        level: "location_level (required)"
+        location_type: "location_type (default: shelf)"
+        max_pallets: "number | null (optional)"
+        max_weight_kg: "number | null (optional)"
+        is_active: "boolean (default: true)"
+
+    response:
+      status: 201
+      type: "Location"
+
+    errors:
+      - status: 400
+        code: "VALIDATION_ERROR"
+        message: "Invalid input data"
+      - status: 409
+        code: "DUPLICATE_CODE"
+        message: "Location code must be unique within warehouse"
+      - status: 400
+        code: "INVALID_HIERARCHY"
+        message: "Invalid parent-child level combination"
+
+  - method: "GET"
+    path: "/api/settings/warehouses/:warehouseId/locations/:id"
+    description: "Get location by ID"
+    file: "apps/frontend/app/api/settings/warehouses/[warehouseId]/locations/[id]/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    response:
+      status: 200
+      type: "Location"
+
+    errors:
+      - status: 404
+        code: "LOCATION_NOT_FOUND"
+        message: "Location not found"
+
+  - method: "PUT"
+    path: "/api/settings/warehouses/:warehouseId/locations/:id"
+    description: "Update location"
+    file: "apps/frontend/app/api/settings/warehouses/[warehouseId]/locations/[id]/route.ts"
+    auth: "required"
+    roles: ["SUPER_ADMIN", "ADMIN", "WAREHOUSE_MANAGER"]
+
+    request:
+      type: "UpdateLocationInput"
+      fields:
+        name: "string (optional)"
+        description: "string (optional)"
+        location_type: "location_type (optional)"
+        max_pallets: "number | null (optional)"
+        max_weight_kg: "number | null (optional)"
+        is_active: "boolean (optional)"
+      immutable_fields: ["code", "level", "parent_id"]
+
+    response:
+      status: 200
+      type: "Location"
+
+    errors:
+      - status: 404
+        code: "LOCATION_NOT_FOUND"
+        message: "Location not found"
+
+  - method: "DELETE"
+    path: "/api/settings/warehouses/:warehouseId/locations/:id"
+    description: "Delete location (if no children or inventory)"
+    file: "apps/frontend/app/api/settings/warehouses/[warehouseId]/locations/[id]/route.ts"
+    auth: "required"
+    roles: ["SUPER_ADMIN", "ADMIN"]
+
+    response:
+      status: 204
+      type: "No Content"
+
+    errors:
+      - status: 400
+        code: "HAS_CHILDREN"
+        message: "Delete child locations first"
+        details: "children_count: number"
+      - status: 400
+        code: "HAS_INVENTORY"
+        message: "Location has inventory. Relocate first."
+        details: "inventory_count: number"
+      - status: 404
+        code: "LOCATION_NOT_FOUND"
+        message: "Location not found"
+
+  - method: "GET"
+    path: "/api/settings/warehouses/:warehouseId/locations/:id/tree"
+    description: "Get subtree under location"
+    file: "apps/frontend/app/api/settings/warehouses/[warehouseId]/locations/[id]/tree/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    response:
+      status: 200
+      type: "LocationNode[]"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/location-service.ts"
+    description: "Location CRUD and tree operations"
+    exports:
+      - name: "list"
+        params: ["warehouseId: string", "params: LocationListParams"]
+        returns: "Promise<LocationTreeResponse>"
+
+      - name: "getById"
+        params: ["warehouseId: string", "id: string"]
+        returns: "Promise<Location | null>"
+
+      - name: "create"
+        params: ["warehouseId: string", "data: CreateLocationInput"]
+        returns: "Promise<Location>"
+
+      - name: "update"
+        params: ["warehouseId: string", "id: string", "data: UpdateLocationInput"]
+        returns: "Promise<Location>"
+
+      - name: "delete"
+        params: ["warehouseId: string", "id: string"]
+        returns: "Promise<void>"
+
+      - name: "getTree"
+        params: ["warehouseId: string", "parentId?: string"]
+        returns: "Promise<LocationNode[]>"
+
+      - name: "getAncestors"
+        params: ["locationId: string"]
+        returns: "Promise<Location[]>"
+
+      - name: "getDescendants"
+        params: ["locationId: string"]
+        returns: "Promise<Location[]>"
+
+      - name: "canDelete"
+        params: ["locationId: string"]
+        returns: "Promise<{ can: boolean; reason?: string; count?: number }>"
+
+      - name: "validateHierarchy"
+        params: ["parentId: string | null", "level: LocationLevel"]
+        returns: "Promise<boolean>"
+
+      - name: "updateCapacity"
+        params: ["locationId: string", "pallets: number", "weight: number"]
+        returns: "Promise<void>"
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/location.ts"
+    description: "Location TypeScript interfaces"
+    exports:
+      - "Location"
+      - "LocationNode"
+      - "LocationLevel"
+      - "LocationType"
+      - "CreateLocationInput"
+      - "UpdateLocationInput"
+      - "LocationListParams"
+      - "LocationTreeResponse"
+
+# Validation
+validation:
+  - path: "apps/frontend/lib/validation/location.ts"
+    schema: "createLocationSchema"
+    rules:
+      code:
+        - "min 1 character"
+        - "max 50 characters"
+        - "uppercase alphanumeric with hyphens"
+        - "regex: ^[A-Z0-9-]+$"
+      name:
+        - "min 2 characters"
+        - "max 255 characters"
+      level:
+        - "enum: zone, aisle, rack, bin"
+      location_type:
+        - "enum: bulk, pallet, shelf, floor, staging"
+        - "default: shelf"
+      max_pallets:
+        - "positive integer or null"
+      max_weight_kg:
+        - "positive decimal or null"
+      hierarchy_validation:
+        - "Root locations (no parent) must be level = zone"
+
+# Implementation patterns
+patterns:
+  tree_query: |
+    // Recursive CTE for tree structure
+    WITH RECURSIVE location_tree AS (
+      SELECT *, 1 as depth
+      FROM locations
+      WHERE warehouse_id = $1 AND parent_id IS NULL
+      UNION ALL
+      SELECT l.*, lt.depth + 1
+      FROM locations l
+      INNER JOIN location_tree lt ON l.parent_id = lt.id
+    )
+    SELECT * FROM location_tree ORDER BY depth, code;
+
+  delete_validation: |
+    // Check children
+    const { count: childrenCount } = await supabase
+      .from('locations')
+      .select('id', { count: 'exact', head: true })
+      .eq('parent_id', locationId);
+
+    if (childrenCount > 0) {
+      return { can: false, reason: 'HAS_CHILDREN', count: childrenCount };
+    }
+
+    // Check inventory (from warehouse module)
+    const { count: inventoryCount } = await supabase
+      .from('license_plates')
+      .select('id', { count: 'exact', head: true })
+      .eq('location_id', locationId);
+
+    if (inventoryCount > 0) {
+      return { can: false, reason: 'HAS_INVENTORY', count: inventoryCount };
+    }
+
+    return { can: true };

@@ -1,0 +1,117 @@
+# Story 03.16 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "03.16"
+  name: "Planning Dashboard"
+  slug: "planning-dashboard"
+  epic: "03-planning"
+  phase: "1A"
+  complexity: "M"
+  estimate_days: 4
+  type: "full-stack"
+  state: "ready"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Views, indexes, caching strategy (no new tables)
+  - api.yaml         # Dashboard endpoints, response schemas
+  - frontend.yaml    # Components, hooks, pages
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["org_id context", "RLS patterns"]
+    - story: "03.3"
+      name: "Purchase Orders CRUD"
+      provides: ["purchase_orders table", "po_lines table", "PO status lifecycle"]
+    - story: "03.8"
+      name: "Transfer Orders CRUD"
+      provides: ["transfer_orders table", "to_lines table", "TO status lifecycle"]
+    - story: "03.10"
+      name: "Work Orders CRUD"
+      provides: ["work_orders table", "WO status lifecycle"]
+  soft:
+    - story: "01.8"
+      name: "Warehouses CRUD"
+      provides: ["warehouses table for TO location names"]
+    - story: "01.9"
+      name: "Production Lines CRUD"
+      provides: ["production_lines table for WO line names"]
+    - story: "02.1"
+      name: "Products CRUD"
+      provides: ["products table for activity feed"]
+    - story: "03.1"
+      name: "Suppliers CRUD"
+      provides: ["suppliers table for PO supplier names"]
+  blocked_by: ["03.3", "03.8", "03.10"]
+  blocks: []  # Dashboard is a leaf node - no dependents
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/planning.md"
+    sections: ["Section 8 - Dashboard KPIs"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/planning.md"
+    sections: ["Dashboard Aggregations", "Caching Strategy"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/03-planning/03.16.planning-dashboard.md"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-023-planning-dashboard.md"
+      screens: ["PLAN-023"]
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS on dashboard aggregations"
+  patterns:
+    - path: "docs/2-MANAGEMENT/epics/current/01-settings/context/01.1/"
+      relevance: "Context YAML structure pattern"
+
+# High-level deliverables
+deliverables:
+  - type: "api"
+    count: 3
+    description: "Dashboard KPIs, Alerts, Activity endpoints"
+  - type: "service"
+    count: 1
+    description: "planning-dashboard-service.ts"
+  - type: "validation"
+    count: 1
+    description: "planning-dashboard-schemas.ts"
+  - type: "page"
+    count: 1
+    description: "Planning dashboard page at /planning"
+  - type: "component"
+    count: 8
+    description: "KPI cards, alerts panel, activity feed components"
+  - type: "test"
+    count: 4
+    description: "Unit + integration + E2E tests"
+
+# Technical notes
+technical_notes:
+  - "Dashboard aggregates data from PO, TO, WO tables - no new database tables"
+  - "Use COUNT queries with indexed filters for KPI performance"
+  - "Cache dashboard data in Redis with 2-minute TTL per org_id"
+  - "Invalidate cache on PO/TO/WO create/update/delete"
+  - "Return 404 (not 403) for cross-tenant access per ADR-013"
+  - "Activity feed sources from multiple tables with UNION query"
+  - "Page must load within 2 seconds with 1000+ entities"
+  - "Gracefully handle missing dependencies with zero states"
+
+# Handoff to DEV agents
+handoff:
+  backend_agent:
+    focus: ["api", "service", "validation", "caching"]
+    start_with: "database.yaml, api.yaml"
+  frontend_agent:
+    focus: ["page", "components", "hooks"]
+    start_with: "frontend.yaml"
+  qa_agent:
+    focus: ["unit tests", "integration tests", "e2e tests"]
+    start_with: "tests.yaml"

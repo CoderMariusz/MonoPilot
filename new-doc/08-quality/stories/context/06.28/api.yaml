@@ -1,0 +1,133 @@
+# Story 06.28 - CoA Generation Engine API Endpoints
+
+endpoints:
+  - method: GET
+    path: /api/quality/coas
+    auth: required
+    description: "List CoAs with filters"
+    query_params:
+      status: "draft|pending_approval|approved|void"
+      product_id: UUID
+      batch_id: UUID
+      issue_date_from: date
+      issue_date_to: date
+      search: string (coa_number or batch_number)
+      sort_by: "coa_number|issue_date|batch_number|created_at"
+      sort_order: "asc|desc"
+      page: number
+      limit: number
+
+  - method: GET
+    path: /api/quality/coas/:id
+    auth: required
+    description: "Get CoA detail with parameters"
+    response:
+      coa: CertificateOfAnalysis
+      parameters: CoAParameter[]
+      batch_info: {work_order_number, routing_name, completed_at}
+
+  - method: POST
+    path: /api/quality/coas/generate
+    auth: required
+    roles: [QA_INSPECTOR, QA_MANAGER]
+    description: "Generate CoA from batch"
+    body:
+      batch_id: UUID (required)
+      template_id: UUID (optional override)
+      issue_date: date (optional, default = today)
+    validation: generateCoASchema
+    logic:
+      - "Get final inspection for batch"
+      - "Get active template for product (or use template_id override)"
+      - "Create CoA record with batch snapshot"
+      - "Populate coa_parameters from quality_test_results"
+      - "Snapshot template data (header, footer, logo, compliance)"
+      - "Return CoA with parameters"
+
+  - method: PUT
+    path: /api/quality/coas/:id
+    auth: required
+    description: "Update draft CoA"
+    constraint: "status = 'draft' only"
+    body: UpdateCoARequest
+
+  - method: DELETE
+    path: /api/quality/coas/:id
+    auth: required
+    description: "Delete draft CoA"
+    constraint: "status = 'draft' only"
+
+  - method: POST
+    path: /api/quality/coas/:id/approve
+    auth: required
+    roles: [QA_MANAGER, QUALITY_DIRECTOR]
+    description: "Approve CoA with e-signature"
+    body:
+      password: string (e-signature password)
+      approval_meaning: string (required for FDA 21 CFR Part 11)
+      approval_notes: string (optional)
+    validation: approveCoASchema
+    logic:
+      - "Verify password for current user"
+      - "Encrypt signature"
+      - "Set status = 'approved'"
+      - "Set approved_by, approved_at, approval_signature, approval_meaning"
+      - "Trigger sets is_locked = true"
+
+  - method: POST
+    path: /api/quality/coas/:id/void
+    auth: required
+    roles: [QA_MANAGER, QUALITY_DIRECTOR]
+    description: "Void approved CoA"
+    body:
+      void_reason: string (required)
+    constraint: "status = 'approved' only"
+    logic:
+      - "Set status = 'void'"
+      - "Set voided_by, voided_at, void_reason"
+      - "CoA remains immutable (is_locked = true)"
+
+  - method: POST
+    path: /api/quality/coas/:id/regenerate
+    auth: required
+    description: "Regenerate parameters from latest test results"
+    constraint: "status = 'draft' only"
+    logic:
+      - "Delete all coa_parameters for CoA"
+      - "Repopulate from latest quality_test_results"
+      - "Return updated CoA with new parameters"
+
+validation_schemas:
+  generateCoASchema:
+    fields:
+      batch_id: UUID (required)
+      template_id: UUID (optional)
+      issue_date: date (optional)
+
+  approveCoASchema:
+    fields:
+      password: string (required, min 8 chars)
+      approval_meaning: string (required, min 10 chars)
+      approval_notes: string (optional, max 1000)
+
+  voidCoASchema:
+    fields:
+      void_reason: string (required, min 10 chars, max 500)
+
+service_layer:
+  file: lib/services/coa-service.ts
+  class: CoAService
+  methods:
+    - list(params): PaginatedResult<CertificateOfAnalysis>
+    - getById(id): CoADetail | null
+    - generate(batchId, options?): CoADetail
+    - update(id, input): CertificateOfAnalysis
+    - submitForApproval(id): CertificateOfAnalysis
+    - approve(id, password, meaning, userId): CertificateOfAnalysis
+    - void(id, reason, userId): CertificateOfAnalysis
+    - regenerate(id): CoADetail
+    - delete(id): void
+    - populateParameters(coaId, inspectionId): CoAParameter[]
+    - snapshotTemplate(coaId, templateId): void
+    - generateCoANumber(): string
+    - verifySignature(userId, password): boolean
